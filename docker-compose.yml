@@ -1,0 +1,106 @@
+version: "3.9"
+
+services:
+
+  eurekaserver:
+    image: eurekaserver:latest
+    build:
+      context: ./eurekaserver
+      dockerfile: Dockerfile
+    ports:
+      - "8761:8761"
+    environment:
+      - SPRING_APPLICATION_NAME=eurekaserver
+      - EUREKA_INSTANCE_HOSTNAME=localhost
+      - EUREKA_CLIENT_REGISTER_WITH_EUREKA=false
+      - EUREKA_CLIENT_FETCH_REGISTRY=false
+      - SERVER_PORT=8761
+    networks:
+      - craftpilotnetwork
+
+  apigateway:
+    image: apigateway:latest
+    build:
+      context: ./apigateway
+      dockerfile: Dockerfile
+    ports:
+      - "1110:1110"
+    environment:
+      - SPRING_APPLICATION_NAME=apigateway
+      - EUREKA_SERVICE_URL=http://eurekaserver:8761/eureka/
+    depends_on:
+      eurekaserver:
+        condition: service_started
+    networks:
+      - craftpilotnetwork
+
+  productservice:
+    image: productservice:latest
+    build:
+      context: ./productservice
+      dockerfile: Dockerfile
+    ports:
+      - "1111:1111"
+    environment:
+      - server.port=1111
+      - SPRING_APPLICATION_NAME=ProductService
+      - EUREKA_SERVICE_URL=http://eurekaserver:8761/eureka/
+      - DATABASE_HOST=craftpilot-micro-db.c7gsy4o6mgaw.us-east-1.rds.amazonaws.com
+      - DATABASE_PORT=5432
+      - spring.datasource.url=postgresql://craftpilot-micro-db.c7gsy4o6mgaw.us-east-1.rds.amazonaws.com:5432/postgres
+      - spring.datasource.username=${DATABASE_USERNAME}
+      - spring.datasource.password=${DATABASE_PASSWORD}
+      - spring.jpa.properties.hibernate.default_schema=product_service
+    depends_on:
+      database:
+        condition: service_healthy
+      eurekaserver:
+        condition: service_started
+    networks:
+      - craftpilotnetwork
+
+  authservice:
+    image: authservice:latest
+    build:
+      context: ./authservice
+      dockerfile: Dockerfile
+    ports:
+      - "1112:1112"
+    environment:
+      - server.port=1112
+      - SPRING_APPLICATION_NAME=authservice
+      - EUREKA_SERVICE_URL=http://eurekaserver:8761/eureka/
+    depends_on:
+      eurekaserver:
+        condition: service_started
+    networks:
+      - craftpilotnetwork
+
+  userservice:
+    image: userservice:latest
+    build:
+      context: ./userservice
+      dockerfile: Dockerfile
+    ports:
+      - "1113:1113"
+    environment:
+      - server.port=1113
+      - SPRING_APPLICATION_NAME=UserService
+      - EUREKA_SERVICE_URL=http://eurekaserver:8761/eureka/
+      - DATABASE_HOST=craftpilot-micro-db.c7gsy4o6mgaw.us-east-1.rds.amazonaws.com
+      - DATABASE_PORT=5432
+      - spring.datasource.url=postgresql://craftpilot-micro-db.c7gsy4o6mgaw.us-east-1.rds.amazonaws.com:5432/postgres
+      - spring.datasource.username=${DATABASE_USERNAME}
+      - spring.datasource.password=${DATABASE_PASSWORD}
+      - spring.jpa.properties.hibernate.default_schema=user_service
+    depends_on:
+      database:
+        condition: service_healthy
+      eurekaserver:
+        condition: service_started
+    networks:
+      - craftpilotnetwork
+
+networks:
+  craftpilotnetwork:
+    driver: bridge
