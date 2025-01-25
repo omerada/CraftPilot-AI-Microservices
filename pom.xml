@@ -10,22 +10,65 @@
 
     <modules>
         <module>apigateway</module>
-        <module>authservice</module>
-        <module>eurekaserver</module>
-        <module>userservice</module>
-        <module>subscriptionservice</module>
-        <module>productservice</module>
+        <module>eureka-server</module>
+        <module>user-service</module>
+        <module>redis-service</module>
         <!-- Diğer servisler burada listelenebilir -->
     </modules>
 
+    <properties>
+        <java.version>21</java.version>
+        <spring-cloud.version>2023.0.2</spring-cloud.version>
+        <spring-boot.version>3.3.1</spring-boot.version>
+    </properties>
+
     <dependencyManagement>
         <dependencies>
+            <!-- Spring Boot BOM -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Spring Cloud BOM -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
             <!-- https://mvnrepository.com/artifact/org.springframework.kafka/spring-kafka -->
             <dependency>
                 <groupId>org.springframework.kafka</groupId>
                 <artifactId>spring-kafka</artifactId>
                 <version>3.3.1</version>
             </dependency>
+
+            <dependency>
+                <groupId>com.google.cloud</groupId>
+                <artifactId>spring-cloud-gcp-starter-firestore</artifactId>
+                <version>5.10.0</version>
+            </dependency>
+
+            <!-- https://mvnrepository.com/artifact/com.google.cloud/google-cloud-firestore -->
+            <dependency>
+                <groupId>com.google.cloud</groupId>
+                <artifactId>google-cloud-firestore</artifactId>
+                <version>3.30.3</version>
+            </dependency>
+
+            <!-- https://mvnrepository.com/artifact/com.google.firebase/firebase-admin -->
+            <dependency>
+                <groupId>com.google.firebase</groupId>
+                <artifactId>firebase-admin</artifactId>
+                <version>9.4.3</version>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 

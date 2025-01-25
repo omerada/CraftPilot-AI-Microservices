@@ -1,5 +1,9 @@
 server:
   port: 1110
+  shutdown: graceful
+  netty:
+    connection-timeout: 2s
+    idle-timeout: 15s
 
 spring:
   application:
@@ -9,20 +13,111 @@ spring:
       discovery:
         locator:
           enabled: true
+          lower-case-service-id: true
       httpclient:
-        connect-timeout: 60000
-        response-timeout: 60s
+        connect-timeout: 2000
+        response-timeout: 5s
+        pool:
+          max-idle-time: 15s
+          type: elastic
+          max-connections: 1000
+      default-filters:
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter:
+              replenishRate: 10
+              burstCapacity: 20
+              requestedTokens: 1
+            key-resolver: "#{@userKeyResolver}"
+        - name: Retry
+          args:
+            retries: 3
+            methods: GET
+            series: SERVER_ERROR
+            exceptions: java.io.IOException
+        - name: CircuitBreaker
+          args:
+            name: defaultCircuitBreaker
+            fallbackUri: forward:/fallback
+      globalcors:
+        corsConfigurations:
+          "[/**]":
+            allowedOrigins:
+              - "http://localhost:5173"
+              - "https://craftpilot.io"
+              - "https://app.craftpilot.io"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            exposedHeaders:
+              - "X-User-ID"
+              - "X-User-Email"
+              - "X-User-Role"
+            maxAge: 3600
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:your_redis_password}
+    lettuce:
+      pool:
+        max-active: 32
+        max-idle: 16
+        min-idle: 8
+        max-wait: 500ms
+    timeout: 1000
 
 eureka:
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
   client:
     serviceUrl:
       defaultZone: ${EUREKA_SERVICE_URL:http://localhost:8761/eureka/}
+    registry-fetch-interval-seconds: 5
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 3
+  ratelimiter:
+    configs:
+      default:
+        limitForPeriod: 10
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
 
 logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
   level:
-    org.springframework.security: DEBUG
-    org.springframework.security.web.access.ExceptionTranslationFilter: DEBUG
-    org.springframework.security.web.FilterChainProxy: DEBUG
-    org.springframework.security.web.authentication: DEBUG
-    org.springframework.security.web.access.intercept.FilterSecurityInterceptor: DEBUG
-    org.springframework.security.access.intercept.AbstractSecurityInterceptor: DEBUG
+    com.craftpilot.apigateway: DEBUG
+    org.springframework.cloud.gateway: INFO
+    org.springframework.security: INFO
+    reactor.netty: INFO
+
+firebase:
+  credential:
+    path: classpath:firebase-service-account.json
+  auth:
+    token-cache:
+      maximum-size: 1000
+      expire-after-write: 3600s

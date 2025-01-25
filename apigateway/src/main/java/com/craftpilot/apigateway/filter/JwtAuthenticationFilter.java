@@ -1,12 +1,12 @@
 package com.craftpilot.apigateway.filter;
 
-import com.craftpilot.apigateway.client.UserServiceClient;
-import com.craftpilot.apigateway.model.Token;
-import feign.FeignException;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseToken;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
-import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -14,6 +14,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * A custom Gateway filter named {@link JwtAuthenticationFilter} that handles JWT authentication for requests.
@@ -21,7 +22,10 @@ import java.util.List;
  */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAuthenticationFilter.Config> {
+
+    private final FirebaseAuth firebaseAuth;
 
     /**
      * Configuration class for JwtAuthenticationFilter.
@@ -64,40 +68,44 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
         return (exchange, chain) -> {
             String path = exchange.getRequest().getURI().getPath();
 
-            // Skip filtering for public endpoints
+            // Public endpoint kontrolü
             if (config != null && config.getPublicEndpoints().stream().anyMatch(path::startsWith)) {
                 return chain.filter(exchange);
             }
 
-            String authorizationHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+            String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
 
-            if (Token.isBearerToken(authorizationHeader)) {
-                String jwt = Token.getJwt(authorizationHeader);
-
-                // Inject UserServiceClient here
-                ApplicationContext context = exchange.getApplicationContext();
-                UserServiceClient userServiceClient = context.getBean(UserServiceClient.class);
-
-                return Mono.fromCallable(() -> {
-                            userServiceClient.validateToken(jwt);
-                            log.debug("Token validation succeeded for path: {}", path);
-                            return true;
-                        })
-                        .subscribeOn(Schedulers.boundedElastic())
-                        .flatMap(valid -> chain.filter(exchange))
-                        .onErrorResume(e -> {
-                            log.error("Token validation failed for path: {}", path, e);
-                            if (e instanceof FeignException.Unauthorized || e instanceof FeignException.Forbidden) {
-                                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                            } else {
-                                exchange.getResponse().setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR);
-                            }
-                            return exchange.getResponse().setComplete();
-                        });
+            // Auth header kontrolü
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                return exchange.getResponse().setComplete();
             }
-            log.warn("Missing or invalid Authorization header for path: {}", path);
-            return chain.filter(exchange);
+
+            String token = authHeader.substring(7);
+
+            return validateToken(token)
+                    .flatMap(decodedToken -> {
+                        // Token geçerliyse kullanıcı bilgilerini header'lara ekle
+                        exchange.getRequest().mutate()
+                                .header("X-User-ID", decodedToken.getUid())
+                                .header("X-User-Email", decodedToken.getEmail())
+                                .header("X-User-Role", Objects.toString(decodedToken.getClaims().get("role"), "USER"))
+                                .build();
+
+                        return chain.filter(exchange);
+                    })
+                    .onErrorResume(e -> {
+                        log.error("Token doğrulama hatası: {}", e.getMessage());
+                        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                        return exchange.getResponse().setComplete();
+                    });
         };
+    }
+
+    @Cacheable(value = "tokenCache", key = "#token")
+    private Mono<FirebaseToken> validateToken(String token) {
+        return Mono.fromCallable(() -> firebaseAuth.verifyIdToken(token))
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
 }
