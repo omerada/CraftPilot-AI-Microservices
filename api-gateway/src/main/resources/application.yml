@@ -1,0 +1,169 @@
+server:
+  port: ${SERVER_PORT:8090}
+  shutdown: ${SERVER_SHUTDOWN:graceful}
+  netty:
+    connection-timeout: ${SERVER_NETTY_CONNECTION_TIMEOUT:2s}
+    idle-timeout: ${SERVER_NETTY_IDLE_TIMEOUT:15s}
+
+spring:
+  application:
+    name: api-gateway
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  cloud:
+    gcp:
+      project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
+      credentials:
+        location: classpath:firebase-service-account.json
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lowerCaseServiceId: true
+      httpclient:
+        connect-timeout: ${GATEWAY_HTTPCLIENT_CONNECT_TIMEOUT:2000}
+        response-timeout: ${GATEWAY_HTTPCLIENT_RESPONSE_TIMEOUT:5s}
+        pool:
+          max-idle-time: ${GATEWAY_HTTPCLIENT_POOL_MAX_IDLE_TIME:15s}
+          type: elastic
+          max-connections: ${GATEWAY_HTTPCLIENT_POOL_MAX_CONNECTIONS:1000}
+      default-filters:
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: ${RATE_LIMITER_REPLENISH_RATE:10}
+            redis-rate-limiter.burstCapacity: ${RATE_LIMITER_BURST_CAPACITY:20}
+            redis-rate-limiter.requestedTokens: ${RATE_LIMITER_REQUESTED_TOKENS:1}
+            key-resolver: "#{@userKeyResolver}"
+        - name: CircuitBreaker
+          args:
+            name: defaultCircuitBreaker
+            fallbackUri: forward:/fallback
+      globalcors:
+        corsConfigurations:
+          "[/**]":
+            allowedOrigins:
+              - "http://localhost:5173"
+              - "https://craftpilot.io"
+              - "https://app.craftpilot.io"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            exposedHeaders:
+              - "X-User-ID"
+              - "X-User-Email"
+              - "X-User-Role"
+            maxAge: 3600
+      routes:
+        - id: user-service
+          uri: lb://user-service
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: userServiceCircuitBreaker
+                fallbackUri: forward:/fallback/user
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter:
+                  replenishRate: 10
+                  burstCapacity: 20
+                key-resolver: "#{@userKeyResolver}"
+
+        - id: subscription-service
+          uri: lb://subscription-service
+          predicates:
+            - Path=/api/subscriptions/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: subscriptionServiceCircuitBreaker
+                fallbackUri: forward:/fallback/subscription
+
+        - id: aiquestion-service
+          uri: lb://aiquestion-service
+          predicates:
+            - Path=/api/questions/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: aiquestionServiceCircuitBreaker
+                fallbackUri: forward:/fallback/aiquestion
+
+        - id: kafka-service
+          uri: lb://kafka-service
+          predicates:
+            - Path=/api/kafka/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: kafkaServiceCircuitBreaker
+                fallbackUri: forward:/fallback/kafka
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 0
+      timeout: 10000
+      connect-timeout: 10000
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+    fetch-registry: ${EUREKA_CLIENT_FETCH_REGISTRY:true}
+    register-with-eureka: ${EUREKA_CLIENT_REGISTER_WITH_EUREKA:true}
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 20
+    instance-id: ${spring.application.name}:${server.port}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      default:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: ${CIRCUIT_BREAKER_SLIDING_WINDOW_SIZE:10}
+        failureRateThreshold: ${CIRCUIT_BREAKER_FAILURE_RATE_THRESHOLD:50}
+        waitDurationInOpenState: ${CIRCUIT_BREAKER_WAIT_DURATION_OPEN_STATE:10000}
+        permittedNumberOfCallsInHalfOpenState: ${CIRCUIT_BREAKER_PERMITTED_CALLS_HALF_OPEN:5}
+        registerHealthIndicator: true
+  timelimiter:
+    instances:
+      default:
+        timeoutDuration: ${TIME_LIMITER_TIMEOUT_DURATION:5s}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  level:
+    org.springframework.cloud.gateway: ${LOGGING_LEVEL_SPRING_CLOUD_GATEWAY:DEBUG}
+    org.springframework.security: ${LOGGING_LEVEL_SPRING_SECURITY:DEBUG}
+    com.craftpilot.apigateway: ${LOGGING_LEVEL_COM_CRAFTPILOT_APIGATEWAY:DEBUG}
+    root: ${LOGGING_LEVEL_ROOT:INFO}
+
+firebase:
+  credentials:
+    path: ${FIREBASE_CREDENTIAL_PATH:firebase-service-account.json}
+  project:
+    id: ${GCP_PROJECT_ID:craft-pilot-ai}
+  auth:
+    token-cache:
+      maximum-size: 1000
+      expire-after-write: 3600s

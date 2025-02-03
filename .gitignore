@@ -37,3 +37,6 @@ build/
 
 ### db folder
 /db
+
+# Firebase credentials
+**/firebase-service-account.json

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: content-service
+  namespace: craftpilot
+  labels:
+    app: content-service
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/actuator/prometheus"
+    prometheus.io/port: "8080"
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: content-service

@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: craftpilot
+  labels:
+    app: notification-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: craftpilot/notification-service:latest
+          ports:
+            - containerPort: 8087
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: redis-host
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: redis-port
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: kafka-config
+                  key: bootstrap-servers
+            - name: EUREKA_SERVER_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: eureka-config
+                  key: eureka-url
+            - name: SMTP_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: notification-service-secrets
+                  key: smtp-host
+            - name: SMTP_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: notification-service-secrets
+                  key: smtp-port
+            - name: SMTP_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: notification-service-secrets
+                  key: smtp-username
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: notification-service-secrets
+                  key: smtp-password
+            - name: FCM_SERVICE_ACCOUNT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: notification-service-secrets
+                  key: fcm-service-account
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8087
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8087
+            initialDelaySeconds: 30
+            periodSeconds: 10

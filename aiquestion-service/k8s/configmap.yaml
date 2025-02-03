@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-config
+data:
+  brokers: kafka-service:9092
+  security-protocol: SASL_PLAINTEXT
+  sasl-mechanism: PLAIN
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+data:
+  host: redis-service
+  port: "6379"

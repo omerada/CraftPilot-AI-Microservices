@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: content-service
+  namespace: craftpilot
+  labels:
+    app: content-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: content-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: content-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: content-service
+          image: craftpilot/content-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: "/etc/gcp/service-account.json"
+          envFrom:
+            - configMapRef:
+                name: content-service-config
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: gcp-credentials
+              mountPath: "/etc/gcp"
+              readOnly: true
+            - name: tmp-volume
+              mountPath: /tmp
+      volumes:
+        - name: gcp-credentials
+          secret:
+            secretName: gcp-service-account
+        - name: tmp-volume
+          emptyDir: {}
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - content-service
+                topologyKey: "kubernetes.io/hostname"

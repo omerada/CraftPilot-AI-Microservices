@@ -1,0 +1,112 @@
+server:
+  port: 8087
+  shutdown: graceful
+
+spring:
+  application:
+    name: kafka-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    admin:
+      auto-create: true
+      fail-fast: true
+    producer:
+      acks: all
+      retries: 3
+      batch-size: 16384
+      buffer-memory: 33554432
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      compression-type: snappy
+      properties:
+        spring.json.add.type.headers: false
+        linger.ms: 5
+    consumer:
+      group-id: kafka-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        fetch.min.bytes: 1
+        fetch.max.wait.ms: 500
+        max.partition.fetch.bytes: 1048576
+        session.timeout.ms: 30000
+        heartbeat.interval.ms: 3000
+        max.poll.interval.ms: 300000
+        max.poll.records: 500
+        enable.auto.commit: true
+        auto.commit.interval.ms: 5000
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_SERVICE_URL:http://localhost:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: "*"
+          show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+    export:
+      prometheus:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+  show-actuator: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      kafkaService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 5
+  retry:
+    instances:
+      kafkaService:
+        maxAttempts: 3
+        waitDuration: 1s
+  ratelimiter:
+    instances:
+      kafkaService:
+        limitForPeriod: 1000
+        limitRefreshPeriod: 1s
+        timeoutDuration: 5s
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId},%X{spanId}] [%X{userId}] %-5level %logger{36} - %msg%n"
+  level:
+    root: INFO
+    com.craftpilot.kafkaservice: DEBUG
+    org.springframework.kafka: INFO
+    org.apache.kafka: INFO

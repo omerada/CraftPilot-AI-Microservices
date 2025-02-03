@@ -1,55 +1,66 @@
 package com.craftpilot.userservice.controller;
 
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
 import com.craftpilot.userservice.model.user.entity.UserEntity;
 import com.craftpilot.userservice.service.UserService;
-
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
 
 /**
  * REST controller for managing user-related operations using Firebase Authentication and Firestore.
  */
-@RestController
-@RequestMapping("/api/users")
-@RequiredArgsConstructor
 @Slf4j
+@RestController
+@RequestMapping("/v1/users")
+@RequiredArgsConstructor
+@Tag(name = "User Operations", description = "Kullanıcı yönetimi için endpoints")
 public class UserController {
 
     private final UserService userService;
 
-    /**
-     * Retrieves user details from Firestore using the Firebase UID.
-     *
-     * @param uid the Firebase user ID to retrieve details for
-     * @return a {@link ResponseEntity} containing the user details
-     */
-    @GetMapping("/profile")
-    public ResponseEntity<UserEntity> getUserProfile(
-            @RequestHeader("X-User-ID") String uid) {
-        return ResponseEntity.ok(userService.getUserProfile(uid));
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Yeni kullanıcı oluştur", description = "Firebase token kullanarak yeni bir kullanıcı oluşturur")
+    public Mono<UserEntity> createUser(@RequestHeader("Firebase-Token") String firebaseToken) {
+        return userService.createUser(firebaseToken);
     }
 
-    /**
-     * Updates user profile in Firestore.
-     *
-     * @param uid the Firebase user ID to update profile for
-     * @param updatedProfile the updated user profile
-     * @return a {@link ResponseEntity} indicating the success of the profile update operation
-     */
-    @PutMapping("/profile")
-    public ResponseEntity<Void> updateProfile(
-            @RequestHeader("X-User-ID") String uid,
-            @RequestBody UserEntity updatedProfile) {
-        userService.updateUserProfile(uid, updatedProfile);
-        return ResponseEntity.ok().build();
+    @GetMapping("/{id}")
+    @Operation(summary = "Kullanıcı getir", description = "ID'ye göre kullanıcı bilgilerini getirir")
+    public Mono<UserEntity> getUser(@PathVariable String id) {
+        return userService.getUserById(id);
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Kullanıcı güncelle", description = "Kullanıcı bilgilerini günceller")
+    public Mono<UserEntity> updateUser(@PathVariable String id, @RequestBody UserEntity updates) {
+        return userService.updateUser(id, updates);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Kullanıcı sil", description = "Belirtilen kullanıcıyı siler")
+    public Mono<Void> deleteUser(@PathVariable String id) {
+        return userService.deleteUser(id);
+    }
+
+    @PatchMapping("/{id}/status")
+    @Operation(summary = "Kullanıcı durumunu güncelle", description = "Kullanıcının durumunu günceller")
+    public Mono<UserEntity> updateUserStatus(
+            @PathVariable String id,
+            @RequestParam String status) {
+        return userService.updateUserStatus(id, status);
     }
 
     @GetMapping("/search")
-    public ResponseEntity<UserEntity> findByEmail(
-            @RequestParam String email) {
-        return ResponseEntity.ok(userService.findByEmail(email));
+    @Operation(summary = "Kullanıcı ara", description = "Email veya kullanıcı adına göre kullanıcı arar")
+    public Mono<UserEntity> searchUsers(
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String username) {
+        return userService.searchUsers(email, username);
     }
 }

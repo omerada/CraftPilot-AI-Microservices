@@ -1,0 +1,148 @@
+server:
+  port: 8091
+  shutdown: graceful
+
+spring:
+  application:
+    name: subscription-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    timeout: 2000
+    database: ${REDIS_DATABASE:0}
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 2
+        max-wait: -1ms
+      shutdown-timeout: 100ms
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      retries: 3
+      batch-size: 16384
+      buffer-memory: 33554432
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.trusted.packages: "com.craftpilot.subscriptionservice.event"
+    consumer:
+      group-id: subscription-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.craftpilot.subscriptionservice.event"
+  cache:
+    type: redis
+    redis:
+      time-to-live: 1800000 # 30 minutes
+      cache-null-values: false
+  cloud:
+    function:
+      definition: processSubscriptionEvent;processPaymentEvent
+    stream:
+      bindings:
+        processSubscriptionEvent-in-0:
+          destination: subscription-events
+          group: subscription-service-group
+        processPaymentEvent-in-0:
+          destination: payment-events
+          group: subscription-service-group
+      kafka:
+        binder:
+          brokers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+          configuration:
+            key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
+            value.deserializer: org.apache.kafka.common.serialization.StringDeserializer
+            auto.offset.reset: earliest
+    gcp:
+      project-id: craftpilot-ai
+      credentials:
+        location: classpath:firebase-service-account.json
+
+iyzico:
+  api-key: ${IYZICO_API_KEY:sandbox-api-key}
+  secret-key: ${IYZICO_SECRET_KEY:sandbox-secret-key}
+  base-url: ${IYZICO_BASE_URL:https://sandbox-api.iyzipay.com}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+    doc-expansion: none
+    syntax-highlight:
+      theme: monokai
+    try-it-out-enabled: true
+    filter: true
+  show-actuator: true
+  default-produces-media-type: application/json
+  default-consumes-media-type: application/json
+  writer-with-default-pretty-printer: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      subscription-service:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+      iyzico-service:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+      firestore-service:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+  retry:
+    instances:
+      default:
+        maxAttempts: 3
+        waitDuration: 1000
+  ratelimiter:
+    instances:
+      default:
+        limitForPeriod: 100
+        limitRefreshPeriod: 1s
+        timeoutDuration: 2s
+
+logging:
+  level:
+    com.craftpilot.subscriptionservice: DEBUG
+    org.springframework.data: INFO
+    org.springframework.kafka: INFO
+    org.springframework.web: INFO

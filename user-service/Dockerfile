@@ -1,27 +1,31 @@
-# Stage 1: Build stage
-FROM maven:3.9.7-amazoncorretto-21 AS build
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
 
-# Copy Maven files for dependency resolution
-COPY pom.xml ./
-COPY .mvn .mvn
+WORKDIR /build
 
-# Copy application source code
-COPY src src
+# Copy the project files
+COPY pom.xml .
+COPY user-service/pom.xml user-service/
+COPY user-service/src user-service/src
 
-# Build the project and create the executable JAR
-RUN mvn clean install -DskipTests
+# Build the application
+WORKDIR /build/user-service
+RUN mvn clean package -DskipTests
 
-# Stage 2: Run stage
-FROM amazoncorretto:21
+FROM eclipse-temurin:21-jre-alpine
 
-# Set working directory
-WORKDIR userservice
+WORKDIR /app
 
-# Copy the JAR file from the build stage
-COPY --from=build target/*.jar userservice.jar
+# Add non-root user
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring:spring
 
-# Expose port 1113
-EXPOSE 1113
+# Copy the built artifact
+COPY --from=build /build/user-service/target/*.jar app.jar
 
-# Set the entrypoint command for running the application
-ENTRYPOINT ["java", "-jar", "userservice.jar"]
+EXPOSE 8092
+
+ENTRYPOINT ["java", \
+            "-XX:+UseContainerSupport", \
+            "-XX:MaxRAMPercentage=75.0", \
+            "-Djava.security.egd=file:/dev/./urandom", \
+            "-jar", "app.jar"]

@@ -1,55 +1,37 @@
 package com.craftpilot.redisservice.config;
 
+import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
-import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
-import io.lettuce.core.ClientOptions;
-import io.lettuce.core.resource.ClientResources;
-import io.lettuce.core.resource.DefaultClientResources;
-
-import java.time.Duration;
 
 @Configuration
-@EnableCaching
 public class RedisConfig {
 
-    @Value("${spring.redis.host}")
+    @Value("${spring.data.redis.host}")
     private String redisHost;
 
-    @Value("${spring.redis.port}")
+    @Value("${spring.data.redis.port}")
     private int redisPort;
 
-    @Value("${spring.redis.password}")
+    @Value("${spring.data.redis.password}")
     private String redisPassword;
 
-    @Bean(destroyMethod = "shutdown")
-    ClientResources clientResources() {
-        return DefaultClientResources.create();
-    }
-
     @Bean
-    public RedisConnectionFactory connectionFactory(ClientResources clientResources) {
-        LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
-                .commandTimeout(Duration.ofSeconds(2))
-                .clientOptions(ClientOptions.builder()
-                        .autoReconnect(true)
-                        .disconnectedBehavior(ClientOptions.DisconnectedBehavior.REJECT_COMMANDS)
-                        .build())
-                .clientResources(clientResources)
-                .build();
-
-        RedisStandaloneConfiguration serverConfig = new RedisStandaloneConfiguration(redisHost, redisPort);
-        serverConfig.setPassword(redisPassword);
-
-        return new LettuceConnectionFactory(serverConfig, clientConfig);
+    public RedisConnectionFactory redisConnectionFactory() {
+        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration(redisHost, redisPort);
+        if (redisPassword != null && !redisPassword.isEmpty()) {
+            config.setPassword(redisPassword);
+        }
+        return new LettuceConnectionFactory(config);
     }
 
     @Bean
@@ -61,6 +43,24 @@ public class RedisConfig {
         template.setHashKeySerializer(new StringRedisSerializer());
         template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
         template.setEnableTransactionSupport(true);
+        template.afterPropertiesSet();
         return template;
+    }
+
+    @Bean
+    public RedissonClient redissonClient() {
+        Config config = new Config();
+        String address = String.format("redis://%s:%d", redisHost, redisPort);
+        config.useSingleServer()
+                .setAddress(address)
+                .setConnectTimeout(5000)
+                .setRetryAttempts(3)
+                .setRetryInterval(1500);
+        
+        if (redisPassword != null && !redisPassword.isEmpty()) {
+            config.useSingleServer().setPassword(redisPassword);
+        }
+        
+        return Redisson.create(config);
     }
 } 

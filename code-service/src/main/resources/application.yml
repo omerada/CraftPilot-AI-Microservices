@@ -1,0 +1,145 @@
+server:
+  port: 8093
+  shutdown: graceful
+
+spring:
+  application:
+    name: code-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+    consumer:
+      group-id: code-service-group
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.craftpilot.codeservice.model"
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=1h
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:your_redis_password}
+    timeout: 2000
+    lettuce:
+      pool:
+        max-active: 16
+        max-idle: 8
+        min-idle: 4
+        max-wait: 1000ms
+      shutdown-timeout: 200ms
+  webflux:
+    base-path: /api
+  main:
+    web-application-type: reactive
+  codec:
+    max-in-memory-size: 16MB
+  cloud:
+    gcp:
+      project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
+      credentials:
+        location: firebase-service-account.json
+
+firebase:
+  credential:
+    path: firebase-service-account.json
+  project:
+    id: craft-pilot-ai
+
+eureka:
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_SERVICE_URL:http://localhost:8761/eureka/}
+    registry-fetch-interval-seconds: 5
+    register-with-eureka: true
+    fetch-registry: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+    export:
+      prometheus:
+        enabled: true
+
+resilience4j:
+  ratelimiter:
+    instances:
+      codeApi:
+        limitForPeriod: 50
+        limitRefreshPeriod: 1s
+        timeoutDuration: 2s
+  circuitbreaker:
+    instances:
+      codeApi:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+  bulkhead:
+    instances:
+      codeApi:
+        maxConcurrentCalls: 50
+        maxWaitDuration: 1s
+
+logging:
+  level:
+    root: INFO
+    com.craftpilot.codeservice: DEBUG
+    org.springframework.web: INFO
+    org.springframework.data: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+  show-actuator: true
+
+code:
+  analysis:
+    cache-dir: "/tmp/code-cache"
+    max-file-size: 10MB
+    supported-languages:
+      - java
+      - python
+      - javascript
+      - typescript
+    github:
+      token: ${GITHUB_TOKEN}
+
+openai:
+  model: gpt-4
+  max-tokens: 2000
+  temperature: 0.7
+  api-key: ${OPENAI_API_KEY}

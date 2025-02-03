@@ -1,0 +1,189 @@
+server:
+  port: ${SERVER_PORT:8083}
+  shutdown: graceful
+  netty:
+    connection-timeout: 2s
+    idle-timeout: 15s
+    max-keep-alive-requests: 100
+
+spring:
+  application:
+    name: image-service
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: 1
+      retries: 3
+      batch-size: 16384
+      buffer-memory: 33554432
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      compression-type: snappy
+      properties:
+        spring.json.add.type.headers: false
+        linger.ms: 5
+    consumer:
+      group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID:image-service-group}
+      auto-offset-reset: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.craftpilot.imageservice.model"
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000
+      cache-null-values: false
+      use-key-prefix: true
+      key-prefix: craftpilot
+  redis:
+    host: ${SPRING_REDIS_HOST:localhost}
+    port: ${SPRING_REDIS_PORT:6379}
+    timeout: 2000
+    connect-timeout: 2000
+    lettuce:
+      pool:
+        max-active: 16
+        max-idle: 8
+        min-idle: 4
+        max-wait: 1000ms
+      shutdown-timeout: 200ms
+  main:
+    web-application-type: reactive
+  codec:
+    max-in-memory-size: 32MB
+  cloud:
+    gcp:
+      project-id: craft-pilot-ai
+      firestore:
+        enabled: true
+      credentials:
+        location: classpath:firebase-service-account.json
+      storage:
+        project-id: craft-pilot-ai
+        credentials:
+          location: classpath:firebase-service-account.json
+    kubernetes:
+      config:
+        enabled: true
+        name: image-service-config
+      reload:
+        enabled: true
+        mode: polling
+        period: 1000
+      discovery:
+        all-namespaces: false
+
+logging:
+  level:
+    root: ${LOGGING_LEVEL_ROOT:INFO}
+    com.craftpilot: ${LOGGING_LEVEL_COM_CRAFTPILOT:DEBUG}
+    org.springframework.data.redis: INFO
+    org.springframework.kafka: INFO
+    com.google.cloud: INFO
+    org.springframework.web: INFO
+    org.springframework.data: INFO
+
+eureka:
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_SERVICE_URL:http://localhost:8761/eureka/}
+    registry-fetch-interval-seconds: 5
+    register-with-eureka: true
+    fetch-registry: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      validate-group-membership: false
+      group:
+        readiness:
+          include: db,redis,diskSpace
+  health:
+    livenessstate:
+      enabled: ${MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED:true}
+    readinessstate:
+      enabled: ${MANAGEMENT_HEALTH_READINESSSTATE_ENABLED:true}
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 50ms, 100ms, 200ms, 500ms
+    export:
+      prometheus:
+        enabled: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      default:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+  retry:
+    instances:
+      default:
+        maxAttempts: 3
+        waitDuration: 1s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+  ratelimiter:
+    instances:
+      default:
+        limitForPeriod: 10
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0
+  bulkhead:
+    instances:
+      default:
+        maxConcurrentCalls: 100
+
+image:
+  storage:
+    bucket-name: ${IMAGE_STORAGE_BUCKET_NAME}
+    base-path: images
+  processing:
+    max-file-size: 10MB
+    allowed-types: image/jpeg,image/png,image/gif,image/webp
+    thumbnail:
+      sizes: 150x150,300x300,600x600
+      quality: 0.8
+    compression:
+      quality: 0.85
+      max-width: 2000
+      max-height: 2000
+  cache:
+    ttl-minutes: 60
+    max-size: 1000
+
+openai:
+  api-key: ${OPENAI_API_KEY:your-api-key-here}
+  model: ${OPENAI_MODEL:dall-e-3}
+  size: ${OPENAI_SIZE:1024x1024}
+  quality: ${OPENAI_QUALITY:standard}
+  style: ${OPENAI_STYLE:vivid}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    disable-swagger-default-url: true
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  packages-to-scan: com.craftpilot.imageservice.controller
+  paths-to-match: /**

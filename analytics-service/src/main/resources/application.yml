@@ -1,0 +1,111 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: analytics-service
+  cloud:
+    discovery:
+      enabled: true
+    function:
+      definition: metricsEventConsumer
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+          configuration:
+            security.protocol: PLAINTEXT
+        bindings:
+          metricsEventProducer-out-0:
+            producer:
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+                value.serializer: org.springframework.kafka.support.serializer.JsonSerializer
+          metricsEventConsumer-in-0:
+            consumer:
+              configuration:
+                key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
+                value.deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+                spring.json.trusted.packages: com.craftpilot.analyticsservice.event
+      bindings:
+        metricsEventProducer-out-0:
+          destination: metrics-events
+          contentType: application/json
+        metricsEventConsumer-in-0:
+          destination: metrics-events
+          group: analytics-service
+          contentType: application/json
+    gcp:
+      project-id: craft-pilot-ai
+      credentials:
+        location: classpath:firebase-service-account.json
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    hostname: localhost
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+
+redis:
+  host: ${REDIS_HOST:localhost}
+  port: ${REDIS_PORT:6379}
+
+google:
+  cloud:
+    project-id: craft-pilot-ai
+    credentials:
+      location: classpath:firebase-service-account.json
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      analyticsService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+  ratelimiter:
+    instances:
+      analyticsService:
+        limitForPeriod: 50
+        limitRefreshPeriod: 1s
+        timeoutDuration: 5s
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] [%X{userId}] %-5level %logger{36} - %msg%n"
+  level:
+    com.craftpilot.analyticsservice: ${LOG_LEVEL:INFO}
+    org.springframework.web: ${LOG_LEVEL:INFO}
+    org.springframework.data: ${LOG_LEVEL:INFO}
