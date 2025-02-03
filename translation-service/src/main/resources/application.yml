@@ -1,0 +1,194 @@
+server:
+  port: ${SERVER_PORT:8084}
+  shutdown: graceful
+  netty:
+    connection-timeout: 2s
+    idle-timeout: 15s
+    max-keep-alive-requests: 100
+
+spring:
+  application:
+    name: translation-service
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: 1
+      retries: 3
+      batch-size: 16384
+      buffer-memory: 33554432
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      compression-type: snappy
+      properties:
+        spring.json.add.type.headers: false
+        linger.ms: 5
+    consumer:
+      group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID:translation-service-group}
+      auto-offset-reset: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.craftpilot.translationservice.model"
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000
+      cache-null-values: false
+      use-key-prefix: true
+      key-prefix: craftpilot
+  redis:
+    host: ${SPRING_REDIS_HOST:localhost}
+    port: ${SPRING_REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:your_redis_password}
+    timeout: 2000
+    connect-timeout: 2000
+    lettuce:
+      pool:
+        max-active: 16
+        max-idle: 8
+        min-idle: 4
+        max-wait: 1000ms
+      shutdown-timeout: 200ms
+  main:
+    web-application-type: reactive
+  codec:
+    max-in-memory-size: 16MB
+  cloud:
+    kubernetes:
+      config:
+        enabled: true
+        name: translation-service-config
+      reload:
+        enabled: true
+        mode: polling
+        period: 1000
+      discovery:
+        all-namespaces: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+logging:
+  level:
+    root: ${LOGGING_LEVEL_ROOT:INFO}
+    com.craftpilot: ${LOGGING_LEVEL_COM_CRAFTPILOT:DEBUG}
+    org.springframework.data.redis: INFO
+    org.springframework.kafka: INFO
+    org.springframework.web: INFO
+    org.springframework.data: INFO
+
+eureka:
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVICE_URL:http://localhost:8761/eureka}
+    fetch-registry: true
+    register-with-eureka: true
+    registry-fetch-interval-seconds: 5
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      probes:
+        enabled: ${MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED:true}
+      show-details: always
+      group:
+        readiness:
+          include: redis
+  health:
+    livenessstate:
+      enabled: ${MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED:true}
+    readinessstate:
+      enabled: ${MANAGEMENT_HEALTH_READINESSSTATE_ENABLED:true}
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 50ms, 100ms, 200ms, 500ms
+    export:
+      prometheus:
+        enabled: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      default:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+  retry:
+    instances:
+      default:
+        maxAttempts: 3
+        waitDuration: 1s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+  ratelimiter:
+    instances:
+      default:
+        limitForPeriod: 10
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0
+  bulkhead:
+    instances:
+      default:
+        maxConcurrentCalls: 100
+
+translation:
+  providers:
+    openai:
+      api-key: ${OPENAI_API_KEY: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}
+      model: ${OPENAI_MODEL:gpt-3.5-turbo}
+      max-tokens: ${OPENAI_MAX_TOKENS:2000}
+      temperature: ${OPENAI_TEMPERATURE:0.7}
+    google:
+      project-id: ${GOOGLE_CLOUD_PROJECT_ID:craft-pilot-ai}
+      credentials: ${GOOGLE_APPLICATION_CREDENTIALS:src/main/resources/google-cloud-credentials.json}
+    azure:
+      endpoint: ${AZURE_TRANSLATOR_ENDPOINT}
+      key: ${AZURE_TRANSLATOR_KEY}
+      region: ${AZURE_TRANSLATOR_REGION}
+  cache:
+    ttl-minutes: 60
+    max-size: 10000
+  batch:
+    max-size: 100
+    timeout-seconds: 30
+  fallback:
+    enabled: true
+    strategy: NEXT_PROVIDER # NEXT_PROVIDER, CACHE_ONLY, FAIL_FAST
+
+firebase:
+  enabled: true
+  credential:
+    path: firebase-service-account.json
+  project:
+    id: craft-pilot-ai
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+  packages-to-scan: com.craftpilot.translationservice.controller
+  paths-to-match: /**
+
+openai:
+  api-key: ${OPENAI_API_KEY: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}
+  model: ${OPENAI_MODEL:gpt-3.5-turbo}
+  max-tokens: ${OPENAI_MAX_TOKENS:2000}
+  temperature: ${OPENAI_TEMPERATURE:0.7}

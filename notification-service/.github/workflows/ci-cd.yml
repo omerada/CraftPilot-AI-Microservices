@@ -1,0 +1,183 @@
+name: Notification Service CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "notification-service/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "notification-service/**"
+
+env:
+  IMAGE_NAME: craftpilot/notification-service
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GKE_CLUSTER: craftpilot-cluster
+  GKE_ZONE: us-central1-a
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: "Notification Service"
+          path: "notification-service"
+          format: "HTML"
+          args: >
+            --failOnCVSS 7
+            --enableRetired
+
+      - name: Upload OWASP Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-check-report
+          path: reports
+
+      - name: Run Snyk Security Scan
+        uses: snyk/actions/maven@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+  build-and-test:
+    needs: security-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: maven
+
+      - name: Build and Test
+        run: |
+          cd notification-service
+          mvn clean verify
+
+      - name: Run SonarQube Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          cd notification-service
+          mvn sonar:sonar \
+            -Dsonar.projectKey=notification-service \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: notification-service/target/surefire-reports
+
+  performance-test:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run K6 Performance Tests
+        uses: grafana/k6-action@v0.3.0
+        with:
+          filename: notification-service/src/test/k6/performance-test.js
+
+      - name: Upload Performance Test Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: k6-results
+          path: summary.html
+
+  build-and-push-image:
+    needs: [build-and-test, performance-test]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./notification-service
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
+
+  deploy:
+    needs: build-and-push-image
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          install_components: "gke-gcloud-auth-plugin"
+
+      - name: Configure kubectl
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+            --zone ${{ env.GKE_ZONE }} \
+            --project ${{ env.GCP_PROJECT_ID }}
+
+      - name: Deploy to GKE
+        run: |
+          cd notification-service/k8s
+          kubectl apply -f deployment.yml
+          kubectl apply -f service.yml
+          kubectl apply -f configmap.yml
+          kubectl apply -f hpa.yml
+          kubectl rollout status deployment/notification-service -n craftpilot
+
+      - name: Run Integration Tests
+        run: |
+          cd notification-service
+          mvn verify -P integration-test
+
+      - name: Notify Slack on Success
+        if: success()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: deployments
+          SLACK_COLOR: good
+          SLACK_MESSAGE: "Notification Service successfully deployed to GKE :rocket:"
+          SLACK_TITLE: Deployment Success
+          SLACK_USERNAME: GitHub Actions
+
+      - name: Notify Slack on Failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: deployments
+          SLACK_COLOR: danger
+          SLACK_MESSAGE: "Notification Service deployment to GKE failed :x:"
+          SLACK_TITLE: Deployment Failure
+          SLACK_USERNAME: GitHub Actions

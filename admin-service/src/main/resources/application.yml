@@ -1,0 +1,74 @@
+server:
+  port: 8081
+  ssl:
+    enabled: false
+
+spring:
+  profiles:
+    active: local
+  application:
+    name: admin-service
+  cloud:
+    kubernetes:
+      enabled: false
+    discovery:
+      enabled: true
+    loadbalancer:
+      ribbon:
+        enabled: false
+    gcp:
+      project-id: craftpilot-ai
+      credentials:
+        location: classpath:firebase-service-account.json
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    hostname: localhost
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.craftpilot.adminservice: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.cloud: DEBUG
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+  show-actuator: true
+
+resilience4j:
+  ratelimiter:
+    instances:
+      adminApi:
+        limitForPeriod: 10
+        limitRefreshPeriod: 1s
+        timeoutDuration: 500ms

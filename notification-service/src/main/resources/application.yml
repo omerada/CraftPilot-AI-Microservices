@@ -1,0 +1,118 @@
+server:
+  port: 8094
+
+spring:
+  application:
+    name: notification-service
+
+  mail:
+    from: noreply@craftpilot.com
+    host: smtp.sendgrid.net
+    port: 587
+    username: apikey
+    password: ${SENDGRID_API_KEY}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
+  cloud:
+    gcp:
+      project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
+      credentials:
+        location: ${GOOGLE_APPLICATION_CREDENTIALS:/app/config/firebase-service-account.json}
+      firestore:
+        enabled: true
+        project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
+        database-id: ${GCP_FIRESTORE_DATABASE_ID:default}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: notification-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    timeout: 2000
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 2
+        max-wait: -1ms
+      shutdown-timeout: 100ms
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      notificationService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 5
+  retry:
+    instances:
+      notificationService:
+        maxAttempts: 3
+        waitDuration: 1s
+  ratelimiter:
+    instances:
+      notificationService:
+        limitForPeriod: 100
+        limitRefreshPeriod: 1s
+        timeoutDuration: 5s
+
+logging:
+  level:
+    com.craftpilot.notificationservice: ${LOG_LEVEL_APP:INFO}
+    org.springframework.web: ${LOG_LEVEL_SPRING_WEB:INFO}
+    org.springframework.kafka: ${LOG_LEVEL_SPRING_KAFKA:INFO}
+    com.google.cloud: ${LOG_LEVEL_GOOGLE_CLOUD:DEBUG}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    disable-swagger-default-url: true
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  packages-to-scan: com.craftpilot.notificationservice.controller
+  paths-to-match: /**
+  default-produces-media-type: application/json
+  default-consumes-media-type: application/json

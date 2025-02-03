@@ -1,0 +1,130 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aiquestion-service
+  namespace: craftpilot
+  labels:
+    app: aiquestion-service
+spec:
+  replicas: ${REPLICAS:2}
+  selector:
+    matchLabels:
+      app: aiquestion-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: aiquestion-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8082"
+    spec:
+      containers:
+        - name: aiquestion-service
+          image: ${DOCKER_REGISTRY}/aiquestion-service:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8082
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            - name: SERVER_PORT
+              value: "8082"
+            - name: KUBERNETES_ENABLED
+              value: "true"
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: kafka-config
+                  key: brokers
+            - name: KAFKA_SECURITY_PROTOCOL
+              valueFrom:
+                configMapKeyRef:
+                  name: kafka-config
+                  key: security-protocol
+            - name: KAFKA_SASL_MECHANISM
+              valueFrom:
+                configMapKeyRef:
+                  name: kafka-config
+                  key: sasl-mechanism
+            - name: KAFKA_SASL_JAAS_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-secret
+                  key: sasl-jaas-config
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: host
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: port
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: password
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-secret
+                  key: openai-api-key
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-secret
+                  key: anthropic-api-key
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: "/etc/gcp/service-account.json"
+          volumeMounts:
+            - name: google-cloud-key
+              mountPath: /etc/gcp
+              readOnly: true
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8082
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+      volumes:
+        - name: google-cloud-key
+          secret:
+            secretName: google-cloud-key
+      imagePullSecrets:
+        - name: registry-credentials
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aiquestion-service
+  namespace: craftpilot
+spec:
+  selector:
+    app: aiquestion-service
+  ports:
+    - port: 80
+      targetPort: 8082
+  type: ClusterIP

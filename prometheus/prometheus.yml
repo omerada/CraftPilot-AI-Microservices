@@ -1,0 +1,104 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "eureka-server"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["eureka-server:8761"]
+
+  - job_name: "api-gateway"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["api-gateway:1110"]
+
+  - job_name: "auth-service"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["auth-service:1112"]
+
+  - job_name: "user-service"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["user-service:1113"]
+
+  - job_name: "redis-service"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["redis-service:1114"]
+
+  - job_name: "notification-service"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["notification-service:1115"]
+
+  - job_name: "admin-service"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["admin-service:1116"]
+
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis:6379"]
+
+  - job_name: "kafka"
+    static_configs:
+      - targets: ["kafka:9092"]
+
+  - job_name: "zookeeper"
+    static_configs:
+      - targets: ["zookeeper:2181"]
+
+  # JVM (Micrometer) Metrics
+  - job_name: "jvm-metrics"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets:
+          [
+            "eureka-server:8761",
+            "api-gateway:1110",
+            "auth-service:1112",
+            "user-service:1113",
+            "redis-service:1114",
+            "notification-service:1115",
+            "admin-service:1116",
+          ]
+
+# Alerting rules
+rule_files:
+  - "alert.rules"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # AlertManager hedefi eklenecek
+          # - 'alertmanager:9093'
+
+# Global yapılandırmalar
+scrape_configurations:
+  # Genel metrik yapılandırmaları
+  - job_name: "spring-actuator"
+    metrics_path: "/actuator/prometheus"
+    scrape_interval: 5s
+    static_configs:
+      - targets:
+          [
+            "eureka-server:8761",
+            "api-gateway:1110",
+            "auth-service:1112",
+            "user-service:1113",
+            "redis-service:1114",
+            "notification-service:1115",
+            "admin-service:1116",
+          ]
+    metrics_relabel_configs:
+      - source_labels: [__name__]
+        regex: "^jvm_.*"
+        action: keep

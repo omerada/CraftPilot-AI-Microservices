@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-service
+  namespace: craftpilot
+  labels:
+    app: admin-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8081
+      targetPort: 8081
+      protocol: TCP
+      name: http
+  selector:
+    app: admin-service
