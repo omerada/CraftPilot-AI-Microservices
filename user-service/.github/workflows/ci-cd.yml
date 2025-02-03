@@ -2,11 +2,11 @@ name: User Service CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "user-service/**"
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - "user-service/**"
 

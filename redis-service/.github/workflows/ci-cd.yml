@@ -2,11 +2,11 @@ name: Redis Service CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "redis-service/**"
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - "redis-service/**"
 

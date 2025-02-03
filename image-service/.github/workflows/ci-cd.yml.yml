@@ -2,11 +2,11 @@ name: Image Service CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "image-service/**"
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - "image-service/**"
 

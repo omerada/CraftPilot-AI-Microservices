@@ -1,31 +1,22 @@
 FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
 
 WORKDIR /build
-
-# Copy the project files
-COPY pom.xml .
-COPY admin-service/pom.xml admin-service/
-COPY admin-service/src admin-service/src
-
-# Build the application
-WORKDIR /build/admin-service
+COPY . .
 RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-# Add non-root user
-RUN addgroup -S spring && adduser -S spring -G spring
-USER spring:spring
+# Create config directory
+RUN mkdir -p /app/config
 
-# Copy the built artifact
-COPY --from=build /build/admin-service/target/*.jar app.jar
+COPY --from=build /build/target/*.jar app.jar
+
+ENV JAVA_OPTS="\
+    -XX:+UseContainerSupport \
+    -XX:MaxRAMPercentage=75.0 \
+    -Djava.security.egd=file:/dev/./urandom"
 
 EXPOSE 8097
-
-ENTRYPOINT ["java", \
-            "-XX:+UseContainerSupport", \
-            "-XX:MaxRAMPercentage=75.0", \
-            "-Djava.security.egd=file:/dev/./urandom", \
-            "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

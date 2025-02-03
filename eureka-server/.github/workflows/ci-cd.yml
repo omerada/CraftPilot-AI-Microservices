@@ -2,11 +2,11 @@ name: Eureka Server CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "eureka-server/**"
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - "eureka-server/**"
 
