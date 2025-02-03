@@ -1,9 +1,17 @@
 spring:
   application:
-    name: eurekaserver
+    name: eureka-server
   output:
     ansi:
       enabled: always
+  cloud:
+    loadbalancer:
+      ribbon:
+        enabled: false
+  security:
+    user:
+      name: ${eureka.security.username}
+      password: ${eureka.security.password}
 
 server:
   port: 8761
@@ -11,10 +19,11 @@ server:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/xml,text/plain
     min-response-size: 1024
+  shutdown: graceful
 
 eureka:
   instance:
-    hostname: ${EUREKA_HOST:localhost}
+    hostname: localhost
     prefer-ip-address: true
     lease-renewal-interval-in-seconds: 10
   client:
@@ -24,11 +33,11 @@ eureka:
       defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
   server:
     # Performance tuning
-    enableSelfPreservation: false
-    renewalPercentThreshold: 0.85
-    responseCacheUpdateIntervalMs: 3000
-    responseCacheAutoExpirationInSeconds: 180
-    evictionIntervalTimerInMs: 3000
+    wait-time-in-ms-when-sync-empty: 0
+    enable-self-preservation: false
+    renewal-percent-threshold: 0.85
+    response-cache-update-interval-ms: 3000
+    eviction-interval-timer-in-ms: 3000
     # Rate limiting
     rateLimiterEnabled: true
     rateLimiterThrottleStandardClients: true
@@ -37,24 +46,28 @@ eureka:
       - "userservice"
     rateLimiterBurstSize: 10
     rateLimiterRegistrationsPerSecond: 5
+  security:
+    username: eureka
+    password: ${EUREKA_PASSWORD:secret}
 
 management:
   endpoints:
     web:
       exposure:
-        include: ["health", "info", "metrics"]
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
-  metrics:
-    tags:
-      application: ${spring.application.name}
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
 
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
   level:
     com.craftpilot.eurekaserver: DEBUG
-    com.netflix.eureka: INFO
+    org.springframework.cloud.netflix.eureka: INFO
     com.netflix.discovery: INFO
-    org.springframework.cloud: INFO
+    com.netflix.eureka: INFO

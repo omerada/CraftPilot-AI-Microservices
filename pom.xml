@@ -9,17 +9,46 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>apigateway</module>
+        <!-- 1. Service Discovery -->
         <module>eureka-server</module>
-        <module>user-service</module>
+        
+        <!-- 2. API Gateway -->
+        <module>api-gateway</module>
+		
+        <module>kafka-service</module>
+        
+        <!-- 3. Infrastructure Services -->
         <module>redis-service</module>
-        <!-- Diğer servisler burada listelenebilir -->
+        
+        <!-- 4. Core Services -->
+        <module>user-service</module>
+        <module>subscription-service</module>
+        <module>credit-service</module>
+        
+        <!-- 5. AI and Processing Services -->
+        <module>model-service</module>
+        <module>aiquestion-service</module>
+        <module>code-service</module>
+        <module>image-service</module>
+        <module>translation-service</module>
+        
+        <!-- 6. Content and Analytics Services -->
+        <module>content-service</module>
+        <module>analytics-service</module>
+        
+        <!-- 7. Support Services -->
+        <module>notification-service</module>
+        <module>admin-service</module>
     </modules>
 
     <properties>
         <java.version>21</java.version>
         <spring-cloud.version>2023.0.2</spring-cloud.version>
         <spring-boot.version>3.3.1</spring-boot.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
 
     <dependencyManagement>
@@ -42,34 +71,159 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- https://mvnrepository.com/artifact/org.springframework.kafka/spring-kafka -->
+            <!-- Kafka -->
             <dependency>
                 <groupId>org.springframework.kafka</groupId>
                 <artifactId>spring-kafka</artifactId>
                 <version>3.3.1</version>
             </dependency>
 
+            <!-- Firestore -->
             <dependency>
                 <groupId>com.google.cloud</groupId>
                 <artifactId>spring-cloud-gcp-starter-firestore</artifactId>
                 <version>5.10.0</version>
             </dependency>
-
-            <!-- https://mvnrepository.com/artifact/com.google.cloud/google-cloud-firestore -->
             <dependency>
                 <groupId>com.google.cloud</groupId>
                 <artifactId>google-cloud-firestore</artifactId>
-                <version>3.30.3</version>
+                <version>3.14.0</version>
             </dependency>
 
-            <!-- https://mvnrepository.com/artifact/com.google.firebase/firebase-admin -->
+            <!-- Firebase -->
             <dependency>
                 <groupId>com.google.firebase</groupId>
                 <artifactId>firebase-admin</artifactId>
                 <version>9.4.3</version>
             </dependency>
 
+            <!-- Monitoring -->
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-registry-prometheus</artifactId>
+                <version>1.12.3</version>
+            </dependency>
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-tracing-bridge-brave</artifactId>
+                <version>1.2.3</version>
+            </dependency>
+
+            <!-- Resilience4j -->
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-spring-boot3</artifactId>
+                <version>2.1.0</version>
+            </dependency>
+
+            <!-- Google Cloud bağımlılıkları -->
+            <dependency>
+                <groupId>com.google.cloud</groupId>
+                <artifactId>google-cloud-core</artifactId>
+                <version>2.30.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.auth</groupId>
+                <artifactId>google-auth-library-oauth2-http</artifactId>
+                <version>1.20.0</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
+    <dependencies>
+        <!-- Spring Boot -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!-- Redis -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+        </dependency>
+
+        <!-- Swagger -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+            <version>2.3.0</version>
+        </dependency>
+
+        <!-- Firestore -->
+        <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>spring-cloud-gcp-starter-firestore</artifactId>
+            <version>5.10.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>google-cloud-firestore</artifactId>
+            <version>3.14.0</version>
+        </dependency>
+
+        <!-- Google Cloud -->
+        <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>google-cloud-core</artifactId>
+            <version>2.30.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.auth</groupId>
+            <artifactId>google-auth-library-oauth2-http</artifactId>
+            <version>1.20.0</version>
+        </dependency>
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Validation -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                    <configuration>
+                        <excludes>
+                            <exclude>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </exclude>
+                        </excludes>
+                        <image>
+                            <name>craftpilot/${project.artifactId}:${project.version}</name>
+                        </image>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.12.1</version>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>1.18.30</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>

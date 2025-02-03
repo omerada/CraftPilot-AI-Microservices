@@ -1,11 +1,28 @@
 spring:
   application:
     name: user-service
+  cloud:
+    gcp:
+      project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
+      credentials:
+        location: ${GOOGLE_APPLICATION_CREDENTIALS:/app/config/firebase-service-account.json}
+      firestore:
+        enabled: true
+        project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
+        database-id: ${GCP_FIRESTORE_DATABASE_ID:default}
   kafka:
     bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
     producer:
+      acks: 1
+      retries: 3
+      batch-size: 16384
+      buffer-memory: 33554432
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      compression-type: snappy
+      properties:
+        spring.json.add.type.headers: false
+        linger.ms: 5
     consumer:
       group-id: userservice-group
       auto-offset-reset: earliest
@@ -20,6 +37,8 @@ spring:
       cache-null-values: false
       use-key-prefix: true
       key-prefix: craftpilot
+      repositories:
+        enabled: false
   autoconfigure:
     exclude: org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
   redis:
@@ -34,6 +53,12 @@ spring:
         min-idle: 4
         max-wait: 1000ms
       shutdown-timeout: 200ms
+  webflux:
+    base-path: /api
+  main:
+    web-application-type: reactive
+  codec:
+    max-in-memory-size: 16MB
 
 eureka:
   instance:
@@ -44,13 +69,17 @@ eureka:
     serviceUrl:
       defaultZone: ${EUREKA_SERVICE_URL:http://localhost:8761/eureka/}
     registry-fetch-interval-seconds: 5
+    register-with-eureka: true
+    fetch-registry: true
 
 server:
-  port: 1113
+  port: 8092
   shutdown: graceful
+  http2:
+    enabled: true
   compression:
     enabled: true
-    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+    mime-types: application/json,application/xml,text/plain
     min-response-size: 1024
 
 logging:
@@ -63,59 +92,92 @@ logging:
     org.springframework.cache: DEBUG
     org.springframework.data.redis: INFO
     org.springframework.kafka: INFO
+    com.google.cloud: DEBUG
 
 springdoc:
   api-docs:
-    path: /api-docs
+    path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
     operationsSorter: method
+    tagsSorter: alpha
   show-actuator: true
 
 firebase:
-  credentials:
-    path: classpath:firebase-service-account.json
+  credential:
+    path: ${FIREBASE_CREDENTIAL_PATH:/app/config/firebase-service-account.json}
+  project:
+    id: ${GCP_PROJECT_ID:craft-pilot-ai}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,metrics,prometheus,info,env
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: kafka
+        liveness:
+          include: ping
   metrics:
     tags:
       application: ${spring.application.name}
     distribution:
       percentiles-histogram:
         http.server.requests: true
+    enable:
+      jvm: true
+      process: true
+      system: true
+    export:
+      prometheus:
+        enabled: true
+        step: 1m
 
 resilience4j:
   circuitbreaker:
     instances:
       userService:
-        registerHealthIndicator: true
-        slidingWindowSize: 10
-        minimumNumberOfCalls: 5
-        permittedNumberOfCallsInHalfOpenState: 3
-        automaticTransitionFromOpenToHalfOpenEnabled: true
-        waitDurationInOpenState: 10000
+        slidingWindowSize: 100
         failureRateThreshold: 50
-        eventConsumerBufferSize: 10
-        recordExceptions:
-          - java.io.IOException
-          - java.util.concurrent.TimeoutException
-  retry:
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 10
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+    configs:
+      default:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        permittedNumberOfCallsInHalfOpenState: 3
+  bulkhead:
     instances:
       userService:
-        maxAttempts: 3
-        waitDuration: 1s
-        enableExponentialBackoff: true
-        exponentialBackoffMultiplier: 2
+        maxConcurrentCalls: 100
+  timelimiter:
+    instances:
+      userService:
+        timeoutDuration: 5s
+        cancelRunningFuture: true
   ratelimiter:
-    instances:
-      userService:
+    configs:
+      default:
         limitForPeriod: 100
         limitRefreshPeriod: 1s
-        timeoutDuration: 500ms
+        timeoutDuration: 0s
+
+cloud:
+  loadbalancer:
+    cache:
+      enabled: true
+      caffeine:
+        spec: maximumSize=500,expireAfterWrite=5s
+
+health:
+  redis:
+    enabled: true
+  diskspace:
+    enabled: true

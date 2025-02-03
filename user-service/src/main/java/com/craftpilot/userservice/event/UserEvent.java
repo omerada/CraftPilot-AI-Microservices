@@ -1,21 +1,27 @@
 package com.craftpilot.userservice.event;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.ToString;
-import java.time.LocalDateTime;
+import com.craftpilot.userservice.model.user.entity.UserEntity;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Getter
-@ToString
-@RequiredArgsConstructor
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class UserEvent {
-    private final String uid;
-    private final String email;
-    private final UserEventType type;
-    private final LocalDateTime timestamp = LocalDateTime.now();
-
-    public enum UserEventType {
-        UPDATED,
-        PROFILE_VIEWED
+    private String eventType;
+    private String userId;
+    private Long timestamp;
+    private UserEntity user;
+    
+    public static UserEvent fromUser(String eventType, UserEntity user) {
+        return UserEvent.builder()
+                .eventType(eventType)
+                .userId(user.getId())
+                .timestamp(System.currentTimeMillis())
+                .user(user)
+                .build();
     }
 } 
