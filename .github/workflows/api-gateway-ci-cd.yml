@@ -41,6 +41,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./api-gateway
+          file: ./api-gateway/Dockerfile
           platforms: linux/arm64
           push: true
           tags: |
@@ -161,4 +162,3 @@ jobs:
         with:
           token: ${{ secrets.GH_TOKEN }}
           event-type: trigger-deploy-services
-
