@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -26,15 +27,20 @@ public class FirestoreConfig {
 
     @Bean
     public Firestore firestore() throws IOException {
+        String credentialsPath = System.getenv("GOOGLE_APPLICATION_CREDENTIALS");
+        if (credentialsPath == null || credentialsPath.isEmpty()) {
+            throw new IllegalStateException("GOOGLE_APPLICATION_CREDENTIALS environment variable is not set");
+        }
+
+        com.google.auth.oauth2.GoogleCredentials credentials = com.google.auth.oauth2.GoogleCredentials.fromStream(new FileInputStream(credentialsPath));
+        FirebaseOptions options = FirebaseOptions.builder()
+                .setCredentials(credentials)
+                .build();
+
         if (FirebaseApp.getApps().isEmpty()) {
-            Resource resource = new ClassPathResource(credentialPath);
-            InputStream serviceAccount = resource.getInputStream();
-            FirebaseOptions options = FirebaseOptions.builder()
-                    .setCredentials(com.google.auth.oauth2.GoogleCredentials.fromStream(serviceAccount))
-                    .setProjectId(projectId)
-                    .build();
             FirebaseApp.initializeApp(options);
         }
+
         return FirestoreClient.getFirestore();
     }
 } 

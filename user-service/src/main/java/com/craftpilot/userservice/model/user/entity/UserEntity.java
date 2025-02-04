@@ -26,8 +26,8 @@ public class UserEntity {
     private String photoUrl;
     private UserRole role;
     private UserStatus status;
-    private Long createdAt;
-    private Long updatedAt;
+    private long createdAt;
+    private long updatedAt;
     private String phoneNumber;
     private Boolean emailVerified;
     private String locale;
