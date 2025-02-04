@@ -5,6 +5,7 @@ on:
     branches: [master]
     paths:
       - "analytics-service/**"
+  workflow_dispatch: # Manuel tetikleme için ekleyin
 
 jobs:
   build-and-deploy:
