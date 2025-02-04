@@ -1,31 +1,28 @@
 FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
 
 WORKDIR /build
-
-# Copy the project files
 COPY pom.xml .
-COPY analytics-service/pom.xml analytics-service/
-COPY analytics-service/src analytics-service/src
-
-# Build the application
-WORKDIR /build/analytics-service
+COPY src ./src
 RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-# Add non-root user
-RUN addgroup -S spring && adduser -S spring -G spring
-USER spring:spring
+# Create necessary directories
+RUN mkdir -p /app/config
 
-# Copy the built artifact
-COPY --from=build /build/analytics-service/target/*.jar app.jar
+COPY --from=build /build/target/*.jar app.jar
 
-EXPOSE 8098
+# Environment variables will be provided during runtime
+ENV SPRING_PROFILES_ACTIVE=prod \
+    EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
+    SPRING_REDIS_HOST=${REDIS_HOST} \
+    SPRING_REDIS_PORT=${REDIS_PORT} \
+    SPRING_REDIS_PASSWORD=${REDIS_PASSWORD} \
+    GCP_PROJECT_ID=${GCP_PROJECT_ID} \
+    OPENAI_API_KEY=${OPENAI_API_KEY} \
+    JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 
-ENTRYPOINT ["java", \
-            "-XX:+UseContainerSupport", \
-            "-XX:MaxRAMPercentage=75.0", \
-            "-Djava.security.egd=file:/dev/./urandom", \
-            "-jar", "app.jar"]
+EXPOSE 8096
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

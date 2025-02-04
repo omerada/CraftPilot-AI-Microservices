@@ -53,12 +53,6 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Create config directory if not exists
-            mkdir -p /opt/craftpilot/config
-
-            # Write GCP credentials to file
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/firebase-service-account.json
-
             # Pull latest image
             docker pull ${{ env.DOCKER_IMAGE }}:latest
 
@@ -72,23 +66,27 @@ jobs:
               --network craftpilot-network \
               -p ${{ env.SERVICE_PORT }}:${{ env.SERVICE_PORT }} \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/ \
-              -e SPRING_REDIS_HOST=redis \
-              -e SPRING_KAFKA_BOOTSTRAP-SERVERS=kafka:9092 \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-service-account.json \
-              -v /opt/craftpilot/config/firebase-service-account.json:/app/config/firebase-service-account.json:ro \
+              -e EUREKA_USERNAME=${{ secrets.EUREKA_USERNAME }} \
+              -e EUREKA_PASSWORD=${{ secrets.EUREKA_PASSWORD }} \
+              -e REDIS_HOST=${{ secrets.REDIS_HOST }} \
+              -e REDIS_PORT=${{ secrets.REDIS_PORT }} \
+              -e REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }} \
+              -e GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
+              -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
+              -e GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}' \
               ${{ env.DOCKER_IMAGE }}:latest
 
-            # Health check
-            echo "Waiting for service to start..."
-            sleep 30
-            if curl -f http://localhost:${{ env.SERVICE_PORT }}/actuator/health; then
-              echo "Service is healthy"
-            else
-              echo "Service failed health check"
-              docker logs ${{ env.SERVICE_NAME }}
-              exit 1
-            fi
+      - name: Health check
+        run: |
+          echo "Waiting for service to start..."
+          sleep 30
+          if curl -f http://localhost:${{ env.SERVICE_PORT }}/actuator/health; then
+            echo "Service is healthy"
+          else
+            echo "Service failed health check"
+            docker logs ${{ env.SERVICE_NAME }}
+            exit 1
+          fi
 
       - name: Notify Slack on Failure
         if: failure()

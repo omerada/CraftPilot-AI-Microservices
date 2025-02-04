@@ -507,123 +507,30 @@ services:
 
   # Analytics Service
   analytics-service:
-    build:
-      context: .
-      dockerfile: analytics-service/Dockerfile
-    ports:
-      - "8098:8098"
+    image: craftpilot/analytics-service:latest
+    container_name: analytics-service
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
-      - FIREBASE_CREDENTIAL_PATH=/app/config/firebase-service-account.json
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-service-account.json
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
-    volumes:
-      - ./analytics-service/src/main/resources/firebase-service-account.json:/app/config/firebase-service-account.json
-    depends_on:
-      eureka-server:
-        condition: service_healthy
+      - SPRING_PROFILES_ACTIVE=prod
+      - EUREKA_USERNAME=${EUREKA_USERNAME}
+      - EUREKA_PASSWORD=${EUREKA_PASSWORD}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GCP_SA_KEY=${GCP_SA_KEY}
+    ports:
+      - "8096:8096"
     networks:
       - craftpilot-network
+    depends_on:
+      - eureka-server
+      - redis
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8098/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8096/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-
-  # Image Service
-  image-service:
-    build:
-      context: .
-      dockerfile: image-service/Dockerfile
-    ports:
-      - "8099:8099"
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
-      - FIREBASE_CREDENTIAL_PATH=/app/config/firebase-service-account.json
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-service-account.json
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
-    volumes:
-      - ./image-service/src/main/resources/firebase-service-account.json:/app/config/firebase-service-account.json
-    depends_on:
-      eureka-server:
-        condition: service_healthy
-    networks:
-      - craftpilot-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8099/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-
-  # Model Service
-  model-service:
-    build:
-      context: .
-      dockerfile: model-service/Dockerfile
-    ports:
-      - "8100:8100"
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
-      - FIREBASE_CREDENTIAL_PATH=/app/config/firebase-service-account.json
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-service-account.json
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
-    volumes:
-      - ./model-service/src/main/resources/firebase-service-account.json:/app/config/firebase-service-account.json
-    depends_on:
-      eureka-server:
-        condition: service_healthy
-    networks:
-      - craftpilot-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8100/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-
-  # Translation Service
-  translation-service:
-    build:
-      context: .
-      dockerfile: translation-service/Dockerfile
-    ports:
-      - "8101:8101"
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
-      - FIREBASE_CREDENTIAL_PATH=/app/config/firebase-service-account.json
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-service-account.json
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
-    volumes:
-      - ./translation-service/src/main/resources/firebase-service-account.json:/app/config/firebase-service-account.json
-    depends_on:
-      eureka-server:
-        condition: service_healthy
-    networks:
-      - craftpilot-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8101/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 512M
 
 volumes:
   redis-data:

@@ -15,6 +15,9 @@ public class OpenApiConfig {
     @Value("${server.port}")
     private String serverPort;
 
+    @Value("${VPS_HOST:localhost}")
+    private String vpsHost;
+
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
@@ -23,7 +26,7 @@ public class OpenApiConfig {
                         .version("1.0")
                         .description("Analytics Service for Craft Pilot AI"))
                 .servers(List.of(
-                        new Server().url("http://152.53.115.63:" + serverPort)
+                        new Server().url("http://" + vpsHost + ":" + serverPort)
                                 .description("Production server"),
                         new Server().url("http://localhost:" + serverPort)
                                 .description("Local server")
