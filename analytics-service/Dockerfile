@@ -11,7 +11,7 @@ RUN echo "Building for ARM64 architecture"
 RUN mvn clean package -DskipTests
 
 # Run stage - sadece ARM64
-FROM --platform=linux/arm64 eclipse-temurin:21-jre-slim
+FROM --platform=linux/arm64 eclipse-temurin:21-jdk
 
 WORKDIR /app
 COPY --from=build /build/target/*.jar app.jar
