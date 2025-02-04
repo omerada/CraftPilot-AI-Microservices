@@ -40,7 +40,8 @@ jobs:
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: ./user-service
+          context: . # Ana dizini context olarak kullan
+          file: ./user-service/Dockerfile # Dockerfile'ın yolunu belirt
           platforms: linux/arm64
           push: true
           tags: |
