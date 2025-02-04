@@ -1,17 +1,13 @@
-# Build stage - sadece ARM64
-FROM --platform=linux/arm64 maven:3.9.6-eclipse-temurin-21 AS build
-
-# Docker Hub kimlik bilgilerini al
-ARG DOCKER_USERNAME
-ARG DOCKER_PASSWORD
-
-# Docker Hub'a giriş yap
-RUN echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+# Build stage
+FROM public.ecr.aws/amazoncorretto/amazoncorretto:21 AS build
 
 WORKDIR /build
 
 # Tüm projeyi kopyala
 COPY . .
+
+# Maven kurulumu
+RUN yum install -y maven
 
 # Maven build için platform ayarı
 ARG TARGETARCH=arm64
@@ -20,8 +16,8 @@ RUN echo "Building for ARM64 architecture"
 # Projeyi derle
 RUN mvn clean package -DskipTests
 
-# Run stage - sadece ARM64
-FROM --platform=linux/arm64 eclipse-temurin:21-jdk
+# Run stage
+FROM public.ecr.aws/amazoncorretto/amazoncorretto:21-alpine
 
 WORKDIR /app
 COPY --from=build /build/target/*.jar app.jar
