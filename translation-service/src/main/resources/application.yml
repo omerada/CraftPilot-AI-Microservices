@@ -1,5 +1,5 @@
 server:
-  port: ${SERVER_PORT:8051}
+  port: 8051
   shutdown: graceful
   netty:
     connection-timeout: 2s
@@ -9,6 +9,8 @@ server:
 spring:
   application:
     name: translation-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -39,7 +41,7 @@ spring:
   redis:
     host: ${SPRING_REDIS_HOST:localhost}
     port: ${SPRING_REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:your_redis_password}
+    password: ${SPRING_REDIS_PASSWORD:}
     timeout: 2000
     connect-timeout: 2000
     lettuce:
@@ -66,9 +68,9 @@ spring:
         all-namespaces: false
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+      password: ${SPRING_REDIS_PASSWORD:}
 
 logging:
   level:
@@ -80,30 +82,23 @@ logging:
     org.springframework.data: INFO
 
 eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
   instance:
     prefer-ip-address: true
-    lease-renewal-interval-in-seconds: 5
-    lease-expiration-duration-in-seconds: 10
-  client:
-    service-url:
-      defaultZone: ${EUREKA_SERVICE_URL:http://localhost:8761/eureka}
-    fetch-registry: true
-    register-with-eureka: true
-    registry-fetch-interval-seconds: 5
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
 
 management:
   endpoints:
     web:
       exposure:
-        include: "*"
+        include: health,info,metrics
   endpoint:
     health:
-      probes:
-        enabled: ${MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED:true}
       show-details: always
-      group:
-        readiness:
-          include: redis
   health:
     livenessstate:
       enabled: ${MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED:true}
@@ -175,9 +170,9 @@ translation:
 firebase:
   enabled: true
   credential:
-    path: firebase-service-account.json
+    path: ${GOOGLE_APPLICATION_CREDENTIALS:/gcp-credentials.json}
   project:
-    id: craft-pilot-ai
+    id: ${FIREBASE_PROJECT_ID:your-project-id}
 
 springdoc:
   swagger-ui:
