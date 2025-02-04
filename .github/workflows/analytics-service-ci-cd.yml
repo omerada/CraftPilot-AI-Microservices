@@ -114,7 +114,7 @@ jobs:
               ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
 
             echo "=== Container Logs ==="
-            docker logs analytics-service
+            docker logs analytics-service 
 
       - name: Health check
         run: |
