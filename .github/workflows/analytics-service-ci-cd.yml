@@ -21,13 +21,13 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
         with:
-          platforms: arm64,amd64
+          platforms: arm64
 
       # Docker Buildx kurulumu
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:
-          platforms: linux/arm64,linux/amd64
+          platforms: linux/arm64
 
       # Docker Hub'a giriş yap
       - name: Login to DockerHub
@@ -36,18 +36,18 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Multi-platform build ve push
+      # Sadece ARM64 için build ve push
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
           context: ./analytics-service
-          platforms: linux/arm64,linux/amd64
+          platforms: linux/arm64
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:${{ github.sha }}
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:buildcache,mode=max
+            ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
+            ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:${{ github.sha }}-arm64
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:buildcache-arm64
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:buildcache-arm64,mode=max
           build-args: |
             BUILDPLATFORM=linux/arm64
             TARGETPLATFORM=linux/arm64
@@ -91,8 +91,8 @@ jobs:
             docker info
             docker ps
 
-            echo "=== Pulling Image ==="
-            docker pull --platform linux/arm64 ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest
+            echo "=== Pulling ARM64 Image ==="
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
 
             echo "=== Stopping Old Container ==="
             docker stop analytics-service || true
@@ -100,7 +100,6 @@ jobs:
 
             echo "=== Starting New Container ==="
             docker run -d \
-              --platform linux/arm64 \
               --name analytics-service \
               --network craftpilot-network \
               -p 8096:8096 \
@@ -112,7 +111,7 @@ jobs:
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
-              ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest
+              ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
 
             echo "=== Container Logs ==="
             docker logs analytics-service
