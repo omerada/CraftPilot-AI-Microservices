@@ -132,7 +132,6 @@ jobs:
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
-
               -e EUREKA_PASSWORD=13579ada \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \

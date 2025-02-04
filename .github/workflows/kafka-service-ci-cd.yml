@@ -131,11 +131,12 @@ jobs:
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
-
               -e EUREKA_PASSWORD=13579ada \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
+              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e KAFKA_GROUP_ID=kafka-service \
               ${{ secrets.DOCKERHUB_USERNAME }}/kafka-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
@@ -145,14 +146,17 @@ jobs:
             docker logs kafka-service
 
             echo "=== Health Check ==="
-            if curl -f http://localhost:8055/actuator/health; then
-              echo "Service is healthy"
-            else
-
-              echo "Service failed health check"
-              docker logs kafka-service
-              exit 1
-            fi
+            for i in {1..5}; do
+              if curl -f http://localhost:8055/actuator/health; then
+                echo "Service is healthy"
+                exit 0
+              fi
+              echo "Waiting for service to start... Attempt $i"
+              sleep 10
+            done
+            echo "Service failed health check"
+            docker logs kafka-service
+            exit 1
 
       - name: Trigger Deploy Services Workflow
         if: success()
