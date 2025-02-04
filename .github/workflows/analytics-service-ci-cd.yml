@@ -94,6 +94,27 @@ jobs:
             # Docker ağını oluştur (eğer yoksa)
             docker network create craftpilot-network || true
 
+            # Redis container'ını başlat (eğer çalışmıyorsa)
+            if ! docker ps | grep -q redis; then
+              docker run -d \
+                --name redis \
+                --network craftpilot-network \
+                -p 6379:6379 \
+                redis:latest
+            fi
+
+            # Eureka server'ı başlat (eğer çalışmıyorsa)
+            if ! docker ps | grep -q eureka-server; then
+              docker run -d \
+                --name eureka-server \
+                --network craftpilot-network \
+                -p 8761:8761 \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e EUREKA_USERNAME=craftpilot \
+                -e EUREKA_PASSWORD=13579ada \
+                ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
+            fi
+
             echo "=== Pulling ARM64 Image ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
 
@@ -117,7 +138,7 @@ jobs:
               ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 30
+            sleep 45  # Biraz daha uzun bekleyelim
 
             echo "=== Container Logs ==="
             docker logs analytics-service

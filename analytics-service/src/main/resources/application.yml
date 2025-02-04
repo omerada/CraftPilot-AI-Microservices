@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: analytics-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   cloud:
     discovery:
       enabled: true
@@ -40,12 +42,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,metrics,prometheus
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
-      probes:
-        enabled: true
   metrics:
     tags:
       application: ${spring.application.name}
@@ -55,8 +55,8 @@ management:
 
 eureka:
   client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka
+    serviceUrl:
+      defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka
     fetch-registry: true
     register-with-eureka: true
   instance:
