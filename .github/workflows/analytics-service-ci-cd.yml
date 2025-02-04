@@ -17,13 +17,17 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # QEMU kurulumu (multi-platform build için)
+      # QEMU kurulumu
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
+        with:
+          platforms: arm64,amd64
 
       # Docker Buildx kurulumu
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+        with:
+          platforms: linux/arm64,linux/amd64
 
       # Docker Hub'a giriş yap
       - name: Login to DockerHub
@@ -37,11 +41,16 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./analytics-service
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64,linux/amd64
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:${{ github.sha }}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:buildcache,mode=max
+          build-args: |
+            BUILDPLATFORM=linux/arm64
+            TARGETPLATFORM=linux/arm64
 
       # Google Cloud kimlik doğrulaması
       - id: "auth"
@@ -67,18 +76,29 @@ jobs:
             echo "=== Testing SSH Connection ==="
             whoami
             pwd
+
+            echo "=== System Architecture ==="
+            uname -m
+
             echo "=== Testing Directory Access ==="
             ls -la /opt/craftpilot || mkdir -p /opt/craftpilot
+
             echo "=== Continuing with Deployment ==="
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
+
             echo "=== Testing Docker ==="
+            docker version
+            docker info
             docker ps
 
-            # Pull the image with platform specification
+            echo "=== Pulling Image ==="
             docker pull --platform linux/arm64 ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest
+
+            echo "=== Stopping Old Container ==="
             docker stop analytics-service || true
             docker rm analytics-service || true
 
+            echo "=== Starting New Container ==="
             docker run -d \
               --platform linux/arm64 \
               --name analytics-service \
@@ -93,6 +113,9 @@ jobs:
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest
+
+            echo "=== Container Logs ==="
+            docker logs analytics-service
 
       - name: Health check
         run: |
