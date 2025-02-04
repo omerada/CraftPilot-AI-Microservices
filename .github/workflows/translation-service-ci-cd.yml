@@ -131,8 +131,6 @@ jobs:
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
-
-
               -e EUREKA_PASSWORD=13579ada \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
@@ -146,14 +144,17 @@ jobs:
             docker logs translation-service
 
             echo "=== Health Check ==="
-            if curl -f http://localhost:8051/actuator/health; then
-              echo "Service is healthy"
-
-            else
-              echo "Service failed health check"
-              docker logs translation-service
-              exit 1
-            fi
+            for i in {1..5}; do
+              if curl -f http://localhost:8051/actuator/health; then
+                echo "Service is healthy"
+                exit 0
+              fi
+              echo "Waiting for service to start... Attempt $i"
+              sleep 10
+            done
+            echo "Service failed health check"
+            docker logs translation-service
+            exit 1
 
       - name: Trigger Deploy Services Workflow
         if: success()

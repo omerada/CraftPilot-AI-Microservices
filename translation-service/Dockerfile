@@ -2,12 +2,22 @@
 FROM --platform=linux/arm64 maven:3.9.6-eclipse-temurin-21 AS build
 
 WORKDIR /build
+
+# Önce parent POM'u kopyala
+COPY ../pom.xml /build/parent/pom.xml
+
+# Sonra servis POM'unu ve kaynak kodları kopyala
 COPY pom.xml .
 COPY src ./src
 
 # Maven build için platform ayarı
 ARG TARGETARCH=arm64
 RUN echo "Building for ARM64 architecture"
+
+# Parent POM'u yerel Maven repository'ye yükle
+RUN mvn -f /build/parent/pom.xml install -DskipTests
+
+# Projeyi derle
 RUN mvn clean package -DskipTests
 
 # Run stage - sadece ARM64
