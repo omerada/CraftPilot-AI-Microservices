@@ -1,5 +1,5 @@
 server:
-  port: 8088
+  port: 8059
   shutdown: graceful
   netty:
     connection-timeout: 2s

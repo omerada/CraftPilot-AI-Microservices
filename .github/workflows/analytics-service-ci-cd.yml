@@ -126,11 +126,12 @@ jobs:
             docker run -d \
               --name analytics-service \
               --network craftpilot-network \
-              -p 8096:8096 \
+              -p 8064:8064 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
+
               -e EUREKA_PASSWORD=13579ada \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
@@ -138,16 +139,21 @@ jobs:
               ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 45  # Biraz daha uzun bekleyelim
+            sleep 60  # 45 saniyeden 60 saniyeye çıkardık
 
             echo "=== Container Logs ==="
             docker logs analytics-service
 
             echo "=== Health Check ==="
-            if curl -f http://localhost:8096/actuator/health; then
-              echo "Service is healthy"
-            else
-              echo "Service failed health check"
-              docker logs analytics-service
-              exit 1
-            fi
+            for i in {1..5}; do
+              if curl -f http://localhost:8064/actuator/health; then
+                echo "Service is healthy"
+                exit 0
+              fi
+
+              echo "Waiting for service to start... Attempt $i"
+              sleep 10
+            done
+            echo "Service failed health check"
+            docker logs analytics-service
+            exit 1

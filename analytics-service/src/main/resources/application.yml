@@ -1,5 +1,5 @@
 server:
-  port: 8096
+  port: 8064
 
 spring:
   application:
@@ -37,6 +37,11 @@ spring:
           destination: metrics-events
           group: analytics-service
           contentType: application/json
+  main:
+    web-application-type: reactive
+  security:
+    basic:
+      enabled: false
 
 management:
   endpoints:

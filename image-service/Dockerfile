@@ -1,65 +1,24 @@
-FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
-
-
+# Build stage - sadece ARM64
+FROM --platform=linux/arm64 maven:3.9.6-eclipse-temurin-21 AS build
 
 WORKDIR /build
-
-
-
-# Copy the project files
-
 COPY pom.xml .
+COPY src ./src
 
-COPY image-service/pom.xml image-service/
-
-COPY image-service/src image-service/src
-
-
-
-# Build the application
-
-
-WORKDIR /build/image-service
-
+# Maven build için platform ayarı
+ARG TARGETARCH=arm64
+RUN echo "Building for ARM64 architecture"
 RUN mvn clean package -DskipTests
 
-
-
-FROM eclipse-temurin:21-jre-alpine
-
-
-
+# Run stage - sadece ARM64
+FROM --platform=linux/arm64 eclipse-temurin:21-jdk
 
 WORKDIR /app
+COPY --from=build /build/target/*.jar app.jar
 
+# JVM ayarları
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+RUN echo "Running on ARM64 architecture"
 
-
-# Add non-root user
-
-RUN addgroup -S spring && adduser -S spring -G spring
-
-USER spring:spring
-
-
-
-# Copy the built artifact
-
-COPY --from=build /build/image-service/target/*.jar app.jar
-
-
-
-
-EXPOSE 8099
-
-
-
-
-ENTRYPOINT ["java", \
-
-            "-XX:+UseContainerSupport", \
-
-            "-XX:MaxRAMPercentage=75.0", \
-
-            "-Djava.security.egd=file:/dev/./urandom", \
-
-            "-jar", "app.jar"]
+EXPOSE 8056
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]

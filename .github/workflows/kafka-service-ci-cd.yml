@@ -2,13 +2,11 @@ name: Kafka Service CI/CD
 
 on:
   push:
-
     branches: [master]
     paths:
       - "kafka-service/**"
       - ".github/workflows/kafka-service-ci-cd.yml"
   workflow_dispatch:
-
 
 jobs:
   build-and-deploy:
@@ -18,7 +16,6 @@ jobs:
         working-directory: ./kafka-service
     steps:
       - uses: actions/checkout@v3
-
 
       # QEMU kurulumu
       - name: Set up QEMU
@@ -43,14 +40,14 @@ jobs:
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: ./analytics-service
+          context: ./kafka-service
           platforms: linux/arm64
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
-            ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:${{ github.sha }}-arm64
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:buildcache-arm64
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:buildcache-arm64,mode=max
+            ${{ secrets.DOCKERHUB_USERNAME }}/kafka-service:latest-arm64
+            ${{ secrets.DOCKERHUB_USERNAME }}/kafka-service:${{ github.sha }}-arm64
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/kafka-service:buildcache-arm64
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/kafka-service:buildcache-arm64,mode=max
           build-args: |
             BUILDPLATFORM=linux/arm64
             TARGETPLATFORM=linux/arm64
@@ -119,38 +116,40 @@ jobs:
             fi
 
             echo "=== Pulling ARM64 Image ==="
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/kafka-service:latest-arm64
 
             echo "=== Stopping Old Container ==="
-            docker stop analytics-service || true
-            docker rm analytics-service || true
+            docker stop kafka-service || true
+            docker rm kafka-service || true
 
             echo "=== Starting New Container ==="
             docker run -d \
-              --name analytics-service \
+              --name kafka-service \
               --network craftpilot-network \
-              -p 8096:8096 \
+              -p 8055:8055 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
+
               -e EUREKA_PASSWORD=13579ada \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
-              ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
+              ${{ secrets.DOCKERHUB_USERNAME }}/kafka-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 45  # Biraz daha uzun bekleyelim
+            sleep 60  # Biraz daha uzun bekleyelim
 
             echo "=== Container Logs ==="
-            docker logs analytics-service
+            docker logs kafka-service
 
             echo "=== Health Check ==="
-            if curl -f http://localhost:8096/actuator/health; then
+            if curl -f http://localhost:8055/actuator/health; then
               echo "Service is healthy"
             else
+
               echo "Service failed health check"
-              docker logs analytics-service
+              docker logs kafka-service
               exit 1
             fi

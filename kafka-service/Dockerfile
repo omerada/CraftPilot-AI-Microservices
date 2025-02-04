@@ -1,33 +1,24 @@
-FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
+# Build stage - sadece ARM64
+FROM --platform=linux/arm64 maven:3.9.6-eclipse-temurin-21 AS build
 
-WORKDIR /app
-
-# Copy parent pom.xml first
-COPY ../pom.xml /app/parent/pom.xml
-
-# Copy project files
-WORKDIR /app/subscription-service
+WORKDIR /build
 COPY pom.xml .
-COPY .mvn .mvn
-COPY mvnw .
+COPY src ./src
 
-# Fix line endings and make mvnw executable
-RUN sed -i 's/\r$//' mvnw && \
-    chmod +x mvnw
+# Maven build için platform ayarı
+ARG TARGETARCH=arm64
+RUN echo "Building for ARM64 architecture"
+RUN mvn clean package -DskipTests
 
-# Download dependencies
-RUN --mount=type=cache,target=/root/.m2 ./mvnw dependency:go-offline -B
-
-# Copy source and build
-COPY src src
-RUN --mount=type=cache,target=/root/.m2 ./mvnw clean package -DskipTests
-
-FROM eclipse-temurin:21-jre-alpine
+# Run stage - sadece ARM64
+FROM --platform=linux/arm64 eclipse-temurin:21-jdk
 
 WORKDIR /app
+COPY --from=build /build/target/*.jar app.jar
 
-COPY --from=builder /app/subscription-service/target/*.jar app.jar
+# JVM ayarları
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+RUN echo "Running on ARM64 architecture"
 
-EXPOSE 8091
-
-ENTRYPOINT ["java", "-jar", "app.jar"]
+EXPOSE 8055
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]

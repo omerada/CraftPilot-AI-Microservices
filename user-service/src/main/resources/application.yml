@@ -73,7 +73,7 @@ eureka:
     fetch-registry: true
 
 server:
-  port: 8092
+  port: 8050
   shutdown: graceful
   http2:
     enabled: true

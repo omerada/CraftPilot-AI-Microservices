@@ -1,5 +1,5 @@
 server:
-  port: ${SERVER_PORT:8084}
+  port: ${SERVER_PORT:8051}
   shutdown: graceful
   netty:
     connection-timeout: 2s

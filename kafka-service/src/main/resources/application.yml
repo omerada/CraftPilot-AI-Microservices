@@ -1,5 +1,5 @@
 server:
-  port: 8087
+  port: 8055
   shutdown: graceful
 
 spring:

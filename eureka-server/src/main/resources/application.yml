@@ -14,7 +14,7 @@ spring:
       password: ${eureka.security.password}
 
 server:
-  port: 8761
+  port: 8057
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/xml,text/plain

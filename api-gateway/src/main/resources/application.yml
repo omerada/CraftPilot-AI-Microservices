@@ -1,15 +1,15 @@
 server:
-  port: ${SERVER_PORT:8090}
-  shutdown: ${SERVER_SHUTDOWN:graceful}
+  port: ${SERVER_PORT:8070}
+  shutdown: graceful
   netty:
-    connection-timeout: ${SERVER_NETTY_CONNECTION_TIMEOUT:2s}
-    idle-timeout: ${SERVER_NETTY_IDLE_TIMEOUT:15s}
+    connection-timeout: 2s
+    idle-timeout: 15s
 
 spring:
   application:
     name: api-gateway
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:local}
+    active: ${SPRING_PROFILES_ACTIVE:prod}
   cloud:
     gcp:
       project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
@@ -21,12 +21,12 @@ spring:
           enabled: true
           lowerCaseServiceId: true
       httpclient:
-        connect-timeout: ${GATEWAY_HTTPCLIENT_CONNECT_TIMEOUT:2000}
-        response-timeout: ${GATEWAY_HTTPCLIENT_RESPONSE_TIMEOUT:5s}
+        connect-timeout: 2000
+        response-timeout: 5s
         pool:
-          max-idle-time: ${GATEWAY_HTTPCLIENT_POOL_MAX_IDLE_TIME:15s}
+          max-idle-time: 15s
           type: elastic
-          max-connections: ${GATEWAY_HTTPCLIENT_POOL_MAX_CONNECTIONS:1000}
+          max-connections: 1000
       default-filters:
         - name: RequestRateLimiter
           args:
@@ -53,6 +53,7 @@ spring:
               - "X-User-Role"
             maxAge: 3600
       routes:
+        # User Service Routes
         - id: user-service
           uri: lb://user-service
           predicates:
@@ -62,23 +63,30 @@ spring:
               args:
                 name: userServiceCircuitBreaker
                 fallbackUri: forward:/fallback/user
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter:
-                  replenishRate: 10
-                  burstCapacity: 20
-                key-resolver: "#{@userKeyResolver}"
 
-        - id: subscription-service
-          uri: lb://subscription-service
+        # Admin Service Routes
+        - id: admin-service
+          uri: lb://admin-service
           predicates:
-            - Path=/api/subscriptions/**
+            - Path=/api/admin/**
           filters:
             - name: CircuitBreaker
               args:
-                name: subscriptionServiceCircuitBreaker
-                fallbackUri: forward:/fallback/subscription
+                name: adminServiceCircuitBreaker
+                fallbackUri: forward:/fallback/admin
 
+        # Analytics Service Routes
+        - id: analytics-service
+          uri: lb://analytics-service
+          predicates:
+            - Path=/api/analytics/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: analyticsServiceCircuitBreaker
+                fallbackUri: forward:/fallback/analytics
+
+        # AI Question Service Routes
         - id: aiquestion-service
           uri: lb://aiquestion-service
           predicates:
@@ -89,15 +97,88 @@ spring:
                 name: aiquestionServiceCircuitBreaker
                 fallbackUri: forward:/fallback/aiquestion
 
-        - id: kafka-service
-          uri: lb://kafka-service
+        # Code Service Routes
+        - id: code-service
+          uri: lb://code-service
           predicates:
-            - Path=/api/kafka/**
+            - Path=/api/code/**
           filters:
             - name: CircuitBreaker
               args:
-                name: kafkaServiceCircuitBreaker
-                fallbackUri: forward:/fallback/kafka
+                name: codeServiceCircuitBreaker
+                fallbackUri: forward:/fallback/code
+
+        # Content Service Routes
+        - id: content-service
+          uri: lb://content-service
+          predicates:
+            - Path=/api/content/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: contentServiceCircuitBreaker
+                fallbackUri: forward:/fallback/content
+
+        # Credit Service Routes
+        - id: credit-service
+          uri: lb://credit-service
+          predicates:
+            - Path=/api/credits/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: creditServiceCircuitBreaker
+                fallbackUri: forward:/fallback/credit
+
+        # Swagger UI Routes
+        - id: swagger-ui-user
+          uri: lb://user-service
+          predicates:
+            - Path=/user-service/swagger-ui/**,/user-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
+        - id: swagger-ui-admin
+          uri: lb://admin-service
+          predicates:
+            - Path=/admin-service/swagger-ui/**,/admin-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
+        - id: swagger-ui-analytics
+          uri: lb://analytics-service
+          predicates:
+            - Path=/analytics-service/swagger-ui/**,/analytics-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
+        - id: swagger-ui-aiquestion
+          uri: lb://aiquestion-service
+          predicates:
+            - Path=/aiquestion-service/swagger-ui/**,/aiquestion-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
+        - id: swagger-ui-code
+          uri: lb://code-service
+          predicates:
+            - Path=/code-service/swagger-ui/**,/code-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
+        - id: swagger-ui-content
+          uri: lb://content-service
+          predicates:
+            - Path=/content-service/swagger-ui/**,/content-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
+        - id: swagger-ui-credit
+          uri: lb://credit-service
+          predicates:
+            - Path=/credit-service/swagger-ui/**,/credit-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
 
   data:
     redis:
@@ -111,9 +192,9 @@ spring:
 eureka:
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
-    fetch-registry: ${EUREKA_CLIENT_FETCH_REGISTRY:true}
-    register-with-eureka: ${EUREKA_CLIENT_REGISTER_WITH_EUREKA:true}
+      defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka
+    fetch-registry: true
+    register-with-eureka: true
     registry-fetch-interval-seconds: 5
   instance:
     prefer-ip-address: true
@@ -126,15 +207,71 @@ resilience4j:
     instances:
       default:
         slidingWindowType: COUNT_BASED
-        slidingWindowSize: ${CIRCUIT_BREAKER_SLIDING_WINDOW_SIZE:10}
-        failureRateThreshold: ${CIRCUIT_BREAKER_FAILURE_RATE_THRESHOLD:50}
-        waitDurationInOpenState: ${CIRCUIT_BREAKER_WAIT_DURATION_OPEN_STATE:10000}
-        permittedNumberOfCallsInHalfOpenState: ${CIRCUIT_BREAKER_PERMITTED_CALLS_HALF_OPEN:5}
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 5
         registerHealthIndicator: true
+      userServiceCircuitBreaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 5
+      adminServiceCircuitBreaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 5
+      analyticsServiceCircuitBreaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 5
+      aiquestionServiceCircuitBreaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 5
+      subscriptionServiceCircuitBreaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 5
+      productServiceCircuitBreaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 5
+      paymentServiceCircuitBreaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 5
+      notificationServiceCircuitBreaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 5
+      codeServiceCircuitBreaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 5
+      contentServiceCircuitBreaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 5
+      creditServiceCircuitBreaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 5
+
   timelimiter:
     instances:
       default:
-        timeoutDuration: ${TIME_LIMITER_TIMEOUT_DURATION:5s}
+        timeoutDuration: 5s
 
 management:
   endpoints:
@@ -144,6 +281,8 @@ management:
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
     metrics:
       enabled: true
     prometheus:
@@ -151,12 +290,23 @@ management:
 
 logging:
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] [%X{spanId}] %-5level %logger{36} - %msg%n"
   level:
-    org.springframework.cloud.gateway: ${LOGGING_LEVEL_SPRING_CLOUD_GATEWAY:DEBUG}
-    org.springframework.security: ${LOGGING_LEVEL_SPRING_SECURITY:DEBUG}
-    com.craftpilot.apigateway: ${LOGGING_LEVEL_COM_CRAFTPILOT_APIGATEWAY:DEBUG}
-    root: ${LOGGING_LEVEL_ROOT:INFO}
+    org.springframework.cloud.gateway: INFO
+    org.springframework.security: INFO
+    com.craftpilot.apigateway: INFO
+    root: INFO
+
+# Service Port Mappings
+# api-gateway:           8061
+# eureka-server:         8761
+# user-service:          8050
+# admin-service:         8063
+# analytics-service:     8064
+# aiquestion-service:    8065
+# code-service:          8066
+# content-service:       8067
+# credit-service:        8068
 
 firebase:
   credentials:
