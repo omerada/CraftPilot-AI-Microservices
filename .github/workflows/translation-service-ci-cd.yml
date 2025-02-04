@@ -35,6 +35,13 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: false # Oturumu açık tut
+
+      # Docker Hub'dan base image'ları çek
+      - name: Pull base images
+        run: |
+          docker pull maven:3.9.6-eclipse-temurin-21
+          docker pull eclipse-temurin:21-jdk
 
       # Sadece ARM64 için build ve push
       - name: Build and Push Docker image
@@ -51,6 +58,8 @@ jobs:
           build-args: |
             BUILDPLATFORM=linux/arm64
             TARGETPLATFORM=linux/arm64
+            DOCKER_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            DOCKER_PASSWORD=${{ secrets.DOCKERHUB_TOKEN }}
 
       # Google Cloud kimlik doğrulaması
       - id: "auth"

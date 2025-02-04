@@ -1,6 +1,13 @@
 # Build stage - sadece ARM64
 FROM --platform=linux/arm64 maven:3.9.6-eclipse-temurin-21 AS build
 
+# Docker Hub kimlik bilgilerini al
+ARG DOCKER_USERNAME
+ARG DOCKER_PASSWORD
+
+# Docker Hub'a giriş yap
+RUN echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
 WORKDIR /build
 
 # Tüm projeyi kopyala
@@ -23,5 +30,5 @@ COPY --from=build /build/target/*.jar app.jar
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 RUN echo "Running on ARM64 architecture"
 
-EXPOSE 8080
+EXPOSE 8070
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]

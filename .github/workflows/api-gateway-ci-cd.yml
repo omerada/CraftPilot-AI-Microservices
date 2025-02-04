@@ -35,13 +35,19 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: false # Oturumu açık tut
+
+      # Docker Hub'dan base image'ları çek
+      - name: Pull base images
+        run: |
+          docker pull maven:3.9.6-eclipse-temurin-21
+          docker pull eclipse-temurin:21-jdk
 
       # Sadece ARM64 için build ve push
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
           context: ./api-gateway
-          file: ./api-gateway/Dockerfile
           platforms: linux/arm64
           push: true
           tags: |
@@ -52,6 +58,8 @@ jobs:
           build-args: |
             BUILDPLATFORM=linux/arm64
             TARGETPLATFORM=linux/arm64
+            DOCKER_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            DOCKER_PASSWORD=${{ secrets.DOCKERHUB_TOKEN }}
 
       # Google Cloud kimlik doğrulaması
       - id: "auth"
@@ -74,19 +82,6 @@ jobs:
           debug: true
           command_timeout: "20m"
           script: |
-            echo "=== Testing SSH Connection ==="
-            whoami
-            pwd
-
-            echo "=== System Architecture ==="
-            uname -m
-
-            echo "=== Testing Directory Access ==="
-            ls -la /opt/craftpilot || mkdir -p /opt/craftpilot
-
-            echo "=== Continuing with Deployment ==="
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
-
             echo "=== Testing Docker ==="
             docker version
             docker info
@@ -123,7 +118,6 @@ jobs:
             docker stop api-gateway || true
             docker rm api-gateway || true
 
-
             echo "=== Starting New Container ==="
             docker run -d \
               --name api-gateway \
@@ -132,29 +126,34 @@ jobs:
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/ \
+              -e EUREKA_INSTANCE_PREFERIPADDRESS=true \
               -e EUREKA_USERNAME=craftpilot \
-
               -e EUREKA_PASSWORD=13579ada \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
+              -e SPRING_REDIS_HOST=redis \
+              -e SPRING_REDIS_PORT=6379 \
+              -e SPRING_REDIS_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 60  # Biraz daha uzun bekleyelim
+            sleep 60
 
             echo "=== Container Logs ==="
-              docker logs api-gateway
-
+            docker logs api-gateway
 
             echo "=== Health Check ==="
-            if curl -f http://localhost:8070/actuator/health; then
-              echo "Service is healthy"
-            else
-              echo "Service failed health check"
-              docker logs api-gateway
-              exit 1
-            fi
+            for i in {1..5}; do
+              if curl -f http://localhost:8070/actuator/health; then
+                echo "Service is healthy"
+                exit 0
+              fi
+              echo "Waiting for service to start... Attempt $i"
+              sleep 10
+            done
+
+            echo "Service failed health check"
+            docker logs api-gateway
+            exit 1
 
       - name: Trigger Deploy Services Workflow
         if: success()
