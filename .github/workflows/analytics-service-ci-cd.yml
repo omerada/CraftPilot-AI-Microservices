@@ -91,6 +91,9 @@ jobs:
             docker info
             docker ps
 
+            # Docker ağını oluştur (eğer yoksa)
+            docker network create craftpilot-network || true
+
             echo "=== Pulling ARM64 Image ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
 
@@ -113,17 +116,17 @@ jobs:
               -e REDIS_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
 
-            echo "=== Container Logs ==="
-            docker logs analytics-service 
+            echo "=== Waiting for Container to Start ==="
+            sleep 30
 
-      - name: Health check
-        run: |
-          echo "Waiting for service to start..."
-          sleep 30
-          if curl -f http://localhost:8096/actuator/health; then
-            echo "Service is healthy"
-          else
-            echo "Service failed health check"
+            echo "=== Container Logs ==="
             docker logs analytics-service
-            exit 1
-          fi
+
+            echo "=== Health Check ==="
+            if curl -f http://localhost:8096/actuator/health; then
+              echo "Service is healthy"
+            else
+              echo "Service failed health check"
+              docker logs analytics-service
+              exit 1
+            fi
