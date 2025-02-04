@@ -55,8 +55,14 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true # Hata durumunda scripti durdur
+          debug: true # Debug modunu aktifleştir
           script: |
-            # Google Cloud kimlik bilgilerini VPS'e kopyala
+            # Test connection
+            whoami
+            pwd
+
+            # Continue with deployment
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
 
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest
