@@ -17,6 +17,27 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # Docker Hub'a giriş yap
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Docker Buildx kurulumu
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Build ve Push işlemleri
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./analytics-service
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:buildcache,mode=max
+
       # Google Cloud kimlik doğrulaması
       - id: "auth"
         name: "Authenticate to Google Cloud"
@@ -28,17 +49,6 @@ jobs:
       - name: "Set up Cloud SDK"
         uses: "google-github-actions/setup-gcloud@v1"
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and Push Docker image
-        run: |
-          docker build -t craftpilot/analytics-service:latest .
-          docker push craftpilot/analytics-service:latest
-
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
@@ -49,7 +59,7 @@ jobs:
             # Google Cloud kimlik bilgilerini VPS'e kopyala
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
 
-            docker pull craftpilot/analytics-service:latest
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest
             docker stop analytics-service || true
             docker rm analytics-service || true
 
@@ -65,7 +75,7 @@ jobs:
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
-              craftpilot/analytics-service:latest
+              ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest
 
       - name: Health check
         run: |
