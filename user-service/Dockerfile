@@ -6,8 +6,14 @@ WORKDIR /build
 # Tüm projeyi kopyala
 COPY . .
 
-# Maven kurulumu
-RUN yum install -y maven
+# Maven kurulumu ve versiyonu belirleme
+RUN yum install -y wget tar
+RUN wget https://dlcdn.apache.org/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz
+RUN tar xzf apache-maven-3.9.6-bin.tar.gz -C /opt/
+RUN ln -s /opt/apache-maven-3.9.6 /opt/maven
+ENV M2_HOME=/opt/maven
+ENV MAVEN_HOME=/opt/maven
+ENV PATH=${M2_HOME}/bin:${PATH}
 
 # Maven build için platform ayarı
 ARG TARGETARCH=arm64
