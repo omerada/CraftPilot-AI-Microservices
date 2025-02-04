@@ -2,19 +2,25 @@
 FROM --platform=linux/arm64 maven:3.9.6-eclipse-temurin-21 AS build
 
 WORKDIR /build
-COPY pom.xml .
-COPY src ./src
+
+# Tüm projeyi kopyala
+COPY . .
 
 # Maven build için platform ayarı
 ARG TARGETARCH=arm64
 RUN echo "Building for ARM64 architecture"
-RUN mvn clean package -DskipTests
+
+# Önce parent POM'u yükle
+RUN mvn -f pom.xml install -N -DskipTests
+
+# Projeyi derle
+RUN cd analytics-service && mvn clean package -DskipTests
 
 # Run stage - sadece ARM64
 FROM --platform=linux/arm64 eclipse-temurin:21-jdk
 
 WORKDIR /app
-COPY --from=build /build/target/*.jar app.jar
+COPY --from=build /build/analytics-service/target/*.jar app.jar
 
 # JVM ayarları
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
