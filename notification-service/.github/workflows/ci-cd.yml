@@ -2,11 +2,11 @@ name: Notification Service CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "notification-service/**"
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - "notification-service/**"
 

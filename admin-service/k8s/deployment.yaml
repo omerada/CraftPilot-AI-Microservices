@@ -6,7 +6,7 @@ metadata:
   labels:
     app: admin-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: admin-service
@@ -19,44 +19,47 @@ spec:
         - name: admin-service
           image: craftpilot/admin-service:latest
           ports:
-            - containerPort: 8081
+            - containerPort: 8097
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              valueFrom:
+                configMapKeyRef:
+                  name: craftpilot-config
+                  key: eureka.client.serviceUrl.defaultZone
             - name: GCP_PROJECT_ID
               valueFrom:
                 secretKeyRef:
-                  name: gcp-credentials
-                  key: project-id
-            - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: "/etc/gcp/credentials.json"
+                  name: craftpilot-secrets
+                  key: gcp-project-id
           volumeMounts:
-            - name: gcp-credentials
-              mountPath: "/etc/gcp"
+            - name: firebase-credentials
+              mountPath: "/app/config"
               readOnly: true
           resources:
-            requests:
-              memory: "512Mi"
-              cpu: "250m"
             limits:
-              memory: "1Gi"
+              memory: "512Mi"
               cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
           livenessProbe:
             httpGet:
               path: /actuator/health
-              port: 8081
+              port: 8097
             initialDelaySeconds: 60
             periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /actuator/health
-              port: 8081
+              port: 8097
             initialDelaySeconds: 30
             periodSeconds: 10
       volumes:
-        - name: gcp-credentials
+        - name: firebase-credentials
           secret:
-            secretName: gcp-credentials
+            secretName: firebase-credentials
             items:
               - key: credentials.json
                 path: credentials.json

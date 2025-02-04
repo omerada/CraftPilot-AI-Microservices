@@ -1,5 +1,5 @@
 server:
-  port: 8086
+  port: 8096
 
 spring:
   application:
@@ -68,10 +68,11 @@ eureka:
     hostname: localhost
 
 springdoc:
-  api-docs:
-    path: /api-docs
   swagger-ui:
     path: /swagger-ui.html
+    enabled: true
+  api-docs:
+    path: /v3/api-docs
     enabled: true
 
 redis:
@@ -109,3 +110,11 @@ logging:
     com.craftpilot.analyticsservice: ${LOG_LEVEL:INFO}
     org.springframework.web: ${LOG_LEVEL:INFO}
     org.springframework.data: ${LOG_LEVEL:INFO}
+
+cors:
+  allowed-origins: "*"
+  allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
+  allowed-headers: "*"
+  exposed-headers: "Authorization,Link,X-Total-Count"
+  allow-credentials: true
+  max-age: 1800

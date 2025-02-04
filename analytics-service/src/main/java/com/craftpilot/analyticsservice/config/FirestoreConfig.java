@@ -1,25 +1,24 @@
-package com.craftpilot.adminservice.config;
+package com.craftpilot.analyticsservice.config;
 
-import com.google.auth.oauth2.GoogleCredentials;
-import com.google.cloud.firestore.Firestore;
-import com.google.cloud.firestore.FirestoreOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.io.FileInputStream;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.firestore.Firestore;
+import com.google.cloud.firestore.FirestoreOptions;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 @Configuration
 public class FirestoreConfig {
 
-    @Value("${GOOGLE_APPLICATION_CREDENTIALS}")
-    private String credentialsPath;
+    @Value("${GCP_SA_KEY}")
+    private String gcpServiceAccountKey;
 
     @Bean
     public Firestore firestore() throws IOException {
         GoogleCredentials credentials = GoogleCredentials.fromStream(
-            new FileInputStream(credentialsPath)
+            new ByteArrayInputStream(gcpServiceAccountKey.getBytes())
         );
 
         FirestoreOptions firestoreOptions = FirestoreOptions.newBuilder()

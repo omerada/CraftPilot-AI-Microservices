@@ -1,4 +1,4 @@
-package com.craftpilot.adminservice.config;
+package com.craftpilot.analyticsservice.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,16 +16,11 @@ public class SecurityConfig {
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
-                        // Swagger UI ve API docs için public erişim
                         .pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", 
                                     "/webjars/**", "/swagger-resources/**").permitAll()
-                        // Actuator endpoint'leri için public erişim
                         .pathMatchers("/actuator/**").permitAll()
-                        // OPTIONS istekleri için public erişim
                         .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        // Health check için public erişim
                         .pathMatchers("/health", "/info").permitAll()
-                        // Diğer tüm istekler için basic auth
                         .anyExchange().authenticated()
                 )
                 .httpBasic(httpBasic -> httpBasic

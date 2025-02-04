@@ -2,11 +2,11 @@ name: Translation Service CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "translation-service/**"
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - "translation-service/**"
 

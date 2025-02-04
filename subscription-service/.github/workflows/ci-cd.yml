@@ -2,11 +2,11 @@ name: Subscription Service CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "subscription-service/**"
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - "subscription-service/**"
 

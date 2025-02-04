@@ -39,3 +39,5 @@ data:
         operationsSorter: method
         tagsSorter: alpha
       show-actuator: true
+
+  eureka.client.serviceUrl.defaultZone: "http://eureka-server:8761/eureka/"
