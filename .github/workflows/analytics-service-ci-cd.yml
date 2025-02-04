@@ -37,6 +37,11 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           logout: false # Oturumu açık tut
 
+      # Docker CLI ile de giriş yap (pull komutları için)
+      - name: Docker Login for CLI
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+
       # Docker Hub'dan base image'ları çek
       - name: Pull base images
         run: |
