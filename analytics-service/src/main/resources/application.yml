@@ -37,8 +37,6 @@ spring:
           contentType: application/json
     gcp:
       project-id: craft-pilot-ai
-      credentials:
-        location: classpath:firebase-service-account.json
 
 management:
   endpoints:

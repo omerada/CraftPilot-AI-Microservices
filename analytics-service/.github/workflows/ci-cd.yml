@@ -5,15 +5,6 @@ on:
     branches: [master]
     paths:
       - "analytics-service/**"
-  pull_request:
-    branches: [master]
-    paths:
-      - "analytics-service/**"
-
-env:
-  SERVICE_NAME: analytics-service
-  DOCKER_IMAGE: craftpilot/analytics-service
-  SERVICE_PORT: 8096
 
 jobs:
   build-and-deploy:
@@ -21,30 +12,17 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v3
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
         with:
-          java-version: "21"
-          distribution: "temurin"
-          cache: maven
-
-      - name: Build with Maven
-        run: |
-          cd ${{ env.SERVICE_NAME }}
-          mvn clean package -DskipTests
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          project_id: craft-pilot-ai
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
 
       - name: Build and Push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./${{ env.SERVICE_NAME }}
-          push: true
-          tags: ${{ env.DOCKER_IMAGE }}:latest
+        run: |
+          docker build -t craftpilot/analytics-service:latest .
+          docker push craftpilot/analytics-service:latest
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
@@ -53,38 +31,30 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Pull latest image
-            docker pull ${{ env.DOCKER_IMAGE }}:latest
-
-            # Stop and remove existing container
-            docker stop ${{ env.SERVICE_NAME }} || true
-            docker rm ${{ env.SERVICE_NAME }} || true
-
-            # Run new container
+            docker pull craftpilot/analytics-service:latest
+            docker stop analytics-service || true
+            docker rm analytics-service || true
             docker run -d \
-              --name ${{ env.SERVICE_NAME }} \
+              --name analytics-service \
               --network craftpilot-network \
-              -p ${{ env.SERVICE_PORT }}:${{ env.SERVICE_PORT }} \
+              -p 8096:8096 \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_USERNAME=${{ secrets.EUREKA_USERNAME }} \
-              -e EUREKA_PASSWORD=${{ secrets.EUREKA_PASSWORD }} \
-              -e REDIS_HOST=${{ secrets.REDIS_HOST }} \
-              -e REDIS_PORT=${{ secrets.REDIS_PORT }} \
-              -e REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }} \
-              -e GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
-              -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
-              -e GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}' \
-              ${{ env.DOCKER_IMAGE }}:latest
+              -e EUREKA_USERNAME=craftpilot \
+              -e EUREKA_PASSWORD=13579ada \
+              -e REDIS_HOST=redis \
+              -e REDIS_PORT=6379 \
+              -e REDIS_PASSWORD=13579ada \
+              craftpilot/analytics-service:latest
 
       - name: Health check
         run: |
           echo "Waiting for service to start..."
           sleep 30
-          if curl -f http://localhost:${{ env.SERVICE_PORT }}/actuator/health; then
+          if curl -f http://localhost:8096/actuator/health; then
             echo "Service is healthy"
           else
             echo "Service failed health check"
-            docker logs ${{ env.SERVICE_NAME }}
+            docker logs analytics-service
             exit 1
           fi
 

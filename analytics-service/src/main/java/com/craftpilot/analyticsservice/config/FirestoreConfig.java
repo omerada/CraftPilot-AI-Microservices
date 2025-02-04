@@ -12,19 +12,11 @@ import java.io.IOException;
 @Configuration
 public class FirestoreConfig {
 
-    @Value("${GCP_SA_KEY}")
+    @Value("${spring.cloud.gcp.credentials}")
     private String gcpServiceAccountKey;
 
     @Bean
     public Firestore firestore() throws IOException {
-        GoogleCredentials credentials = GoogleCredentials.fromStream(
-            new ByteArrayInputStream(gcpServiceAccountKey.getBytes())
-        );
-
-        FirestoreOptions firestoreOptions = FirestoreOptions.newBuilder()
-            .setCredentials(credentials)
-            .build();
-
-        return firestoreOptions.getService();
+        return FirestoreOptions.getDefaultInstance().getService();
     }
 } 

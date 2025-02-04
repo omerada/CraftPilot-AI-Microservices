@@ -509,16 +509,16 @@ services:
   analytics-service:
     image: craftpilot/analytics-service:latest
     container_name: analytics-service
+    env_file:
+      - .env
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - EUREKA_USERNAME=${EUREKA_USERNAME}
-      - EUREKA_PASSWORD=${EUREKA_PASSWORD}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GCP_SA_KEY=${GCP_SA_KEY}
+      - EUREKA_USERNAME=craftpilot
+      - EUREKA_PASSWORD=13579ada
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=13579ada
+      - GCP_PROJECT_ID=craft-pilot-ai
     ports:
       - "8096:8096"
     networks:
