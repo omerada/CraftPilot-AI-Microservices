@@ -55,15 +55,19 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true # Hata durumunda scripti durdur
-          debug: true # Debug modunu aktifleştir
+          script_stop: true
+          debug: true
+          command_timeout: "20m"
           script: |
-            # Test connection
+            echo "=== Testing SSH Connection ==="
             whoami
             pwd
-
-            # Continue with deployment
+            echo "=== Testing Directory Access ==="
+            ls -la /opt/craftpilot || mkdir -p /opt/craftpilot
+            echo "=== Continuing with Deployment ==="
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
+            echo "=== Testing Docker ==="
+            docker ps
 
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest
             docker stop analytics-service || true
