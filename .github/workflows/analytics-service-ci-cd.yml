@@ -37,17 +37,6 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           logout: true
 
-      # Docker CLI ile de giriş yap (pull komutları için)
-      - name: Docker Login for CLI
-        run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-
-      # Docker Hub'dan base image'ları çek
-      - name: Pull base images
-        run: |
-          docker pull maven:3.9.6-eclipse-temurin-21
-          docker pull eclipse-temurin:21-jdk
-
       # Sadece ARM64 için build ve push
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
