@@ -17,7 +17,7 @@ RUN echo "Building for ARM64 architecture"
 RUN mvn clean package -DskipTests
 
 # Run stage
-FROM public.ecr.aws/amazoncorretto/amazoncorretto:21-alpine
+FROM public.ecr.aws/amazoncorretto/amazoncorretto:21
 
 WORKDIR /app
 COPY --from=build /build/target/*.jar app.jar
