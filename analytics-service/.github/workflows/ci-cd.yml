@@ -12,12 +12,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
+      # Google Cloud kimlik doğrulaması
+      - id: "auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v1"
         with:
-          project_id: craft-pilot-ai
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
+          credentials_json: "${{ secrets.GCP_SA_KEY }}"
+
+      # Google Cloud CLI kurulumu
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v1"
 
       - name: Build and Push Docker image
         run: |
@@ -31,13 +35,19 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Google Cloud kimlik bilgilerini VPS'e kopyala
+            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
+
             docker pull craftpilot/analytics-service:latest
             docker stop analytics-service || true
             docker rm analytics-service || true
+
             docker run -d \
               --name analytics-service \
               --network craftpilot-network \
               -p 8096:8096 \
+              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \

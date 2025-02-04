@@ -35,8 +35,6 @@ spring:
           destination: metrics-events
           group: analytics-service
           contentType: application/json
-    gcp:
-      project-id: craft-pilot-ai
 
 management:
   endpoints:
@@ -76,12 +74,6 @@ springdoc:
 redis:
   host: ${REDIS_HOST:localhost}
   port: ${REDIS_PORT:6379}
-
-google:
-  cloud:
-    project-id: craft-pilot-ai
-    credentials:
-      location: classpath:firebase-service-account.json
 
 openai:
   api-key: ${OPENAI_API_KEY}
