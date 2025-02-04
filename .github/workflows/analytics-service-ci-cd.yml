@@ -78,12 +78,3 @@ jobs:
             docker logs analytics-service
             exit 1
           fi
-
-      - name: Notify Slack on Failure
-        if: failure()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
