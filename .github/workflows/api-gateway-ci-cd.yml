@@ -29,6 +29,14 @@ jobs:
         with:
           platforms: linux/arm64
 
+      # Docker Hub'a giriş yap
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: true
+
       # Sadece ARM64 için build ve push
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
