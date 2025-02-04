@@ -2,7 +2,7 @@ version: "3.8"
 services:
   # Infrastructure Services
   redis:
-    image: redis:7.2-alpine
+    image: redis:latest
     container_name: redis
     ports:
       - "6379:6379"
@@ -10,13 +10,9 @@ services:
       - craftpilot-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 512M
+      retries: 5
 
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
@@ -72,77 +68,42 @@ services:
 
   # Service Discovery
   eureka-server:
+    image: ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
     container_name: eureka-server
-    image: craftpilot/eureka-server:latest
     ports:
       - "8761:8761"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_CLIENT_REGISTER_WITH_EUREKA=false
-      - EUREKA_CLIENT_FETCH_REGISTRY=false
-      - EUREKA_INSTANCE_HOSTNAME=eureka-server
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
-      - SPRING_SECURITY_USER_NAME=${EUREKA_USERNAME}
-      - SPRING_SECURITY_USER_PASSWORD=${EUREKA_PASSWORD}
+      - SPRING_PROFILES_ACTIVE=prod
+      - EUREKA_USERNAME=${EUREKA_USERNAME}
+      - EUREKA_PASSWORD=${EUREKA_PASSWORD}
     networks:
       - craftpilot-network
     healthcheck:
-      test:
-        [
-          "CMD",
-          "curl",
-          "-f",
-          "http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@localhost:8761/actuator/health",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # API Gateway
   api-gateway:
+    image: ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
     container_name: api-gateway
-    image: craftpilot/api-gateway:latest
     ports:
-      - "8090:8090"
+      - "8070:8070"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
-      - EUREKA_INSTANCE_HOSTNAME=api-gateway
-      - FIREBASE_CREDENTIAL_PATH=/app/config/firebase-service-account.json
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-service-account.json
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
-      - SPRING_SECURITY_USER_NAME=${EUREKA_USERNAME}
-      - SPRING_SECURITY_USER_PASSWORD=${EUREKA_PASSWORD}
+      - SPRING_PROFILES_ACTIVE=prod
+      - EUREKA_USERNAME=${EUREKA_USERNAME}
+      - EUREKA_PASSWORD=${EUREKA_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - GCP_SA_KEY=${GCP_SA_KEY}
     volumes:
-      - ./api-gateway/src/main/resources/firebase-service-account.json:/app/config/firebase-service-account.json
+      - ${GCP_CREDENTIALS_PATH}:/gcp-credentials.json:ro
+    networks:
+      - craftpilot-network
     depends_on:
       eureka-server:
         condition: service_healthy
-      redis:
-        condition: service_started
-    networks:
-      - craftpilot-network
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "curl",
-          "-f",
-          "http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@localhost:8090/actuator/health",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
 
   # Content Service
   content-service:

@@ -15,9 +15,10 @@ jobs:
       run:
         working-directory: ./admin-service
     steps:
+      - uses: actions/checkout@v3
+
       # QEMU kurulumu
       - name: Set up QEMU
-
         uses: docker/setup-qemu-action@v2
         with:
           platforms: arm64
@@ -130,7 +131,6 @@ jobs:
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
-
               -e EUREKA_PASSWORD=13579ada \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
@@ -143,7 +143,6 @@ jobs:
             echo "=== Container Logs ==="
             docker logs admin-service
 
-
             echo "=== Health Check ==="
             if curl -f http://localhost:8063/actuator/health; then
               echo "Service is healthy"
@@ -153,3 +152,9 @@ jobs:
               exit 1
             fi
 
+      - name: Trigger Deploy Services Workflow
+        if: success()
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          event-type: trigger-deploy-services

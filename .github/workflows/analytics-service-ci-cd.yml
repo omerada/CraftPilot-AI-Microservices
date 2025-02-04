@@ -157,3 +157,10 @@ jobs:
             echo "Service failed health check"
             docker logs analytics-service
             exit 1
+
+      - name: Trigger Deploy Services Workflow
+        if: success()
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          event-type: trigger-deploy-services

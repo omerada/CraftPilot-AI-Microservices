@@ -153,3 +153,10 @@ jobs:
               docker logs credit-service
               exit 1
             fi
+
+      - name: Trigger Deploy Services Workflow
+        if: success()
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          event-type: trigger-deploy-services

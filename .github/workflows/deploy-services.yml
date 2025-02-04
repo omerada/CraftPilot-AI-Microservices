@@ -1,0 +1,63 @@
+name: Deploy Services
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [trigger-deploy-services]
+  push:
+    branches: [master]
+    paths:
+      - "docker-compose.yml"
+      - "start-services.sh"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@master
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          EUREKA_USERNAME: ${{ secrets.EUREKA_USERNAME }}
+          EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DOCKERHUB_USERNAME,EUREKA_USERNAME,EUREKA_PASSWORD,GCP_SA_KEY
+          script_stop: true
+          script: |
+            echo "=== Starting Deployment Process ==="
+
+            # Environment variables'ları export et
+            export DOCKERHUB_USERNAME="$DOCKERHUB_USERNAME"
+            export EUREKA_USERNAME="$EUREKA_USERNAME"
+            export EUREKA_PASSWORD="$EUREKA_PASSWORD"
+            export GCP_SA_KEY="$GCP_SA_KEY"
+
+            # Proje dizinine git
+            cd /opt/craftpilot
+
+            # Mevcut docker-compose.yml ve start-services.sh dosyalarını yedekle
+            timestamp=$(date +%Y%m%d_%H%M%S)
+            mkdir -p backups
+            cp docker-compose.yml backups/docker-compose_$timestamp.yml || true
+            cp start-services.sh backups/start-services_$timestamp.sh || true
+
+            # Yeni dosyaları kopyala
+            echo "$DOCKER_COMPOSE_CONTENT" > docker-compose.yml
+            echo "$START_SCRIPT_CONTENT" > start-services.sh
+
+            # Yetkileri ayarla
+            chmod +x start-services.sh
+
+            echo "=== Starting Services ==="
+            ./start-services.sh
+
+            echo "=== Checking Services Status ==="
+            docker ps
+
+            echo "=== Deployment Complete ==="
