@@ -122,6 +122,7 @@ jobs:
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
+              -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
               ${{ secrets.DOCKERHUB_USERNAME }}/aiquestion-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
