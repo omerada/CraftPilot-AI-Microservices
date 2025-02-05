@@ -84,17 +84,24 @@ jobs:
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
             chmod 600 /opt/craftpilot/gcp-credentials.json
 
-            # Redis container'ını başlat (eğer çalışmıyorsa)
-            if ! docker ps | grep -q redis; then
+            # Redis durumunu kontrol et ve gerekirse başlat
+            if ! docker ps --filter "name=redis" --filter "status=running" -q | grep -q .; then
+              echo "=== Starting Redis ==="
               docker run -d \
                 --name redis \
                 --network craftpilot-network \
                 -p 6379:6379 \
                 redis:latest
+              
+              echo "=== Waiting for Redis to start ==="
+              sleep 10
+            else
+              echo "=== Redis is already running ==="
             fi
 
-            # Eureka server'ı başlat (eğer çalışmıyorsa)
-            if ! docker ps | grep -q eureka-server; then
+            # Eureka durumunu kontrol et ve gerekirse başlat
+            if ! docker ps --filter "name=eureka-server" --filter "status=running" -q | grep -q .; then
+              echo "=== Starting Eureka Server ==="
               docker run -d \
                 --name eureka-server \
                 --network craftpilot-network \
@@ -103,6 +110,11 @@ jobs:
                 -e EUREKA_USERNAME=craftpilot \
                 -e EUREKA_PASSWORD=13579ada \
                 ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
+              
+              echo "=== Waiting for Eureka to start ==="
+              sleep 30
+            else
+              echo "=== Eureka Server is already running ==="
             fi
 
             echo "=== Pulling ARM64 Image ==="
@@ -119,6 +131,7 @@ jobs:
               -p 8063:8063 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+              -e GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/ \
               -e EUREKA_INSTANCE_PREFERIPADDRESS=true \
@@ -127,14 +140,45 @@ jobs:
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
+              -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=/gcp-credentials.json \
               ${{ secrets.DOCKERHUB_USERNAME }}/admin-service:latest-arm64
 
-            echo "=== Waiting for Container to Start ==="
-            sleep 60
+            # Servislerin başlamasını bekle
+            echo "=== Waiting for Services to Start ==="
+            sleep 30
+
+            # Bağlantı kontrolleri için yardımcı fonksiyon
+            check_connection() {
+              local max_attempts=5
+              local attempt=1
+              local service=$1
+              local host=$2
+              local port=$3
+              
+              while [ $attempt -le $max_attempts ]; do
+                if docker exec admin-service nc -z $host $port; then
+                  echo "$service connection successful"
+                  return 0
+                fi
+                echo "Attempt $attempt: Waiting for $service connection..."
+                sleep 10
+                attempt=$((attempt + 1))
+              done
+              
+              echo "$service connection failed after $max_attempts attempts"
+              docker logs $host
+              return 1
+            }
+
+            # Redis ve Eureka bağlantılarını kontrol et
+            echo "=== Testing Service Connections ==="
+            check_connection "Redis" "redis" "6379" || exit 1
+            check_connection "Eureka" "eureka-server" "8761" || exit 1
 
             echo "=== Container Logs ==="
             docker logs admin-service
 
+            # Health check
             echo "=== Health Check ==="
             for i in {1..5}; do
               if curl -f http://localhost:8063/actuator/health; then
