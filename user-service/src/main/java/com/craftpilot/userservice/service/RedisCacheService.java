@@ -17,26 +17,29 @@ public class RedisCacheService {
     private final ReactiveRedisTemplate<String, UserEntity> redisTemplate;
     private final ObjectMapper objectMapper;
     private static final Duration CACHE_TTL = Duration.ofHours(1);
-    private static final String USER_CACHE_PREFIX = "user:";
+    private static final String USER_KEY_PREFIX = "user:";
 
     public Mono<UserEntity> cacheUser(UserEntity user) {
+        String key = USER_KEY_PREFIX + user.getId();
         return redisTemplate.opsForValue()
-                .set(USER_CACHE_PREFIX + user.getId(), user, CACHE_TTL)
+                .set(key, user, CACHE_TTL)
                 .thenReturn(user);
     }
 
     public Mono<UserEntity> getCachedUser(String userId) {
-        return redisTemplate.opsForValue()
-                .get(USER_CACHE_PREFIX + userId);
+        String key = USER_KEY_PREFIX + userId;
+        return redisTemplate.opsForValue().get(key)
+                .doOnNext(user -> log.debug("Cache hit for user: {}", userId))
+                .doOnError(error -> log.error("Error getting user from cache: {}", error.getMessage()));
     }
 
     public Mono<Boolean> invalidateUser(String userId) {
         return redisTemplate.opsForValue()
-                .delete(USER_CACHE_PREFIX + userId);
+                .delete(USER_KEY_PREFIX + userId);
     }
 
     public Mono<Boolean> hasUser(String userId) {
-        String key = USER_CACHE_PREFIX + userId;
+        String key = USER_KEY_PREFIX + userId;
         return redisTemplate.hasKey(key)
                 .doOnSuccess(exists -> log.debug("Cache check for user {}: {}", key, exists))
                 .doOnError(e -> log.error("Error checking user cache: {}", key, e));

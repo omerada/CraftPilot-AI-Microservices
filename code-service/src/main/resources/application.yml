@@ -1,5 +1,5 @@
 server:
-  port: 8060
+  port: 8065
   shutdown: graceful
 
 spring:
@@ -46,6 +46,10 @@ spring:
       project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
       credentials:
         location: firebase-service-account.json
+    kubernetes:
+      enabled: false
+    discovery:
+      enabled: true
 
 firebase:
   credential:
@@ -55,12 +59,13 @@ firebase:
 
 eureka:
   instance:
-    prefer-ip-address: true
+    preferIpAddress: true
+    hostname: code-service
     lease-renewal-interval-in-seconds: 5
     lease-expiration-duration-in-seconds: 10
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_SERVICE_URL:http://localhost:8761/eureka/}
+      defaultZone: http://eureka-server:8761/eureka/
     registry-fetch-interval-seconds: 5
     register-with-eureka: true
     fetch-registry: true
@@ -69,12 +74,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: always
-      probes:
-        enabled: true
     metrics:
       enabled: true
     prometheus:
@@ -139,7 +142,5 @@ code:
       token: ${GITHUB_TOKEN}
 
 openai:
-  model: gpt-4
-  max-tokens: 2000
-  temperature: 0.7
-  api-key: ${OPENAI_API_KEY}
+  api:
+    key: ${OPENAI_API_KEY}

@@ -1,8 +1,6 @@
 package com.craftpilot.userservice.model.user.entity;
 
-import com.craftpilot.userservice.model.user.enums.UserRole;
 import com.craftpilot.userservice.model.user.enums.UserStatus;
-import com.google.cloud.firestore.annotation.DocumentId;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,21 +15,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UserEntity {
     
-    @DocumentId
     private String id;
     
-    private String email;
     private String username;
     private String displayName;
     private String photoUrl;
-    private UserRole role;
+    private String email;
     private UserStatus status;
     private long createdAt;
     private long updatedAt;
-    private String phoneNumber;
-    private Boolean emailVerified;
-    private String locale;
-    private String timezone;
     
     @Builder.Default
     private Boolean isActive = true;

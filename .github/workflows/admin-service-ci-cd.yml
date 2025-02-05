@@ -41,12 +41,13 @@ jobs:
         run: |
           cd admin-service
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-          docker build -t $DOCKER_USERNAME/admin-service:latest .
-          docker push $DOCKER_USERNAME/admin-service:latest
+          docker buildx create --use
+          docker buildx build --platform linux/arm64 -t $DOCKER_USERNAME/admin-service:latest-arm64 --push .
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -60,13 +61,31 @@ jobs:
             chmod 600 /opt/craftpilot/gcp-credentials.json
 
             # Docker container'ı güncelle
-            docker pull ${{ secrets.DOCKER_USERNAME }}/admin-service:latest
+            docker pull $DOCKER_USERNAME/admin-service:latest-arm64
             docker stop admin-service || true
             docker rm admin-service || true
             docker run -d \
               --name admin-service \
               --network craftpilot-network \
               -p 8063:8063 \
+              -e SPRING_PROFILES_ACTIVE=prod \
               -e GCP_PROJECT_ID=$GCP_PROJECT_ID \
               -v /opt/craftpilot/gcp-credentials.json:/opt/craftpilot/gcp-credentials.json:ro \
-              ${{ secrets.DOCKER_USERNAME }}/admin-service:latest
+              $DOCKER_USERNAME/admin-service:latest-arm64
+
+            echo "=== Waiting for Container to Start ==="
+            sleep 30
+
+            echo "=== Container Logs ==="
+            docker logs admin-service
+
+            echo "=== Health Check ==="
+            HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8063/actuator/health)
+            if [ "$HEALTH_CHECK" = "200" ]; then
+              echo "Service is healthy"
+            else
+              echo "Service failed health check"
+              docker stop admin-service
+              docker rm admin-service
+              exit 1
+            fi

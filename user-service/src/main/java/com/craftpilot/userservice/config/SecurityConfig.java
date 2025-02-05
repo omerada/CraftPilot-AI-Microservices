@@ -20,8 +20,8 @@ public class SecurityConfig {
                 .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers("/actuator/**").permitAll()
-                        .pathMatchers("/api/v1/users/**").permitAll()
-                        .anyExchange().permitAll()
+                        .pathMatchers("/api/v1/public/**").permitAll()
+                        .anyExchange().authenticated()
                 )
                 .build();
     }
