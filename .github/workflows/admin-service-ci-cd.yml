@@ -87,25 +87,67 @@ jobs:
             # Redis durumunu kontrol et ve gerekirse başlat
             if ! docker ps --filter "name=redis" --filter "status=running" -q | grep -q .; then
               echo "=== Starting Redis ==="
+              # Önce eski Redis container'ını temizle
+              docker rm -f redis || true
+              
+              # Redis yapılandırma dosyasını oluştur
+              cat > /opt/craftpilot/redis.conf << EOF
+              port 6379
+              bind 0.0.0.0
+              protected-mode no
+              requirepass 13579ada
+              appendonly yes
+              appendfsync everysec
+              no-appendfsync-on-rewrite yes
+              auto-aof-rewrite-percentage 100
+              auto-aof-rewrite-min-size 64mb
+              save 900 1
+              save 300 10
+              save 60 10000
+              maxmemory 1gb
+              maxmemory-policy allkeys-lru
+              replica-read-only no
+              replicaof no one
+              EOF
+
+              # Redis'i yeni yapılandırmayla başlat
               docker run -d \
                 --name redis \
                 --network craftpilot-network \
                 -p 6379:6379 \
                 --restart unless-stopped \
+                -v /opt/craftpilot/redis.conf:/usr/local/etc/redis/redis.conf \
                 redis:latest \
-                redis-server --protected-mode no --requirepass 13579ada --appendonly yes --replica-read-only no --slaveof no one
+                redis-server /usr/local/etc/redis/redis.conf
               
               echo "=== Waiting for Redis to start ==="
               sleep 10
             else
               echo "=== Redis is already running ==="
-              # Redis'i master moduna geç
+              # Redis'i master moduna geç ve yapılandırmayı güncelle
+              docker exec redis redis-cli -a 13579ada CONFIG SET appendonly yes
+              docker exec redis redis-cli -a 13579ada CONFIG SET appendfsync everysec
+              docker exec redis redis-cli -a 13579ada CONFIG SET no-appendfsync-on-rewrite yes
+              docker exec redis redis-cli -a 13579ada CONFIG SET maxmemory 1gb
+              docker exec redis redis-cli -a 13579ada CONFIG SET maxmemory-policy allkeys-lru
               docker exec redis redis-cli -a 13579ada SLAVEOF NO ONE
             fi
 
             # Redis bağlantısını test et
             echo "=== Testing Redis Connection ==="
-            if ! docker exec redis redis-cli -a 13579ada ping | grep -q 'PONG'; then
+            max_attempts=5
+            attempt=1
+            while [ $attempt -le $max_attempts ]; do
+              if docker exec redis redis-cli -a 13579ada ping | grep -q 'PONG'; then
+                echo "Redis connection successful"
+                break
+              fi
+              echo "Attempt $attempt: Waiting for Redis connection..."
+              sleep 5
+              attempt=$((attempt + 1))
+            done
+
+            if [ $attempt -gt $max_attempts ]; then
               echo "Redis connection test failed"
               docker logs redis
               exit 1
