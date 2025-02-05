@@ -9,15 +9,7 @@ spring:
   application:
     name: admin-service
   cloud:
-    kubernetes:
-      enabled: false
-    discovery:
-      enabled: true
-    loadbalancer:
-      ribbon:
-        enabled: false
     gcp:
-      project-id: craftpilot-ai
       credentials:
         location: file:/opt/craftpilot/gcp-credentials.json
       firestore:
@@ -25,6 +17,13 @@ spring:
         project-id: ${GCP_PROJECT_ID}
         credentials:
           location: file:/opt/craftpilot/gcp-credentials.json
+    kubernetes:
+      enabled: false
+    discovery:
+      enabled: true
+    loadbalancer:
+      ribbon:
+        enabled: false
 
 eureka:
   client:

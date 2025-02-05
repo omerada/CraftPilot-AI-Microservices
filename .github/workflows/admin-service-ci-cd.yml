@@ -20,6 +20,15 @@ jobs:
           java-version: "21"
           distribution: "corretto"
 
+      - name: Create GCP Credentials Directory
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            mkdir -p /opt/craftpilot
+
       - name: Build with Maven
         run: |
           cd admin-service
@@ -45,7 +54,12 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           envs: DOCKER_USERNAME,GCP_PROJECT_ID
           script: |
+            # GCP kimlik bilgilerini oluştur
+            mkdir -p /opt/craftpilot
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
+            chmod 600 /opt/craftpilot/gcp-credentials.json
+
+            # Docker container'ı güncelle
             docker pull ${{ secrets.DOCKER_USERNAME }}/admin-service:latest
             docker stop admin-service || true
             docker rm admin-service || true
