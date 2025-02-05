@@ -19,23 +19,28 @@ spring:
     gcp:
       project-id: craftpilot-ai
       credentials:
-        location: classpath:firebase-service-account.json
+        location: file:/opt/craftpilot/gcp-credentials.json
+      firestore:
+        enabled: true
+        project-id: ${GCP_PROJECT_ID}
+        credentials:
+          location: file:/opt/craftpilot/gcp-credentials.json
 
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: http://eureka-server:8761/eureka/
     register-with-eureka: true
     fetch-registry: true
   instance:
-    prefer-ip-address: true
-    hostname: localhost
+    preferIpAddress: true
+    hostname: admin-service
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: always
@@ -72,3 +77,10 @@ resilience4j:
         limitForPeriod: 10
         limitRefreshPeriod: 1s
         timeoutDuration: 500ms
+
+security:
+  oauth2:
+    resourceserver:
+      jwt:
+        issuer-uri: https://securetoken.google.com/${GCP_PROJECT_ID}
+        jwk-set-uri: https://www.googleapis.com/robot/v1/metadata/jwk/securetoken@system.gserviceaccount.com

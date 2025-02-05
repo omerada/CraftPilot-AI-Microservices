@@ -2,159 +2,57 @@ name: Admin Service CI/CD
 
 on:
   push:
-    branches: [master]
     paths:
       - "admin-service/**"
       - ".github/workflows/admin-service-ci-cd.yml"
-  workflow_dispatch:
+    branches: [main]
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./admin-service
+
     steps:
       - uses: actions/checkout@v3
 
-      # QEMU kurulumu
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
         with:
-          platforms: arm64
+          java-version: "21"
+          distribution: "corretto"
 
-      # Docker Buildx kurulumu
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-        with:
-          platforms: linux/arm64
+      - name: Build with Maven
+        run: |
+          cd admin-service
+          mvn clean package -DskipTests
 
-      # Docker Hub'a giriş yap
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # Sadece ARM64 için build ve push
-      - name: Build and Push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./admin-service
-          platforms: linux/arm64
-          push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/admin-service:latest-arm64
-            ${{ secrets.DOCKERHUB_USERNAME }}/admin-service:${{ github.sha }}-arm64
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/admin-service:buildcache-arm64
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/admin-service:buildcache-arm64,mode=max
-          build-args: |
-            BUILDPLATFORM=linux/arm64
-            TARGETPLATFORM=linux/arm64
-
-      # Google Cloud kimlik doğrulaması
-      - id: "auth"
-        name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v1"
-        with:
-          credentials_json: "${{ secrets.GCP_SA_KEY }}"
-
-      # Google Cloud CLI kurulumu
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
+      - name: Build and Push Docker Image
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          cd admin-service
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+          docker build -t $DOCKER_USERNAME/admin-service:latest .
+          docker push $DOCKER_USERNAME/admin-service:latest
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         with:
           host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true
-          debug: true
-          command_timeout: "20m"
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: DOCKER_USERNAME,GCP_PROJECT_ID
           script: |
-            echo "=== Testing SSH Connection ==="
-            whoami
-            pwd
-
-            echo "=== System Architecture ==="
-            uname -m
-
-            echo "=== Testing Directory Access ==="
-            ls -la /opt/craftpilot || mkdir -p /opt/craftpilot
-
-            echo "=== Continuing with Deployment ==="
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
-
-            echo "=== Testing Docker ==="
-            docker version
-            docker info
-            docker ps
-
-            # Docker ağını oluştur (eğer yoksa)
-            docker network create craftpilot-network || true
-
-            # Redis container'ını başlat (eğer çalışmıyorsa)
-            if ! docker ps | grep -q redis; then
-              docker run -d \
-                --name redis \
-                --network craftpilot-network \
-                -p 6379:6379 \
-                redis:latest
-            fi
-
-            # Eureka server'ı başlat (eğer çalışmıyorsa)
-            if ! docker ps | grep -q eureka-server; then
-              docker run -d \
-                --name eureka-server \
-                --network craftpilot-network \
-                -p 8761:8761 \
-                -e SPRING_PROFILES_ACTIVE=prod \
-                -e EUREKA_USERNAME=craftpilot \
-                -e EUREKA_PASSWORD=13579ada \
-                ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
-            fi
-
-            echo "=== Pulling ARM64 Image ==="
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/admin-service:latest-arm64
-
-            echo "=== Stopping Old Container ==="
+            docker pull ${{ secrets.DOCKER_USERNAME }}/admin-service:latest
             docker stop admin-service || true
             docker rm admin-service || true
-
-            echo "=== Starting New Container ==="
             docker run -d \
               --name admin-service \
               --network craftpilot-network \
               -p 8063:8063 \
-              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
-              -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_USERNAME=craftpilot \
-              -e EUREKA_PASSWORD=13579ada \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
-              ${{ secrets.DOCKERHUB_USERNAME }}/admin-service:latest-arm64
-
-            echo "=== Waiting for Container to Start ==="
-            sleep 60  # Biraz daha uzun bekleyelim
-
-            echo "=== Container Logs ==="
-            docker logs admin-service
-
-            echo "=== Health Check ==="
-            if curl -f http://localhost:8063/actuator/health; then
-              echo "Service is healthy"
-            else
-              echo "Service failed health check"
-              docker logs admin-service
-              exit 1
-            fi
-
-      - name: Trigger Deploy Services Workflow
-        if: success()
-        uses: peter-evans/repository-dispatch@v2
-        with:
-          token: ${{ secrets.GH_TOKEN }}
-          event-type: trigger-deploy-services
+              -e GCP_PROJECT_ID=$GCP_PROJECT_ID \
+              -v /opt/craftpilot/gcp-credentials.json:/opt/craftpilot/gcp-credentials.json:ro \
+              ${{ secrets.DOCKER_USERNAME }}/admin-service:latest

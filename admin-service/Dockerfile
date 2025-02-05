@@ -7,7 +7,9 @@ WORKDIR /build
 COPY . .
 
 # Maven kurulumu
-RUN yum install -y wget tar gzip && \
+RUN yum clean all && \
+    yum update -y && \
+    yum install -y wget tar gzip && \
     wget https://dlcdn.apache.org/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz && \
     tar -xzf apache-maven-3.9.6-bin.tar.gz -C /opt/ && \
     ln -s /opt/apache-maven-3.9.6 /opt/maven && \
@@ -31,9 +33,9 @@ FROM public.ecr.aws/amazoncorretto/amazoncorretto:21
 WORKDIR /app
 COPY --from=build /build/target/*.jar app.jar
 
-# JVM ayarları
+# JVM ayarları ve Firebase yapılandırması
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
-ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
+ENV GOOGLE_APPLICATION_CREDENTIALS=/opt/craftpilot/gcp-credentials.json
 
 RUN echo "Running on ARM64 architecture"
 
