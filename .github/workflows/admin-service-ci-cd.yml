@@ -20,17 +20,20 @@ jobs:
           java-version: "21"
           distribution: "corretto"
 
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
       - name: Create GCP Credentials Directory
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          script: |
+        run: |
+          ssh -i ~/.ssh/id_rsa -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} "
             mkdir -p /opt/craftpilot
             echo '${{ secrets.GCP_CREDENTIALS }}' > /opt/craftpilot/gcp-credentials.json
             chmod 600 /opt/craftpilot/gcp-credentials.json
+          "
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -50,19 +53,10 @@ jobs:
           docker buildx build --platform linux/arm64 -t $DOCKER_USERNAME/admin-service:latest-arm64 --push .
 
       - name: Deploy to VPS
-        uses: appleboy/ssh-action@master
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          envs: DOCKER_USERNAME,GCP_PROJECT_ID
-          script: |
+        run: |
+          ssh -i ~/.ssh/id_rsa -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} "
             # Docker container'ı güncelle
-            docker pull $DOCKER_USERNAME/admin-service:latest-arm64
+            docker pull ${{ secrets.DOCKER_USERNAME }}/admin-service:latest-arm64
             docker stop admin-service || true
             docker rm admin-service || true
             docker run -d \
@@ -70,23 +64,24 @@ jobs:
               --network craftpilot-network \
               -p 8063:8063 \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e GCP_PROJECT_ID=$GCP_PROJECT_ID \
+              -e GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
               -v /opt/craftpilot/gcp-credentials.json:/opt/craftpilot/gcp-credentials.json:ro \
-              $DOCKER_USERNAME/admin-service:latest-arm64
-
-            echo "=== Waiting for Container to Start ==="
+              ${{ secrets.DOCKER_USERNAME }}/admin-service:latest-arm64
+            
+            echo '=== Waiting for Container to Start ==='
             sleep 30
-
-            echo "=== Container Logs ==="
+            
+            echo '=== Container Logs ==='
             docker logs admin-service
-
-            echo "=== Health Check ==="
-            HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8063/actuator/health)
-            if [ "$HEALTH_CHECK" = "200" ]; then
-              echo "Service is healthy"
+            
+            echo '=== Health Check ==='
+            HEALTH_CHECK=\$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8063/actuator/health)
+            if [ \"\$HEALTH_CHECK\" = \"200\" ]; then
+              echo 'Service is healthy'
             else
-              echo "Service failed health check"
+              echo 'Service failed health check'
               docker stop admin-service
               docker rm admin-service
               exit 1
             fi
+          "
