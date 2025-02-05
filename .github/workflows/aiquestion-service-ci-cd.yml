@@ -87,51 +87,86 @@ jobs:
             # Redis durumunu kontrol et ve gerekirse başlat
             if ! docker ps --filter "name=redis" --filter "status=running" -q | grep -q .; then
               echo "=== Starting Redis ==="
+              # Önce eski Redis container'ını temizle
+              docker rm -f redis || true
+              
+              # Redis yapılandırma dosyasını oluştur
+              cat > /opt/craftpilot/redis.conf << EOF
+              port 6379
+              bind 0.0.0.0
+              protected-mode no
+              requirepass 13579ada
+              appendonly yes
+              appendfsync everysec
+              no-appendfsync-on-rewrite yes
+              auto-aof-rewrite-percentage 100
+              auto-aof-rewrite-min-size 64mb
+              save 900 1
+              save 300 10
+              save 60 10000
+              maxmemory 1gb
+              maxmemory-policy allkeys-lru
+              replica-read-only no
+              replicaof no one
+              EOF
+
+              # Redis'i yeni yapılandırmayla başlat
               docker run -d \
                 --name redis \
                 --network craftpilot-network \
                 -p 6379:6379 \
                 --restart unless-stopped \
+                -v /opt/craftpilot/redis.conf:/usr/local/etc/redis/redis.conf \
                 redis:latest \
-                redis-server \
-                  --protected-mode no \
-                  --requirepass 13579ada \
-                  --appendonly yes \
-                  --replica-read-only no \
-                  --slaveof no one
+                redis-server /usr/local/etc/redis/redis.conf
               
               echo "=== Waiting for Redis to start ==="
               sleep 10
             else
               echo "=== Redis is already running ==="
-              # Redis'i master moduna geç
+              # Redis'i master moduna geç ve yapılandırmayı güncelle
+              docker exec redis redis-cli -a 13579ada CONFIG SET appendonly yes
+              docker exec redis redis-cli -a 13579ada CONFIG SET appendfsync everysec
+              docker exec redis redis-cli -a 13579ada CONFIG SET no-appendfsync-on-rewrite yes
+              docker exec redis redis-cli -a 13579ada CONFIG SET maxmemory 1gb
+              docker exec redis redis-cli -a 13579ada CONFIG SET maxmemory-policy allkeys-lru
               docker exec redis redis-cli -a 13579ada SLAVEOF NO ONE
             fi
 
-            # Redis bağlantısını test et
-            echo "=== Testing Redis Connection ==="
-            if ! docker exec redis redis-cli -a 13579ada ping | grep -q 'PONG'; then
-              echo "Redis connection test failed"
-              docker logs redis
-              exit 1
-            fi
-
-            # Eureka durumunu kontrol et ve gerekirse başlat
-            if ! docker ps --filter "name=eureka-server" --filter "status=running" -q | grep -q .; then
-              echo "=== Starting Eureka Server ==="
-              docker run -d \
-                --name eureka-server \
-                --network craftpilot-network \
-                -p 8761:8761 \
-                -e SPRING_PROFILES_ACTIVE=prod \
-                -e EUREKA_USERNAME=craftpilot \
-                -e EUREKA_PASSWORD=13579ada \
-                ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
+            # Kafka durumunu kontrol et ve gerekirse başlat
+            if ! docker ps --filter "name=kafka" --filter "status=running" -q | grep -q .; then
+              echo "=== Starting Kafka ==="
+              # Önce eski Kafka container'ını temizle
+              docker rm -f kafka zookeeper || true
               
-              echo "=== Waiting for Eureka to start ==="
+              # Zookeeper'ı başlat
+              docker run -d \
+                --name zookeeper \
+                --network craftpilot-network \
+                -e ZOOKEEPER_CLIENT_PORT=2181 \
+                -e ZOOKEEPER_TICK_TIME=2000 \
+                confluentinc/cp-zookeeper:latest
+              
+              echo "=== Waiting for Zookeeper to start ==="
+              sleep 20
+              
+              # Kafka'yı başlat
+              docker run -d \
+                --name kafka \
+                --network craftpilot-network \
+                -p 9092:9092 \
+                -e KAFKA_BROKER_ID=1 \
+                -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
+                -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
+                -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+                -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
+                -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 \
+                confluentinc/cp-kafka:latest
+              
+              echo "=== Waiting for Kafka to start ==="
               sleep 30
             else
-              echo "=== Eureka Server is already running ==="
+              echo "=== Kafka is already running ==="
             fi
 
             echo "=== Pulling ARM64 Image ==="
