@@ -1,24 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
 		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
-		<groupId>com.craftpilot</groupId>
-		<artifactId>craftpilot-main</artifactId>
-		<version>1.0-SNAPSHOT</version>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>3.2.2</version>
+		<relativePath/>
 	</parent>
 
+	<groupId>com.craftpilot</groupId>
 	<artifactId>user-service</artifactId>
+	<version>1.0-SNAPSHOT</version>
+	<name>user-service</name>
+	<description>User Service for Craft Pilot AI</description>
 
 	<properties>
+		<!-- Core -->
 		<java.version>21</java.version>
-		<maven.compiler.release>21</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		
+		<!-- Spring Cloud -->
 		<spring-cloud.version>2023.0.2</spring-cloud.version>
+		
+		<!-- Firebase -->
 		<firebase-admin.version>9.2.0</firebase-admin.version>
+		
+		<!-- Tools -->
 		<springdoc.version>2.2.0</springdoc.version>
 		<caffeine.version>3.1.8</caffeine.version>
 		<lombok.version>1.18.30</lombok.version>
@@ -42,12 +53,19 @@
 		<dependency>
 			<groupId>com.google.firebase</groupId>
 			<artifactId>firebase-admin</artifactId>
+			<version>${firebase-admin.version}</version>
 		</dependency>
 
 		<!-- Redis -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+		</dependency>
+
+		<!-- Kafka -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
 		</dependency>
 
 		<!-- Actuator -->
@@ -70,7 +88,7 @@
 			<scope>provided</scope>
 		</dependency>
 
-		<!-- OpenAPI (Swagger) -->
+		<!-- OpenAPI -->
 		<dependency>
 			<groupId>org.springdoc</groupId>
 			<artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
@@ -88,113 +106,37 @@
 			<artifactId>reactor-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-		<dependency>
-			<groupId>org.mockito</groupId>
-			<artifactId>mockito-junit-jupiter</artifactId>
-			<scope>test</scope>
-		</dependency>
-
-		<!-- Security -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-security</artifactId>
-		</dependency>
-
-		<!-- Validation -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-validation</artifactId>
-		</dependency>
-
-		<!-- Firestore ve Firebase bağımlılıkları -->
-		<dependency>
-			<groupId>com.google.cloud</groupId>
-			<artifactId>google-cloud-firestore</artifactId>
-			<version>3.14.0</version>
-			<exclusions>
-				<exclusion>
-					<groupId>io.grpc</groupId>
-					<artifactId>grpc-netty-shaded</artifactId>
-				</exclusion>
-			</exclusions>
-		</dependency>
-
-		<!-- Kafka bağımlılıkları -->
-		<dependency>
-			<groupId>org.springframework.kafka</groupId>
-			<artifactId>spring-kafka</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.kafka</groupId>
-			<artifactId>kafka-clients</artifactId>
-		</dependency>
-
-		<!-- Logging -->
-		<dependency>
-			<groupId>net.logstash.logback</groupId>
-			<artifactId>logstash-logback-encoder</artifactId>
-			<version>7.4</version>
-		</dependency>
-
-		<!-- Circuit Breaker -->
-		<dependency>
-			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-circuitbreaker-reactor-resilience4j</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>io.github.resilience4j</groupId>
-			<artifactId>resilience4j-spring-boot3</artifactId>
-			<version>2.0.2</version>
-		</dependency>
-
-		<!-- gRPC bağımlılıkları -->
-		<dependency>
-			<groupId>io.grpc</groupId>
-			<artifactId>grpc-netty</artifactId>
-			<version>1.60.0</version>
-		</dependency>
-		<dependency>
-			<groupId>io.grpc</groupId>
-			<artifactId>grpc-protobuf</artifactId>
-			<version>1.60.0</version>
-		</dependency>
-		<dependency>
-			<groupId>io.grpc</groupId>
-			<artifactId>grpc-stub</artifactId>
-			<version>1.60.0</version>
-		</dependency>
-		<dependency>
-			<groupId>io.grpc</groupId>
-			<artifactId>grpc-api</artifactId>
-			<version>1.60.0</version>
-		</dependency>
-		<dependency>
-			<groupId>io.grpc</groupId>
-			<artifactId>grpc-core</artifactId>
-			<version>1.60.0</version>
-		</dependency>
-
-		<!-- Google Cloud bağımlılıkları -->
-		<dependency>
-			<groupId>com.google.auth</groupId>
-			<artifactId>google-auth-library-oauth2-http</artifactId>
-			<version>1.20.0</version>
-		</dependency>
-
-		<!-- Netty bağımlılıkları -->
-		<dependency>
-			<groupId>io.netty</groupId>
-			<artifactId>netty-all</artifactId>
-			<version>4.1.100.Final</version>
-		</dependency>
 	</dependencies>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
 	<build>
 		<plugins>
 			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<excludes>
+						<exclude>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</exclude>
+					</excludes>
+				</configuration>
+			</plugin>
+			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.12.1</version>
 				<configuration>
 					<source>${java.version}</source>
 					<target>${java.version}</target>
@@ -210,18 +152,6 @@
 							<version>${mapstruct.version}</version>
 						</path>
 					</annotationProcessorPaths>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-				<configuration>
-					<excludes>
-						<exclude>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok</artifactId>
-						</exclude>
-					</excludes>
 				</configuration>
 			</plugin>
 		</plugins>
