@@ -79,6 +79,11 @@ jobs:
             # Docker ağını oluştur (eğer yoksa)
             docker network create craftpilot-network || true
 
+            # GCP kimlik bilgilerini oluştur
+            mkdir -p /opt/craftpilot
+            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
+            chmod 600 /opt/craftpilot/gcp-credentials.json
+
             # Redis container'ını başlat (eğer çalışmıyorsa)
             if ! docker ps | grep -q redis; then
               docker run -d \
