@@ -13,7 +13,7 @@ import java.io.IOException;
 @Configuration
 public class FirestoreConfig {
 
-    @Value("${GOOGLE_APPLICATION_CREDENTIALS}")
+    @Value("${GOOGLE_APPLICATION_CREDENTIALS:/gcp-credentials.json}")
     private String credentialsPath;
 
     @Bean
