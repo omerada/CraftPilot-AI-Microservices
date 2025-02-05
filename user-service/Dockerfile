@@ -31,6 +31,8 @@ COPY --from=build /build/target/*.jar app.jar
 
 # JVM ayarları
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
+
 RUN echo "Running on ARM64 architecture"
 
 EXPOSE 8080

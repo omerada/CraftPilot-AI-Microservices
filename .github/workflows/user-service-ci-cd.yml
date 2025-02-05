@@ -35,13 +35,13 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: true
 
       # Sadece ARM64 için build ve push
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: . # Ana dizini context olarak kullan
-          file: ./user-service/Dockerfile # Dockerfile'ın yolunu belirt
+          context: ./user-service
           platforms: linux/arm64
           push: true
           tags: |
@@ -49,9 +49,6 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/user-service:${{ github.sha }}-arm64
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64,mode=max
-          build-args: |
-            BUILDPLATFORM=linux/arm64
-            TARGETPLATFORM=linux/arm64
 
       # Google Cloud kimlik doğrulaması
       - id: "auth"
@@ -127,7 +124,7 @@ jobs:
             docker run -d \
               --name user-service \
               --network craftpilot-network \
-              -p 8050:8050 \
+              -p 8080:8080 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -139,19 +136,23 @@ jobs:
               ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 60  # Biraz daha uzun bekleyelim
+            sleep 60
 
             echo "=== Container Logs ==="
             docker logs user-service
 
             echo "=== Health Check ==="
-            if curl -f http://localhost:8050/actuator/health; then
-              echo "Service is healthy"
-            else
-              echo "Service failed health check"
-              docker logs user-service
-              exit 1
-            fi
+            for i in {1..5}; do
+              if curl -f http://localhost:8080/actuator/health; then
+                echo "Service is healthy"
+                exit 0
+              fi
+              echo "Waiting for service to start... Attempt $i"
+              sleep 10
+            done
+            echo "Service failed health check"
+            docker logs user-service
+            exit 1
 
       - name: Trigger Deploy Services Workflow
         if: success()
