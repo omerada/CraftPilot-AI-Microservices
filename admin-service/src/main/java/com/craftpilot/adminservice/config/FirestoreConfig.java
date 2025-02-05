@@ -1,5 +1,5 @@
 package com.craftpilot.adminservice.config;
-
+ 
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.FirestoreOptions;
@@ -13,22 +13,18 @@ import java.io.IOException;
 @Configuration
 public class FirestoreConfig {
 
-    @Value("${spring.cloud.gcp.firestore.project-id}")
-    private String projectId;
-
-    @Value("${spring.cloud.gcp.credentials.location}")
+    @Value("${GOOGLE_APPLICATION_CREDENTIALS}")
     private String credentialsPath;
 
     @Bean
     public Firestore firestore() throws IOException {
-        FileInputStream serviceAccount = new FileInputStream(credentialsPath.substring(5));
-        GoogleCredentials credentials = GoogleCredentials.fromStream(serviceAccount);
+        GoogleCredentials credentials = GoogleCredentials.fromStream(
+            new FileInputStream(credentialsPath)
+        );
 
-        FirestoreOptions firestoreOptions =
-                FirestoreOptions.getDefaultInstance().toBuilder()
-                        .setProjectId(projectId)
-                        .setCredentials(credentials)
-                        .build();
+        FirestoreOptions firestoreOptions = FirestoreOptions.newBuilder()
+            .setCredentials(credentials)
+            .build();
 
         return firestoreOptions.getService();
     }
