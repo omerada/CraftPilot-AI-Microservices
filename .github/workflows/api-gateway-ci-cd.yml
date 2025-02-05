@@ -1,4 +1,4 @@
-name: API GATEWAY Service CI/CD
+name: API Gateway CI/CD
 
 on:
   push:
@@ -71,6 +71,19 @@ jobs:
           debug: true
           command_timeout: "20m"
           script: |
+            echo "=== Testing SSH Connection ==="
+            whoami
+            pwd
+
+            echo "=== System Architecture ==="
+            uname -m
+
+            echo "=== Testing Directory Access ==="
+            ls -la /opt/craftpilot || mkdir -p /opt/craftpilot
+
+            echo "=== Continuing with Deployment ==="
+            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
+
             echo "=== Testing Docker ==="
             docker version
             docker info
@@ -115,13 +128,11 @@ jobs:
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/ \
-              -e EUREKA_INSTANCE_PREFERIPADDRESS=true \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \
-              -e SPRING_REDIS_HOST=redis \
-              -e SPRING_REDIS_PORT=6379 \
-              -e SPRING_REDIS_PASSWORD=13579ada \
+              -e REDIS_HOST=redis \
+              -e REDIS_PORT=6379 \
+              -e REDIS_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
@@ -139,7 +150,6 @@ jobs:
               echo "Waiting for service to start... Attempt $i"
               sleep 10
             done
-
             echo "Service failed health check"
             docker logs api-gateway
             exit 1
