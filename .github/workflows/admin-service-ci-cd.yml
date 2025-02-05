@@ -5,7 +5,7 @@ on:
     paths:
       - "admin-service/**"
       - ".github/workflows/admin-service-ci-cd.yml"
-    branches: [main]
+    branches: [master]
 
 jobs:
   build-and-deploy:
@@ -28,19 +28,23 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             mkdir -p /opt/craftpilot
+            echo '${{ secrets.GCP_CREDENTIALS }}' > /opt/craftpilot/gcp-credentials.json
+            chmod 600 /opt/craftpilot/gcp-credentials.json
 
-      - name: Build with Maven
-        run: |
-          cd admin-service
-          mvn clean package -DskipTests
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build and Push Docker Image
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
           cd admin-service
-          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
           docker buildx create --use
           docker buildx build --platform linux/arm64 -t $DOCKER_USERNAME/admin-service:latest-arm64 --push .
 
@@ -55,11 +59,6 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           envs: DOCKER_USERNAME,GCP_PROJECT_ID
           script: |
-            # GCP kimlik bilgilerini oluştur
-            mkdir -p /opt/craftpilot
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
-            chmod 600 /opt/craftpilot/gcp-credentials.json
-
             # Docker container'ı güncelle
             docker pull $DOCKER_USERNAME/admin-service:latest-arm64
             docker stop admin-service || true

@@ -5,7 +5,7 @@ on:
     paths:
       - "code-service/**"
       - ".github/workflows/code-service-ci-cd.yml"
-    branches: [main]
+    branches: [master]
 
 jobs:
   build-and-deploy:

@@ -3,9 +3,6 @@ FROM public.ecr.aws/amazoncorretto/amazoncorretto:21 AS build
 
 WORKDIR /build
 
-# Tüm projeyi kopyala
-COPY . .
-
 # Maven kurulumu
 RUN yum clean all && \
     yum update -y && \
@@ -20,6 +17,9 @@ ENV M2_HOME=/opt/maven
 ENV MAVEN_HOME=/opt/maven
 ENV PATH=${M2_HOME}/bin:${PATH}
 
+# Tüm projeyi kopyala
+COPY . .
+
 # Maven build için platform ayarı
 ARG TARGETARCH=arm64
 RUN echo "Building for ARM64 architecture"
@@ -33,7 +33,10 @@ FROM public.ecr.aws/amazoncorretto/amazoncorretto:21
 WORKDIR /app
 COPY --from=build /build/target/*.jar app.jar
 
-# JVM ayarları ve Firebase yapılandırması
+# GCP kimlik bilgileri için dizin oluştur
+RUN mkdir -p /opt/craftpilot
+
+# JVM ayarları ve GCP yapılandırması
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 ENV GOOGLE_APPLICATION_CREDENTIALS=/opt/craftpilot/gcp-credentials.json
 

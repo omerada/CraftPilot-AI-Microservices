@@ -5,7 +5,7 @@ on:
     paths:
       - "aiquestion-service/**"
       - ".github/workflows/aiquestion-service-ci-cd.yml"
-    branches: [main]
+    branches: [master]
 
 jobs:
   build-and-deploy:
