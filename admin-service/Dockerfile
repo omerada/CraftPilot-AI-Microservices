@@ -3,22 +3,18 @@ FROM public.ecr.aws/amazoncorretto/amazoncorretto:21 AS build
 
 WORKDIR /build
 
-# Maven kurulumu
-RUN yum clean all && \
-    yum update -y && \
-    yum install -y wget tar gzip && \
-    wget https://dlcdn.apache.org/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz && \
-    tar -xzf apache-maven-3.9.6-bin.tar.gz -C /opt/ && \
-    ln -s /opt/apache-maven-3.9.6 /opt/maven && \
-    rm -f apache-maven-3.9.6-bin.tar.gz
+# Tüm projeyi kopyala
+COPY . .
 
-# Maven environment variables
+# Maven kurulumu ve versiyonu belirleme
+RUN yum install -y wget tar gzip
+RUN wget https://dlcdn.apache.org/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz
+RUN tar -xzf apache-maven-3.9.6-bin.tar.gz -C /opt/
+RUN ln -s /opt/apache-maven-3.9.6 /opt/maven
+
 ENV M2_HOME=/opt/maven
 ENV MAVEN_HOME=/opt/maven
 ENV PATH=${M2_HOME}/bin:${PATH}
-
-# Tüm projeyi kopyala
-COPY . .
 
 # Maven build için platform ayarı
 ARG TARGETARCH=arm64
@@ -33,13 +29,8 @@ FROM public.ecr.aws/amazoncorretto/amazoncorretto:21
 WORKDIR /app
 COPY --from=build /build/target/*.jar app.jar
 
-# GCP kimlik bilgileri için dizin oluştur
-RUN mkdir -p /opt/craftpilot
-
-# JVM ayarları ve GCP yapılandırması
+# JVM ayarları
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
-ENV GOOGLE_APPLICATION_CREDENTIALS=/opt/craftpilot/gcp-credentials.json
-
 RUN echo "Running on ARM64 architecture"
 
 EXPOSE 8063
