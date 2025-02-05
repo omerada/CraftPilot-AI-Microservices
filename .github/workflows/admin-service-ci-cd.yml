@@ -50,17 +50,6 @@ jobs:
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/admin-service:buildcache-arm64
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/admin-service:buildcache-arm64,mode=max
 
-      # Google Cloud kimlik doğrulaması
-      - id: "auth"
-        name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v1"
-        with:
-          credentials_json: "${{ secrets.GCP_SA_KEY }}"
-
-      # Google Cloud CLI kurulumu
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
-
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
@@ -80,6 +69,7 @@ jobs:
             docker network create craftpilot-network || true
 
             # GCP kimlik bilgilerini oluştur
+            echo "=== Setting up GCP Credentials ==="
             mkdir -p /opt/craftpilot
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
             chmod 600 /opt/craftpilot/gcp-credentials.json
@@ -132,6 +122,7 @@ jobs:
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
+              -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=/gcp-credentials.json \
               ${{ secrets.DOCKERHUB_USERNAME }}/admin-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
