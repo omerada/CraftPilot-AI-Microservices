@@ -36,10 +36,3 @@ management:
   endpoint:
     health:
       show-details: always
-
-security:
-  oauth2:
-    resourceserver:
-      jwt:
-        issuer-uri: https://securetoken.google.com/${GCP_PROJECT_ID}
-        jwk-set-uri: https://www.googleapis.com/robot/v1/metadata/jwk/securetoken@system.gserviceaccount.com
