@@ -79,77 +79,33 @@ jobs:
             # Docker ağını oluştur (eğer yoksa)
             docker network create craftpilot-network || true
 
-            # GCP kimlik bilgilerini oluştur
-            mkdir -p /opt/craftpilot
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
-            chmod 600 /opt/craftpilot/gcp-credentials.json
-
-            # Redis durumunu kontrol et ve gerekirse başlat
-            if ! docker ps --filter "name=redis" --filter "status=running" -q | grep -q .; then
-              echo "=== Starting Redis ==="
-              # Önce eski Redis container'ını temizle
-              docker rm -f redis || true
-              
-              # Redis yapılandırma dosyasını oluştur
-              cat > /opt/craftpilot/redis.conf << 'EOF'
-              port 6379
-              bind 0.0.0.0
-              protected-mode no
-              requirepass 13579ada
-              appendonly yes
-              appendfsync everysec
-              no-appendfsync-on-rewrite yes
-              auto-aof-rewrite-percentage 100
-              auto-aof-rewrite-min-size 64mb
-              save 900 1
-              save 300 10
-              save 60 10000
-              maxmemory 1gb
-              maxmemory-policy allkeys-lru
-              replica-read-only no              
-              replicaof no one
-              EOF
-
-              # Redis'i yeni yapılandırmayla başlat
+            # Redis container'ını başlat (eğer çalışmıyorsa)
+            if ! docker ps | grep -q redis; then
               docker run -d \
                 --name redis \
                 --network craftpilot-network \
                 -p 6379:6379 \
                 --restart unless-stopped \
-                -v /opt/craftpilot/redis.conf:/usr/local/etc/redis/redis.conf \
-                redis:latest \
-                redis-server /usr/local/etc/redis/redis.conf
-              
-              echo "=== Waiting for Redis to start ==="
-              sleep 10
-            else
-              echo "=== Redis is already running ==="
-              # Redis'i master moduna geç ve yapılandırmayı güncelle
-              docker exec redis redis-cli -a 13579ada CONFIG SET appendonly yes
-              docker exec redis redis-cli -a 13579ada CONFIG SET appendfsync everysec
-              docker exec redis redis-cli -a 13579ada CONFIG SET no-appendfsync-on-rewrite yes
-              docker exec redis redis-cli -a 13579ada CONFIG SET maxmemory 1gb
-              docker exec redis redis-cli -a 13579ada CONFIG SET maxmemory-policy allkeys-lru
-              docker exec redis redis-cli -a 13579ada SLAVEOF NO ONE
+                redis:latest redis-server \
+                --requirepass 13579ada \
+                --appendonly yes \
+                --maxmemory 1gb \
+                --maxmemory-policy allkeys-lru
             fi
 
-            # Kafka durumunu kontrol et ve gerekirse başlat
-            if ! docker ps --filter "name=kafka" --filter "status=running" -q | grep -q .; then
-              echo "=== Starting Kafka ==="
-              # Önce eski Kafka container'ını temizle
-              docker rm -f kafka zookeeper || true
-              
+            # Kafka ve Zookeeper'ı başlat (eğer çalışmıyorsa)
+            if ! docker ps | grep -q kafka; then
               # Zookeeper'ı başlat
               docker run -d \
                 --name zookeeper \
                 --network craftpilot-network \
                 -e ZOOKEEPER_CLIENT_PORT=2181 \
                 -e ZOOKEEPER_TICK_TIME=2000 \
+                --restart unless-stopped \
                 confluentinc/cp-zookeeper:latest
-              
-              echo "=== Waiting for Zookeeper to start ==="
-              sleep 20
-              
+
+              sleep 10
+
               # Kafka'yı başlat
               docker run -d \
                 --name kafka \
@@ -161,12 +117,20 @@ jobs:
                 -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
                 -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
                 -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 \
+                --restart unless-stopped \
                 confluentinc/cp-kafka:latest
-              
-              echo "=== Waiting for Kafka to start ==="
-              sleep 30
-            else
-              echo "=== Kafka is already running ==="
+            fi
+
+            # Eureka server'ı başlat (eğer çalışmıyorsa)
+            if ! docker ps | grep -q eureka-server; then
+              docker run -d \
+                --name eureka-server \
+                --network craftpilot-network \
+                -p 8761:8761 \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e EUREKA_USERNAME=craftpilot \
+                -e EUREKA_PASSWORD=13579ada \
+                ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
             fi
 
             echo "=== Pulling ARM64 Image ==="
@@ -191,25 +155,27 @@ jobs:
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
-              -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
+              -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e SPRING_KAFKA_CONSUMER_GROUP_ID=aiquestion-service \
+              -e SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET=earliest \
+              -e SPRING_KAFKA_PRODUCER_RETRIES=3 \
+              -e SPRING_KAFKA_PRODUCER_ACKS=all \
               ${{ secrets.DOCKERHUB_USERNAME }}/aiquestion-service:latest-arm64
 
-            # Servislerin başlamasını bekle
-            echo "=== Waiting for Services to Start ==="
-            sleep 30
+            echo "=== Waiting for Container to Start ==="
+            sleep 60
 
-            # Servis sağlık kontrolü
+            echo "=== Container Logs ==="
+            docker logs aiquestion-service
+
             echo "=== Health Check ==="
-            max_attempts=5
-            attempt=1
-            while [ $attempt -le $max_attempts ]; do
-              if curl -s http://localhost:8062/actuator/health | grep -q '"status":"UP"'; then
+            for i in {1..5}; do
+              if curl -f http://localhost:8062/actuator/health; then
                 echo "Service is healthy"
                 exit 0
               fi
-              echo "Attempt $attempt: Waiting for service to start..."
+              echo "Waiting for service to start... Attempt $i"
               sleep 10
-              attempt=$((attempt + 1))
             done
 
             echo "Service failed health check"
