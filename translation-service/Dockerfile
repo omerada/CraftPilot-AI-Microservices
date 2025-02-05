@@ -33,5 +33,5 @@ COPY --from=build /build/target/*.jar app.jar
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 RUN echo "Running on ARM64 architecture"
 
-EXPOSE 1116
+EXPOSE 8051
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]
