@@ -2,10 +2,10 @@ package com.craftpilot.adminservice.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
-import org.springframework.http.HttpMethod;
+import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -15,22 +15,15 @@ public class SecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+                .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
                 .authorizeExchange(exchanges -> exchanges
-                        // Swagger UI ve API docs için public erişim
-                        .pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", 
-                                    "/webjars/**", "/swagger-resources/**").permitAll()
-                        // Actuator endpoint'leri için public erişim
                         .pathMatchers("/actuator/**").permitAll()
-                        // OPTIONS istekleri için public erişim
-                        .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        // Health check için public erişim
-                        .pathMatchers("/health", "/info").permitAll()
-                        // Diğer tüm istekler için basic auth
+                        .pathMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyExchange().authenticated()
                 )
-                .httpBasic(httpBasic -> httpBasic
-                        .disable()
-                )
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
                 .build();
     }
 } 

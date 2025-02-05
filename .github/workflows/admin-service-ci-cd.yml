@@ -26,6 +26,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
           script: |
             mkdir -p /opt/craftpilot
             echo '${{ secrets.GCP_CREDENTIALS }}' > /opt/craftpilot/gcp-credentials.json
@@ -57,6 +58,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
           envs: DOCKER_USERNAME,GCP_PROJECT_ID
           script: |
             # Docker container'ı güncelle

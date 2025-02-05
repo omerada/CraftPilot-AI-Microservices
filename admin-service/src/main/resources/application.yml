@@ -1,11 +1,7 @@
 server:
   port: 8063
-  ssl:
-    enabled: false
 
 spring:
-  profiles:
-    active: local
   application:
     name: admin-service
   cloud:
@@ -21,9 +17,6 @@ spring:
       enabled: false
     discovery:
       enabled: true
-    loadbalancer:
-      ribbon:
-        enabled: false
 
 eureka:
   client:
@@ -43,39 +36,6 @@ management:
   endpoint:
     health:
       show-details: always
-    metrics:
-      enabled: true
-    prometheus:
-      enabled: true
-  metrics:
-    tags:
-      application: ${spring.application.name}
-    export:
-      prometheus:
-        enabled: true
-
-logging:
-  level:
-    com.craftpilot.adminservice: DEBUG
-    org.springframework.web: DEBUG
-    org.springframework.cloud: DEBUG
-
-springdoc:
-  api-docs:
-    path: /v3/api-docs
-  swagger-ui:
-    path: /swagger-ui.html
-    operationsSorter: method
-    tagsSorter: alpha
-  show-actuator: true
-
-resilience4j:
-  ratelimiter:
-    instances:
-      adminApi:
-        limitForPeriod: 10
-        limitRefreshPeriod: 1s
-        timeoutDuration: 500ms
 
 security:
   oauth2:
