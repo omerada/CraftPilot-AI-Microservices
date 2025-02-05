@@ -25,14 +25,10 @@ public class UserEntity {
     private long createdAt;
     private long updatedAt;
     
-    @Builder.Default
-    private Boolean isActive = true;
+    private Boolean isActive;
     
-    @Builder.Default
-    private Boolean isDeleted = false;
+    private Boolean isDeleted;
     
     private String firestoreId;
     private String path;
-    private Object customClaims;
-    private Object metadata;
 }
