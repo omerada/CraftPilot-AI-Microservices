@@ -7,7 +7,7 @@ spring:
   cloud:
     gcp:
       credentials:
-        location: file:/opt/craftpilot/gcp-credentials.json
+        location: ${SPRING_CLOUD_GCP_CREDENTIALS_LOCATION:file:/app/gcp-credentials.json}
       firestore:
         enabled: true
         project-id: ${GCP_PROJECT_ID}
