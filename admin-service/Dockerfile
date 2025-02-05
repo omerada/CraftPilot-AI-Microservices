@@ -1,30 +1,17 @@
-# Build stage
-FROM public.ecr.aws/amazoncorretto/amazoncorretto:21 AS build
+# Build stage - sadece ARM64
+FROM --platform=linux/arm64 maven:3.9.6-eclipse-temurin-21 AS build
 
 WORKDIR /build
-
-# Tüm projeyi kopyala
-COPY . .
-
-# Maven kurulumu ve versiyonu belirleme
-RUN yum install -y wget tar gzip
-RUN wget https://dlcdn.apache.org/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz
-RUN tar -xzf apache-maven-3.9.6-bin.tar.gz -C /opt/
-RUN ln -s /opt/apache-maven-3.9.6 /opt/maven
-
-ENV M2_HOME=/opt/maven
-ENV MAVEN_HOME=/opt/maven
-ENV PATH=${M2_HOME}/bin:${PATH}
+COPY pom.xml .
+COPY src ./src
 
 # Maven build için platform ayarı
 ARG TARGETARCH=arm64
 RUN echo "Building for ARM64 architecture"
-
-# Projeyi derle
 RUN mvn clean package -DskipTests
 
-# Run stage
-FROM public.ecr.aws/amazoncorretto/amazoncorretto:21
+# Run stage - sadece ARM64
+FROM --platform=linux/arm64 eclipse-temurin:21-jdk
 
 WORKDIR /app
 COPY --from=build /build/target/*.jar app.jar
