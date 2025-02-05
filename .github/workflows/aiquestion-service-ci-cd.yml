@@ -91,7 +91,7 @@ jobs:
               docker rm -f redis || true
               
               # Redis yapılandırma dosyasını oluştur
-              cat << 'EOF' > /opt/craftpilot/redis.conf
+              cat > /opt/craftpilot/redis.conf << 'EOF'
 port 6379
 bind 0.0.0.0
 protected-mode no
