@@ -160,6 +160,9 @@ jobs:
               -e SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET=earliest \
               -e SPRING_KAFKA_PRODUCER_RETRIES=3 \
               -e SPRING_KAFKA_PRODUCER_ACKS=all \
+              -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
+              -e ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }} \
+              -e GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }} \
               ${{ secrets.DOCKERHUB_USERNAME }}/aiquestion-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
