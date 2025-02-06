@@ -132,12 +132,11 @@ services:
     ports:
       - "8062:8062"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD:-secret}@eureka-server:8057/eureka/
-      - FIREBASE_CREDENTIAL_PATH=/app/config/firebase-service-account.json
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-service-account.json
+      - GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
     volumes:
-      - ${FIREBASE_CREDENTIALS_PATH}:/app/config/firebase-service-account.json:ro
+      - ${GCP_CREDENTIALS_PATH:-/tmp/gcp-credentials.json}:/gcp-credentials.json:ro
     networks:
       - craftpilot-network
     healthcheck:
