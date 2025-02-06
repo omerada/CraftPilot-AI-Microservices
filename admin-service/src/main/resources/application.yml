@@ -18,12 +18,17 @@ spring:
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka/
+      defaultZone: http://${EUREKA_USERNAME:eureka}:${EUREKA_PASSWORD:secret}@eureka-server:8057/eureka/
     register-with-eureka: true
     fetch-registry: true
   instance:
-    preferIpAddress: true
-    hostname: admin-service
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    health-check-url-path: /actuator/health
+    metadata-map:
+      startup: ${random.int}
+      user.name: ${spring.security.user.name}
+      user.password: ${spring.security.user.password}
 
 management:
   endpoints:

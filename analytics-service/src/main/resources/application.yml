@@ -61,7 +61,7 @@ management:
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka
+      defaultZone: http://${EUREKA_USERNAME:eureka}:${EUREKA_PASSWORD:secret}@eureka-server:8057/eureka/
     fetch-registry: true
     register-with-eureka: true
   instance:
