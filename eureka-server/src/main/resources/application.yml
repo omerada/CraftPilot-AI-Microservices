@@ -8,6 +8,10 @@ spring:
     loadbalancer:
       ribbon:
         enabled: false
+      cache:
+        enabled: true
+        caffeine:
+          spec: maximumSize=500,expireAfterWrite=5s
   security:
     user:
       name: ${EUREKA_USERNAME:eureka}
@@ -30,14 +34,16 @@ eureka:
     registerWithEureka: false
     fetchRegistry: false
     serviceUrl:
-      defaultZone: http://localhost:8057/eureka/
+      defaultZone: http://${EUREKA_USERNAME:eureka}:${EUREKA_PASSWORD:secret}@localhost:8057/eureka/
   server:
     # Performance tuning
     waitTimeInMsWhenSyncEmpty: 0
     enableSelfPreservation: false
-    renewal-percent-threshold: 0.85
     response-cache-update-interval-ms: 3000
     eviction-interval-timer-in-ms: 3000
+    peer-node-read-timeout-ms: 1000
+    peer-node-connect-timeout-ms: 1000
+    renewal-percent-threshold: 0.85
     # Rate limiting
     rateLimiterEnabled: true
     rateLimiterThrottleStandardClients: true

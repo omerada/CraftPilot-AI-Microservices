@@ -77,11 +77,18 @@ services:
       - "8057:8057"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_PASSWORD=${EUREKA_PASSWORD}
+      - EUREKA_USERNAME=${EUREKA_USERNAME:-eureka}
+      - EUREKA_PASSWORD=${EUREKA_PASSWORD:-secret}
     networks:
       - craftpilot-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8057/actuator/health"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD:-secret}@localhost:8057/actuator/health",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
