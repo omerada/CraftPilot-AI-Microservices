@@ -19,9 +19,9 @@ spring:
       ribbon:
         enabled: false
     gcp:
-      project-id: ${GCP_PROJECT_ID:craftpilot-ai}
+      project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
       credentials:
-        location: ${GOOGLE_APPLICATION_CREDENTIALS:classpath:firebase-service-account.json}
+        location: file:/opt/craftpilot/gcp-credentials.json
     function:
       definition: none
     stream:
@@ -29,21 +29,15 @@ spring:
         binder:
           enabled: false
   kafka:
-    bootstrap-servers: kafka:9092
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     consumer:
-      group-id: aiquestion-service
+      group-id: aiquestion-service-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      retries: 3
-      batch-size: 16384
-      buffer-memory: 33554432
-      acks: all
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
   redis:
     host: redis
     port: 6379
@@ -72,13 +66,12 @@ management:
 eureka:
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_SERVICE_URL:http://localhost:8761/eureka/}
-    register-with-eureka: ${EUREKA_REGISTER_ENABLED:true}
-    fetch-registry: ${EUREKA_FETCH_ENABLED:true}
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
   instance:
-    prefer-ip-address: true
-    hostname: ${HOSTNAME:localhost}
-    lease-renewal-interval-in-seconds: 30
+    preferIpAddress: true
+    hostname: aiquestion-service
 
 springdoc:
   api-docs:
