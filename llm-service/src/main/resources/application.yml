@@ -1,5 +1,10 @@
 server:
-  port: 8062
+  port: 8065
+  compression:
+    enabled: true
+    mime-types: application/json,text/plain
+    min-response-size: 1024
+  shutdown: graceful
 
 spring:
   application:
@@ -20,6 +25,10 @@ spring:
     host: ${REDIS_HOST:redis}
     port: ${REDIS_PORT:6379}
     password: ${REDIS_PASSWORD:13579ada}
+  security:
+    user:
+      name: ${EUREKA_USERNAME:eureka}
+      password: ${EUREKA_PASSWORD:secret}
 
 openrouter:
   api-key: ${OPENROUTER_API_KEY}
@@ -45,6 +54,21 @@ resilience4j:
         limitRefreshPeriod: 1s
         timeoutDuration: 5s
 
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://${EUREKA_USERNAME:eureka}:${EUREKA_PASSWORD:secret}@localhost:8057/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    health-check-url-path: /actuator/health
+    metadata-map:
+      startup: ${random.int}
+      user.name: ${spring.security.user.name}
+      user.password: ${spring.security.user.password}
+
 management:
   endpoints:
     web:
@@ -53,11 +77,15 @@ management:
   endpoint:
     health:
       show-details: always
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
 
 logging:
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] [%X{userId}] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
   level:
-    com.craftpilot.llmservice: INFO
-    org.springframework.web: INFO
-    org.springframework.data: INFO
+    com.craftpilot.llmservice: DEBUG
+    org.springframework.cloud.netflix.eureka: INFO
+    com.netflix.discovery: INFO
