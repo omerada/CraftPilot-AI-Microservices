@@ -27,14 +27,14 @@ server:
 
 eureka:
   instance:
-    hostname: localhost
+    hostname: ${EUREKA_HOST:localhost}
     prefer-ip-address: true
     lease-renewal-interval-in-seconds: 10
   client:
     registerWithEureka: false
     fetchRegistry: false
     serviceUrl:
-      defaultZone: http://${EUREKA_USERNAME:eureka}:${EUREKA_PASSWORD:secret}@localhost:8057/eureka/
+      defaultZone: http://${EUREKA_USERNAME:eureka}:${EUREKA_PASSWORD:secret}@${EUREKA_HOST:localhost}:8057/eureka/
   server:
     # Performance tuning
     waitTimeInMsWhenSyncEmpty: 0

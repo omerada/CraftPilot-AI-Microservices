@@ -72,23 +72,27 @@ services:
     build:
       context: .
       dockerfile: eureka-server/Dockerfile
+      platforms:
+        - linux/arm64
+        - linux/amd64
     image: ${DOCKERHUB_USERNAME}/eureka-server:${VERSION:-latest}
     ports:
       - "8057:8057"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_USERNAME=${EUREKA_USERNAME:-eureka}
       - EUREKA_PASSWORD=${EUREKA_PASSWORD:-secret}
+      - EUREKA_HOST=${EUREKA_HOST:-localhost}
     networks:
       - craftpilot-network
     healthcheck:
       test:
-        [
-          "CMD",
-          "curl",
-          "-f",
-          "http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD:-secret}@localhost:8057/actuator/health",
-        ]
+        - "CMD"
+        - "curl"
+        - "-f"
+        - "-u"
+        - "${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD:-secret}"
+        - "http://localhost:8057/actuator/health"
       interval: 30s
       timeout: 10s
       retries: 3
