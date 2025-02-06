@@ -1,7 +1,7 @@
 #!/bin/bash
 
 SERVICE_NAME="llm-service"
-PORT=8065
+PORT=8062
 
 # Health check function
 wait_for_service() {

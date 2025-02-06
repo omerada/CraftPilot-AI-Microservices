@@ -126,10 +126,10 @@ services:
         - linux/amd64
     image: ${DOCKERHUB_USERNAME}/llm-service:${VERSION:-latest}
     ports:
-      - "8065:8065"
+      - "8062:8062"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8057/eureka/
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD:-secret}@eureka-server:8057/eureka/
       - FIREBASE_CREDENTIAL_PATH=/app/config/firebase-service-account.json
       - GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-service-account.json
     volumes:
@@ -137,7 +137,7 @@ services:
     networks:
       - craftpilot-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8065/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8062/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -18,5 +18,5 @@ COPY --from=build /build/target/*.jar app.jar
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
 
-EXPOSE 8065
+EXPOSE 8062
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]
