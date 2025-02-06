@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
 
 @Slf4j
 @Service
@@ -28,22 +29,19 @@ public class KafkaService {
 
     private void sendUserEvent(String eventType, UserEntity user) {
         UserEvent event = UserEvent.builder()
+                .userId(user.getId())
                 .eventType(eventType)
-                .user(user)
                 .timestamp(System.currentTimeMillis())
                 .build();
 
-        try {
-            kafkaTemplate.send(USER_TOPIC, user.getId(), event)
-                    .whenComplete((result, ex) -> {
-                        if (ex == null) {
-                            log.info("User event sent successfully: {}", event);
-                        } else {
-                            log.error("Failed to send user event: {}", event, ex);
-                        }
-                    });
-        } catch (Exception e) {
-            log.error("Error while sending user event: {}", event, e);
-        }
+        kafkaTemplate.send(USER_TOPIC, user.getId(), event)
+                .whenComplete((result, ex) -> {
+                    if (ex == null) {
+                        log.info("Sent event {} for user {}", eventType, user.getId());
+                    } else {
+                        log.error("Failed to send event {} for user {}: {}", 
+                                eventType, user.getId(), ex.getMessage());
+                    }
+                });
     }
 } 
