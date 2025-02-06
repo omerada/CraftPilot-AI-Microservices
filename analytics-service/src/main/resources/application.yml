@@ -1,5 +1,10 @@
 server:
   port: 8064
+  compression:
+    enabled: true
+    mime-types: application/json,text/plain
+    min-response-size: 1024
+  shutdown: graceful
 
 spring:
   application:
@@ -66,7 +71,12 @@ eureka:
     register-with-eureka: true
   instance:
     prefer-ip-address: true
-    hostname: localhost
+    lease-renewal-interval-in-seconds: 10
+    health-check-url-path: /actuator/health
+    metadata-map:
+      startup: ${random.int}
+      user.name: ${spring.security.user.name}
+      user.password: ${spring.security.user.password}
 
 springdoc:
   swagger-ui:

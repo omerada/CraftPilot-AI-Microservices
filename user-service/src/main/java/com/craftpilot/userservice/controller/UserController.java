@@ -1,6 +1,7 @@
 package com.craftpilot.userservice.controller;
 
 import com.craftpilot.userservice.model.user.entity.UserEntity;
+import com.craftpilot.userservice.model.user.enums.UserStatus;
 import com.craftpilot.userservice.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,7 +27,7 @@ public class UserController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Yeni kullanıcı oluştur", description = "Firebase token kullanarak yeni bir kullanıcı oluşturur")
     public Mono<UserEntity> createUser(@RequestHeader("Firebase-Token") String firebaseToken) {
-        return userService.createUser(firebaseToken);
+        return userService.verifyAndCreateUser(firebaseToken);
     }
 
     @GetMapping("/{id}")
@@ -53,7 +54,12 @@ public class UserController {
     public Mono<UserEntity> updateUserStatus(
             @PathVariable String id,
             @RequestParam String status) {
-        return userService.updateUserStatus(id, status);
+        try {
+            UserStatus userStatus = UserStatus.valueOf(status.toUpperCase());
+            return userService.updateUserStatus(id, userStatus);
+        } catch (IllegalArgumentException e) {
+            return Mono.error(new IllegalArgumentException("Invalid status: " + status));
+        }
     }
 
     @GetMapping("/search")

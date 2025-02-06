@@ -114,6 +114,9 @@ services:
     build:
       context: .
       dockerfile: llm-service/Dockerfile
+      platforms:
+        - linux/arm64
+        - linux/amd64
     image: ${DOCKERHUB_USERNAME}/llm-service:${VERSION:-latest}
     ports:
       - "8065:8065"
@@ -347,31 +350,34 @@ services:
 
   # Analytics Service
   analytics-service:
-    image: craftpilot/analytics-service:latest
     container_name: analytics-service
-    env_file:
-      - .env
-    environment:
-      - SPRING_PROFILES_ACTIVE=prod
-      - EUREKA_USERNAME=craftpilot
-      - EUREKA_PASSWORD=13579ada
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=13579ada
-      - GCP_PROJECT_ID=craft-pilot-ai
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8057/eureka/
+    build:
+      context: .
+      dockerfile: analytics-service/Dockerfile
+    image: ${DOCKERHUB_USERNAME}/analytics-service:${VERSION:-latest}
     ports:
-      - "8096:8096"
+      - "8064:8064"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8057/eureka/
+      - FIREBASE_CREDENTIAL_PATH=/app/config/firebase-service-account.json
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-service-account.json
+    volumes:
+      - ${FIREBASE_CREDENTIALS_PATH}:/app/config/firebase-service-account.json:ro
     networks:
       - craftpilot-network
-    depends_on:
-      - eureka-server
-      - redis
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8096/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8064/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   redis-data:

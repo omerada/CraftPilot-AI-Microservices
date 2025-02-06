@@ -53,16 +53,10 @@ public class UserService {
     }
 
     @Transactional
-    public Mono<UserEntity> createUser(String idToken) {
-        return Mono.fromCallable(() -> firebaseAuth.verifyIdToken(idToken))
-                .onErrorMap(FirebaseAuthException.class, e -> new IllegalArgumentException("Invalid token"))
-                .map(this::buildUserFromToken)
-                .flatMap(userRepository::save)
-                .doOnSuccess(user -> {
-                    userCreationCounter.increment();
-                    kafkaService.sendUserCreatedEvent(user).subscribe();
-                })
-                .flatMap(cacheService::cacheUser);
+    public Mono<UserEntity> createUser(UserEntity user) {
+        return userRepository.save(user)
+                .doOnSuccess(savedUser -> kafkaService.sendUserCreatedEvent(savedUser))
+                .doOnError(error -> log.error("Error creating user: {}", error.getMessage()));
     }
 
     public Mono<UserEntity> getUserById(String id) {
@@ -75,65 +69,58 @@ public class UserService {
     }
 
     @Transactional
-    public Mono<UserEntity> updateUser(String id, UserEntity updates) {
-        validateUserUpdate(updates);
-        return userRepository.findById(id)
-                .switchIfEmpty(Mono.error(new UserNotFoundException("User not found: " + id)))
+    public Mono<UserEntity> updateUser(String userId, UserEntity updates) {
+        return userRepository.findById(userId)
                 .flatMap(existingUser -> {
-                    updateUserFields(existingUser, updates);
-                    return userRepository.save(existingUser)
-                            .flatMap(cacheService::cacheUser)
-                            .doOnSuccess(savedUser -> {
-                                userUpdateCounter.increment();
-                                kafkaService.sendUserUpdatedEvent(savedUser).subscribe();
-                            });
-                });
+                    if (updates.getUsername() != null) {
+                        existingUser.setUsername(updates.getUsername());
+                    }
+                    if (updates.getDisplayName() != null) {
+                        existingUser.setDisplayName(updates.getDisplayName());
+                    }
+                    if (updates.getPhotoUrl() != null) {
+                        existingUser.setPhotoUrl(updates.getPhotoUrl());
+                    }
+                    if (updates.getStatus() != null) {
+                        existingUser.setStatus(updates.getStatus());
+                    }
+                    existingUser.setUpdatedAt(System.currentTimeMillis());
+                    return userRepository.save(existingUser);
+                })
+                .doOnSuccess(updatedUser -> kafkaService.sendUserUpdatedEvent(updatedUser))
+                .doOnError(error -> log.error("Error updating user: {}", error.getMessage()));
     }
 
-    public Mono<Void> deleteUser(String id) {
-        return userRepository.deleteById(id)
-                .then(cacheService.invalidateUser(id))
-                .then(Mono.fromRunnable(() -> {
-                    userDeletionCounter.increment();
-                    kafkaService.sendUserDeletedEvent(id).subscribe();
-                }));
+    public Mono<Void> deleteUser(String userId) {
+        return userRepository.findById(userId)
+                .flatMap(user -> userRepository.deleteById(userId)
+                        .then(Mono.fromRunnable(() -> kafkaService.sendUserDeletedEvent(user))))
+                .then();
     }
 
-    public Mono<UserEntity> updateUserStatus(String id, String status) {
-        try {
-            UserStatus newStatus = UserStatus.valueOf(status.toUpperCase());
-            return userRepository.findById(id)
-                    .switchIfEmpty(Mono.error(new UserNotFoundException(id)))
-                    .map(user -> {
-                        user.setStatus(newStatus);
-                        return user;
-                    })
-                    .flatMap(userRepository::save)
-                    .doOnSuccess(user -> kafkaService.sendUserStatusChangedEvent(user).subscribe())
-                    .flatMap(cacheService::cacheUser);
-        } catch (IllegalArgumentException e) {
-            return Mono.error(new IllegalArgumentException("Invalid status: " + status));
-        }
+    public Mono<UserEntity> updateUserStatus(String userId, UserStatus status) {
+        return userRepository.findById(userId)
+                .flatMap(user -> {
+                    user.setStatus(status);
+                    user.setUpdatedAt(System.currentTimeMillis());
+                    return userRepository.save(user);
+                })
+                .doOnSuccess(updatedUser -> kafkaService.sendUserUpdatedEvent(updatedUser))
+                .doOnError(error -> log.error("Error updating user status: {}", error.getMessage()));
     }
 
     public Mono<UserEntity> searchUsers(String email, String username) {
         if (email != null && !email.isEmpty()) {
-            return findByEmail(email);
+            return userRepository.findByEmail(email);
         } else if (username != null && !username.isEmpty()) {
-            return findByUsername(username);
+            return userRepository.findByUsername(username);
         }
         return Mono.error(new IllegalArgumentException("Either email or username must be provided"));
     }
 
-    private Mono<UserEntity> findByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .switchIfEmpty(Mono.error(new UserNotFoundException("User not found with email: " + email)))
-                .flatMap(cacheService::cacheUser);
-    }
-
-    private Mono<FirebaseToken> verifyFirebaseToken(String token) {
+    public Mono<FirebaseToken> verifyFirebaseToken(String token) {
         return Mono.fromCallable(() -> firebaseAuth.verifyIdToken(token))
-                .subscribeOn(Schedulers.boundedElastic());
+                .doOnError(e -> log.error("Error verifying Firebase token: {}", e.getMessage()));
     }
 
     private UserEntity buildUserFromToken(FirebaseToken token) {
@@ -170,12 +157,6 @@ public class UserService {
         return email.split("@")[0] + "_" + System.currentTimeMillis() % 1000;
     }
 
-    private Mono<UserEntity> findByUsername(String username) {
-        return userRepository.findByUsername(username)
-                .switchIfEmpty(Mono.error(new UserNotFoundException("User not found with username: " + username)))
-                .flatMap(cacheService::cacheUser);
-    }
-
     private void validateUserUpdate(UserEntity updates) {
         Set<ConstraintViolation<UserEntity>> violations = validator.validate(updates);
         if (!violations.isEmpty()) {
@@ -185,5 +166,19 @@ public class UserService {
                     .collect(Collectors.joining(", "))
             );
         }
+    }
+
+    public Mono<UserEntity> verifyAndCreateUser(String firebaseToken) {
+        return verifyFirebaseToken(firebaseToken)
+                .map(decodedToken -> UserEntity.builder()
+                        .id(decodedToken.getUid())
+                        .email(decodedToken.getEmail())
+                        .displayName(decodedToken.getName())
+                        .photoUrl(decodedToken.getPicture())
+                        .status(UserStatus.ACTIVE)
+                        .createdAt(System.currentTimeMillis())
+                        .updatedAt(System.currentTimeMillis())
+                        .build())
+                .flatMap(this::createUser);
     }
 }

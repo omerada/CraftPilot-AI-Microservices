@@ -1,64 +1,47 @@
 package com.craftpilot.userservice.service;
 
 import com.craftpilot.userservice.model.UserPreferenceResponse;
-import com.google.cloud.firestore.Firestore; 
-import com.google.api.core.ApiFuture;
+import com.craftpilot.userservice.repository.UserPreferenceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
-import java.util.concurrent.CompletableFuture;
-
-@Service
 @Slf4j
+@Service
 @RequiredArgsConstructor
 public class UserPreferenceService {
-
-    private final Firestore firestore;
-    private static final String COLLECTION_NAME = "user_preferences";
+    private final UserPreferenceRepository preferenceRepository;
+    private final RedisCacheService cacheService;
 
     public Mono<UserPreferenceResponse> getUserPreferences(String userId) {
-        return Mono.fromFuture(() -> 
-            toCompletableFuture(firestore.collection(COLLECTION_NAME)
-                .document(userId)
-                .get())
-        ).map(doc -> doc.exists() ? 
-            doc.toObject(UserPreferenceResponse.class) : 
-            createDefaultPreferences(userId));
+        return cacheService.getUserPreferences(userId)
+                .switchIfEmpty(Mono.defer(() -> 
+                    preferenceRepository.findByUserId(userId)
+                        .map(preferences -> UserPreferenceResponse.builder()
+                            .userId(userId)
+                            .theme(preferences.getTheme())
+                            .language(preferences.getLanguage())
+                            .notifications(preferences.isNotifications())
+                            .build())
+                        .doOnSuccess(preferences -> cacheService.cacheUserPreferences(userId, preferences))
+                ));
     }
 
-    public Mono<UserPreferenceResponse> updateUserPreferences(String userId, UserPreferenceResponse preferences) {
-        preferences.setUserId(userId);
-        return Mono.fromFuture(() -> 
-            toCompletableFuture(firestore.collection(COLLECTION_NAME)
-                .document(userId)
-                .set(preferences))
-        ).thenReturn(preferences);
-    }
-
-    private <T> CompletableFuture<T> toCompletableFuture(ApiFuture<T> apiFuture) {
-        CompletableFuture<T> completableFuture = new CompletableFuture<>();
-        apiFuture.addListener(() -> {
-            try {
-                completableFuture.complete(apiFuture.get());
-            } catch (Exception e) {
-                completableFuture.completeExceptionally(e);
-            }
-        }, Runnable::run);
-        return completableFuture;
-    }
-
-    private UserPreferenceResponse createDefaultPreferences(String userId) {
-        return UserPreferenceResponse.builder()
-            .userId(userId)
-            .language("tr")
-            .timezone("Europe/Istanbul")
-            .emailEnabled(true)
-            .pushEnabled(true)
-            .smsEnabled(false)
-            .quietHoursStart(22L)
-            .quietHoursEnd(7L)
-            .build();
+    public Mono<UserPreferenceResponse> updateUserPreferences(String userId, UserPreferenceResponse request) {
+        return preferenceRepository.findByUserId(userId)
+                .flatMap(existingPrefs -> {
+                    existingPrefs.setTheme(request.getTheme());
+                    existingPrefs.setLanguage(request.getLanguage());
+                    existingPrefs.setNotifications(request.isNotifications());
+                    return preferenceRepository.save(existingPrefs);
+                })
+                .map(updatedPrefs -> UserPreferenceResponse.builder()
+                    .userId(userId)
+                    .theme(updatedPrefs.getTheme())
+                    .language(updatedPrefs.getLanguage())
+                    .notifications(updatedPrefs.isNotifications())
+                    .build())
+                .doOnSuccess(preferences -> cacheService.cacheUserPreferences(userId, preferences));
     }
 } 
