@@ -10,7 +10,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserPreferenceResponse {
-    private String userId;
     private String theme;
     private String language;
     private boolean notifications;

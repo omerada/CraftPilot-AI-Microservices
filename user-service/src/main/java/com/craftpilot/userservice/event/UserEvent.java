@@ -1,6 +1,5 @@
 package com.craftpilot.userservice.event;
 
-import com.craftpilot.userservice.model.user.entity.UserEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,14 +10,14 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserEvent {
+    private String userId;
     private String eventType;
-    private UserEntity user;
     private long timestamp;
     
-    public static UserEvent fromUser(String eventType, UserEntity user) {
+    public static UserEvent fromUser(String eventType, String userId) {
         return UserEvent.builder()
                 .eventType(eventType)
-                .user(user)
+                .userId(userId)
                 .timestamp(System.currentTimeMillis())
                 .build();
     }
