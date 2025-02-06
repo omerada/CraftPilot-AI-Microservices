@@ -86,38 +86,16 @@ spring:
                 name: analyticsServiceCircuitBreaker
                 fallbackUri: forward:/fallback/analytics
 
-        # AI Question Service Routes
-        - id: aiquestion-service
-          uri: lb://aiquestion-service
+        # LLM Service Routes
+        - id: llm-service
+          uri: lb://llm-service
           predicates:
             - Path=/api/questions/**
           filters:
             - name: CircuitBreaker
               args:
-                name: aiquestionServiceCircuitBreaker
-                fallbackUri: forward:/fallback/aiquestion
-
-        # Code Service Routes
-        - id: code-service
-          uri: lb://code-service
-          predicates:
-            - Path=/api/code/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: codeServiceCircuitBreaker
-                fallbackUri: forward:/fallback/code
-
-        # Content Service Routes
-        - id: content-service
-          uri: lb://content-service
-          predicates:
-            - Path=/api/content/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: contentServiceCircuitBreaker
-                fallbackUri: forward:/fallback/content
+                name: llmServiceCircuitBreaker
+                fallbackUri: forward:/fallback/llm
 
         # Credit Service Routes
         - id: credit-service
@@ -152,24 +130,10 @@ spring:
           filters:
             - StripPrefix=1
 
-        - id: swagger-ui-aiquestion
-          uri: lb://aiquestion-service
+        - id: swagger-ui-llm
+          uri: lb://llm-service
           predicates:
-            - Path=/aiquestion-service/swagger-ui/**,/aiquestion-service/v3/api-docs/**
-          filters:
-            - StripPrefix=1
-
-        - id: swagger-ui-code
-          uri: lb://code-service
-          predicates:
-            - Path=/code-service/swagger-ui/**,/code-service/v3/api-docs/**
-          filters:
-            - StripPrefix=1
-
-        - id: swagger-ui-content
-          uri: lb://content-service
-          predicates:
-            - Path=/content-service/swagger-ui/**,/content-service/v3/api-docs/**
+            - Path=/llm-service/swagger-ui/**,/llm-service/v3/api-docs/**
           filters:
             - StripPrefix=1
 
@@ -227,7 +191,7 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 10000
         permittedNumberOfCallsInHalfOpenState: 5
-      aiquestionServiceCircuitBreaker:
+      llmServiceCircuitBreaker:
         slidingWindowSize: 10
         failureRateThreshold: 50
         waitDurationInOpenState: 10000
@@ -303,9 +267,7 @@ logging:
 # user-service:          8050
 # admin-service:         8063
 # analytics-service:     8064
-# aiquestion-service:    8065
-# code-service:          8066
-# content-service:       8067
+# llm-service:    8065
 # credit-service:        8068
 
 firebase:

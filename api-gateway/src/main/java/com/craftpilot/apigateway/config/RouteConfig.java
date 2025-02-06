@@ -53,35 +53,7 @@ public class RouteConfig {
                                 .setName("imageServiceCircuitBreaker")
                                 .setFallbackUri("forward:/fallback/image")))
                         .uri("lb://image-service"))
-
-                // Code Service Routes
-                .route("code-service", r -> r.path("/api/code/**")
-                        .filters(f -> f.circuitBreaker(config -> config
-                                .setName("codeServiceCircuitBreaker")
-                                .setFallbackUri("forward:/fallback/code")))
-                        .uri("lb://code-service"))
-
-                // Translation Service Routes
-                .route("translation-service", r -> r.path("/api/translations/**")
-                        .filters(f -> f.circuitBreaker(config -> config
-                                .setName("translationServiceCircuitBreaker")
-                                .setFallbackUri("forward:/fallback/translation")))
-                        .uri("lb://translation-service"))
-
-                // Content Service Routes
-                .route("content-service", r -> r.path("/api/content/**")
-                        .filters(f -> f.circuitBreaker(config -> config
-                                .setName("contentServiceCircuitBreaker")
-                                .setFallbackUri("forward:/fallback/content")))
-                        .uri("lb://content-service"))
-
-                // Model Service Routes
-                .route("model-service", r -> r.path("/api/models/**")
-                        .filters(f -> f.circuitBreaker(config -> config
-                                .setName("modelServiceCircuitBreaker")
-                                .setFallbackUri("forward:/fallback/model")))
-                        .uri("lb://model-service"))
-
+ 
                 // Analytics Service Routes
                 .route("analytics-service", r -> r.path("/api/analytics/**")
                         .filters(f -> f.circuitBreaker(config -> config

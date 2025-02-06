@@ -5,13 +5,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Map;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserPreferenceResponse {
     private String userId;
-    private Map<String, String> preferences;
+    private String language;
+    private String timezone;
+    private Boolean emailEnabled;
+    private Boolean pushEnabled;
+    private Boolean smsEnabled;
+    private Long quietHoursStart;
+    private Long quietHoursEnd;
 }

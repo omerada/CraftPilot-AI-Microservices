@@ -1,0 +1,63 @@
+server:
+  port: 8062
+
+spring:
+  application:
+    name: llm-service
+  webflux:
+    base-path: /api
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    consumer:
+      group-id: llm-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+  redis:
+    host: ${REDIS_HOST:redis}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:13579ada}
+
+openrouter:
+  api-key: ${OPENROUTER_API_KEY}
+  base-url: https://openrouter.ai/api/v1
+  default-model: openai/gpt-3.5-turbo
+  max-tokens: 2000
+  temperature: 0.7
+  retry-attempts: 3
+  retry-delay: 1000
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      openrouter:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+  ratelimiter:
+    instances:
+      openrouter:
+        limitForPeriod: 50
+        limitRefreshPeriod: 1s
+        timeoutDuration: 5s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] [%X{userId}] %-5level %logger{36} - %msg%n"
+  level:
+    com.craftpilot.llmservice: INFO
+    org.springframework.web: INFO
+    org.springframework.data: INFO

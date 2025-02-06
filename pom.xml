@@ -22,15 +22,11 @@
         <module>subscription-service</module>
         <module>credit-service</module>
         
-        <!-- 5. AI and Processing Services -->
-        <module>model-service</module>
-        <module>aiquestion-service</module>
-        <module>code-service</module>
+        <!-- 5. AI and Processing Services --> 
+        <module>llm-service</module>
         <module>image-service</module>
-        <module>translation-service</module>
         
         <!-- 6. Content and Analytics Services -->
-        <module>content-service</module>
         <module>analytics-service</module>
         
         <!-- 7. Support Services -->

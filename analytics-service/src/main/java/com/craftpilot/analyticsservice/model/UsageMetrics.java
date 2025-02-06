@@ -32,12 +32,9 @@ public class UsageMetrics {
     private LocalDateTime updatedAt;
 
     public enum ServiceType {
-        QUESTION,
+        LLM,
         CHAT,
         IMAGE,
-        CODE,
-        TRANSLATION,
-        CONTENT,
-        MODEL
+        VIDEO,
     }
 } 

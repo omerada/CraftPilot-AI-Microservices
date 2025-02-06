@@ -103,63 +103,14 @@ services:
       - craftpilot-network
     depends_on:
       eureka-server:
-        condition: service_healthy
+        condition: service_healthy 
 
-  # Content Service
-  content-service:
-    container_name: content-service
+  # LLM Service
+  llm-service:
+    container_name: llm-service
     build:
       context: .
-      dockerfile: content-service/Dockerfile
-    ports:
-      - "8088:8088"
-    environment:
-      - SPRING_APPLICATION_NAME=content-service
-      - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - FIREBASE_CREDENTIAL_PATH=/app/config/firebase-service-account.json
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-service-account.json
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
-      - SPRING_SECURITY_USER_NAME=${EUREKA_USERNAME}
-      - SPRING_SECURITY_USER_PASSWORD=${EUREKA_PASSWORD}
-    volumes:
-      - ./content-service/src/main/resources/firebase-service-account.json:/app/config/firebase-service-account.json
-    depends_on:
-      eureka-server:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      kafka:
-        condition: service_started
-    networks:
-      - craftpilot-network
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "curl",
-          "-f",
-          "http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@localhost:8088/actuator/health",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-
-  # AI Question Service
-  aiquestion-service:
-    container_name: aiquestion-service
-    build:
-      context: .
-      dockerfile: aiquestion-service/Dockerfile
+      dockerfile: llm-service/Dockerfile
     ports:
       - "8095:8095"
     environment:
@@ -171,7 +122,7 @@ services:
       - SPRING_SECURITY_USER_NAME=${EUREKA_USERNAME}
       - SPRING_SECURITY_USER_PASSWORD=${EUREKA_PASSWORD}
     volumes:
-      - ./aiquestion-service/src/main/resources/firebase-service-account.json:/app/config/firebase-service-account.json
+      - ./llm-service/src/main/resources/firebase-service-account.json:/app/config/firebase-service-account.json
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -308,46 +259,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
-
-  # Code Service
-  code-service:
-    container_name: code-service
-    build:
-      context: .
-      dockerfile: code-service/Dockerfile
-    ports:
-      - "8096:8096"
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
-      - FIREBASE_CREDENTIAL_PATH=/app/config/firebase-service-account.json
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-service-account.json
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
-      - SPRING_SECURITY_USER_NAME=${EUREKA_USERNAME}
-      - SPRING_SECURITY_USER_PASSWORD=${EUREKA_PASSWORD}
-    volumes:
-      - ./code-service/src/main/resources/firebase-service-account.json:/app/config/firebase-service-account.json
-    depends_on:
-      eureka-server:
-        condition: service_healthy
-    networks:
-      - craftpilot-network
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "curl",
-          "-f",
-          "http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@localhost:8096/actuator/health",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 512M
+          memory: 512M 
 
   # Notification Service
   notification-service:
