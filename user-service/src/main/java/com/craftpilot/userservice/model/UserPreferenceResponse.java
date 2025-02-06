@@ -11,11 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UserPreferenceResponse {
     private String userId;
+    private String theme;
     private String language;
-    private String timezone;
-    private Boolean emailEnabled;
-    private Boolean pushEnabled;
-    private Boolean smsEnabled;
-    private Long quietHoursStart;
-    private Long quietHoursEnd;
+    private boolean notifications;
 }

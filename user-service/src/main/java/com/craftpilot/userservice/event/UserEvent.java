@@ -11,14 +11,14 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserEvent {
-    private String userId;
     private String eventType;
+    private UserEntity user;
     private long timestamp;
     
     public static UserEvent fromUser(String eventType, UserEntity user) {
         return UserEvent.builder()
-                .userId(user.getId())
                 .eventType(eventType)
+                .user(user)
                 .timestamp(System.currentTimeMillis())
                 .build();
     }
