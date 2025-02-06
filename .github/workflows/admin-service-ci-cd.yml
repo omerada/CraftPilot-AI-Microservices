@@ -52,53 +52,18 @@ jobs:
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true
-          debug: true
-          command_timeout: "20m"
+          envs: GCP_SA_KEY
           script: |
-            echo "=== Testing Docker ==="
-            docker version
-            docker info
-            docker ps
-
-            # Docker ağını oluştur (eğer yoksa)
-            docker network create craftpilot-network || true
-
-            # GCP kimlik bilgilerini oluştur
-            echo "=== Setting up GCP Credentials ==="
+            echo "=== Creating GCP Credentials ==="
             mkdir -p /opt/craftpilot
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
+            echo "$GCP_SA_KEY" > /opt/craftpilot/gcp-credentials.json
             chmod 600 /opt/craftpilot/gcp-credentials.json
-
-            # Redis container'ını başlat (eğer çalışmıyorsa)
-            if ! docker ps | grep -q redis; then
-              docker run -d \
-                --name redis \
-                --network craftpilot-network \
-                -p 6379:6379 \
-                --restart unless-stopped \
-                redis:latest redis-server \
-                --requirepass 13579ada \
-                --appendonly yes \
-                --maxmemory 1gb \
-                --maxmemory-policy allkeys-lru
-            fi
-
-            # Eureka server'ı başlat (eğer çalışmıyorsa)
-            if ! docker ps | grep -q eureka-server; then
-              docker run -d \
-                --name eureka-server \
-                --network craftpilot-network \
-                -p 8761:8761 \
-                -e SPRING_PROFILES_ACTIVE=prod \
-                -e EUREKA_USERNAME=craftpilot \
-                -e EUREKA_PASSWORD=13579ada \
-                ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
-            fi
 
             echo "=== Pulling ARM64 Image ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/admin-service:latest-arm64
@@ -116,30 +81,24 @@ jobs:
               -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/gcp-credentials.json \
+              -e GCP_PROJECT_ID=craft-pilot-ai \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/ \
               -e EUREKA_INSTANCE_PREFERIPADDRESS=true \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \
-              -e SPRING_REDIS_HOST=redis \
-              -e SPRING_REDIS_PORT=6379 \
-              -e SPRING_REDIS_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/admin-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
             sleep 30
 
-            # Servis sağlık kontrolü
             echo "=== Health Check ==="
-            max_attempts=5
-            attempt=1
-            while [ $attempt -le $max_attempts ]; do
-              if curl -s http://localhost:8063/actuator/health | grep -q '"status":"UP"'; then
+            for i in {1..5}; do
+              if curl -f http://localhost:8063/actuator/health; then
                 echo "Service is healthy"
                 exit 0
               fi
-              echo "Attempt $attempt: Waiting for service to start..."
+              echo "Attempt $i: Waiting for service to start..."
               sleep 10
-              attempt=$((attempt + 1))
             done
 
             echo "Service failed health check"

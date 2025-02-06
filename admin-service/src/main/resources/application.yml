@@ -7,12 +7,9 @@ spring:
   cloud:
     gcp:
       credentials:
-        location: ${SPRING_CLOUD_GCP_CREDENTIALS_LOCATION:file:/app/gcp-credentials.json}
+        location: file:/app/gcp-credentials.json
       firestore:
-        enabled: true
-        project-id: ${GCP_PROJECT_ID}
-        credentials:
-          location: file:/opt/craftpilot/gcp-credentials.json
+        project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
     kubernetes:
       enabled: false
     discovery:
@@ -21,7 +18,7 @@ spring:
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://eureka-server:8761/eureka/
+      defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka/
     register-with-eureka: true
     fetch-registry: true
   instance:
