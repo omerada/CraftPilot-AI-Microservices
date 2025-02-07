@@ -120,39 +120,26 @@ jobs:
             docker rm llm-service || true
 
             echo "=== Starting New Container ==="
-            # GCP kimlik bilgilerini oluştur
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
-            chmod 600 /opt/craftpilot/gcp-credentials.json
-
-            echo "=== Starting LLM Service ==="
             docker run -d \
               --name llm-service \
               --network craftpilot-network \
               --dns 8.8.8.8 \
               --dns 8.8.4.4 \
-              --add-host=eureka-server:$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' eureka-server) \
               -p 8062:8062 \
-              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e EUREKA_INSTANCE_PREFERIPADDRESS=true \
-              -e EUREKA_USERNAME=craftpilot \
-              -e EUREKA_PASSWORD=13579ada \
-              -e SPRING_REDIS_HOST=redis \
-              -e SPRING_REDIS_PORT=6379 \
-              -e SPRING_REDIS_PASSWORD=13579ada \
-              -e GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
+              -e SPRING_CLOUD_DISCOVERY_ENABLED=true \
+              -e SPRING_CLOUD_LOADBALANCER_RIBBON_ENABLED=false \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 60
-
-            echo "=== Container Logs ==="
-            docker logs llm-service
+            sleep 30
 
             echo "=== Health Check ==="
-            for i in {1..5}; do
+            for i in {1..10}; do
               if curl -f http://localhost:8062/actuator/health; then
                 echo "Service is healthy"
                 exit 0

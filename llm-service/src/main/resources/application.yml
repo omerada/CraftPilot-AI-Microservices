@@ -8,7 +8,7 @@ server:
 
 spring:
   application:
-    name: llm-service
+    name: LLM-SERVICE
   webflux:
     base-path: /api
   kafka:
@@ -71,19 +71,18 @@ spring:
         max-wait: 1000
 
 eureka:
+  instance:
+    prefer-ip-address: true
+    hostname: ${spring.cloud.client.hostname}
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 20
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8761/eureka/}
+      defaultZone: http://craftpilot:13579ada@eureka-server:8761/eureka/
     register-with-eureka: true
     fetch-registry: true
     registry-fetch-interval-seconds: 5
-  instance:
-    prefer-ip-address: true
-    lease-renewal-interval-in-seconds: 5
-    lease-expiration-duration-in-seconds: 10
-    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
-    hostname: ${spring.cloud.client.hostname}
-    health-check-url-path: /actuator/health
 
 management:
   endpoints:
