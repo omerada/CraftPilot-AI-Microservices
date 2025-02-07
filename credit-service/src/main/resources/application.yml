@@ -19,6 +19,10 @@ spring:
     discovery:
       enabled: true
     loadbalancer:
+      cache:
+        enabled: true
+        caffeine:
+          spec: expireAfterWrite=5s
       ribbon:
         enabled: false
     circuit-breaker:
@@ -81,6 +85,10 @@ spring:
         max.poll.interval.ms: 300000
         session.timeout.ms: 45000
         heartbeat.interval.ms: 10000
+  cache:
+    type: caffeine
+    caffeine:
+      spec: expireAfterWrite=5m
 
 management:
   endpoints:
@@ -90,12 +98,28 @@ management:
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: redis,db
+        liveness:
+          include: ping
   metrics:
     tags:
       application: ${spring.application.name}
     export:
       prometheus:
         enabled: true
+  health:
+    redis:
+      enabled: true
+    circuitbreakers:
+      enabled: true
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
 
 eureka:
   client:
@@ -126,8 +150,18 @@ springdoc:
     enabled: true
 
 redis:
-  host: ${REDIS_HOST:localhost}
-  port: ${REDIS_PORT:6379}
+  host: ${SPRING_REDIS_HOST:redis}
+  port: ${SPRING_REDIS_PORT:6379}
+  password: ${SPRING_REDIS_PASSWORD:13579ada}
+  lettuce:
+    pool:
+      max-active: 8
+      max-idle: 8
+      min-idle: 2
+      max-wait: -1ms
+    shutdown-timeout: 100ms
+  connect-timeout: 2000ms
+  timeout: 1000ms
 
 openai:
   api-key: ${OPENAI_API_KEY}
@@ -154,6 +188,10 @@ logging:
     com.craftpilot.analyticsservice: ${LOG_LEVEL:INFO}
     org.springframework.web: ${LOG_LEVEL:INFO}
     org.springframework.data: ${LOG_LEVEL:INFO}
+    org.springframework.cloud.loadbalancer: ERROR
+    org.springframework.cloud.client: ERROR
+    com.netflix.discovery: ERROR
+    org.springframework.data.redis: ERROR
 
 cors:
   allowed-origins: "*"

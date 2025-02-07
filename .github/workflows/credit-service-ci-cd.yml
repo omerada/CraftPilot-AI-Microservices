@@ -69,24 +69,14 @@ jobs:
             # Infrastructure containers
             docker network create craftpilot-network || true
 
-            # Start Kafka & Zookeeper
-            if ! docker ps | grep -q kafka; then
+            # Start Redis (eğer çalışmıyorsa)
+            if ! docker ps | grep -q redis; then
               docker run -d \
-                --name zookeeper \
+                --name redis \
                 --network craftpilot-network \
-                -e ZOOKEEPER_CLIENT_PORT=2181 \
-                -e ZOOKEEPER_TICK_TIME=2000 \
-                confluentinc/cp-zookeeper:latest
-
-              docker run -d \
-                --name kafka \
-                --network craftpilot-network \
-                -p 9092:9092 \
-                -e KAFKA_BROKER_ID=1 \
-                -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
-                -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
-                -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
-                confluentinc/cp-kafka:latest
+                -p 6379:6379 \
+                -e REDIS_PASSWORD=13579ada \
+                redis:latest --requirepass 13579ada
             fi
 
             # Deploy Credit Service
@@ -106,6 +96,9 @@ jobs:
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_SECURITY_USER_NAME=craftpilot \
               -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+              -e SPRING_REDIS_HOST=redis \
+              -e SPRING_REDIS_PORT=6379 \
+              -e SPRING_REDIS_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/credit-service:latest-arm64
 
             # Basic health check
