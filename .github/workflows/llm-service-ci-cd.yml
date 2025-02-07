@@ -5,7 +5,7 @@ on:
     branches: [master]
     paths:
       - "llm-service/**"
-
+      - ".github/workflows/llm-service-ci-cd.yml"
   workflow_dispatch:
 
 jobs:
@@ -17,41 +17,49 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v3
+      # QEMU kurulumu
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
         with:
-          java-version: "21"
-          distribution: "corretto"
+          platforms: arm64
 
-      - name: Build with Maven
-        run: mvn clean package -DskipTests
+      # Docker Buildx kurulumu
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          platforms: linux/arm64
+          buildkitd-flags: --debug
 
-      - name: Login to Docker Hub
+      # Docker Hub'a giriş yap
+      - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push Docker Image
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64 .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
+      # Build ve Push
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./llm-service
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
+            ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:${{ github.sha }}-arm64
+          no-cache: true
+          pull: true
 
+      # VPS'e deploy
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
-        env:
-          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: GCP_SA_KEY
           script: |
             echo "=== Creating GCP Credentials ==="
-            mkdir -p /opt/craftpilot
-            echo "$GCP_SA_KEY" > /opt/craftpilot/gcp-credentials.json
-            chmod 600 /opt/craftpilot/gcp-credentials.json
+            echo "${{ secrets.GCP_SA_KEY }}" > /tmp/gcp-credentials.json
 
             echo "=== Pulling ARM64 Image ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
@@ -63,19 +71,20 @@ jobs:
             echo "=== Starting New Container ==="
             docker run -d \
               --name llm-service \
+              --platform linux/arm64 \
               --network craftpilot-network \
               -p 8062:8062 \
-              -v /opt/craftpilot:/opt/craftpilot \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/opt/craftpilot/gcp-credentials.json \
-              -e GCP_PROJECT_ID=craft-pilot-ai \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e EUREKA_INSTANCE_PREFERIPADDRESS=true \
-              -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8057/eureka/ \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+              -v /tmp/gcp-credentials.json:/gcp-credentials.json:ro \
               ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 30
+            sleep 60
+
+            echo "=== Container Logs ==="
+            docker logs llm-service
 
             echo "=== Health Check ==="
             for i in {1..5}; do
@@ -86,7 +95,6 @@ jobs:
               echo "Attempt $i: Waiting for service to start..."
               sleep 10
             done
-
             echo "Service failed health check"
             docker logs llm-service
             exit 1
