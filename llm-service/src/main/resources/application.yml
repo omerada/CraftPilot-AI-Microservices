@@ -12,8 +12,9 @@ spring:
   webflux:
     base-path: /api
   kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka-service:9092}
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     producer:
+      bootstrap-servers: ${SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS:kafka:9092}
       retries: 3
       acks: 1
       batch-size: 16384
@@ -29,6 +30,7 @@ spring:
         retry.backoff.ms: 1000
         max.block.ms: 60000
     consumer:
+      bootstrap-servers: ${SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS:kafka:9092}
       group-id: ${spring.application.name}-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -39,6 +41,11 @@ spring:
         max.poll.interval.ms: 300000
         session.timeout.ms: 45000
         heartbeat.interval.ms: 10000
+    admin:
+      bootstrap-servers: ${SPRING_KAFKA_ADMIN_BOOTSTRAP_SERVERS:kafka:9092}
+      properties:
+        request.timeout.ms: 20000
+        retry.backoff.ms: 500
   webclient:
     max-in-memory-size: 16MB
     connect-timeout: 5000
