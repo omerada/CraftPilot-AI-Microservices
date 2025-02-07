@@ -68,30 +68,44 @@ jobs:
             # Infrastructure containers
             docker network create craftpilot-network || true
 
-            # Remove existing container
+            # Start Redis container if not running
+            if ! docker ps | grep -q redis; then
+              docker run -d \
+                --name redis \
+                --network craftpilot-network \
+                -p 6379:6379 \
+                -e REDIS_PASSWORD=13579ada \
+                redis:latest --requirepass 13579ada
+            fi
+
+            # Wait for Redis to be ready
+            echo "Waiting for Redis to be ready..."
+            sleep 10
+
+            # Remove existing Redis service container
             docker stop redis-service || true
             docker rm redis-service || true
 
-            # Run new container
+            # Run new Redis service container
             docker run -d \
               --name redis-service \
               --network craftpilot-network \
               --restart unless-stopped \
-              -p 6379:6379 \
+              -p 8085:8085 \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
+              -e SPRING_REDIS_HOST=redis \
+              -e SPRING_REDIS_PORT=6379 \
+              -e SPRING_REDIS_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
 
-            # Wait for service to be ready
-            echo "Waiting for service to start..."
+            # Wait for Redis service to be ready
+            echo "Waiting for Redis service to start..."
             sleep 30
 
             # Health check
             for i in {1..30}; do
-              if curl -s http://localhost:6379/actuator/health | grep -q "UP"; then
+              if curl -s http://localhost:8085/actuator/health | grep -q "UP"; then
                 echo "Service is healthy"
                 exit 0
               fi
