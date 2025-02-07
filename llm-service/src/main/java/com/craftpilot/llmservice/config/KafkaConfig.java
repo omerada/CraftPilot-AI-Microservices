@@ -15,6 +15,7 @@ import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.kafka.config.TopicBuilder;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -32,6 +33,9 @@ public class KafkaConfig {
     public KafkaAdmin kafkaAdmin() {
         Map<String, Object> configs = new HashMap<>();
         configs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        configs.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "15000");
+        configs.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "30000");
+        configs.put(AdminClientConfig.RETRIES_CONFIG, "3");
         return new KafkaAdmin(configs);
     }
 
@@ -57,7 +61,10 @@ public class KafkaConfig {
     }
 
     @Bean
-    public NewTopic aiEventsTopic() {
-        return new NewTopic("ai-events", 3, (short) 1);
+    public NewTopic aiEventTopic() {
+        return TopicBuilder.name("ai-events")
+                .partitions(3)
+                .replicas(1)
+                .build();
     }
 } 

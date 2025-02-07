@@ -50,6 +50,39 @@ jobs:
           no-cache: true
           pull: true
 
+      # Kafka'nın çalışıp çalışmadığını kontrol et
+      - name: Check Kafka Status
+        run: |
+          if ! docker ps | grep -q kafka; then
+            echo "Kafka container is not running. Starting Kafka..."
+            
+            # Zookeeper'ı başlat
+            docker run -d \
+              --name zookeeper \
+              --network craftpilot-network \
+              -e ZOOKEEPER_CLIENT_PORT=2181 \
+              -e ZOOKEEPER_TICK_TIME=2000 \
+              confluentinc/cp-zookeeper:latest
+
+            sleep 10
+
+            # Kafka'yı başlat
+            docker run -d \
+              --name kafka \
+              --network craftpilot-network \
+              -p 9092:9092 \
+              -e KAFKA_BROKER_ID=1 \
+              -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
+              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
+              -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT \
+              -e KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT \
+              -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+              -e KAFKA_AUTO_CREATE_TOPICS_ENABLE="true" \
+              confluentinc/cp-kafka:latest
+
+            sleep 20
+          fi
+
       # VPS'e deploy
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
@@ -77,7 +110,7 @@ jobs:
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8057/eureka/ \
               -e GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}' \
-              -e SPRING_KAFKA_BOOTSTRAP_SERVERS=localhost:8055 \
+              -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
@@ -91,7 +124,7 @@ jobs:
 
             echo "=== Health Check ==="
             for i in {1..5}; do
-              if curl -f http://localhost:8062/actuator/health/liveness; then
+              if curl -f http://localhost:8062/actuator/health; then
                 echo "Service is healthy"
                 exit 0
               fi

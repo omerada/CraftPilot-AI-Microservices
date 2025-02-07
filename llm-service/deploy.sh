@@ -3,25 +3,39 @@
 SERVICE_NAME="llm-service"
 PORT=8062
 
-# Health check function
-wait_for_service() {
-    local max_attempts=5
-    local attempt=1
-    local wait_time=10
+# Kafka'nın hazır olmasını bekle
+wait_for_kafka() {
+    echo "Waiting for Kafka to be ready..."
+    until nc -z kafka 9092; do
+        echo "Kafka is unavailable - sleeping"
+        sleep 2
+    done
+    echo "Kafka is up"
+}
 
-    echo "=== Waiting for Container to Start ==="
-    while [ $attempt -le $max_attempts ]; do
-        if curl -f "http://localhost:$PORT/actuator/health" >/dev/null 2>&1; then
-            echo "Service is healthy"
+# Ana servisin başlamasını bekle
+wait_for_service() {
+    echo "Waiting for service to be ready..."
+    for i in {1..30}; do
+        if curl -f http://localhost:8062/actuator/health &>/dev/null; then
+            echo "Service is up"
             return 0
         fi
-        echo "Attempt $attempt: Waiting for service to start..."
-        sleep $wait_time
-        attempt=$((attempt + 1))
+        echo "Service is unavailable - attempt $i - sleeping"
+        sleep 2
     done
-    echo "Service failed health check"
+    echo "Service failed to start"
     return 1
 }
+
+echo "=== Starting Dependencies ==="
+wait_for_kafka
+
+echo "=== Starting Service ==="
+java -jar app.jar &
+
+echo "=== Waiting for Service to Start ==="
+wait_for_service
 
 echo "=== Creating GCP Credentials ==="
 echo "${GCP_CREDENTIALS}" > /tmp/gcp-credentials.json

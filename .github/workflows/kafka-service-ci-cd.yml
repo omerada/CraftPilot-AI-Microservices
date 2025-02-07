@@ -126,7 +126,7 @@ jobs:
             docker run -d \
               --name kafka-service \
               --network craftpilot-network \
-              -p 8055:8055 \
+              -p 9092:9092 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -147,7 +147,7 @@ jobs:
 
             echo "=== Health Check ==="
             for i in {1..5}; do
-              if curl -f http://localhost:8055/actuator/health; then
+              if curl -f http://localhost:9092/actuator/health; then
                 echo "Service is healthy"
                 exit 0
               fi
