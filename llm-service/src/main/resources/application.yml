@@ -100,9 +100,7 @@ management:
     livenessstate:
       enabled: true
     readinessstate:
-      enabled: true
-  server:
-    port: 8062
+      enabled: true 
 
 openrouter:
   api-key: ${OPENROUTER_API_KEY:your-api-key}

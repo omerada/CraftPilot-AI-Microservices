@@ -1,5 +1,5 @@
 # Build stage
-FROM --platform=$BUILDPLATFORM maven:3.9.6-eclipse-temurin-21-jammy AS build
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 
 WORKDIR /build
 COPY pom.xml .
@@ -9,20 +9,14 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # Run stage
-FROM --platform=$TARGETPLATFORM eclipse-temurin:21-jre-jammy
-
-# Install curl for healthcheck
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+FROM eclipse-temurin:21-jdk
 
 WORKDIR /app
 COPY --from=build /build/target/*.jar app.jar
 
 # JVM ayarları
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
-
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=3s \
-  CMD curl -f http://localhost:8062/actuator/health || exit 1
+ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
 
 EXPOSE 8062
-ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]
