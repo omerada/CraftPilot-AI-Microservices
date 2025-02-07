@@ -17,51 +17,36 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # QEMU kurulumu
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Build
+        run: ./mvnw clean package -DskipTests
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
         with:
           platforms: arm64
 
-      # Docker Buildx kurulumu
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-        with:
-          platforms: linux/arm64
 
-      # Docker Hub'a giriş yap
       - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Sadece ARM64 için build ve push
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
           context: ./kafka-service
           platforms: linux/arm64
           push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/kafka-service:latest-arm64
-            ${{ secrets.DOCKERHUB_USERNAME }}/kafka-service:${{ github.sha }}-arm64
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/kafka-service:buildcache-arm64
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/kafka-service:buildcache-arm64,mode=max
-          build-args: |
-            BUILDPLATFORM=linux/arm64
-            TARGETPLATFORM=linux/arm64
-
-      # Google Cloud kimlik doğrulaması
-      - id: "auth"
-        name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v1"
-        with:
-          credentials_json: "${{ secrets.GCP_SA_KEY }}"
-
-      # Google Cloud CLI kurulumu
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/kafka-service:latest-arm64
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
@@ -69,92 +54,64 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true
-          debug: true
-          command_timeout: "20m"
           script: |
-            echo "=== Testing SSH Connection ==="
-            whoami
-            pwd
-
-            echo "=== System Architecture ==="
-            uname -m
-
-            echo "=== Testing Directory Access ==="
-            ls -la /opt/craftpilot || mkdir -p /opt/craftpilot
-
-            echo "=== Continuing with Deployment ==="
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
-
-            echo "=== Testing Docker ==="
-            docker version
-            docker info
-            docker ps
-
-            # Docker ağını oluştur (eğer yoksa)
+            # Infrastructure containers
             docker network create craftpilot-network || true
 
-            # Redis container'ını başlat (eğer çalışmıyorsa)
-            if ! docker ps | grep -q redis; then
+            # Start Zookeeper if not running
+            if ! docker ps | grep -q zookeeper; then
               docker run -d \
-                --name redis \
+                --name zookeeper \
                 --network craftpilot-network \
-                -p 6379:6379 \
-                redis:latest
+                -e ZOOKEEPER_CLIENT_PORT=2181 \
+                -e ZOOKEEPER_TICK_TIME=2000 \
+                confluentinc/cp-zookeeper:latest
             fi
 
-            # Eureka server'ı başlat (eğer çalışmıyorsa)
-            if ! docker ps | grep -q eureka-server; then
-              docker run -d \
-                --name eureka-server \
-                --network craftpilot-network \
-                -p 8761:8761 \
-                -e SPRING_PROFILES_ACTIVE=prod \
-                -e EUREKA_USERNAME=craftpilot \
-                -e EUREKA_PASSWORD=13579ada \
-                ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
-            fi
+            # Wait for Zookeeper to be ready
+            echo "Waiting for Zookeeper to be ready..."
+            sleep 20
 
-            echo "=== Pulling ARM64 Image ==="
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/kafka-service:latest-arm64
-
-            echo "=== Stopping Old Container ==="
+            # Remove existing container
             docker stop kafka-service || true
             docker rm kafka-service || true
 
-            echo "=== Starting New Container ==="
+            # Run new container
             docker run -d \
               --name kafka-service \
               --network craftpilot-network \
+              --restart unless-stopped \
               -p 9092:9092 \
-              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_USERNAME=craftpilot \
-              -e EUREKA_PASSWORD=13579ada \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-              -e KAFKA_GROUP_ID=kafka-service \
+              -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
+              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka-service:9092 \
+              -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT \
+              -e KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT \
+              -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
               ${{ secrets.DOCKERHUB_USERNAME }}/kafka-service:latest-arm64
 
-            echo "=== Waiting for Container to Start ==="
-            sleep 60  # Biraz daha uzun bekleyelim
+            # Wait for service to be ready
+            echo "Waiting for service to start..."
+            sleep 30
 
-            echo "=== Container Logs ==="
-            docker logs kafka-service
-
-            echo "=== Health Check ==="
-            for i in {1..5}; do
-              if curl -f http://localhost:9092/actuator/health; then
+            # Health check
+            for i in {1..30}; do
+              if curl -s http://localhost:9092/actuator/health | grep -q "UP"; then
                 echo "Service is healthy"
                 exit 0
               fi
-              echo "Waiting for service to start... Attempt $i"
+              echo "Attempt $i: Service not ready yet..."
+              if [ $i -eq 15 ]; then
+                echo "Mid-point container logs:"
+                docker logs kafka-service
+              fi
               sleep 10
             done
-            echo "Service failed health check"
+
+            echo "Service failed to become healthy within timeout"
+            echo "Final container logs:"
             docker logs kafka-service
             exit 1
 

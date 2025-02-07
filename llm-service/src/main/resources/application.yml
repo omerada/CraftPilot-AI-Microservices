@@ -12,14 +12,14 @@ spring:
   webflux:
     base-path: /api
   kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka-service:9092}
     producer:
       retries: 3
       acks: 1
       batch-size: 16384
       buffer-memory: 33554432
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
       properties:
         spring.json.add.type.headers: false
         spring.json.type.mapping: aiEvent:com.craftpilot.llmservice.event.AIEvent
@@ -32,7 +32,7 @@ spring:
       group-id: ${spring.application.name}-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       properties:
         spring.json.trusted.packages: "com.craftpilot.*"
         isolation.level: read_committed
@@ -76,14 +76,13 @@ spring:
 eureka:
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@localhost:8761/eureka/}
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8761/eureka/}
     register-with-eureka: true
     fetch-registry: true
   instance:
     prefer-ip-address: true
-    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
     lease-renewal-interval-in-seconds: 10
-    lease-expiration-duration-in-seconds: 30
+    health-check-url-path: /actuator/health
 
 management:
   endpoints:
@@ -98,13 +97,11 @@ management:
         enabled: true
       group:
         readiness:
-          include: redis,diskSpace,kafka
+          include: redis,diskSpace
         liveness:
           include: ping
   health:
     redis:
-      enabled: true
-    kafka:
       enabled: true
     circuitbreakers:
       enabled: true

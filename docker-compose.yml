@@ -166,11 +166,12 @@ services:
       - "8062:8062"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD:-secret}@eureka-server:8761/eureka/
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
       - GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
       - SPRING_REDIS_HOST=redis
       - SPRING_REDIS_PORT=6379
       - SPRING_REDIS_PASSWORD=13579ada
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka-service:9092
     volumes:
       - ${GCP_CREDENTIALS_PATH:-/tmp/gcp-credentials.json}:/gcp-credentials.json:ro
     networks:
@@ -184,6 +185,8 @@ services:
       eureka-server:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
 
   # Credit Service
@@ -437,6 +440,37 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  kafka-service:
+    container_name: kafka-service
+    image: ${DOCKERHUB_USERNAME}/kafka-service:latest-arm64
+    ports:
+      - "9092:9092"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka-service:9092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+    networks:
+      - craftpilot-network
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9092/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
 volumes:
   redis-data:
