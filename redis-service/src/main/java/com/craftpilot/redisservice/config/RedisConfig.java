@@ -10,6 +10,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
@@ -50,17 +51,23 @@ public class RedisConfig {
     @Bean
     public RedissonClient redissonClient() {
         Config config = new Config();
-        String address = String.format("redis://%s:%d", redisHost, redisPort);
         config.useSingleServer()
-                .setAddress(address)
-                .setConnectTimeout(5000)
-                .setRetryAttempts(3)
-                .setRetryInterval(1500);
-        
-        if (redisPassword != null && !redisPassword.isEmpty()) {
-            config.useSingleServer().setPassword(redisPassword);
-        }
-        
+            .setAddress("redis://" + redisHost + ":" + redisPort)
+            .setPassword(redisPassword)
+            .setConnectionMinimumIdleSize(1)
+            .setConnectionPoolSize(2)
+            .setRetryAttempts(3)
+            .setRetryInterval(1500)
+            .setTimeout(3000)
+            .setConnectTimeout(3000);
+
         return Redisson.create(config);
+    }
+
+    @Bean
+    public StringRedisTemplate stringRedisTemplate(RedisConnectionFactory redisConnectionFactory) {
+        StringRedisTemplate template = new StringRedisTemplate();
+        template.setConnectionFactory(redisConnectionFactory);
+        return template;
     }
 } 
