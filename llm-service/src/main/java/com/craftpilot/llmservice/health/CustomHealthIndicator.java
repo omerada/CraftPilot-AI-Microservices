@@ -19,9 +19,8 @@ public class CustomHealthIndicator implements ReactiveHealthIndicator {
         return checkRedis()
                 .then(checkOpenRouter())
                 .thenReturn(Health.up().build())
-                .onErrorResume(throwable -> Mono.just(Health.builder()
-                        .down()
-                        .withException(throwable)
+                .onErrorResume(throwable -> Mono.just(Health.down()
+                        .withDetail("error", throwable.getMessage())
                         .build()));
     }
 
