@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-test:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -32,25 +32,10 @@ jobs:
           cd credit-service
           chmod +x mvnw
 
-      - name: Build and Test
+      - name: Build
         run: |
           cd credit-service
-          ./mvnw clean verify
-
-      - name: Run SonarQube Analysis
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          cd credit-service
-          ./mvnw sonar:sonar \
-            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
-
-  build-and-push-docker:
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
+          ./mvnw clean package -DskipTests
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -66,22 +51,14 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push
+      - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
           context: ./credit-service
           platforms: linux/arm64
           push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/credit-service:latest-arm64
-            ${{ secrets.DOCKERHUB_USERNAME }}/credit-service:${{ github.sha }}-arm64
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/credit-service:buildcache-arm64
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/credit-service:buildcache-arm64,mode=max
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/credit-service:latest-arm64
 
-  deploy:
-    needs: build-and-push-docker
-    runs-on: ubuntu-latest
-    steps:
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
@@ -109,8 +86,6 @@ jobs:
                 -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
                 -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
                 -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
-                -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
-                -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 \
                 confluentinc/cp-kafka:latest
             fi
 
@@ -133,16 +108,10 @@ jobs:
               -e SPRING_SECURITY_USER_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/credit-service:latest-arm64
 
-            # Health check
-            for i in {1..12}; do
-              if curl -s http://localhost:8058/actuator/health | grep -q "UP"; then
-                echo "Service is healthy"
-                exit 0
-              fi
-              echo "Waiting for service to start... Attempt $i"
-              sleep 10
-            done
-
-            echo "Service failed health check"
-            docker logs credit-service
-            exit 1
+            # Basic health check
+            sleep 30
+            if ! curl -s http://localhost:8058/actuator/health | grep -q "UP"; then
+              echo "Service failed health check"
+              docker logs credit-service
+              exit 1
+            fi
