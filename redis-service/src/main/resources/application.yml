@@ -9,11 +9,18 @@ server:
 spring:
   application:
     name: redis-service
+  cloud:
+    gcp:
+      credentials:
+        location: ${SPRING_CLOUD_GCP_CREDENTIALS_LOCATION:file:/app/gcp-credentials.json}
+      firestore:
+        project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
+        enabled: true
   data:
     redis:
-      host: ${REDIS_HOST:redis}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:13579ada}
+      host: ${SPRING_REDIS_HOST:redis}
+      port: ${SPRING_REDIS_PORT:6379}
+      password: ${SPRING_REDIS_PASSWORD:13579ada}
       timeout: 5000
       lettuce:
         pool:
@@ -22,12 +29,6 @@ spring:
           min-idle: 2
           max-wait: 1000ms
         shutdown-timeout: 200ms
-  cloud:
-    discovery:
-      enabled: true
-    loadbalancer:
-      ribbon:
-        enabled: false
 
 eureka:
   client:
@@ -39,10 +40,6 @@ eureka:
     prefer-ip-address: true
     lease-renewal-interval-in-seconds: 10
     health-check-url-path: /actuator/health
-    metadata-map:
-      startup: ${random.int}
-      user.name: ${spring.security.user.name:craftpilot}
-      user.password: ${spring.security.user.password:13579ada}
 
 management:
   endpoints:
@@ -68,7 +65,6 @@ management:
       enabled: true
     readinessstate:
       enabled: true
-    validate-group-membership: false
 
 logging:
   pattern:
@@ -78,4 +74,3 @@ logging:
     com.craftpilot: DEBUG
     org.springframework.web: INFO
     org.springframework.data.redis: INFO
-    org.springframework.cloud: INFO

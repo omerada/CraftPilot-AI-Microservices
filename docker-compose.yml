@@ -26,6 +26,7 @@ services:
         limits:
           memory: 512M
 
+  # Redis Service
   redis-service:
     image: ${DOCKERHUB_USERNAME}/redis-service:latest-arm64
     container_name: redis-service
@@ -37,6 +38,11 @@ services:
       - SPRING_REDIS_HOST=redis
       - SPRING_REDIS_PORT=6379
       - SPRING_REDIS_PASSWORD=13579ada
+      - SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/gcp-credentials.json
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
+    volumes:
+      - ${GCP_CREDENTIALS_PATH:-./redis-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
     networks:
       - craftpilot-network
     depends_on:
@@ -46,8 +52,8 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
-      interval: 10s
-      timeout: 5s
+      interval: 30s
+      timeout: 10s
       retries: 3
     deploy:
       resources:
