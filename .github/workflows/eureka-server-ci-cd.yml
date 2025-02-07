@@ -28,6 +28,8 @@ jobs:
         uses: docker/setup-buildx-action@v2
         with:
           platforms: linux/arm64
+          # Build cache'i devre dışı bırak
+          buildkitd-flags: --debug
 
       # Docker Hub'a giriş yap
       - name: Login to DockerHub
@@ -46,54 +48,18 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
             ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:${{ github.sha }}-arm64
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:buildcache-arm64
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:buildcache-arm64,mode=max
-          build-args: |
-            BUILDPLATFORM=linux/arm64
-            TARGETPLATFORM=linux/arm64
+          # Cache'i devre dışı bırak
+          no-cache: true
+          pull: true
 
-      # Google Cloud kimlik doğrulaması
-      - id: "auth"
-        name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v1"
-        with:
-          credentials_json: "${{ secrets.GCP_SA_KEY }}"
-
-      # Google Cloud CLI kurulumu
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
-
+      # VPS'e deploy
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true
-          debug: true
-          command_timeout: "20m"
           script: |
-            echo "=== Testing SSH Connection ==="
-            whoami
-            pwd
-
-            echo "=== System Architecture ==="
-            uname -m
-
-            echo "=== Testing Directory Access ==="
-            ls -la /opt/craftpilot || mkdir -p /opt/craftpilot
-
-            echo "=== Testing Docker ==="
-            docker version
-            docker info
-            docker ps
-
-            # Docker ağını oluştur (eğer yoksa)
-            docker network create craftpilot-network || true
-
-            echo "=== Pulling ARM64 Image ==="
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
-
             echo "=== Stopping Old Container ==="
             docker stop eureka-server || true
             docker rm eureka-server || true
@@ -102,21 +68,21 @@ jobs:
             docker run -d \
               --name eureka-server \
               --network craftpilot-network \
-              -p 8761:8761 \
+              -p 8057:8057 \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 60  # Biraz daha uzun bekleyelim
+            sleep 30
 
             echo "=== Container Logs ==="
             docker logs eureka-server
 
             echo "=== Health Check ==="
             for i in {1..5}; do
-              if curl -f http://localhost:8761/actuator/health; then
+              if curl -f -u craftpilot:13579ada http://localhost:8057/actuator/health; then
                 echo "Service is healthy"
                 exit 0
               fi
