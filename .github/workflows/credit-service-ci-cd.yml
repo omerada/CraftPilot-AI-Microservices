@@ -1,4 +1,4 @@
-name: Analytics Service CI/CD
+name: Credit Service CI/CD
 
 on:
   push:

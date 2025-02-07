@@ -67,57 +67,72 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          debug: true
+          command_timeout: "20m"
           script: |
-            # Docker compose dosyasını oluştur
-            cat > docker-compose.yml <<EOF
-            version: "3.8"
+            echo "=== Testing Docker ==="
+            docker version
+            docker info
+            docker ps
 
-            networks:
-              craftpilot-network:
-                external: true
+            # Docker ağını oluştur (eğer yoksa)
+            docker network create craftpilot-network || true
 
-            services:
-              llm-service:
-                image: ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
-                container_name: llm-service
-                networks:
-                  - craftpilot-network
-                ports:
-                  - "8062:8062"
-                environment:
-                  - SPRING_PROFILES_ACTIVE=prod
-                  - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
-                  - EUREKA_INSTANCE_PREFERIPADDRESS=true
-                  - SPRING_CLOUD_DISCOVERY_ENABLED=true
-                  - SPRING_CLOUD_LOADBALANCER_RIBBON_ENABLED=false
-                  - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka-service:9092
-                  - SPRING_REDIS_HOST=redis
-                  - SPRING_REDIS_PORT=6379
-                volumes:
-                  - /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro
-                healthcheck:
-                  test: ["CMD", "curl", "-f", "http://localhost:8062/actuator/health/liveness"]
-                  interval: 10s
-                  timeout: 5s
-                  retries: 3
-                  start_period: 40s
-                depends_on:
-                  eureka-server:
-                    condition: service_healthy
-                  kafka-service:
-                    condition: service_healthy
-                  redis:
-                    condition: service_healthy
-            EOF
+            # Redis container'ını başlat (eğer çalışmıyorsa)
+            if ! docker ps | grep -q redis; then
+              docker run -d \
+                --name redis \
+                --network craftpilot-network \
+                -p 6379:6379 \
+                redis:latest
+            fi
 
-            # Servisi yeniden başlat
-            docker-compose pull llm-service
-            docker-compose up -d llm-service
+            # Eureka server'ı başlat (eğer çalışmıyorsa)
+            if ! docker ps | grep -q eureka-server; then
+              docker run -d \
+                --name eureka-server \
+                --network craftpilot-network \
+                -p 8761:8761 \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e EUREKA_USERNAME=craftpilot \
+                -e EUREKA_PASSWORD=13579ada \
+                ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
+            fi
 
-            # Health check
-            echo "=== Waiting for Service Health Check ==="
-            for i in {1..12}; do
-              if curl -s http://localhost:8062/actuator/health/liveness | grep -q '"status":"UP"'; then
+            echo "=== Pulling ARM64 Image ==="
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
+
+            echo "=== Stopping Old Container ==="
+            docker stop llm-service || true
+            docker rm llm-service || true
+
+            echo "=== Starting New Container ==="
+            docker run -d \
+              --name llm-service \
+              --network craftpilot-network \
+              -p 8062:8062 \
+              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/ \
+              -e EUREKA_INSTANCE_PREFERIPADDRESS=true \
+              -e EUREKA_USERNAME=craftpilot \
+              -e EUREKA_PASSWORD=13579ada \
+              -e SPRING_REDIS_HOST=redis \
+              -e SPRING_REDIS_PORT=6379 \
+              -e SPRING_REDIS_PASSWORD=13579ada \
+              ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
+
+            echo "=== Waiting for Container to Start ==="
+            sleep 60
+
+            echo "=== Container Logs ==="
+            docker logs llm-service
+
+            echo "=== Health Check ==="
+            for i in {1..5}; do
+              if curl -f http://localhost:8062/actuator/health; then
                 echo "Service is healthy"
                 exit 0
               fi
@@ -126,7 +141,7 @@ jobs:
             done
 
             echo "Service failed health check"
-            docker-compose logs llm-service
+            docker logs llm-service
             exit 1
 
       - name: Trigger Deploy Services Workflow
