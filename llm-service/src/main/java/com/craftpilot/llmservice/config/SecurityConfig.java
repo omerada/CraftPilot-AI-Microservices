@@ -27,14 +27,9 @@ public class SecurityConfig {
                     return config;
                 }))
                 .authorizeExchange(exchanges -> exchanges
-                        // Swagger UI ve API docs endpoints
+                        .pathMatchers("/actuator/**", "/actuator/health/**").permitAll()
                         .pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**").permitAll()
-                        // Actuator endpoints
-                        .pathMatchers("/actuator/**").permitAll()
-                        // Health check endpoint
-                        .pathMatchers("/health").permitAll()
-                        // Diğer tüm endpointler için header kontrolü
-                        .pathMatchers("/api/v1/ai/**").permitAll()
+                        .pathMatchers("/health", "/api/v1/ai/**").permitAll()
                         .anyExchange().authenticated()
                 )
                 .build();

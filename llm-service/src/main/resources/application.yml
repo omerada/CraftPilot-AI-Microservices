@@ -12,7 +12,7 @@ spring:
   webflux:
     base-path: /api
   kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       retries: 3
       acks: 1
@@ -27,6 +27,10 @@ spring:
         delivery.timeout.ms: 120000
         request.timeout.ms: 30000
         max.block.ms: 60000
+        security.protocol: PLAINTEXT
+        retry.backoff.ms: 1000
+        reconnect.backoff.max.ms: 5000
+        reconnect.backoff.ms: 1000
     consumer:
       group-id: llm-service-group
       auto-offset-reset: earliest

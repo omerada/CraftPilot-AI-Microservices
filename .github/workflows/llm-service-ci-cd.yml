@@ -80,13 +80,13 @@ jobs:
               -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
+              -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 60
-
-            echo "=== Container Logs ==="
-            docker logs llm-service
+            sleep 30
 
             echo "=== Health Check ==="
             for i in {1..5}; do
