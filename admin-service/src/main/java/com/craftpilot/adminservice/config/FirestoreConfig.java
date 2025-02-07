@@ -15,13 +15,13 @@ import java.io.IOException;
 public class FirestoreConfig {
     private static final Logger logger = LoggerFactory.getLogger(FirestoreConfig.class);
 
-    @Value("${GOOGLE_APPLICATION_CREDENTIALS}")
+    @Value("${GOOGLE_APPLICATION_CREDENTIALS:/gcp-credentials.json}")
     private String credentialsPath;
 
     @Bean
     public Firestore firestore() throws IOException {
         try {
-            logger.debug("Credentials path: {}", credentialsPath);
+            logger.debug("Loading credentials from: {}", credentialsPath);
             
             GoogleCredentials credentials = GoogleCredentials.fromStream(
                 new FileInputStream(credentialsPath)
@@ -32,11 +32,8 @@ public class FirestoreConfig {
                 .build();
 
             return firestoreOptions.getService();
-        } catch (IllegalArgumentException e) {
-            logger.error("Credentials path error: {}", e.getMessage());
-            throw new IOException("Invalid credentials path", e);
         } catch (IOException e) {
-            logger.error("Firestore configuration error: {}", e.getMessage());
+            logger.error("Failed to initialize Firestore: {}", e.getMessage());
             throw e;
         }
     }
