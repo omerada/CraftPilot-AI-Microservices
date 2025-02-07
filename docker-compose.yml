@@ -451,16 +451,16 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka-service:9092
-      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT
-      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_KAFKA_ADMIN_BOOTSTRAP_SERVERS=kafka:9092
     networks:
       - craftpilot-network
     depends_on:
       zookeeper:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
       eureka-server:
         condition: service_healthy
