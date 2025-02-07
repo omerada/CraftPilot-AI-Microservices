@@ -18,6 +18,11 @@ spring:
   cloud:
     discovery:
       enabled: true
+    loadbalancer:
+      ribbon:
+        enabled: false
+    circuit-breaker:
+      enabled: true
     function:
       definition: metricsEventConsumer
     stream:
@@ -51,17 +56,31 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     producer:
+      retries: 3
+      acks: all
+      batch-size: 16384
+      buffer-memory: 33554432
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
-        spring.json.trusted.packages: "com.craftpilot.creditservice.event"
+        spring.json.type.mapping: creditEvent:com.craftpilot.creditservice.event.CreditEvent
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 1
+        retries: 3
+        delivery.timeout.ms: 120000
+        request.timeout.ms: 30000
+        retry.backoff.ms: 1000
     consumer:
-      group-id: credit-service-group
+      group-id: ${spring.application.name}-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "*"
+        spring.json.trusted.packages: "com.craftpilot.*"
+        isolation.level: read_committed
+        max.poll.interval.ms: 300000
+        session.timeout.ms: 45000
+        heartbeat.interval.ms: 10000
 
 management:
   endpoints:
@@ -81,14 +100,22 @@ management:
 eureka:
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@localhost:8761/eureka/}
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8761/eureka/}
     register-with-eureka: true
     fetch-registry: true
+    healthcheck:
+      enabled: true
   instance:
     prefer-ip-address: true
     instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
     lease-renewal-interval-in-seconds: 10
     lease-expiration-duration-in-seconds: 30
+    health-check-url-path: /actuator/health
+    statusPageUrlPath: /actuator/info
+    metadataMap:
+      instanceId: ${spring.application.name}:${server.port}
+      zone: primary
+      profile: ${spring.profiles.active}
 
 springdoc:
   swagger-ui:
