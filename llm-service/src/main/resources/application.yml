@@ -22,6 +22,7 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
         spring.json.add.type.headers: false
+        spring.json.type.mapping: aiEvent:com.craftpilot.llmservice.event.AIEvent
         retries: 3
         delivery.timeout.ms: 120000
         request.timeout.ms: 30000

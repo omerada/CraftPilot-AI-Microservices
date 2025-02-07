@@ -75,6 +75,9 @@ public class KafkaConfig {
         configProps.put(ProducerConfig.ACKS_CONFIG, "1");
         configProps.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);
         configProps.put(ProducerConfig.BUFFER_MEMORY_CONFIG, 33554432);
+        configProps.put(ProducerConfig.LINGER_MS_CONFIG, 10);
+        configProps.put(JsonSerializer.TYPE_MAPPINGS, "aiEvent:com.craftpilot.llmservice.event.AIEvent");
+        
         return new DefaultKafkaProducerFactory<>(configProps);
     }
 
