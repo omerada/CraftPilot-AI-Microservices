@@ -53,6 +53,9 @@ jobs:
       # Kafka'nın çalışıp çalışmadığını kontrol et
       - name: Check Kafka Status
         run: |
+          # Docker network'ünü oluştur
+          docker network create craftpilot-network || true
+
           if ! docker ps | grep -q kafka; then
             echo "Kafka container is not running. Starting Kafka..."
             

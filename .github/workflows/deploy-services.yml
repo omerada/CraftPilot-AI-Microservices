@@ -21,6 +21,9 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            echo "=== Creating Docker Network ==="
+            docker network create craftpilot-network || true
+
             echo "=== Starting Zookeeper and Kafka ==="
             # Zookeeper için Docker container başlat
             docker run -d \
