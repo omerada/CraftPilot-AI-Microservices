@@ -73,10 +73,11 @@ eureka:
     fetch-registry: true
 
 server:
-  port: 8050
+  port: 8092
   shutdown: graceful
   http2:
     enabled: true
+
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/plain

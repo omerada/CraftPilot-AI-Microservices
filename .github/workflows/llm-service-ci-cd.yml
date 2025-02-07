@@ -77,12 +77,13 @@ jobs:
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8057/eureka/ \
               -e GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}' \
-              -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e SPRING_KAFKA_BOOTSTRAP_SERVERS=localhost:8055 \
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
               ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
@@ -90,7 +91,7 @@ jobs:
 
             echo "=== Health Check ==="
             for i in {1..5}; do
-              if curl -f http://localhost:8062/actuator/health; then
+              if curl -f http://localhost:8062/actuator/health/liveness; then
                 echo "Service is healthy"
                 exit 0
               fi
