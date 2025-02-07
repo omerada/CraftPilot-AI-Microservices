@@ -13,16 +13,21 @@ import java.io.IOException;
 @Configuration
 public class FirestoreConfig {
 
-    @Value("${GOOGLE_APPLICATION_CREDENTIALS}")
+    @Value("${spring.cloud.gcp.credentials.location}")
     private String credentialsPath;
+
+    @Value("${spring.cloud.gcp.firestore.project-id}")
+    private String projectId;
 
     @Bean
     public Firestore firestore() throws IOException {
+        String cleanPath = credentialsPath.replace("file:", "");
         GoogleCredentials credentials = GoogleCredentials.fromStream(
-            new FileInputStream(credentialsPath)
+            new FileInputStream(cleanPath)
         );
 
         FirestoreOptions firestoreOptions = FirestoreOptions.newBuilder()
+            .setProjectId(projectId)
             .setCredentials(credentials)
             .build();
 

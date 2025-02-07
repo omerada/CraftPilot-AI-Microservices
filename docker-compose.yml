@@ -380,9 +380,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
       - SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/gcp-credentials.json
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
       - SPRING_REDIS_HOST=redis
       - SPRING_REDIS_PORT=6379
       - SPRING_REDIS_PASSWORD=13579ada
