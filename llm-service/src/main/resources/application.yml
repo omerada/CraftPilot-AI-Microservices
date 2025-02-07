@@ -13,61 +13,50 @@ spring:
     base-path: /api
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      retries: 3
+      acks: 1
+      batch-size: 16384
+      buffer-memory: 33554432
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+        retries: 3
+        delivery.timeout.ms: 120000
+        request.timeout.ms: 30000
+        max.block.ms: 60000
     consumer:
       group-id: llm-service-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.use.type.headers: false
+
   redis:
-    host: ${REDIS_HOST:redis}
-    port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:13579ada}
-  security:
-    user:
-      name: ${EUREKA_USERNAME:eureka}
-      password: ${EUREKA_PASSWORD:secret}
-
-openrouter:
-  api-key: ${OPENROUTER_API_KEY}
-  base-url: https://openrouter.ai/api/v1
-  default-model: openai/gpt-3.5-turbo
-  max-tokens: 2000
-  temperature: 0.7
-  retry-attempts: 3
-  retry-delay: 1000
-
-resilience4j:
-  circuitbreaker:
-    instances:
-      openrouter:
-        slidingWindowSize: 10
-        failureRateThreshold: 50
-        waitDurationInOpenState: 10s
-        permittedNumberOfCallsInHalfOpenState: 3
-  ratelimiter:
-    instances:
-      openrouter:
-        limitForPeriod: 50
-        limitRefreshPeriod: 1s
-        timeoutDuration: 5s
+    host: ${SPRING_REDIS_HOST:redis}
+    port: ${SPRING_REDIS_PORT:6379}
+    password: ${SPRING_REDIS_PASSWORD:}
+    timeout: 2000
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 2
+        max-wait: 1000
 
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://${EUREKA_USERNAME:eureka}:${EUREKA_PASSWORD:secret}@eureka-server:8057/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8057/eureka/}
     register-with-eureka: true
     fetch-registry: true
   instance:
     prefer-ip-address: true
     lease-renewal-interval-in-seconds: 10
     health-check-url-path: /actuator/health
-    metadata-map:
-      startup: ${random.int}
-      user.name: ${spring.security.user.name}
-      user.password: ${spring.security.user.password}
 
 management:
   endpoints:
@@ -82,10 +71,19 @@ management:
     prometheus:
       enabled: true
 
+openrouter:
+  api-key: ${OPENROUTER_API_KEY:your-api-key}
+  base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
+  default-model: ${OPENROUTER_DEFAULT_MODEL:openai/gpt-3.5-turbo}
+  max-tokens: ${OPENROUTER_MAX_TOKENS:2000}
+  temperature: ${OPENROUTER_TEMPERATURE:0.7}
+  retry-attempts: ${OPENROUTER_RETRY_ATTEMPTS:3}
+  retry-delay: ${OPENROUTER_RETRY_DELAY:1000}
+
 logging:
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
   level:
-    com.craftpilot.llmservice: DEBUG
-    org.springframework.cloud.netflix.eureka: INFO
-    com.netflix.discovery: INFO
+    com.craftpilot.llmservice: ${LOG_LEVEL:INFO}
+    org.springframework.web: ${LOG_LEVEL:INFO}
+    org.springframework.data: ${LOG_LEVEL:INFO}

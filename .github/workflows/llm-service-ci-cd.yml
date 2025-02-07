@@ -77,6 +77,9 @@ jobs:
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8057/eureka/ \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+              -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e SPRING_REDIS_HOST=redis \
+              -e SPRING_REDIS_PORT=6379 \
               -v /tmp/gcp-credentials.json:/gcp-credentials.json:ro \
               ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
 
