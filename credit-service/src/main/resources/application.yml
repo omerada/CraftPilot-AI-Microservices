@@ -1,26 +1,53 @@
 server:
   port: 8058
+  compression:
+    enabled: true
+    mime-types: application/json,text/plain
+    min-response-size: 1024
+  shutdown: graceful
 
 spring:
   application:
     name: credit-service
-  kafka:
-    bootstrap-servers: localhost:9092
-  data:
-    redis:
-      host: localhost
-      port: 6379
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   cloud:
-    gcp:
-      firestore:
-        enabled: false
-      core:
-        enabled: false
 
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
+    discovery:
+      enabled: true
+    function:
+      definition: metricsEventConsumer
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+          configuration:
+            security.protocol: PLAINTEXT
+        bindings:
+          metricsEventProducer-out-0:
+            producer:
+              configuration:
+                key.serializer: org.apache.kafka.common.serialization.StringSerializer
+                value.serializer: org.springframework.kafka.support.serializer.JsonSerializer
+          metricsEventConsumer-in-0:
+            consumer:
+              configuration:
+                key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
+                value.deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+                spring.json.trusted.packages: com.craftpilot.analyticsservice.event
+      bindings:
+        metricsEventProducer-out-0:
+          destination: metrics-events
+          contentType: application/json
+        metricsEventConsumer-in-0:
+          destination: metrics-events
+          group: credit-service
+          contentType: application/json
+  main:
+    web-application-type: reactive
+  security:
+    basic:
+      enabled: false
 
 management:
   endpoints:
@@ -33,10 +60,67 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://${EUREKA_USERNAME:eureka}:${EUREKA_PASSWORD:secret}@eureka-server:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    health-check-url-path: /actuator/health
+    metadata-map:
+      startup: ${random.int}
+      user.name: ${spring.security.user.name}
+      user.password: ${spring.security.user.password}
 
 springdoc:
-  api-docs:
-    path: /api-docs
   swagger-ui:
     path: /swagger-ui.html
-    operationsSorter: method
+    enabled: true
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+
+redis:
+  host: ${REDIS_HOST:localhost}
+  port: ${REDIS_PORT:6379}
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      analyticsService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+  ratelimiter:
+    instances:
+      analyticsService:
+        limitForPeriod: 50
+        limitRefreshPeriod: 1s
+        timeoutDuration: 5s
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] [%X{userId}] %-5level %logger{36} - %msg%n"
+  level:
+    com.craftpilot.analyticsservice: ${LOG_LEVEL:INFO}
+    org.springframework.web: ${LOG_LEVEL:INFO}
+    org.springframework.data: ${LOG_LEVEL:INFO}
+
+cors:
+  allowed-origins: "*"
+  allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
+  allowed-headers: "*"
+  exposed-headers: "Authorization,Link,X-Total-Count"
+  allow-credentials: true
+  max-age: 1800
