@@ -1,5 +1,9 @@
 server:
   port: 6379
+  compression:
+    enabled: true
+    mime-types: application/json,text/plain
+    min-response-size: 1024
   shutdown: graceful
 
 spring:
@@ -7,57 +11,71 @@ spring:
     name: redis-service
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:13579ada}
       timeout: 5000
       lettuce:
         pool:
           max-active: 8
           max-idle: 8
           min-idle: 2
-          max-wait: 1000
+          max-wait: 1000ms
         shutdown-timeout: 200ms
   cloud:
-    gcp:
-      project-id: craft-pilot-ai
-      credentials:
-        location: classpath:firebase-service-account.json
-      firestore:
-        enabled: true
-        project-id: craft-pilot-ai
-        database-id: default
+    discovery:
+      enabled: true
+    loadbalancer:
+      ribbon:
+        enabled: false
 
 eureka:
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka}
-    register-with-eureka: false
-    fetch-registry: false
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
   instance:
     prefer-ip-address: true
-    lease-renewal-interval-in-seconds: 30
-    lease-expiration-duration-in-seconds: 10
+    lease-renewal-interval-in-seconds: 10
+    health-check-url-path: /actuator/health
+    metadata-map:
+      startup: ${random.int}
+      user.name: ${spring.security.user.name:craftpilot}
+      user.password: ${spring.security.user.password:13579ada}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,metrics
   endpoint:
     health:
       show-details: always
-    metrics:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: redis,diskSpace
+        liveness:
+          include: ping
+  health:
+    redis:
       enabled: true
-    prometheus:
+    circuitbreakers:
       enabled: true
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+    validate-group-membership: false
 
 logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
   level:
-    root: DEBUG
+    root: INFO
     com.craftpilot: DEBUG
-    org.springframework.web: DEBUG
-    org.springframework.data.redis: DEBUG
-    org.springframework.cloud: DEBUG
-    com.netflix.discovery: DEBUG
-    org.springframework.boot: DEBUG
+    org.springframework.web: INFO
+    org.springframework.data.redis: INFO
+    org.springframework.cloud: INFO
