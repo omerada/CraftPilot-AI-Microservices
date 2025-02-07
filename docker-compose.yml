@@ -1,4 +1,9 @@
 version: "3.8"
+
+networks:
+  craftpilot-network:
+    name: craftpilot-network
+
 services:
   # Infrastructure Services
   redis:
@@ -11,8 +16,8 @@ services:
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      timeout: 5s
-      retries: 5
+      timeout: 3s
+      retries: 3
 
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
@@ -75,26 +80,19 @@ services:
       platforms:
         - linux/arm64
         - linux/amd64
-    image: ${DOCKERHUB_USERNAME}/eureka-server:${VERSION:-latest}
+    image: ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
     ports:
       - "8761:8761"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - EUREKA_USERNAME=${EUREKA_USERNAME:-eureka}
-      - EUREKA_PASSWORD=${EUREKA_PASSWORD:-secret}
-      - EUREKA_HOST=${EUREKA_HOST:-localhost}
+      - EUREKA_USERNAME=craftpilot
+      - EUREKA_PASSWORD=13579ada
     networks:
       - craftpilot-network
     healthcheck:
-      test:
-        - "CMD"
-        - "curl"
-        - "-f"
-        - "-u"
-        - "${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD:-secret}"
-        - "http://localhost:8761/actuator/health"
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
       retries: 3
 
   # API Gateway
@@ -393,7 +391,3 @@ volumes:
   redis-data:
   prometheus-data:
   grafana-data:
-
-networks:
-  craftpilot-network:
-    driver: bridge

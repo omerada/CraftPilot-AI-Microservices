@@ -12,7 +12,7 @@ spring:
   webflux:
     base-path: /api
   kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka-service:9092}
     producer:
       retries: 3
       acks: 1
@@ -25,8 +25,8 @@ spring:
         spring.json.type.mapping: aiEvent:com.craftpilot.llmservice.event.AIEvent
         retries: 3
         delivery.timeout.ms: 120000
-        request.timeout.ms: 30000
-        max.block.ms: 30000
+        request.timeout.ms: 5000
+        max.block.ms: 5000
         security.protocol: PLAINTEXT
         retry.backoff.ms: 1000
         reconnect.backoff.max.ms: 5000
@@ -92,14 +92,16 @@ management:
         include: health,info,metrics,prometheus
   endpoint:
     health:
-      show-details: always
       probes:
         enabled: true
+      show-details: always
       group:
         readiness:
           include: "*"
+          show-details: always
         liveness:
           include: "*"
+          show-details: always
     metrics:
       enabled: true
     prometheus:
