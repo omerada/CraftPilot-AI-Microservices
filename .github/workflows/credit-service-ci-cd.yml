@@ -27,6 +27,11 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
+      - name: Grant execute permission for mvnw
+        run: |
+          cd credit-service
+          chmod +x mvnw
+
       - name: Build and Test
         run: |
           cd credit-service
