@@ -1,7 +1,5 @@
 package com.craftpilot.llmservice.config;
-
-import com.craftpilot.llmservice.event.AIEvent;
-import com.fasterxml.jackson.databind.ObjectMapper;
+ 
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -25,9 +23,7 @@ import java.util.Map;
 public class KafkaConfig {
 
     @Value("${spring.kafka.bootstrap-servers}")
-    private String bootstrapServers;
-
-    private final ObjectMapper objectMapper;
+    private String bootstrapServers; 
 
     @Bean
     public KafkaAdmin kafkaAdmin() {
