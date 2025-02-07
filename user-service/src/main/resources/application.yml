@@ -67,7 +67,7 @@ eureka:
     lease-expiration-duration-in-seconds: 10
   client:
     serviceUrl:
-      defaultZone: http://${EUREKA_USERNAME:eureka}:${EUREKA_PASSWORD:secret}@eureka-server:8057/eureka/
+      defaultZone: http://${EUREKA_USERNAME:eureka}:${EUREKA_PASSWORD:secret}@eureka-server:8761/eureka/
     registry-fetch-interval-seconds: 5
     register-with-eureka: true
     fetch-registry: true

@@ -38,7 +38,7 @@ services:
       - "8062:8062"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8057/eureka/
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
       - GCP_SA_KEY=${GCP_SA_KEY}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - SPRING_REDIS_HOST=redis

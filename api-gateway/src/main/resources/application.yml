@@ -156,7 +156,7 @@ spring:
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://${EUREKA_USERNAME:eureka}:${EUREKA_PASSWORD:secret}@eureka-server:8057/eureka/
+      defaultZone: http://${EUREKA_USERNAME:eureka}:${EUREKA_PASSWORD:secret}@eureka-server:8761/eureka/
     fetch-registry: true
     register-with-eureka: true
     registry-fetch-interval-seconds: 5

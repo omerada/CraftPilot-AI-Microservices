@@ -17,5 +17,5 @@ COPY --from=build /build/target/*.jar app.jar
 # JVM ayarları
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 
-EXPOSE 8057
+EXPOSE 8761
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 SERVICE_NAME="eureka-server"
-PORT=8057
+PORT=8761
 
 # Health check function
 wait_for_service() {

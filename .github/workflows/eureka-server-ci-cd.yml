@@ -68,7 +68,7 @@ jobs:
             docker run -d \
               --name eureka-server \
               --network craftpilot-network \
-              -p 8057:8057 \
+              -p 8761:8761 \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \
@@ -82,7 +82,7 @@ jobs:
 
             echo "=== Health Check ==="
             for i in {1..5}; do
-              if curl -f -u craftpilot:13579ada http://localhost:8057/actuator/health; then
+              if curl -f -u craftpilot:13579ada http://localhost:8761/actuator/health; then
                 echo "Service is healthy"
                 exit 0
               fi

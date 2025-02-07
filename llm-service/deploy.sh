@@ -53,7 +53,7 @@ docker run -d \
     --platform linux/arm64 \
     -p ${PORT}:${PORT} \
     -e SPRING_PROFILES_ACTIVE=prod \
-    -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8057/eureka/ \
+    -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
     -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
     -v /tmp/gcp-credentials.json:/gcp-credentials.json:ro \
     --network craftpilot-network \
