@@ -11,19 +11,27 @@ spring:
     name: llm-service
   webflux:
     base-path: /api
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:redis}
+      port: ${SPRING_REDIS_PORT:6379}
+      password: ${SPRING_REDIS_PASSWORD:13579ada}
+      timeout: 5000
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2
+          max-wait: 1000ms
+        shutdown-timeout: 200ms
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     producer:
       bootstrap-servers: ${SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS:kafka:9092}
-      retries: 3
-      acks: 1
-      batch-size: 16384
-      buffer-memory: 33554432
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
       properties:
         spring.json.add.type.headers: false
-        spring.json.type.mapping: aiEvent:com.craftpilot.llmservice.event.AIEvent
         retries: 3
         delivery.timeout.ms: 120000
         request.timeout.ms: 30000
@@ -36,7 +44,7 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       properties:
-        spring.json.trusted.packages: "com.craftpilot.*"
+        spring.json.trusted.packages: "*"
         isolation.level: read_committed
         max.poll.interval.ms: 300000
         session.timeout.ms: 45000
@@ -65,20 +73,6 @@ spring:
     user:
       name: ${SPRING_SECURITY_USER_NAME:craftpilot}
       password: ${SPRING_SECURITY_USER_PASSWORD:13579ada}
-
-  redis:
-    host: ${SPRING_REDIS_HOST:redis}
-    port: ${SPRING_REDIS_PORT:6379}
-    password: ${SPRING_REDIS_PASSWORD:13579ada}
-    lettuce:
-      pool:
-        max-active: 8
-        max-idle: 8
-        min-idle: 2
-        max-wait: -1ms
-      shutdown-timeout: 100ms
-    connect-timeout: 2000ms
-    timeout: 1000ms
 
 eureka:
   client:

@@ -171,7 +171,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
-      - GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
       - SPRING_REDIS_HOST=redis
       - SPRING_REDIS_PORT=6379
       - SPRING_REDIS_PASSWORD=13579ada
@@ -179,15 +179,11 @@ services:
       - SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS=kafka:9092
       - SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS=kafka:9092
       - SPRING_KAFKA_ADMIN_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
     volumes:
-      - ${GCP_CREDENTIALS_PATH:-/tmp/gcp-credentials.json}:/gcp-credentials.json:ro
+      - ${GCP_CREDENTIALS_PATH:-./llm-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
     networks:
       - craftpilot-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8062/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -195,6 +191,11 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8062/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Credit Service
   credit-service:
