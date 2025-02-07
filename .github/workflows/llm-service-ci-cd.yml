@@ -1,4 +1,4 @@
-name: Analytics Service CI/CD
+name: LLM Service CI/CD
 
 on:
   push:
@@ -108,6 +108,10 @@ jobs:
             docker rm llm-service || true
 
             echo "=== Starting New Container ==="
+            # GCP kimlik bilgilerini oluştur
+            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
+            chmod 600 /opt/craftpilot/gcp-credentials.json
+
             docker run -d \
               --name llm-service \
               --network craftpilot-network \
@@ -122,6 +126,7 @@ jobs:
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
+              -e GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
               ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="

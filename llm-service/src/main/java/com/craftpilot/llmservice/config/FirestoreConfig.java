@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
@@ -18,34 +19,27 @@ import java.nio.charset.StandardCharsets;
 @Configuration
 public class FirestoreConfig {
 
-    @Value("${GCP_SA_KEY}")
-    private String gcpCredentials;
+    @Value("${spring.cloud.gcp.firestore.project-id:${GCP_PROJECT_ID:your-project-id}}")
+    private String projectId;
 
     @Bean
     public Firestore firestore() throws IOException {
-        try {
-            // GCP kimlik bilgilerini JSON'dan parse et
-            Gson gson = new GsonBuilder().setLenient().create();
-            String formattedJson = gson.toJson(gson.fromJson(gcpCredentials, Object.class));
-            
-            // Kimlik bilgilerini InputStream'e dönüştür
-            ByteArrayInputStream credentialsStream = new ByteArrayInputStream(
-                formattedJson.getBytes(StandardCharsets.UTF_8)
-            );
+        GoogleCredentials credentials;
+        String credentialsPath = System.getenv("GOOGLE_APPLICATION_CREDENTIALS");
+        
+        if (credentialsPath != null) {
+            try (FileInputStream serviceAccountStream = new FileInputStream(credentialsPath)) {
+                credentials = GoogleCredentials.fromStream(serviceAccountStream);
+            }
+        } else {
+            credentials = GoogleCredentials.getApplicationDefault();
+        }
 
-            // Google kimlik bilgilerini oluştur
-            GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream);
-
-            // Firestore yapılandırmasını oluştur
-            FirestoreOptions firestoreOptions = FirestoreOptions.newBuilder()
+        FirestoreOptions options = FirestoreOptions.newBuilder()
+                .setProjectId(projectId)
                 .setCredentials(credentials)
                 .build();
 
-            log.info("Firestore başarıyla yapılandırıldı");
-            return firestoreOptions.getService();
-        } catch (Exception e) {
-            log.error("Firestore yapılandırması sırasında hata: ", e);
-            throw e;
-        }
+        return options.getService();
     }
 }
