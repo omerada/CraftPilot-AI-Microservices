@@ -109,6 +109,8 @@ jobs:
               --name llm-service \
               --platform linux/arm64 \
               --network craftpilot-network \
+              --dns 8.8.8.8 \
+              --dns 8.8.4.4 \
               -p 8062:8062 \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8057/eureka/ \
@@ -123,16 +125,16 @@ jobs:
               ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 30
+            sleep 45  # Daha uzun bir bekleme süresi
 
             echo "=== Health Check ==="
-            for i in {1..5}; do
+            for i in {1..10}; do  # Daha fazla deneme
               if curl -f http://localhost:8062/actuator/health; then
                 echo "Service is healthy"
                 exit 0
               fi
               echo "Attempt $i: Waiting for service to start..."
-              sleep 10
+              sleep 15  # Daha uzun bekleme aralıkları
             done
             echo "Service failed health check"
             docker logs llm-service
