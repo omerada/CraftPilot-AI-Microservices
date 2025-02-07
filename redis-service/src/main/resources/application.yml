@@ -1,5 +1,5 @@
 server:
-  port: 8085
+  port: 8064
   compression:
     enabled: true
     mime-types: application/json,text/plain

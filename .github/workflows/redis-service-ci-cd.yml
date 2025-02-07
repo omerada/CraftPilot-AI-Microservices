@@ -75,27 +75,30 @@ jobs:
             # Infrastructure network
             docker network create craftpilot-network || true
 
-            # Mevcut container'ı kaldır
+            # Remove existing container
             docker stop redis-service || true
             docker rm redis-service || true
 
-            # Yeni container'ı başlat
+            # Run new container
             docker run -d \
               --name redis-service \
               --network craftpilot-network \
               --restart unless-stopped \
               -p 8064:8064 \
+              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
+              -e SPRING_CLOUD_GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
 
-            # Health check
+            # Health check with more detailed output
             echo "Starting health checks..."
             for i in {1..30}; do
               echo "Attempt $i: Checking service health..."
