@@ -35,6 +35,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: true
 
       # Sadece ARM64 için build ve push
       - name: Build and Push Docker image
@@ -48,9 +49,6 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:${{ github.sha }}-arm64
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/notification-service:buildcache-arm64
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/notification-service:buildcache-arm64,mode=max
-          build-args: |
-            BUILDPLATFORM=linux/arm64
-            TARGETPLATFORM=linux/arm64
 
       # Google Cloud kimlik doğrulaması
       - id: "auth"
@@ -69,89 +67,22 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true
-          debug: true
-          command_timeout: "20m"
           script: |
-            echo "=== Testing SSH Connection ==="
-            whoami
-            pwd
-
-            echo "=== System Architecture ==="
-            uname -m
-
-            echo "=== Testing Directory Access ==="
-            ls -la /opt/craftpilot || mkdir -p /opt/craftpilot
-
-            echo "=== Continuing with Deployment ==="
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
-
-            echo "=== Testing Docker ==="
-            docker version
-            docker info
-            docker ps
-
-            # Docker ağını oluştur (eğer yoksa)
+            # Infrastructure containers
             docker network create craftpilot-network || true
 
-            # Redis container'ını başlat (eğer çalışmıyorsa)
-            if ! docker ps | grep -q redis; then
-              docker run -d \
-                --name redis \
-                --network craftpilot-network \
-                -p 6379:6379 \
-                redis:latest
-            fi
+            # Firebase credentials
+            echo '${{ secrets.FIREBASE_CREDENTIALS }}' > /tmp/firebase-credentials.json
 
-            # Eureka server'ı başlat (eğer çalışmıyorsa)
-            if ! docker ps | grep -q eureka-server; then
-              docker run -d \
-                --name eureka-server \
-                --network craftpilot-network \
-                -p 8761:8761 \
-                -e SPRING_PROFILES_ACTIVE=prod \
-                -e EUREKA_USERNAME=craftpilot \
-                -e EUREKA_PASSWORD=13579ada \
-                ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
-            fi
+            # Deploy service
+            cd /opt/craftpilot
+            curl -o deploy.sh https://raw.githubusercontent.com/${{ github.repository }}/master/notification-service/deploy.sh
+            chmod +x deploy.sh
 
-            echo "=== Pulling ARM64 Image ==="
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            export FIREBASE_CREDENTIALS='${{ secrets.FIREBASE_CREDENTIALS }}'
 
-            echo "=== Stopping Old Container ==="
-            docker stop notification-service || true
-            docker rm notification-service || true
-
-            echo "=== Starting New Container ==="
-            docker run -d \
-              --name notification-service \
-              --network craftpilot-network \
-              -p 8053:8053 \
-              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
-              -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_USERNAME=craftpilot \
-
-              -e EUREKA_PASSWORD=13579ada \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
-              ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
-
-            echo "=== Waiting for Container to Start ==="
-            sleep 60  # Biraz daha uzun bekleyelim
-
-            echo "=== Container Logs ==="
-            docker logs notification-service
-
-            echo "=== Health Check ==="
-            if curl -f http://localhost:8053/actuator/health; then
-              echo "Service is healthy"
-            else
-              echo "Service failed health check"
-              docker logs notification-service
-              exit 1
-            fi
+            ./deploy.sh
 
       - name: Trigger Deploy Services Workflow
         if: success()

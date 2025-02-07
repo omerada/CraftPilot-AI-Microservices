@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:latest
+    container_name: redis
+    command: redis-server --requirepass 13579ada
+    ports:
+      - "6379:6379"
+    networks:
+      - craftpilot-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  notification-service:
+    image: ${DOCKERHUB_USERNAME}/notification-service:latest-arm64
+    container_name: notification-service
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8053:8053"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - SPRING_REDIS_PASSWORD=13579ada
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-credentials.json
+    volumes:
+      - /opt/craftpilot/firebase-credentials.json:/app/firebase-credentials.json:ro
+    networks:
+      - craftpilot-network
+
+networks:
+  craftpilot-network:
+    external: true 
