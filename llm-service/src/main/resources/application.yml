@@ -12,7 +12,7 @@ spring:
   webflux:
     base-path: /api
   kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka-service:9092}
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     producer:
       retries: 3
       acks: 1
@@ -25,23 +25,19 @@ spring:
         spring.json.type.mapping: aiEvent:com.craftpilot.llmservice.event.AIEvent
         retries: 3
         delivery.timeout.ms: 120000
-        request.timeout.ms: 5000
-        max.block.ms: 5000
-        security.protocol: PLAINTEXT
+        request.timeout.ms: 30000
         retry.backoff.ms: 1000
-        reconnect.backoff.max.ms: 5000
-        reconnect.backoff.ms: 1000
-        client.dns.lookup: use_all_dns_ips
-        resolve.dns.refresh.rate.ms: 5000
-        default.api.timeout.ms: 30000
     consumer:
-      group-id: llm-service-group
+      group-id: ${spring.application.name}-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "*"
-        spring.json.use.type.headers: false
+        spring.json.trusted.packages: "com.craftpilot.*"
+        isolation.level: read_committed
+        max.poll.interval.ms: 300000
+        session.timeout.ms: 45000
+        heartbeat.interval.ms: 10000
   webclient:
     max-in-memory-size: 16MB
     connect-timeout: 5000
@@ -65,14 +61,16 @@ spring:
   redis:
     host: ${SPRING_REDIS_HOST:redis}
     port: ${SPRING_REDIS_PORT:6379}
-    password: ${SPRING_REDIS_PASSWORD:}
-    timeout: 2000
+    password: ${SPRING_REDIS_PASSWORD:13579ada}
     lettuce:
       pool:
         max-active: 8
         max-idle: 8
         min-idle: 2
-        max-wait: 1000
+        max-wait: -1ms
+      shutdown-timeout: 100ms
+    connect-timeout: 2000ms
+    timeout: 1000ms
 
 eureka:
   client:
@@ -91,24 +89,22 @@ management:
     web:
       base-path: /actuator
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,metrics
   endpoint:
     health:
+      show-details: always
       probes:
         enabled: true
-      show-details: always
       group:
         readiness:
-          include: "*"
-          show-details: always
+          include: redis,db
         liveness:
-          include: "*"
-          show-details: always
-    metrics:
-      enabled: true
-    prometheus:
-      enabled: true
+          include: ping
   health:
+    redis:
+      enabled: true
+    circuitbreakers:
+      enabled: true
     livenessstate:
       enabled: true
     readinessstate:
@@ -130,6 +126,11 @@ logging:
     com.craftpilot.llmservice: ${LOG_LEVEL:INFO}
     org.springframework.web: ${LOG_LEVEL:INFO}
     org.springframework.data: ${LOG_LEVEL:INFO}
+    org.springframework.cloud.loadbalancer: ERROR
+    org.springframework.cloud.client: ERROR
+    org.netflix.discovery: ERROR
+    org.springframework.data.redis: ERROR
+    org.apache.kafka: WARN
 
 resilience4j:
   circuitbreaker:
