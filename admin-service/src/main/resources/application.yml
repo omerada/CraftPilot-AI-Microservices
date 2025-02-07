@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: admin-service
+  redis:
+    host: redis
+    port: 6379
+    password: 13579ada
   cloud:
     gcp:
       credentials:
@@ -14,13 +18,16 @@ spring:
       enabled: false
     discovery:
       enabled: true
+    loadbalancer:
+      ribbon:
+        enabled: false
 
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://${EUREKA_USERNAME:eureka}:${EUREKA_PASSWORD:secret}@eureka-server:8761/eureka/
-    register-with-eureka: true
+      defaultZone: http://craftpilot:13579ada@eureka-server:8761/eureka/
     fetch-registry: true
+    register-with-eureka: true
   instance:
     prefer-ip-address: true
     lease-renewal-interval-in-seconds: 10
@@ -34,7 +41,24 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: health,info,metrics
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: redis,diskSpace
+        liveness:
+          include: ping
+  health:
+    redis:
+      enabled: true
+    circuitbreakers:
+      enabled: true
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+    validate-group-membership: false
