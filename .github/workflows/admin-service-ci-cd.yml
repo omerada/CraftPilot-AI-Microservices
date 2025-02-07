@@ -63,16 +63,6 @@ jobs:
             # Firebase credentials dosyasını oluştur
             echo '${{ secrets.FIREBASE_CREDENTIALS }}' > /tmp/firebase-credentials.json
 
-            # Start Redis if not running
-            if ! docker ps | grep -q redis; then
-              docker run -d \
-                --name redis \
-                --network craftpilot-network \
-                -p 6379:6379 \
-                -e REDIS_PASSWORD=13579ada \
-                redis:latest --requirepass 13579ada
-            fi
-
             # Remove existing container
             docker stop admin-service || true
             docker rm admin-service || true
@@ -98,10 +88,6 @@ jobs:
 
             # Credentials dosyasını temizle
             rm -f /tmp/firebase-credentials.json
-
-            # Wait for infrastructure to be ready
-            echo "Waiting for infrastructure services..."
-            sleep 30
 
             # Health check with more detailed output
             echo "Starting health checks..."
