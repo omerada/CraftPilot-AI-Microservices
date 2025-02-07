@@ -1,4 +1,4 @@
-name: Credit Service CI/CD
+name: Analytics Service CI/CD
 
 on:
   push:
@@ -35,13 +35,13 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: true
 
       # Sadece ARM64 için build ve push
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: . # Ana dizini context olarak kullan
-          file: ./credit-service/Dockerfile # Dockerfile'ın yolunu belirt
+          context: ./credit-service
           platforms: linux/arm64
           push: true
           tags: |
@@ -49,9 +49,6 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/credit-service:${{ github.sha }}-arm64
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/credit-service:buildcache-arm64
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/credit-service:buildcache-arm64,mode=max
-          build-args: |
-            BUILDPLATFORM=linux/arm64
-            TARGETPLATFORM=linux/arm64
 
       # Google Cloud kimlik doğrulaması
       - id: "auth"
@@ -74,19 +71,6 @@ jobs:
           debug: true
           command_timeout: "20m"
           script: |
-            echo "=== Testing SSH Connection ==="
-            whoami
-            pwd
-
-            echo "=== System Architecture ==="
-            uname -m
-
-            echo "=== Testing Directory Access ==="
-            ls -la /opt/craftpilot || mkdir -p /opt/craftpilot
-
-            echo "=== Continuing with Deployment ==="
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
-
             echo "=== Testing Docker ==="
             docker version
             docker info
@@ -131,15 +115,17 @@ jobs:
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/ \
+              -e EUREKA_INSTANCE_PREFERIPADDRESS=true \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
+              -e SPRING_REDIS_HOST=redis \
+              -e SPRING_REDIS_PORT=6379 \
+              -e SPRING_REDIS_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/credit-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 60  # Biraz daha uzun bekleyelim
+            sleep 60
 
             echo "=== Container Logs ==="
             docker logs credit-service
@@ -153,6 +139,7 @@ jobs:
               echo "Waiting for service to start... Attempt $i"
               sleep 10
             done
+
             echo "Service failed health check"
             docker logs credit-service
             exit 1
