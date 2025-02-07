@@ -93,12 +93,24 @@ jobs:
               docker run -d \
                 --name eureka-server \
                 --network craftpilot-network \
+                --hostname eureka-server \
                 -p 8761:8761 \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e EUREKA_USERNAME=craftpilot \
                 -e EUREKA_PASSWORD=13579ada \
                 ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
             fi
+
+            # Eureka server'ın başlamasını bekle
+            echo "=== Waiting for Eureka Server ==="
+            for i in {1..10}; do
+              if curl -f http://localhost:8761/actuator/health; then
+                echo "Eureka Server is healthy"
+                break
+              fi
+              echo "Waiting for Eureka Server... Attempt $i"
+              sleep 15
+            done
 
             echo "=== Pulling ARM64 Image ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
@@ -112,14 +124,18 @@ jobs:
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
             chmod 600 /opt/craftpilot/gcp-credentials.json
 
+            echo "=== Starting LLM Service ==="
             docker run -d \
               --name llm-service \
               --network craftpilot-network \
+              --dns 8.8.8.8 \
+              --dns 8.8.4.4 \
+              --add-host=eureka-server:$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' eureka-server) \
               -p 8062:8062 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/ \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e EUREKA_INSTANCE_PREFERIPADDRESS=true \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \

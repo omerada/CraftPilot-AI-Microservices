@@ -52,6 +52,11 @@ spring:
       firestore:
         enabled: true
         project-id: ${GCP_PROJECT_ID:your-project-id}
+    loadbalancer:
+      ribbon:
+        enabled: false
+    discovery:
+      enabled: true
 
   redis:
     host: ${SPRING_REDIS_HOST:redis}
@@ -68,12 +73,16 @@ spring:
 eureka:
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8057/eureka/}
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8761/eureka/}
     register-with-eureka: true
     fetch-registry: true
+    registry-fetch-interval-seconds: 5
   instance:
     prefer-ip-address: true
-    lease-renewal-interval-in-seconds: 10
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
+    hostname: ${spring.cloud.client.hostname}
     health-check-url-path: /actuator/health
 
 management:
@@ -100,7 +109,7 @@ management:
     livenessstate:
       enabled: true
     readinessstate:
-      enabled: true 
+      enabled: true
 
 openrouter:
   api-key: ${OPENROUTER_API_KEY:your-api-key}
