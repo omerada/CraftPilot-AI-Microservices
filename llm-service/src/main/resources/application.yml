@@ -27,6 +27,7 @@ spring:
         delivery.timeout.ms: 120000
         request.timeout.ms: 30000
         retry.backoff.ms: 1000
+        max.block.ms: 60000
     consumer:
       group-id: ${spring.application.name}-group
       auto-offset-reset: earliest
@@ -97,11 +98,13 @@ management:
         enabled: true
       group:
         readiness:
-          include: redis,db
+          include: redis,diskSpace,kafka
         liveness:
           include: ping
   health:
     redis:
+      enabled: true
+    kafka:
       enabled: true
     circuitbreakers:
       enabled: true
@@ -109,6 +112,7 @@ management:
       enabled: true
     readinessstate:
       enabled: true
+    validate-group-membership: false
 
 openrouter:
   api-key: ${OPENROUTER_API_KEY:your-api-key}
@@ -131,6 +135,7 @@ logging:
     org.netflix.discovery: ERROR
     org.springframework.data.redis: ERROR
     org.apache.kafka: WARN
+    org.apache.commons.logging: ERROR
 
 resilience4j:
   circuitbreaker:

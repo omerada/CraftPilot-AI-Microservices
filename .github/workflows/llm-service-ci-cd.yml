@@ -69,6 +69,31 @@ jobs:
             # Infrastructure containers
             docker network create craftpilot-network || true
 
+            # Start Zookeeper if not running
+            if ! docker ps | grep -q zookeeper; then
+              docker run -d \
+                --name zookeeper \
+                --network craftpilot-network \
+                -e ZOOKEEPER_CLIENT_PORT=2181 \
+                -e ZOOKEEPER_TICK_TIME=2000 \
+                confluentinc/cp-zookeeper:latest
+            fi
+
+            # Start Kafka if not running
+            if ! docker ps | grep -q kafka; then
+              docker run -d \
+                --name kafka \
+                --network craftpilot-network \
+                -p 9092:9092 \
+                -e KAFKA_BROKER_ID=1 \
+                -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
+                -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
+                -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+                -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
+                -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 \
+                confluentinc/cp-kafka:latest
+            fi
+
             # Start Redis if not running
             if ! docker ps | grep -q redis; then
               docker run -d \
@@ -99,26 +124,39 @@ jobs:
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
+              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e SPRING_KAFKA_CONSUMER_GROUP_ID=llm-service-group \
               -e SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET=earliest \
-              -e MANAGEMENT_HEALTH_CIRCUITBREAKERS_ENABLED=true \
-              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics \
-              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
 
-            # Wait for service to be ready
-            echo "Waiting for service to start..."
-            for i in {1..60}; do
-              if curl -s http://localhost:8062/actuator/health | grep -q "UP"; then
-                echo "Service is healthy"
+            # Wait for infrastructure to be ready
+            echo "Waiting for infrastructure services..."
+            sleep 30
+
+            # Health check with more detailed output
+            echo "Starting health checks..."
+            for i in {1..30}; do
+              echo "Attempt $i: Checking service health..."
+              
+              HEALTH_STATUS=$(curl -s http://localhost:8062/actuator/health || echo "Failed to connect")
+              echo "Health status: $HEALTH_STATUS"
+              
+              if echo "$HEALTH_STATUS" | grep -q "UP"; then
+                echo "Service is healthy!"
                 exit 0
               fi
-              echo "Attempt $i: Service not ready yet..."
-              sleep 5
+              
+              if [ $i -eq 15 ]; then
+                echo "Mid-point container logs:"
+                docker logs llm-service
+              fi
+              
+              sleep 10
             done
 
             echo "Service failed to become healthy within timeout"
+            echo "Final container logs:"
             docker logs llm-service
             exit 1
 
