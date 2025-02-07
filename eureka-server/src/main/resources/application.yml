@@ -14,11 +14,11 @@ spring:
           spec: maximumSize=500,expireAfterWrite=5s
   security:
     user:
-      name: ${EUREKA_USERNAME:eureka}
-      password: ${EUREKA_PASSWORD:secret}
+      name: ${EUREKA_USERNAME:craftpilot}
+      password: ${EUREKA_PASSWORD:13579ada}
 
 server:
-  port: 8761
+  port: ${SERVER_PORT:8761}
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/xml,text/plain
@@ -27,14 +27,14 @@ server:
 
 eureka:
   instance:
-    hostname: ${EUREKA_HOST:localhost}
+    hostname: ${EUREKA_INSTANCE_HOSTNAME:localhost}
     prefer-ip-address: true
     lease-renewal-interval-in-seconds: 10
   client:
     registerWithEureka: false
     fetchRegistry: false
     serviceUrl:
-      defaultZone: http://${EUREKA_USERNAME:eureka}:${EUREKA_PASSWORD:secret}@${EUREKA_HOST:localhost}:8761/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://${eureka.instance.hostname}:${server.port}/eureka/}
   server:
     # Performance tuning
     waitTimeInMsWhenSyncEmpty: 0
@@ -59,14 +59,22 @@ eureka:
 management:
   endpoints:
     web:
+      base-path: /actuator
       exposure:
         include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
     metrics:
       enabled: true
     prometheus:
+      enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
       enabled: true
 
 logging:

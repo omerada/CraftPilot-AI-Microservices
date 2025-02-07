@@ -68,17 +68,20 @@ jobs:
             docker run -d \
               --name eureka-server \
               --network craftpilot-network \
+              --hostname eureka-server \
               -p 8761:8761 \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \
+              -e SERVER_PORT=8761 \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@localhost:8761/eureka/ \
+              -e EUREKA_INSTANCE_HOSTNAME=localhost \
+              -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
+              -e EUREKA_CLIENT_FETCH_REGISTRY=false \
               ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
             sleep 30
-
-            echo "=== Container Logs ==="
-            docker logs eureka-server
 
             echo "=== Health Check ==="
             for i in {1..5}; do
@@ -89,6 +92,7 @@ jobs:
               echo "Waiting for service to start... Attempt $i"
               sleep 10
             done
+
             echo "Service failed health check"
             docker logs eureka-server
             exit 1
