@@ -3,16 +3,20 @@ package com.craftpilot.redisservice.config;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
+import org.redisson.config.SingleServerConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+import java.time.Duration;
 
 @Configuration
 public class RedisConfig {
@@ -29,10 +33,16 @@ public class RedisConfig {
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration(redisHost, redisPort);
-        if (redisPassword != null && !redisPassword.isEmpty()) {
-            config.setPassword(redisPassword);
-        }
-        return new LettuceConnectionFactory(config);
+        config.setPassword(redisPassword);
+        
+        LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
+            .commandTimeout(Duration.ofSeconds(5))
+            .shutdownTimeout(Duration.ofSeconds(2))
+            .build();
+        
+        LettuceConnectionFactory factory = new LettuceConnectionFactory(config, clientConfig);
+        factory.afterPropertiesSet();
+        return factory;
     }
 
     @Bean
@@ -51,17 +61,24 @@ public class RedisConfig {
     @Bean
     public RedissonClient redissonClient() {
         Config config = new Config();
-        config.useSingleServer()
-            .setAddress("redis://" + redisHost + ":" + redisPort)
+        String address = String.format("redis://%s:%d", redisHost, redisPort);
+        
+        SingleServerConfig serverConfig = config.useSingleServer()
+            .setAddress(address)
             .setPassword(redisPassword)
             .setConnectionMinimumIdleSize(1)
             .setConnectionPoolSize(2)
-            .setRetryAttempts(3)
+            .setRetryAttempts(5)
             .setRetryInterval(1500)
             .setTimeout(3000)
-            .setConnectTimeout(3000);
+            .setConnectTimeout(3000)
+            .setDnsMonitoringInterval(5000);
 
-        return Redisson.create(config);
+        try {
+            return Redisson.create(config);
+        } catch (Exception e) {
+            throw new RuntimeException("Redis bağlantısı kurulamadı: " + e.getMessage(), e);
+        }
     }
 
     @Bean
