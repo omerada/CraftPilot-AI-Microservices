@@ -17,14 +17,9 @@ public class CustomHealthIndicator implements ReactiveHealthIndicator {
     @Override
     public Mono<Health> health() {
         return checkRedis()
-                .and(checkOpenRouter())
-                .map(health -> Health.up()
-                        .withDetail("redis", "UP")
-                        .withDetail("openrouter", "UP")
-                        .build())
-                .onErrorResume(ex -> Mono.just(Health.down()
-                        .withException(ex)
-                        .build()));
+                .then(checkOpenRouter())
+                .thenReturn(Health.up().build())
+                .onErrorResume(ex -> Mono.just(Health.down(ex).build()));
     }
 
     private Mono<Void> checkRedis() {

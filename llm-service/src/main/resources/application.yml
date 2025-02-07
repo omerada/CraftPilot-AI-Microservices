@@ -35,6 +35,11 @@ spring:
       properties:
         spring.json.trusted.packages: "*"
         spring.json.use.type.headers: false
+  webclient:
+    max-in-memory-size: 16MB
+    connect-timeout: 5000
+    read-timeout: 5000
+    write-timeout: 5000
 
   redis:
     host: ${SPRING_REDIS_HOST:redis}
