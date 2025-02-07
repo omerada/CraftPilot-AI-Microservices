@@ -29,11 +29,11 @@ public class KafkaConfig {
     public KafkaAdmin kafkaAdmin() {
         Map<String, Object> configs = new HashMap<>();
         configs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        configs.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "15000");
+        configs.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "30000");
         configs.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "30000");
-        configs.put(AdminClientConfig.RETRIES_CONFIG, "3");
-        configs.put("client.dns.lookup", "use_all_dns_ips");
-        configs.put("resolve.dns.refresh.rate.ms", "5000");
+        configs.put(AdminClientConfig.RETRIES_CONFIG, "5");
+        configs.put("reconnect.backoff.ms", "1000");
+        configs.put("reconnect.backoff.max.ms", "10000");
         return new KafkaAdmin(configs);
     }
 
@@ -44,10 +44,9 @@ public class KafkaConfig {
         configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
         configProps.put(ProducerConfig.RETRIES_CONFIG, 3);
-        configProps.put(ProducerConfig.ACKS_CONFIG, "1");
-        configProps.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);
-        configProps.put(ProducerConfig.BUFFER_MEMORY_CONFIG, 33554432);
-        configProps.put(ProducerConfig.LINGER_MS_CONFIG, 10);
+        configProps.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 1000);
+        configProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 30000);
+        configProps.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 30000);
         configProps.put(JsonSerializer.TYPE_MAPPINGS, "aiEvent:com.craftpilot.llmservice.event.AIEvent");
         
         return new DefaultKafkaProducerFactory<>(configProps);

@@ -9,8 +9,19 @@ server:
 spring:
   application:
     name: llm-service
-  webflux:
-    base-path: /api
+  cloud:
+    gcp:
+      project-id: ${SPRING_CLOUD_GCP_PROJECT_ID}
+      credentials:
+        location: file:${GOOGLE_APPLICATION_CREDENTIALS}
+      firestore:
+        project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
+        enabled: true
+    discovery:
+      enabled: true
+    loadbalancer:
+      ribbon:
+        enabled: false
   data:
     redis:
       host: ${SPRING_REDIS_HOST:redis}
@@ -27,52 +38,15 @@ spring:
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     producer:
-      bootstrap-servers: ${SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS:kafka:9092}
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      retries: 3
+      acks: 1
       properties:
-        spring.json.add.type.headers: false
-        retries: 3
-        delivery.timeout.ms: 120000
-        request.timeout.ms: 30000
-        retry.backoff.ms: 1000
-        max.block.ms: 60000
+        spring.json.type.mapping: aiEvent:com.craftpilot.llmservice.event.AIEvent
     consumer:
-      bootstrap-servers: ${SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS:kafka:9092}
-      group-id: ${spring.application.name}-group
+      group-id: llm-service-group
       auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
-        isolation.level: read_committed
-        max.poll.interval.ms: 300000
-        session.timeout.ms: 45000
-        heartbeat.interval.ms: 10000
-    admin:
-      bootstrap-servers: ${SPRING_KAFKA_ADMIN_BOOTSTRAP_SERVERS:kafka:9092}
-      properties:
-        request.timeout.ms: 20000
-        retry.backoff.ms: 500
-  webclient:
-    max-in-memory-size: 16MB
-    connect-timeout: 5000
-    read-timeout: 5000
-    write-timeout: 5000
-  cloud:
-    gcp:
-      firestore:
-        enabled: true
-        project-id: ${GCP_PROJECT_ID:your-project-id}
-    loadbalancer:
-      ribbon:
-        enabled: false
-    discovery:
-      enabled: true
-  security:
-    user:
-      name: ${SPRING_SECURITY_USER_NAME:craftpilot}
-      password: ${SPRING_SECURITY_USER_PASSWORD:13579ada}
 
 eureka:
   client:
@@ -88,7 +62,6 @@ eureka:
 management:
   endpoints:
     web:
-      base-path: /actuator
       exposure:
         include: health,info,metrics
   endpoint:
@@ -110,47 +83,22 @@ management:
       enabled: true
     readinessstate:
       enabled: true
-    validate-group-membership: false
 
 openrouter:
-  api-key: ${OPENROUTER_API_KEY:your-api-key}
-  base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
-  default-model: ${OPENROUTER_DEFAULT_MODEL:openai/gpt-3.5-turbo}
-  max-tokens: ${OPENROUTER_MAX_TOKENS:2000}
-  temperature: ${OPENROUTER_TEMPERATURE:0.7}
-  retry-attempts: ${OPENROUTER_RETRY_ATTEMPTS:3}
-  retry-delay: ${OPENROUTER_RETRY_DELAY:1000}
+  api-key: ${OPENROUTER_API_KEY}
+  base-url: https://openrouter.ai/api/v1
+  default-model: openai/gpt-3.5-turbo
+  max-tokens: 2000
+  temperature: 0.7
+  retry-attempts: 3
+  retry-delay: 1000
 
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
   level:
-    com.craftpilot.llmservice: ${LOG_LEVEL:INFO}
-    org.springframework.web: ${LOG_LEVEL:INFO}
-    org.springframework.data: ${LOG_LEVEL:INFO}
-    org.springframework.cloud.loadbalancer: ERROR
-    org.springframework.cloud.client: ERROR
-    org.netflix.discovery: ERROR
-    org.springframework.data.redis: ERROR
-    org.apache.kafka: WARN
-    org.apache.commons.logging: ERROR
-
-resilience4j:
-  circuitbreaker:
-    configs:
-      default:
-        slidingWindowSize: 10
-        minimumNumberOfCalls: 5
-        permittedNumberOfCallsInHalfOpenState: 3
-        failureRateThreshold: 50
-        waitDurationInOpenState: 10s
-    instances:
-      openRouter:
-        baseConfig: default
-  timelimiter:
-    configs:
-      default:
-        timeoutDuration: 5s
-    instances:
-      openRouter:
-        baseConfig: default
+    root: INFO
+    com.craftpilot: DEBUG
+    org.springframework.web: INFO
+    org.springframework.kafka: INFO
+    org.springframework.cloud: INFO

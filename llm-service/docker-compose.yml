@@ -9,12 +9,18 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     networks:
       - craftpilot-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   kafka:
     image: confluentinc/cp-kafka:latest
     container_name: kafka
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     ports:
       - "9092:9092"
     environment:
@@ -28,25 +34,47 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     networks:
       - craftpilot-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    command: redis-server --requirepass 13579ada
+    ports:
+      - "6379:6379"
+    networks:
+      - craftpilot-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   llm-service:
     image: ${DOCKERHUB_USERNAME}/llm-service:latest-arm64
     container_name: llm-service
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8062:8062"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
-      - GCP_SA_KEY=${GCP_SA_KEY}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - SPRING_REDIS_HOST=redis
       - SPRING_REDIS_PORT=6379
-      - MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
-      - MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always
-      - MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true
+      - SPRING_REDIS_PASSWORD=13579ada
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
+    volumes:
+      - /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro
     networks:
       - craftpilot-network
     dns:
