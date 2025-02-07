@@ -388,7 +388,7 @@ services:
       - SPRING_REDIS_HOST=redis
       - SPRING_REDIS_PORT=6379
       - SPRING_REDIS_PASSWORD=13579ada
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka-service:9092
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     volumes:
       - ${GCP_CREDENTIALS_PATH:-./admin-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
     networks:

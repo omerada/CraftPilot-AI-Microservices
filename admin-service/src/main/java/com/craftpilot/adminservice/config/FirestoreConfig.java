@@ -13,19 +13,23 @@ import java.io.IOException;
 @Configuration
 public class FirestoreConfig {
 
-    @Value("${GOOGLE_APPLICATION_CREDENTIALS}")
+    @Value("${GOOGLE_APPLICATION_CREDENTIALS:#{null}}")
     private String credentialsPath;
+
+    @Value("${GCP_PROJECT_ID:craft-pilot-ai}")
+    private String projectId;
 
     @Bean
     public Firestore firestore() throws IOException {
-        GoogleCredentials credentials = GoogleCredentials.fromStream(
-            new FileInputStream(credentialsPath)
-        );
+        FirestoreOptions.Builder builder = FirestoreOptions.getDefaultInstance().toBuilder()
+            .setProjectId(projectId);
 
-        FirestoreOptions firestoreOptions = FirestoreOptions.newBuilder()
-            .setCredentials(credentials)
-            .build();
+        if (credentialsPath != null) {
+            GoogleCredentials credentials = GoogleCredentials.fromStream(
+                new FileInputStream(credentialsPath));
+            builder.setCredentials(credentials);
+        }
 
-        return firestoreOptions.getService();
+        return builder.build().getService();
     }
 } 
