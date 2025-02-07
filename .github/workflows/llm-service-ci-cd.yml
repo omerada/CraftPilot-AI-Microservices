@@ -1,4 +1,4 @@
-name: LLM Service CI/CD
+name: Analytics Service CI/CD
 
 on:
   push:
@@ -28,7 +28,6 @@ jobs:
         uses: docker/setup-buildx-action@v2
         with:
           platforms: linux/arm64
-          buildkitd-flags: --debug
 
       # Docker Hub'a giriş yap
       - name: Login to DockerHub
@@ -36,8 +35,9 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: true
 
-      # Build ve Push
+      # Sadece ARM64 için build ve push
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
@@ -47,57 +47,58 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
             ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:${{ github.sha }}-arm64
-          no-cache: true
-          pull: true
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/llm-service:buildcache-arm64
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/llm-service:buildcache-arm64,mode=max
 
-      # Kafka'nın çalışıp çalışmadığını kontrol et
-      - name: Check Kafka Status
-        run: |
-          # Docker network'ünü oluştur
-          docker network create craftpilot-network || true
+      # Google Cloud kimlik doğrulaması
+      - id: "auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v1"
+        with:
+          credentials_json: "${{ secrets.GCP_SA_KEY }}"
 
-          if ! docker ps | grep -q kafka; then
-            echo "Kafka container is not running. Starting Kafka..."
-            
-            # Zookeeper'ı başlat
-            docker run -d \
-              --name zookeeper \
-              --network craftpilot-network \
-              -e ZOOKEEPER_CLIENT_PORT=2181 \
-              -e ZOOKEEPER_TICK_TIME=2000 \
-              confluentinc/cp-zookeeper:latest
+      # Google Cloud CLI kurulumu
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v1"
 
-            sleep 10
-
-            # Kafka'yı başlat
-            docker run -d \
-              --name kafka \
-              --network craftpilot-network \
-              --hostname kafka \
-              -p 9092:9092 \
-              -e KAFKA_BROKER_ID=1 \
-              -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
-              -e KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092 \
-              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
-              -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT \
-              -e KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT \
-              -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
-              -e KAFKA_AUTO_CREATE_TOPICS_ENABLE="true" \
-              confluentinc/cp-kafka:latest
-
-            sleep 20
-          fi
-
-      # VPS'e deploy
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          debug: true
+          command_timeout: "20m"
           script: |
-            echo "=== Creating GCP Credentials ==="
-            echo '${{ secrets.GCP_SA_KEY }}' > /tmp/gcp-credentials.json
+            echo "=== Testing Docker ==="
+            docker version
+            docker info
+            docker ps
+
+            # Docker ağını oluştur (eğer yoksa)
+            docker network create craftpilot-network || true
+
+            # Redis container'ını başlat (eğer çalışmıyorsa)
+            if ! docker ps | grep -q redis; then
+              docker run -d \
+                --name redis \
+                --network craftpilot-network \
+                -p 6379:6379 \
+                redis:latest
+            fi
+
+            # Eureka server'ı başlat (eğer çalışmıyorsa)
+            if ! docker ps | grep -q eureka-server; then
+              docker run -d \
+                --name eureka-server \
+                --network craftpilot-network \
+                -p 8761:8761 \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e EUREKA_USERNAME=craftpilot \
+                -e EUREKA_PASSWORD=13579ada \
+                ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
+            fi
 
             echo "=== Pulling ARM64 Image ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
@@ -109,40 +110,38 @@ jobs:
             echo "=== Starting New Container ==="
             docker run -d \
               --name llm-service \
-              --platform linux/arm64 \
               --network craftpilot-network \
-              --dns 8.8.8.8 \
-              --dns 8.8.4.4 \
-              --add-host=kafka:$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' kafka) \
               -p 8062:8062 \
+              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8057/eureka/ \
-              -e GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}' \
-              -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/ \
+              -e EUREKA_INSTANCE_PREFERIPADDRESS=true \
+              -e EUREKA_USERNAME=craftpilot \
+              -e EUREKA_PASSWORD=13579ada \
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
-              -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
-              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
-              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-              -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+              -e SPRING_REDIS_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 45  # Daha uzun bir bekleme süresi
+            sleep 60
+
+            echo "=== Container Logs ==="
+            docker logs llm-service
 
             echo "=== Health Check ==="
-            for i in {1..10}; do
-              if curl -f http://localhost:8062/actuator/health/liveness || curl -f http://localhost:8062/actuator/health; then
+            for i in {1..5}; do
+              if curl -f http://localhost:8062/actuator/health; then
                 echo "Service is healthy"
                 exit 0
               fi
-              echo "Attempt $i: Waiting for service to start..."
-              sleep 15
+              echo "Waiting for service to start... Attempt $i"
+              sleep 10
             done
+
             echo "Service failed health check"
             docker logs llm-service
-            docker exec llm-service ping -c 1 kafka
-            docker exec llm-service nc -zv kafka 9092
             exit 1
 
       - name: Trigger Deploy Services Workflow
