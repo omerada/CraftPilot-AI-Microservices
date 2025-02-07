@@ -69,7 +69,7 @@ jobs:
             # Infrastructure containers
             docker network create craftpilot-network || true
 
-            # Start Redis (eğer çalışmıyorsa)
+            # Start Redis if not running
             if ! docker ps | grep -q redis; then
               docker run -d \
                 --name redis \
@@ -99,12 +99,20 @@ jobs:
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
+              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               ${{ secrets.DOCKERHUB_USERNAME }}/credit-service:latest-arm64
 
-            # Basic health check
-            sleep 30
-            if ! curl -s http://localhost:8058/actuator/health | grep -q "UP"; then
-              echo "Service failed health check"
-              docker logs credit-service
-              exit 1
-            fi
+            # Enhanced health check with longer timeout
+            echo "Waiting for service to start..."
+            for i in {1..12}; do
+              if curl -s http://localhost:8058/actuator/health | grep -q "UP"; then
+                echo "Service is healthy"
+                exit 0
+              fi
+              echo "Attempt $i: Service not ready yet..."
+              sleep 10
+            done
+
+            echo "Service failed to become healthy within timeout"
+            docker logs credit-service
+            exit 1

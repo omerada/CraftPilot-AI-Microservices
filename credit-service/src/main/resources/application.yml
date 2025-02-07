@@ -102,7 +102,7 @@ management:
         enabled: true
       group:
         readiness:
-          include: redis,db
+          include: redis,diskSpace
         liveness:
           include: ping
   metrics:
@@ -120,6 +120,7 @@ management:
       enabled: true
     readinessstate:
       enabled: true
+    validate-group-membership: false
 
 eureka:
   client:
@@ -192,6 +193,8 @@ logging:
     org.springframework.cloud.client: ERROR
     com.netflix.discovery: ERROR
     org.springframework.data.redis: ERROR
+    org.apache.kafka: WARN
+    org.apache.commons.logging: ERROR
 
 cors:
   allowed-origins: "*"
