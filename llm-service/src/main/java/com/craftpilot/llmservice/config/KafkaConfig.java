@@ -36,6 +36,8 @@ public class KafkaConfig {
         configs.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "15000");
         configs.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "30000");
         configs.put(AdminClientConfig.RETRIES_CONFIG, "3");
+        configs.put("client.dns.lookup", "use_all_dns_ips");
+        configs.put("resolve.dns.refresh.rate.ms", "5000");
         return new KafkaAdmin(configs);
     }
 

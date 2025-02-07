@@ -87,9 +87,19 @@ management:
       show-details: always
       probes:
         enabled: true
+      group:
+        readiness:
+          include: "*"
+        liveness:
+          include: "*"
     metrics:
       enabled: true
     prometheus:
+      enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
       enabled: true
   server:
     port: 8062
