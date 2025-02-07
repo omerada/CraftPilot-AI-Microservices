@@ -40,6 +40,11 @@ spring:
     connect-timeout: 5000
     read-timeout: 5000
     write-timeout: 5000
+  cloud:
+    gcp:
+      firestore:
+        enabled: true
+        project-id: ${GCP_PROJECT_ID:your-project-id}
 
   redis:
     host: ${SPRING_REDIS_HOST:redis}

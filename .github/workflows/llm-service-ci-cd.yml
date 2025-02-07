@@ -59,7 +59,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             echo "=== Creating GCP Credentials ==="
-            echo "${{ secrets.GCP_SA_KEY }}" > /tmp/gcp-credentials.json
+            echo '${{ secrets.GCP_SA_KEY }}' > /tmp/gcp-credentials.json
 
             echo "=== Pulling ARM64 Image ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
@@ -76,11 +76,10 @@ jobs:
               -p 8062:8062 \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8057/eureka/ \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+              -e GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}' \
               -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
-              -v /tmp/gcp-credentials.json:/gcp-credentials.json:ro \
               ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
