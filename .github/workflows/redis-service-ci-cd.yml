@@ -43,12 +43,15 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+        with:
+          platforms: linux/arm64
 
       - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: true
 
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
@@ -56,65 +59,65 @@ jobs:
           context: ./redis-service
           platforms: linux/arm64
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
+            ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:${{ github.sha }}-arm64
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/redis-service:buildcache-arm64
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/redis-service:buildcache-arm64,mode=max
 
-      - name: Deploy to Server
+      - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USERNAME }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Create network if not exists
+            # Infrastructure network
             docker network create craftpilot-network || true
 
-            # Check if Redis container exists and is running
-            if ! docker ps -q -f name=redis; then
-              # Remove existing container if exists but not running
-              docker rm -f redis || true
-              
-              # Run Redis container
-              docker run -d \
-                --name redis \
-                --network craftpilot-network \
-                -p 6379:6379 \
-                -e REDIS_PASSWORD=13579ada \
-                redis:latest --requirepass 13579ada
-            fi
-
-            # Wait for Redis to be ready
-            echo "Waiting for Redis to be ready..."
-            sleep 10
-
-            # Remove existing Redis service container
+            # Mevcut container'ı kaldır
             docker stop redis-service || true
             docker rm redis-service || true
 
-            # Run new Redis service container
+            # Yeni container'ı başlat
             docker run -d \
               --name redis-service \
               --network craftpilot-network \
               --restart unless-stopped \
-              -p 8085:8085 \
+              -p 8064:8064 \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
 
-            # Health check with increased timeout
-            echo "Waiting for Redis service to start..."
+            # Health check
+            echo "Starting health checks..."
             for i in {1..30}; do
-              if curl -s http://localhost:8085/actuator/health | grep -q "\"status\":\"UP\""; then
-                echo "Service is healthy"
+              echo "Attempt $i: Checking service health..."
+              
+              HEALTH_STATUS=$(curl -s http://localhost:8064/actuator/health || echo "Failed to connect")
+              echo "Health status: $HEALTH_STATUS"
+              
+              if echo "$HEALTH_STATUS" | grep -q "UP"; then
+                echo "Service is healthy!"
                 exit 0
               fi
-              echo "Attempt $i: Service not ready yet..."
+              
+              if [ $i -eq 15 ]; then
+                echo "Mid-point container logs:"
+                docker logs redis-service
+              fi
+              
               sleep 10
             done
 
             echo "Service failed to become healthy within timeout"
+            echo "Final container logs:"
             docker logs redis-service
             exit 1
 
