@@ -1,5 +1,5 @@
 server:
-  port: 8097
+  port: 8063
   compression:
     enabled: true
     mime-types: application/json,text/plain
@@ -11,8 +11,9 @@ spring:
     name: admin-service
   cloud:
     gcp:
+      project-id: ${SPRING_CLOUD_GCP_PROJECT_ID}
       credentials:
-        location: ${SPRING_CLOUD_GCP_CREDENTIALS_LOCATION:file:/app/gcp-credentials.json}
+        location: file:${GOOGLE_APPLICATION_CREDENTIALS}
       firestore:
         project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
         enabled: true
