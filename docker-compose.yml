@@ -374,20 +374,24 @@ services:
 
   # Admin Service
   admin-service:
-    image: craftpilot/admin-service:latest
+    image: ${DOCKERHUB_USERNAME}/admin-service:latest-arm64
+    container_name: admin-service
     ports:
       - "8097:8097"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
-      - FIREBASE_CREDENTIAL_PATH=/app/config/firebase-service-account.json
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-service-account.json
+      - SPRING_PROFILES_ACTIVE=prod
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
       - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
+      - SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/gcp-credentials.json
       - SPRING_REDIS_HOST=redis
       - SPRING_REDIS_PORT=6379
       - SPRING_REDIS_PASSWORD=13579ada
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka-service:9092
     volumes:
-      - ./admin-service/src/main/resources/firebase-service-account.json:/app/config/firebase-service-account.json
+      - ${GCP_CREDENTIALS_PATH:-./admin-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
+    networks:
+      - craftpilot-network
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -395,8 +399,6 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
-    networks:
-      - craftpilot-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8097/actuator/health"]
       interval: 30s
