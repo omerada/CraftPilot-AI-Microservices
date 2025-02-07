@@ -11,8 +11,11 @@ spring:
     name: credit-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+  security:
+    user:
+      name: ${SPRING_SECURITY_USER_NAME:craftpilot}
+      password: ${SPRING_SECURITY_USER_PASSWORD:13579ada}
   cloud:
-
     discovery:
       enabled: true
     function:
@@ -20,7 +23,7 @@ spring:
     stream:
       kafka:
         binder:
-          brokers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+          brokers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
           configuration:
             security.protocol: PLAINTEXT
         bindings:
@@ -34,7 +37,7 @@ spring:
               configuration:
                 key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
                 value.deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-                spring.json.trusted.packages: com.craftpilot.analyticsservice.event
+                spring.json.trusted.packages: "com.craftpilot.creditservice.event"
       bindings:
         metricsEventProducer-out-0:
           destination: metrics-events
@@ -45,15 +48,26 @@ spring:
           contentType: application/json
   main:
     web-application-type: reactive
-  security:
-    basic:
-      enabled: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.trusted.packages: "com.craftpilot.creditservice.event"
+    consumer:
+      group-id: credit-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,metrics
   endpoint:
     health:
       show-details: always
@@ -67,17 +81,14 @@ management:
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://${EUREKA_USERNAME:eureka}:${EUREKA_PASSWORD:secret}@eureka-server:8761/eureka/
-    fetch-registry: true
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@localhost:8761/eureka/}
     register-with-eureka: true
+    fetch-registry: true
   instance:
     prefer-ip-address: true
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
     lease-renewal-interval-in-seconds: 10
-    health-check-url-path: /actuator/health
-    metadata-map:
-      startup: ${random.int}
-      user.name: ${spring.security.user.name}
-      user.password: ${spring.security.user.password}
+    lease-expiration-duration-in-seconds: 30
 
 springdoc:
   swagger-ui:

@@ -79,6 +79,48 @@ jobs:
             # Docker ağını oluştur (eğer yoksa)
             docker network create craftpilot-network || true
 
+            # Eureka Server'ı başlat
+            if ! docker ps | grep -q eureka-server; then
+              docker run -d \
+                --name eureka-server \
+                --network craftpilot-network \
+                -p 8761:8761 \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
+                -e EUREKA_CLIENT_REGISTERWITHEUREKA=false \
+                -e EUREKA_CLIENT_FETCHREGISTRY=false \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/ \
+                -e EUREKA_SERVER_ENABLESELFREPLICATION=true \
+                -e EUREKA_SERVER_WAITTIME_MS=0 \
+                -e SPRING_SECURITY_USER_NAME=craftpilot \
+                -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+                ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
+            fi
+
+            # Kafka ve Zookeeper'ı başlat
+            if ! docker ps | grep -q kafka; then
+              # Zookeeper'ı başlat
+              docker run -d \
+                --name zookeeper \
+                --network craftpilot-network \
+                -e ZOOKEEPER_CLIENT_PORT=2181 \
+                -e ZOOKEEPER_TICK_TIME=2000 \
+                confluentinc/cp-zookeeper:latest
+
+              # Kafka'yı başlat
+              docker run -d \
+                --name kafka \
+                --network craftpilot-network \
+                -p 9092:9092 \
+                -e KAFKA_BROKER_ID=1 \
+                -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
+                -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
+                -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+                -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
+                -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 \
+                confluentinc/cp-kafka:latest
+            fi
+
             # Redis container'ını başlat (eğer çalışmıyorsa)
             if ! docker ps | grep -q redis; then
               docker run -d \
@@ -86,18 +128,6 @@ jobs:
                 --network craftpilot-network \
                 -p 6379:6379 \
                 redis:latest
-            fi
-
-            # Eureka server'ı başlat (eğer çalışmıyorsa)
-            if ! docker ps | grep -q eureka-server; then
-              docker run -d \
-                --name eureka-server \
-                --network craftpilot-network \
-                -p 8761:8761 \
-                -e SPRING_PROFILES_ACTIVE=prod \
-                -e EUREKA_USERNAME=craftpilot \
-                -e EUREKA_PASSWORD=13579ada \
-                ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
             fi
 
             echo "=== Pulling ARM64 Image ==="
@@ -115,10 +145,11 @@ jobs:
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/ \
+              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e EUREKA_INSTANCE_PREFERIPADDRESS=true \
-              -e EUREKA_USERNAME=craftpilot \
-              -e EUREKA_PASSWORD=13579ada \
+              -e SPRING_SECURITY_USER_NAME=craftpilot \
+              -e SPRING_SECURITY_USER_PASSWORD=13579ada \
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
