@@ -5,55 +5,62 @@ import com.craftpilot.llmservice.model.AIRequest;
 import com.craftpilot.llmservice.model.AIResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cloud.client.circuitbreaker.ReactiveCircuitBreaker; 
+import org.springframework.cloud.client.circuitbreaker.ReactiveCircuitBreaker;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-import reactor.util.retry.Retry;
 
-import java.time.Duration;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class OpenRouterService {
     private final WebClient webClient;
-    private final OpenRouterConfig config; 
+    private final OpenRouterConfig config;
     private final ReactiveCircuitBreaker circuitBreaker;
 
     public Mono<AIResponse> processRequest(AIRequest request) {
-        Map<String, Object> requestBody = buildRequestBody(request);
+        if (request.getRequestId() == null) {
+            request.setRequestId(UUID.randomUUID().toString());
+        }
         
+        return circuitBreaker.run(
+            callOpenRouterAPI(request),
+            throwable -> handleError(throwable, request)
+        );
+    }
+
+    private Mono<AIResponse> callOpenRouterAPI(AIRequest request) {
         return webClient.post()
                 .uri(config.getBaseUrl() + "/chat/completions")
-                .bodyValue(requestBody)
+                .header("Authorization", "Bearer " + config.getApiKey())
+                .bodyValue(createRequestBody(request))
                 .retrieve()
                 .bodyToMono(AIResponse.class)
-                .transform(it -> circuitBreaker.run(it, throwable -> handleError(throwable)))
-                .retryWhen(Retry.backoff(config.getRetryAttempts(), Duration.ofMillis(config.getRetryDelay()))
-                        .filter(throwable -> shouldRetry(throwable)))
-                .doOnError(error -> log.error("Error processing request: {}", error.getMessage()))
-                .doOnSuccess(response -> log.info("Successfully processed request"));
+                .map(response -> {
+                    response.setRequestId(request.getRequestId());
+                    return response;
+                });
     }
 
-    private Map<String, Object> buildRequestBody(AIRequest request) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("model", request.getModel() != null ? request.getModel() : config.getDefaultModel());
-        body.put("messages", request.getMessages());
-        body.put("max_tokens", request.getMaxTokens() != null ? request.getMaxTokens() : config.getMaxTokens());
-        body.put("temperature", request.getTemperature() != null ? request.getTemperature() : config.getTemperature());
-        return body;
+    private Mono<AIResponse> handleError(Throwable throwable, AIRequest request) {
+        log.error("Error calling OpenRouter API for request {}: {}", 
+                request.getRequestId(), throwable.getMessage());
+        return Mono.just(AIResponse.builder()
+                .error("Service temporarily unavailable")
+                .model(request.getModel() != null ? request.getModel() : config.getDefaultModel())
+                .requestId(request.getRequestId())
+                .build());
     }
 
-    private Mono<AIResponse> handleError(Throwable throwable) {
-        log.error("Circuit breaker fallback triggered: {}", throwable.getMessage());
-        return Mono.error(new RuntimeException("Service temporarily unavailable"));
-    }
-
-    private boolean shouldRetry(Throwable throwable) {
-        return throwable instanceof Exception && 
-               !(throwable instanceof IllegalArgumentException);
+    private Map<String, Object> createRequestBody(AIRequest request) {
+        return Map.of(
+            "model", request.getModel() != null ? request.getModel() : config.getDefaultModel(),
+            "messages", request.getMessages(),
+            "max_tokens", request.getMaxTokens() != null ? request.getMaxTokens() : config.getMaxTokens(),
+            "temperature", request.getTemperature() != null ? request.getTemperature() : config.getTemperature()
+        );
     }
 } 

@@ -93,3 +93,23 @@ logging:
     com.craftpilot.llmservice: ${LOG_LEVEL:INFO}
     org.springframework.web: ${LOG_LEVEL:INFO}
     org.springframework.data: ${LOG_LEVEL:INFO}
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+    instances:
+      openRouter:
+        baseConfig: default
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 5s
+    instances:
+      openRouter:
+        baseConfig: default

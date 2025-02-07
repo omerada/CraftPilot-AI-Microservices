@@ -8,12 +8,18 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
+import reactor.core.publisher.Mono;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
 public class WebClientConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(WebClientConfig.class);
 
     @Bean
     public WebClient webClient() {
@@ -26,6 +32,12 @@ public class WebClientConfig {
 
         return WebClient.builder()
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .filter(ExchangeFilterFunction.ofRequestProcessor(
+                    clientRequest -> {
+                        log.debug("Making request to: {}", clientRequest.url());
+                        return Mono.just(clientRequest);
+                    }
+                ))
                 .build();
     }
 } 
