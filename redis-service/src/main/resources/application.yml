@@ -18,9 +18,9 @@ spring:
         enabled: true
   data:
     redis:
-      host: localhost
-      port: 6379
-      password: 13579ada
+      host: ${SPRING_REDIS_HOST:redis}
+      port: ${SPRING_REDIS_PORT:6379}
+      password: ${SPRING_REDIS_PASSWORD:13579ada}
       timeout: 5000
       lettuce:
         pool:

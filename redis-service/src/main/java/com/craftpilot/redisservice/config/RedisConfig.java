@@ -40,9 +40,7 @@ public class RedisConfig {
             .shutdownTimeout(Duration.ofSeconds(2))
             .build();
         
-        LettuceConnectionFactory factory = new LettuceConnectionFactory(config, clientConfig);
-        factory.afterPropertiesSet();
-        return factory;
+        return new LettuceConnectionFactory(config, clientConfig);
     }
 
     @Bean
@@ -71,8 +69,7 @@ public class RedisConfig {
             .setRetryAttempts(5)
             .setRetryInterval(1500)
             .setTimeout(3000)
-            .setConnectTimeout(3000)
-            .setDnsMonitoringInterval(5000);
+            .setConnectTimeout(3000);
 
         try {
             return Redisson.create(config);
