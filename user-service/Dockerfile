@@ -34,10 +34,10 @@ RUN yum update -y && \
 
 WORKDIR /app
 
-# Create log directories with proper permissions
-RUN mkdir -p /app/logs && \
-    chown -R 1000:1000 /app/logs && \
-    chmod 755 /app/logs
+# Create necessary directories
+RUN mkdir -p /app/logs /etc/gcp/credentials && \
+    chown -R 1000:1000 /app/logs /etc/gcp && \
+    chmod 755 /app/logs /etc/gcp
 
 USER 1000
 

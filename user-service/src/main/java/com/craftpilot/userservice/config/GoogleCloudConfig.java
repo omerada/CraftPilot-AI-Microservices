@@ -15,17 +15,20 @@ import org.springframework.core.io.Resource;
 import reactor.core.publisher.Mono;
 
 import jakarta.annotation.PostConstruct;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.function.Predicate;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Configuration
 public class GoogleCloudConfig {
 
     @Value("${spring.cloud.gcp.project-id}")
     private String projectId;
 
-    @Value("${GOOGLE_APPLICATION_CREDENTIALS:classpath:firebase-service-account.json}")
+    @Value("${GOOGLE_APPLICATION_CREDENTIALS}")
     private String credentialsPath;
 
     private final Environment environment;
@@ -35,29 +38,21 @@ public class GoogleCloudConfig {
     }
 
     @PostConstruct
-    public void initialize() throws IOException {
-        if (isFirebaseInitialized()) {
-            return;
+    public void initialize() {
+        try {
+            if (FirebaseApp.getApps().isEmpty()) {
+                FileInputStream serviceAccount = new FileInputStream(credentialsPath);
+                FirebaseOptions options = FirebaseOptions.builder()
+                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+                    .build();
+
+                FirebaseApp.initializeApp(options);
+                log.info("Firebase application has been initialized");
+            }
+        } catch (IOException e) {
+            log.error("Error initializing Firebase: {}", e.getMessage());
+            throw new RuntimeException("Failed to initialize Firebase", e);
         }
-
-        Resource serviceAccount;
-        if (credentialsPath.startsWith("classpath:")) {
-            serviceAccount = new ClassPathResource(credentialsPath.substring("classpath:".length()));
-        } else {
-            serviceAccount = new ClassPathResource(credentialsPath);
-        }
-
-        FirebaseOptions options = FirebaseOptions.builder()
-                .setCredentials(GoogleCredentials.fromStream(serviceAccount.getInputStream()))
-                .build();
-
-        FirebaseApp.initializeApp(options);
-    }
-
-    private boolean isFirebaseInitialized() {
-        return Optional.ofNullable(FirebaseApp.getApps())
-                .filter(Predicate.not(apps -> apps.isEmpty()))
-                .isPresent();
     }
 
     @Bean

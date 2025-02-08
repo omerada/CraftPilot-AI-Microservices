@@ -48,10 +48,10 @@ spec:
                   name: eureka-config
                   key: eureka-url
             - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: "/etc/gcp/credentials.json"
+              value: "/etc/gcp/credentials/gcp-credentials.json"
           volumeMounts:
             - name: gcp-credentials
-              mountPath: "/etc/gcp"
+              mountPath: "/etc/gcp/credentials"
               readOnly: true
             - name: logs
               mountPath: "/app/logs"
@@ -86,6 +86,6 @@ spec:
             secretName: gcp-credentials
             items:
               - key: credentials.json
-                path: credentials.json
+                path: gcp-credentials.json
         - name: logs
           emptyDir: {}
