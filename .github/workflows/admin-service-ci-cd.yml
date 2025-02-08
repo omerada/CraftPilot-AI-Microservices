@@ -65,15 +65,27 @@ jobs:
               sudo mkdir -p /opt/craftpilot
             fi
 
-            # GCP kimlik bilgilerini oluştur
+            # GCP kimlik bilgilerini oluştur ve doğrula
             echo '${{ secrets.GCP_SA_KEY_JSON }}' | sudo tee /opt/craftpilot/gcp-credentials.json > /dev/null
             sudo chmod 640 /opt/craftpilot/gcp-credentials.json
+
+            # JSON formatını doğrula
+            if ! jq empty /opt/craftpilot/gcp-credentials.json 2>/dev/null; then
+              echo "GCP kimlik bilgileri geçerli JSON formatında değil!"
+              exit 1
+            fi
+
+            # Dosya içeriğini kontrol et
+            if [ ! -s /opt/craftpilot/gcp-credentials.json ]; then
+              echo "GCP kimlik bilgileri dosyası boş!"
+              exit 1
+            fi
 
             # Remove existing container
             docker stop admin-service || true
             docker rm admin-service || true
 
-            # Run new container
+            # Run new container with debug mode
             docker run -d \
               --name admin-service \
               --network craftpilot-network \
@@ -90,9 +102,15 @@ jobs:
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+              -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
               ${{ secrets.DOCKERHUB_USERNAME }}/admin-service:latest-arm64
 
-            # Sağlık kontrolü için bekleme süresi
+            # Container loglarını kontrol et
+            echo "Container logları kontrol ediliyor..."
+            sleep 5
+            docker logs admin-service
+
+            # Sağlık kontrolü
             echo "Servis başlatılıyor ve sağlık kontrolü yapılıyor..."
             for i in {1..30}; do
               if curl -s http://localhost:8063/actuator/health | grep -q "UP"; then
@@ -103,7 +121,7 @@ jobs:
               sleep 10
             done
 
-            echo "Servis başlatılamadı - Container logları:"
+            echo "Servis başlatılamadı - Son container logları:"
             docker logs admin-service
             exit 1
 

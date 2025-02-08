@@ -10,6 +10,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 @Configuration
 public class FirestoreConfig {
@@ -22,6 +24,18 @@ public class FirestoreConfig {
     public Firestore firestore() throws IOException {
         try {
             logger.info("Firestore yapılandırması başlatılıyor. Kimlik dosyası yolu: {}", credentialsPath);
+            
+            // Dosyanın varlığını ve içeriğini kontrol et
+            if (!Files.exists(Paths.get(credentialsPath))) {
+                throw new IOException("Kimlik dosyası bulunamadı: " + credentialsPath);
+            }
+
+            String jsonContent = new String(Files.readAllBytes(Paths.get(credentialsPath)));
+            if (jsonContent.trim().isEmpty()) {
+                throw new IOException("Kimlik dosyası boş: " + credentialsPath);
+            }
+
+            logger.debug("Kimlik dosyası içeriği doğrulandı");
             
             GoogleCredentials credentials;
             try (FileInputStream serviceAccountStream = new FileInputStream(credentialsPath)) {
