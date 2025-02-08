@@ -15,12 +15,11 @@ spring:
     from: ${GMAIL_SERVICE_ACCOUNT}
   cloud:
     gcp:
+      project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
       credentials:
-        location: file:${GCP_SA_KEY:/app/config/service-account.json}
-      project-id: ${GCP_PROJECT_ID}
+        location: file:/gcp-credentials.json
       firestore:
         enabled: true
-        project-id: ${GCP_PROJECT_ID}
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}

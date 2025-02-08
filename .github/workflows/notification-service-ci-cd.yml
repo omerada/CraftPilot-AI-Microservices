@@ -92,12 +92,11 @@ jobs:
             docker run -d \
               --name notification-service \
               --network craftpilot-network \
-              --restart unless-stopped \
-              -p 8094:8094 \
-              -v /opt/craftpilot/config/notification-service:/app/config:ro \
-              -e GCP_SA_KEY=/app/config/service-account.json \
-              -e GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
+              -p 8057:8057 \
+              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
+              -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
               ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
 
             # Verify credentials file exists in container

@@ -26,6 +26,9 @@ COPY --from=builder /build/target/*.jar app.jar
 # Create config directory
 RUN mkdir -p /app/config
 
+# GCP credentials için volume mount noktası
+RUN mkdir -p /gcp-credentials
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
   CMD curl -f http://localhost:8094/actuator/health || exit 1
