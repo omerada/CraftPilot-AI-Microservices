@@ -82,6 +82,11 @@ management:
     web:
       exposure:
         include: "*"
+      base-path: /actuator
+    health:
+      show-details: always
+      probes:
+        enabled: true
   endpoint:
     health:
       show-details: always
@@ -89,6 +94,13 @@ management:
       enabled: true
     prometheus:
       enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+  server:
+    port: 8052
 
 springdoc:
   api-docs:
@@ -160,13 +172,21 @@ eureka:
     hostname: ${HOSTNAME:subscription-service}
     lease-renewal-interval-in-seconds: 10
     lease-expiration-duration-in-seconds: 20
-    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
+    instance-id: ${spring.application.name}:${spring.cloud.client.hostname}:${server.port}
     health-check-url-path: /actuator/health
     statusPageUrlPath: /actuator/info
+    healthCheckUrlPath: /actuator/health
+    instanceId: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
+    metadata-map:
+      startup: ${random.int}
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka/}
+      defaultZone: ${EUREKA_SERVER_URL:http://craftpilot:13579ada@eureka-server:8761/eureka/}
     register-with-eureka: true
     fetch-registry: true
     healthcheck:
       enabled: true
+    registerWithEureka: true
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@localhost:8761/eureka/
