@@ -68,6 +68,16 @@ spec:
                   key: eureka-url
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: "/gcp-credentials/credentials.json"
+            - name: EUREKA_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: eureka-credentials
+                  key: username
+            - name: EUREKA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eureka-credentials
+                  key: password
           volumeMounts:
             - name: gcp-credentials
               mountPath: "/gcp-credentials"
