@@ -16,6 +16,9 @@ FROM --platform=linux/arm64 eclipse-temurin:21-jdk
 WORKDIR /app
 COPY --from=build /build/target/*.jar app.jar
 
+# GCP credentials için volume mount noktası
+RUN mkdir -p /gcp-credentials
+
 # JVM ayarları
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 RUN echo "Running on ARM64 architecture"

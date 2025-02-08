@@ -136,22 +136,24 @@ jobs:
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
               -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
+              -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
               ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
 
+            # Container'ın başlaması için bekle
             echo "=== Waiting for Container to Start ==="
-            sleep 60
-
-            echo "=== Container Logs ==="
-            docker logs image-service
-
-            echo "=== Health Check ==="
-            if curl -f http://localhost:8056/actuator/health; then
-              echo "Service is healthy"
-            else
-              echo "Service failed health check"
-              docker logs image-service
-              exit 1
-            fi
+            for i in {1..30}; do
+              if curl -f http://localhost:8056/actuator/health; then
+                echo "Service is healthy"
+                break
+              fi
+              if [ $i -eq 30 ]; then
+                echo "Service failed to start after 30 attempts"
+                docker logs image-service
+                exit 1
+              fi
+              echo "Waiting for service to start... (Attempt $i/30)"
+              sleep 10
+            done
 
       - name: Trigger Deploy Services Workflow
         if: success()

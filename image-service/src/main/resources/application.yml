@@ -54,15 +54,13 @@ spring:
     max-in-memory-size: 32MB
   cloud:
     gcp:
-      project-id: craft-pilot-ai
+      project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
+      credentials:
+        location: file:/gcp-credentials.json
       firestore:
         enabled: true
-      credentials:
-        location: classpath:firebase-service-account.json
       storage:
-        project-id: craft-pilot-ai
-        credentials:
-          location: classpath:firebase-service-account.json
+        enabled: true
     kubernetes:
       config:
         enabled: true
