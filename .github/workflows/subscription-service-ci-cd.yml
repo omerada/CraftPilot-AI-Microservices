@@ -17,6 +17,22 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # JDK kurulumu
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: "maven"
+
+      # Maven bağımlılıklarını önbelleğe alma
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
       # QEMU kurulumu
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -29,14 +45,14 @@ jobs:
         with:
           platforms: linux/arm64
 
-      # Docker Hub'a giriş yap
+      # Docker Hub'a giriş
       - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Sadece ARM64 için build ve push
+      # Build ve Push
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
@@ -63,6 +79,7 @@ jobs:
       - name: "Set up Cloud SDK"
         uses: "google-github-actions/setup-gcloud@v1"
 
+      # VPS'e deployment
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
@@ -94,27 +111,6 @@ jobs:
             # Docker ağını oluştur (eğer yoksa)
             docker network create craftpilot-network || true
 
-            # Redis container'ını başlat (eğer çalışmıyorsa)
-            if ! docker ps | grep -q redis; then
-              docker run -d \
-                --name redis \
-                --network craftpilot-network \
-                -p 6379:6379 \
-                redis:latest
-            fi
-
-            # Eureka server'ı başlat (eğer çalışmıyorsa)
-            if ! docker ps | grep -q eureka-server; then
-              docker run -d \
-                --name eureka-server \
-                --network craftpilot-network \
-                -p 8761:8761 \
-                -e SPRING_PROFILES_ACTIVE=prod \
-                -e EUREKA_USERNAME=craftpilot \
-                -e EUREKA_PASSWORD=13579ada \
-                ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
-            fi
-
             echo "=== Pulling ARM64 Image ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/subscription-service:latest-arm64
 
@@ -126,12 +122,15 @@ jobs:
             docker run -d \
               --name subscription-service \
               --network craftpilot-network \
+              --restart unless-stopped \
+              --memory="1g" \
+              --memory-reservation="512m" \
+              --cpus="0.5" \
               -p 8052:8052 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
-
               -e EUREKA_PASSWORD=13579ada \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
@@ -139,19 +138,23 @@ jobs:
               ${{ secrets.DOCKERHUB_USERNAME }}/subscription-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 60  # Biraz daha uzun bekleyelim
+            sleep 60
 
             echo "=== Container Logs ==="
             docker logs subscription-service
 
             echo "=== Health Check ==="
-            if curl -f http://localhost:8052/actuator/health; then
-              echo "Service is healthy"
-            else
-              echo "Service failed health check"
-              docker logs subscription-service
-              exit 1
-            fi
+            for i in {1..10}; do
+              if curl -f http://localhost:8052/actuator/health; then
+                echo "Service is healthy"
+                exit 0
+              fi
+              echo "Attempt $i: Service not healthy yet, waiting..."
+              sleep 30
+            done
+            echo "Service failed health check"
+            docker logs subscription-service
+            exit 1
 
       - name: Trigger Deploy Services Workflow
         if: success()
