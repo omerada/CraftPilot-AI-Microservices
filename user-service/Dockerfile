@@ -1,40 +1,54 @@
 # Build stage
-FROM public.ecr.aws/amazoncorretto/amazoncorretto:21 AS build
+FROM public.ecr.aws/amazoncorretto/amazoncorretto:21-al2023 AS build
 
 WORKDIR /build
 
-# Tüm projeyi kopyala
-COPY . .
+# Copy Maven wrapper files first
+COPY .mvn/ .mvn/
+COPY mvnw mvnw.cmd pom.xml ./
 
-# Maven kurulumu ve versiyonu belirleme
-RUN yum install -y curl tar gzip
-RUN curl -o apache-maven-3.9.7-bin.tar.gz https://dlcdn.apache.org/maven/maven-3/3.9.7/binaries/apache-maven-3.9.7-bin.tar.gz
-RUN tar -xzf apache-maven-3.9.7-bin.tar.gz -C /opt/
-RUN ln -s /opt/apache-maven-3.9.7 /opt/maven
+# Download dependencies first (this layer will be cached)
+RUN ./mvnw dependency:go-offline -B
 
-ENV M2_HOME=/opt/maven
-ENV MAVEN_HOME=/opt/maven
-ENV PATH=${M2_HOME}/bin:${PATH}
+# Copy source code
+COPY src ./src/
 
-# ARM64 uyumluluğu için Java seçeneklerini ayarla
-ENV JAVA_TOOL_OPTIONS="-Dos.arch=aarch64"
-
-# Projeyi derle
-RUN mvn clean package -DskipTests
+# Build the application
+RUN ./mvnw clean package -DskipTests
 
 # Run stage
-FROM public.ecr.aws/amazoncorretto/amazoncorretto:21
+FROM public.ecr.aws/amazoncorretto/amazoncorretto:21-al2023-slim
 
 WORKDIR /app
-COPY --from=build /build/target/*.jar app.jar
 
-# JVM ayarları
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
-ENV SERVER_PORT=8080
+USER 1000
 
-RUN echo "Running on ARM64 architecture"
+# Install required native dependencies
+RUN yum update -y && \
+    yum install -y glibc-devel openssl-devel apr-devel && \
+    yum clean all
+
+COPY --from=build --chown=1000:1000 /build/target/*.jar app.jar
+
+# Configure JVM for container and ARM64
+ENV JAVA_OPTS="\
+    -XX:+UseContainerSupport \
+    -XX:MaxRAMPercentage=75.0 \
+    -XX:InitialRAMPercentage=50.0 \
+    -XX:+UseG1GC \
+    -XX:MaxGCPauseMillis=200 \
+    -XX:+UseStringDeduplication \
+    -XX:+HeapDumpOnOutOfMemoryError \
+    -XX:HeapDumpPath=/var/log/craftpilot/heap-dump.hprof \
+    -Djava.security.egd=file:/dev/./urandom \
+    -Dspring.output.ansi.enabled=ALWAYS \
+    -Dio.netty.tryReflectionSetAccessible=true \
+    -Dio.netty.transport.noNative=true"
+
+ENV SERVER_PORT=8060
 
 EXPOSE ${SERVER_PORT}
+
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD curl -f http://localhost:${SERVER_PORT}/actuator/health || exit 1
 

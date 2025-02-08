@@ -6,7 +6,7 @@ metadata:
 data:
   application.yml: |
     server:
-      port: 8080
+      port: 8060
 
     spring:
       application:
@@ -26,7 +26,7 @@ data:
       endpoints:
         web:
           exposure:
-            include: health,info,metrics,prometheus
+            include: health,info,metrics,prometheus,loggers
       endpoint:
         health:
           show-details: always
@@ -34,6 +34,15 @@ data:
           enabled: true
         prometheus:
           enabled: true
+      metrics:
+        tags:
+          application: ${spring.application.name}
+        distribution:
+          percentiles-histogram:
+            http.server.requests: true
+      tracing:
+        sampling:
+          probability: 1.0
 
     logging:
       file:
@@ -53,12 +62,33 @@ data:
             minimumNumberOfCalls: 5
             waitDurationInOpenState: 50s
             failureRateThreshold: 50
+            ignoreExceptions:
+              - com.craftpilot.userservice.exception.NotFoundException
+              - com.craftpilot.userservice.exception.ValidationException
       ratelimiter:
         instances:
           userService:
             limitForPeriod: 10
             limitRefreshPeriod: 1s
             timeoutDuration: 3s
+      retry:
+        instances:
+          userService:
+            maxAttempts: 3
+            waitDuration: 1s
+            retryExceptions:
+              - org.springframework.web.client.ResourceAccessException
+              - java.util.concurrent.TimeoutException
+      bulkhead:
+        instances:
+          userService:
+            maxConcurrentCalls: 20
+            maxWaitDuration: 2s
+      timelimiter:
+        instances:
+          userService:
+            timeoutDuration: 5s
+            cancelRunningFuture: true
 
     springdoc:
       api-docs:

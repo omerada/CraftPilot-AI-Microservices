@@ -17,7 +17,7 @@ spec:
               name: ingress-nginx
       ports:
         - protocol: TCP
-          port: 8080
+          port: 8070
   egress:
     - to:
         - namespaceSelector:
@@ -25,7 +25,7 @@ spec:
               name: craftpilot
       ports:
         - protocol: TCP
-          port: 8080
+          port: 8070
     - to:
         - namespaceSelector:
             matchLabels:

@@ -15,11 +15,15 @@ spec:
       labels:
         app: user-service
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
         - name: user-service
           image: craftpilot/user-service:latest
           ports:
-            - containerPort: 8080
+            - containerPort: 8060
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
@@ -61,15 +65,21 @@ spec:
           livenessProbe:
             httpGet:
               path: /actuator/health
-              port: 8080
+              port: 8060
             initialDelaySeconds: 60
             periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /actuator/health
-              port: 8080
+              port: 8060
             initialDelaySeconds: 30
             periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
       volumes:
         - name: gcp-credentials
           secret:

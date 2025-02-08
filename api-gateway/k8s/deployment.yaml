@@ -17,13 +17,13 @@ spec:
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/path: "/actuator/prometheus"
-        prometheus.io/port: "8080"
+        prometheus.io/port: "8070"
     spec:
       containers:
         - name: api-gateway
           image: craftpilot/api-gateway:latest
           ports:
-            - containerPort: 8080
+            - containerPort: 8070
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
@@ -49,13 +49,13 @@ spec:
           readinessProbe:
             httpGet:
               path: /actuator/health
-              port: 8080
+              port: 8070
             initialDelaySeconds: 30
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /actuator/health
-              port: 8080
+              port: 8070
             initialDelaySeconds: 60
             periodSeconds: 15
       volumes:

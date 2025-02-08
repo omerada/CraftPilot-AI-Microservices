@@ -124,7 +124,7 @@ jobs:
             docker run -d \
               --name user-service \
               --network craftpilot-network \
-              -p 8080:8080 \
+              -p 8060:8060 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -143,7 +143,7 @@ jobs:
 
             echo "=== Health Check ==="
             for i in {1..5}; do
-              if curl -f http://localhost:8080/actuator/health; then
+              if curl -f http://localhost:8060/actuator/health; then
                 echo "Service is healthy"
                 exit 0
               fi
