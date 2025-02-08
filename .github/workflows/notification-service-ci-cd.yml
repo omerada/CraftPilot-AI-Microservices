@@ -100,11 +100,13 @@ jobs:
             
             echo "Creating GCP credentials..."
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/notification-service/gcp-credentials.json
-            chmod 600 /opt/craftpilot/config/notification-service/gcp-credentials.json
+            chmod 644 /opt/craftpilot/config/notification-service/gcp-credentials.json
+            chown 65532:65532 /opt/craftpilot/config/notification-service/gcp-credentials.json
             
             echo "Creating Firebase credentials..."
             echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /opt/craftpilot/config/notification-service/firebase-service-account.json
-            chmod 600 /opt/craftpilot/config/notification-service/firebase-service-account.json
+            chmod 644 /opt/craftpilot/config/notification-service/firebase-service-account.json
+            chown 65532:65532 /opt/craftpilot/config/notification-service/firebase-service-account.json
             
             echo "Starting container..."
             docker run -d \
@@ -116,9 +118,8 @@ jobs:
               --memory-reservation="512m" \
               --cpus="1.0" \
               -p 8053:8053 \
-              -v /opt/craftpilot/config/notification-service/gcp-credentials.json:/gcp-credentials.json:ro \
-              -v /opt/craftpilot/config/notification-service/firebase-service-account.json:/app/config/firebase-service-account.json:ro \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+              -v /opt/craftpilot/config/notification-service:/app/config:ro \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
               -e FIREBASE_CONFIG=/app/config/firebase-service-account.json \
               -e GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}' \
               -e SPRING_PROFILES_ACTIVE=prod \

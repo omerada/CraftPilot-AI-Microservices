@@ -47,57 +47,29 @@ spec:
                 configMapKeyRef:
                   name: eureka-config
                   key: eureka-url
-            - name: SMTP_HOST
+            - name: SENDGRID_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: notification-service-secrets
-                  key: smtp-host
-            - name: SMTP_PORT
+                  key: sendgrid-api-key
+            - name: SENDGRID_FROM_EMAIL
               valueFrom:
                 secretKeyRef:
                   name: notification-service-secrets
-                  key: smtp-port
-            - name: SMTP_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: notification-service-secrets
-                  key: smtp-username
-            - name: SMTP_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: notification-service-secrets
-                  key: smtp-password
-            - name: SPRING_MAIL_HOST
-              valueFrom:
-                secretKeyRef:
-                  name: notification-service-secrets
-                  key: smtp-host
-            - name: SPRING_MAIL_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: notification-service-secrets
-                  key: smtp-port
-            - name: SPRING_MAIL_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: notification-service-secrets
-                  key: smtp-username
-            - name: SPRING_MAIL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: notification-service-secrets
-                  key: smtp-password
+                  key: sendgrid-from-email
             - name: FCM_SERVICE_ACCOUNT_KEY
               valueFrom:
                 secretKeyRef:
                   name: notification-service-secrets
                   key: fcm-service-account
             - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: /gcp-credentials.json
+              value: /app/config/gcp-credentials.json
             - name: SPRING_CLOUD_GCP_PROJECT_ID
               value: craft-pilot-ai
             - name: JAVA_OPTS
               value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Dio.netty.transport.noNative=true"
+            - name: FIREBASE_CONFIG
+              value: /app/config/firebase-service-account.json
           resources:
             requests:
               memory: "512Mi"
@@ -120,13 +92,26 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
           volumeMounts:
-            - name: firebase-credentials
-              mountPath: /gcp-credentials.json
+            - name: gcp-credentials
+              mountPath: /app/config/gcp-credentials.json
               subPath: gcp-credentials.json
+              readOnly: true
+            - name: firebase-credentials
+              mountPath: /app/config/firebase-service-account.json
+              subPath: firebase-service-account.json
+              readOnly: true
       volumes:
+        - name: gcp-credentials
+          secret:
+            secretName: notification-service-secrets
+            items:
+              - key: gcp-service-account
+                path: gcp-credentials.json
+            defaultMode: 0444
         - name: firebase-credentials
           secret:
             secretName: notification-service-secrets
             items:
               - key: firebase-service-account
                 path: firebase-service-account.json
+            defaultMode: 0444
