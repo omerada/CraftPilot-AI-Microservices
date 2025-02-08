@@ -33,6 +33,7 @@ wait_for_redis
 
 echo "=== Creating Firebase Credentials ==="
 echo "${GCP_SA_KEY}" > /tmp/firebase-credentials.json
+chmod 600 /tmp/firebase-credentials.json
 
 echo "=== Pulling ARM64 Image ==="
 docker pull ${DOCKERHUB_USERNAME}/${SERVICE_NAME}:latest-arm64

@@ -16,7 +16,7 @@ services:
       retries: 5
 
   notification-service:
-    image: ${DOCKERHUB_USERNAME}/notification-service:latest-arm64
+    image: ${DOCKERHUB_USERNAME}/notification-service:1.0.0-arm64
     container_name: notification-service
     depends_on:
       redis:

@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: notification-service
-          image: craftpilot/notification-service:latest
+          image: craftpilot/notification-service:1.0.0
           ports:
             - containerPort: 8087
           env:

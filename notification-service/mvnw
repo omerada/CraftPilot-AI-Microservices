@@ -150,6 +150,7 @@ exec_maven() {
 if [ -d "$MAVEN_HOME" ]; then
   verbose "found existing MAVEN_HOME at $MAVEN_HOME"
   exec_maven "$@"
+  die "cannot exec $MAVEN_HOME/bin/$MVN_CMD"
 fi
 
 case "${distributionUrl-}" in
@@ -257,3 +258,4 @@ mv -- "$TMP_DOWNLOAD_DIR/$distributionUrlNameMain" "$MAVEN_HOME" || [ -d "$MAVEN
 
 clean || :
 exec_maven "$@"
+die "cannot exec $MAVEN_HOME/bin/$MVN_CMD"

@@ -25,6 +25,7 @@ COPY --from=builder /build/target/*.jar app.jar
 
 # Create firebase-service-account.json from GCP_SA_KEY environment variable
 RUN echo $GCP_SA_KEY > /app/firebase-service-account.json
+RUN chmod 600 /app/firebase-service-account.json
 
 # Create config directory
 RUN mkdir -p /app/config
