@@ -146,6 +146,7 @@ services:
       - REDIS_PORT=6379
       - GCP_SA_KEY=${GCP_SA_KEY}
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
     volumes:
       - ${GCP_SA_KEY_PATH}:/gcp-credentials.json:ro
     networks:
@@ -153,6 +154,12 @@ services:
     depends_on:
       eureka-server:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
   # LLM Service
   llm-service:
