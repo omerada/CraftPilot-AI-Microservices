@@ -79,8 +79,18 @@ jobs:
                 --name redis \
                 --network craftpilot-network \
                 -p 6379:6379 \
-                redis:latest redis-server --requirepass 13579ada
+                redis:latest /bin/sh -c 'redis-server --requirepass "$REDIS_PASSWORD"' \
+                -e REDIS_PASSWORD=13579ada
             fi
+
+            # Bekle ve Redis'in hazır olduğunu kontrol et
+            echo "Redis'in hazır olması bekleniyor..."
+            sleep 10
+            docker exec redis redis-cli -a 13579ada ping || {
+              echo "Redis hazır değil!"
+              docker logs redis
+              exit 1
+            }
 
             # Check if port 8079 is in use
             echo "Checking if port 8079 is already in use..."

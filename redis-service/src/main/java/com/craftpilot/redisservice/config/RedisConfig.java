@@ -75,16 +75,21 @@ public class RedisConfig {
             .setRetryAttempts(5)
             .setRetryInterval(1500)
             .setTimeout(3000)
-            .setConnectTimeout(3000);
+            .setConnectTimeout(3000)
+            .setDnsMonitoringInterval(5000);
 
         if (StringUtils.hasText(redisPassword)) {
+            log.info("Redis şifresi yapılandırılıyor...");
+            serverConfig.setUsername("default");  // Redis 6+ için default kullanıcı
             serverConfig.setPassword(redisPassword);
         }
 
         try {
+            log.info("Redis'e bağlanılıyor: {}", address);
             RedissonClient client = Redisson.create(config);
             // Test bağlantıyı
             client.getBucket("test").delete();
+            log.info("Redis bağlantısı başarılı");
             return client;
         } catch (Exception e) {
             log.error("Redis bağlantısı kurulamadı: {}", e.getMessage(), e);

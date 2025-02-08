@@ -22,6 +22,8 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:13579ada}
       timeout: 10000
+      connect-timeout: 10000
+      client-type: lettuce
       lettuce:
         pool:
           max-active: 8
