@@ -132,27 +132,44 @@ jobs:
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \
+              -e EUREKA_HOST=eureka-server \
+              -e EUREKA_PORT=8761 \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
               -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
               -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/ \
               ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
 
-            # Container'ın başlaması için bekle
-            echo "=== Waiting for Container to Start ==="
+            # Eureka Server'ın hazır olmasını bekle
+            echo "=== Waiting for Eureka Server ==="
             for i in {1..30}; do
-              if curl -f http://localhost:8056/actuator/health; then
-                echo "Service is healthy"
+              if curl -f http://localhost:8761/actuator/health; then
+                echo "Eureka Server is healthy"
                 break
               fi
               if [ $i -eq 30 ]; then
-                echo "Service failed to start after 30 attempts"
+                echo "Eureka Server failed to start"
+                docker logs eureka-server
+                exit 1
+              fi
+              echo "Waiting for Eureka Server... (Attempt $i/30)"
+              sleep 10
+            done
+
+            # Image Service'in başlamasını bekle
+            echo "=== Waiting for Image Service ==="
+            for i in {1..30}; do
+              if curl -f http://localhost:8056/actuator/health; then
+                echo "Image Service is healthy"
+                break
+              fi
+              if [ $i -eq 30 ]; then
+                echo "Image Service failed to start"
                 docker logs image-service
                 exit 1
               fi
-              echo "Waiting for service to start... (Attempt $i/30)"
+              echo "Waiting for Image Service... (Attempt $i/30)"
               sleep 10
             done
 

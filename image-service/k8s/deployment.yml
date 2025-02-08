@@ -20,8 +20,6 @@ spec:
           ports:
             - containerPort: 8056
           env:
-            - name: SPRING_PROFILES_ACTIVE
-              value: "prod"
             - name: EUREKA_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -32,6 +30,12 @@ spec:
                 secretKeyRef:
                   name: eureka-credentials
                   key: password
+            - name: EUREKA_HOST
+              value: "eureka-server"
+            - name: EUREKA_PORT
+              value: "8761"
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
             - name: REDIS_HOST
               value: "redis"
             - name: REDIS_PORT
@@ -81,4 +85,4 @@ spec:
       volumes:
         - name: gcp-credentials
           secret:
-            secretName: gcp-credentials 
+            secretName: gcp-credentials

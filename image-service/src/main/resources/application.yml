@@ -72,6 +72,24 @@ spring:
         period: 1000
       discovery:
         all-namespaces: false
+    loadbalancer:
+      ribbon:
+        enabled: false
+      cache:
+        enabled: true
+        caffeine:
+          spec: expireAfterWrite=5s
+    discovery:
+      enabled: true
+      client:
+        health-indicator:
+          enabled: true
+        simple:
+          instances:
+            eureka-server:
+              - uri: http://eureka-server:8761
+                metadata:
+                  management.port: ${management.server.port:8761}
 
 logging:
   level:
@@ -88,6 +106,10 @@ eureka:
     prefer-ip-address: true
     lease-renewal-interval-in-seconds: 5
     lease-expiration-duration-in-seconds: 10
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
+    metadata-map:
+      zone: primary
+      profile: ${spring.profiles.active}
   client:
     serviceUrl:
       defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://eureka-server:8761/eureka/}
@@ -96,6 +118,14 @@ eureka:
     fetch-registry: true
     eureka-server-connect-timeout-seconds: 5
     eureka-server-read-timeout-seconds: 10
+    eureka-connection-idle-timeout-seconds: 30
+    eureka-server-total-connections: 200
+    eureka-server-total-connections-per-host: 50
+    eureka-service-url-poll-interval-seconds: 5
+    initial-instance-info-replication-interval-seconds: 5
+    instance-info-replication-interval-seconds: 5
+    service-url:
+      defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:13579ada}@${EUREKA_HOST:eureka-server}:${EUREKA_PORT:8761}/eureka/
 
 management:
   endpoints:
