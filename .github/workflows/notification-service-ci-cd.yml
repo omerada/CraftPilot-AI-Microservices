@@ -84,23 +84,21 @@ jobs:
             # Create config directory
             mkdir -p /opt/craftpilot/config/notification-service
 
-            # Create Firebase credentials file
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/notification-service/service-account.json
-            chmod 600 /opt/craftpilot/config/notification-service/service-account.json
+            # Create GCP credentials file
+            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/notification-service/gcp-credentials.json
+            chmod 600 /opt/craftpilot/config/notification-service/gcp-credentials.json
 
             # Run container
             docker run -d \
               --name notification-service \
               --network craftpilot-network \
               -p 8094:8094 \
-              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
+              -v /opt/craftpilot/config/notification-service/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+              -e GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}' \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
               ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
-
-            # Verify credentials file exists in container
-            docker exec notification-service ls -l /app/config/service-account.json || echo "Credentials file not found!"
 
             # Check container logs
             docker logs notification-service
