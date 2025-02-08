@@ -93,8 +93,8 @@ jobs:
               --name notification-service \
               --network craftpilot-network \
               -p 8053:8053 \
-              -v /opt/craftpilot/config/notification-service/gcp-credentials.json:/gcp-credentials.json:ro \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+              -v /opt/craftpilot/config/notification-service/gcp-credentials.json:/app/firebase-credentials.json:ro \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-credentials.json \
               -e GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}' \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
