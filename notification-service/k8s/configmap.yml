@@ -41,6 +41,12 @@ data:
               connectiontimeout: 5000
               timeout: 5000
               writetimeout: 5000
+        provider: sendgrid
+        sendgrid:
+          api-key: ${SENDGRID_API_KEY}
+          from: ${SENDGRID_FROM_EMAIL:noreply@craftpilot.com}
+          template-path: templates/email
+          enabled: true
 
     management:
       endpoints:
@@ -88,6 +94,9 @@ data:
       push:
         enabled: true
         provider: firebase
+        firebase:
+          credentials-path: classpath:firebase-service-account.json
+          project-id: ${GOOGLE_CLOUD_PROJECT_ID}
       retry:
         max-attempts: 3
         initial-interval: 1000
