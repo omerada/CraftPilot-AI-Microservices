@@ -102,6 +102,10 @@ jobs:
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/notification-service/gcp-credentials.json
             chmod 600 /opt/craftpilot/config/notification-service/gcp-credentials.json
             
+            echo "Creating Firebase credentials..."
+            echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /opt/craftpilot/config/notification-service/firebase-service-account.json
+            chmod 600 /opt/craftpilot/config/notification-service/firebase-service-account.json
+            
             echo "Starting container..."
             docker run -d \
               --name notification-service \
@@ -113,7 +117,9 @@ jobs:
               --cpus="1.0" \
               -p 8053:8053 \
               -v /opt/craftpilot/config/notification-service/gcp-credentials.json:/gcp-credentials.json:ro \
+              -v /opt/craftpilot/config/notification-service/firebase-service-account.json:/app/config/firebase-service-account.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+              -e FIREBASE_CONFIG=/app/config/firebase-service-account.json \
               -e GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}' \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8053 \
@@ -124,12 +130,8 @@ jobs:
               -e REDIS_PASSWORD=13579ada \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e JAVA_OPTS="-Xmx768m -Xms384m -XX:+UseContainerSupport -XX:+UseG1GC -Dio.netty.tryReflectionSetAccessible=true -Dio.netty.noUnsafe=true" \
-              -e SPRING_MAIL_HOST=smtp.gmail.com \
-              -e SPRING_MAIL_PORT=587 \
-              -e SPRING_MAIL_USERNAME=${{ secrets.SMTP_USERNAME }} \
-              -e SPRING_MAIL_PASSWORD=${{ secrets.SMTP_PASSWORD }} \
-              -e SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true \
-              -e SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true \
+              -e SENDGRID_API_KEY='${{ secrets.SENDGRID_API_KEY }}' \
+              -e SENDGRID_FROM_EMAIL='${{ secrets.SENDGRID_FROM_EMAIL }}' \
               ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
             
             echo "Waiting for container to start..."
