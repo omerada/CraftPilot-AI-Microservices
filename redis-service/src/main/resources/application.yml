@@ -21,14 +21,14 @@ spring:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:13579ada}
-      timeout: 5000
+      timeout: 10000
       lettuce:
         pool:
           max-active: 8
           max-idle: 8
           min-idle: 2
-          max-wait: 1000ms
-        shutdown-timeout: 200ms
+          max-wait: 2000ms
+        shutdown-timeout: 2000ms
 
 eureka:
   client:
