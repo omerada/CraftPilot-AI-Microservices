@@ -1,5 +1,6 @@
 package com.craftpilot.notificationservice.scheduler;
 
+import com.craftpilot.notificationservice.model.EmailRequest;
 import com.craftpilot.notificationservice.model.Notification;
 import com.craftpilot.notificationservice.service.EmailService;
 import com.craftpilot.notificationservice.service.NotificationService;
@@ -46,7 +47,10 @@ public class NotificationScheduler {
 
     private Mono<Void> sendNotification(Notification notification) {
         return switch (notification.getType()) {
-            case EMAIL -> emailService.sendEmail(notification);
+            case EMAIL -> {
+                processEmailNotification(notification);
+                yield Mono.empty();
+            }
             case PUSH -> pushNotificationService.sendPushNotification(notification);
             default -> {
                 log.warn("Unsupported notification type: {}", notification.getType());
@@ -55,8 +59,21 @@ public class NotificationScheduler {
         };
     }
 
+    private void processEmailNotification(Notification notification) {
+        EmailRequest emailRequest = EmailRequest.builder()
+            .to(notification.getRecipient())
+            .subject(notification.getSubject())
+            .content(notification.getContent())
+            .build();
+            
+        emailService.sendEmail(emailRequest)
+                .doOnSuccess(unused -> log.info("Scheduled email sent successfully to: {}", notification.getRecipient()))
+                .doOnError(error -> log.error("Failed to send scheduled email to: {}", notification.getRecipient(), error))
+                .subscribe();
+    }
+
     private Mono<Void> markNotificationAsSent(Notification notification) {
         notification.setSentAt(LocalDateTime.now());
         return notificationService.markAsSent(notification.getId());
     }
-} 
+}

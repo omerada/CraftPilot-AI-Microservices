@@ -2,6 +2,7 @@ package com.craftpilot.notificationservice.service.impl;
 
 import com.craftpilot.notificationservice.dto.NotificationRequest;
 import com.craftpilot.notificationservice.dto.NotificationResponse;
+import com.craftpilot.notificationservice.model.EmailRequest;
 import com.craftpilot.notificationservice.model.Notification;
 import com.craftpilot.notificationservice.model.NotificationTemplate;
 import com.craftpilot.notificationservice.repository.NotificationRepository;
@@ -138,7 +139,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private Mono<Void> sendNotification(Notification notification) {
         return switch (notification.getType()) {
-            case EMAIL -> emailService.sendEmail(notification);
+            case EMAIL -> sendEmail(notification);
             case PUSH -> pushNotificationService.sendPushNotification(notification);
             default -> {
                 log.warn("Unsupported notification type: {}", notification.getType());
@@ -151,4 +152,16 @@ public class NotificationServiceImpl implements NotificationService {
         return notificationRepository.save(notification)
                 .map(NotificationResponse::fromEntity);
     }
-} 
+
+    private Mono<Void> sendEmail(Notification notification) {
+        EmailRequest emailRequest = EmailRequest.builder()
+            .to(notification.getRecipient())
+            .subject(notification.getSubject())
+            .content(notification.getContent())
+            .build();
+            
+        return emailService.sendEmail(emailRequest)
+                .doOnSuccess(v -> log.info("Email sent successfully to: {}", notification.getRecipient()))
+                .doOnError(e -> log.error("Failed to send email to: {}", notification.getRecipient(), e));
+    }
+}

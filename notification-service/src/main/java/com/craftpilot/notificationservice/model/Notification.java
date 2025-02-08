@@ -16,13 +16,16 @@ import java.util.Map;
 public class Notification {
     @DocumentId
     private String id;
+    private String recipient;
+    private String subject;
+    private String content;
+    private NotificationType type;
+    private NotificationStatus status;
+    private Long scheduledTime;
     private String userId;
     private String templateId;
-    private NotificationType type;
     private String title;
-    private String content;
     private Map<String, Object> data;
-    private NotificationStatus status;
     private LocalDateTime scheduledAt;
     private LocalDateTime sentAt;
     private LocalDateTime createdAt;
@@ -50,4 +53,4 @@ public class Notification {
         HIGH,
         URGENT
     }
-} 
+}
