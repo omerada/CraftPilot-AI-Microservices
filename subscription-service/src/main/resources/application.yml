@@ -66,6 +66,11 @@ spring:
         location: file:/gcp-credentials/credentials.json
       firestore:
         enabled: true
+    service-registry:
+      auto-registration:
+        enabled: true
+    discovery:
+      enabled: true
 
 iyzico:
   api-key: ${IYZICO_API_KEY:sandbox-api-key}
@@ -148,3 +153,16 @@ logging:
     org.springframework.data: INFO
     org.springframework.kafka: INFO
     org.springframework.web: INFO
+
+eureka:
+  instance:
+    preferIpAddress: true
+    hostname: ${HOSTNAME:subscription-service}
+    instanceId: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
+  client:
+    registerWithEureka: true
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+    healthcheck:
+      enabled: true
