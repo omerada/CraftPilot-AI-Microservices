@@ -22,19 +22,19 @@ spec:
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/path: "/actuator/prometheus"
-        prometheus.io/port: "8082"
+        prometheus.io/port: "8062"
     spec:
       containers:
         - name: llm-service
           image: ${DOCKER_REGISTRY}/llm-service:${IMAGE_TAG}
           imagePullPolicy: Always
           ports:
-            - containerPort: 8082
+            - containerPort: 8062
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
             - name: SERVER_PORT
-              value: "8082"
+              value: "8062"
             - name: KUBERNETES_ENABLED
               value: "true"
             - name: KAFKA_BROKERS
@@ -98,14 +98,14 @@ spec:
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
-              port: 8082
+              port: 8062
             initialDelaySeconds: 60
             periodSeconds: 10
             timeoutSeconds: 5
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
-              port: 8082
+              port: 8062
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
@@ -126,5 +126,5 @@ spec:
     app: llm-service
   ports:
     - port: 80
-      targetPort: 8082
+      targetPort: 8062
   type: ClusterIP

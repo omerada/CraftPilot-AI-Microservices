@@ -47,21 +47,21 @@ export FIREBASE_CLIENT_CERT_URL=your-firebase-client-cert-url
 
 ## API Dokümantasyonu
 
-Swagger UI'a http://localhost:8082/swagger-ui.html adresinden erişebilirsiniz.
+Swagger UI'a http://localhost:8064/swagger-ui.html adresinden erişebilirsiniz.
 
 ## Metrikler
 
-Prometheus metriklerine http://localhost:8082/actuator/prometheus adresinden erişebilirsiniz.
+Prometheus metriklerine http://localhost:8064/actuator/prometheus adresinden erişebilirsiniz.
 
 ## Sağlık Kontrolü
 
-Servis sağlık durumunu http://localhost:8082/actuator/health adresinden kontrol edebilirsiniz.
+Servis sağlık durumunu http://localhost:8064/actuator/health adresinden kontrol edebilirsiniz.
 
 ## Docker ile Çalıştırma
 
 ```bash
 docker build -t llm-service .
-docker run -p 8082:8082 llm-service
+docker run -p 8064:8064 llm-service
 ```
 
 ## Kubernetes ile Deploy

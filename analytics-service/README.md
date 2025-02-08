@@ -57,7 +57,7 @@ mvn spring-boot:run
 
 ```bash
 docker build -t craftpilot/analytics-service .
-docker run -p 8082:8082 craftpilot/analytics-service
+docker run -p 8064:8064 craftpilot/analytics-service
 ```
 
 ### Kubernetes ile Deployment
@@ -68,12 +68,12 @@ kubectl apply -f k8s/
 
 ## API Dokümantasyonu
 
-Swagger UI: `http://localhost:8082/swagger-ui.html`
+Swagger UI: `http://localhost:8064/swagger-ui.html`
 
 ## Metrikler ve İzleme
 
-- Prometheus metrikleri: `http://localhost:8082/actuator/prometheus`
-- Health check: `http://localhost:8082/actuator/health`
+- Prometheus metrikleri: `http://localhost:8064/actuator/prometheus`
+- Health check: `http://localhost:8064/actuator/health`
 
 ## Performans
 

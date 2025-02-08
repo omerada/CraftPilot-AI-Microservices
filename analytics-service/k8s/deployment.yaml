@@ -21,16 +21,22 @@ spec:
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/path: "/actuator/prometheus"
-        prometheus.io/port: "8082"
+        prometheus.io/port: "8064"
     spec:
       containers:
         - name: analytics-service
           image: craftpilot/analytics-service:latest
           ports:
-            - containerPort: 8082
+            - containerPort: 8064
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
+            - name: EUREKA_SERVER_URL
+              value: "http://eureka-server.craftpilot.svc.cluster.local:8761/eureka/"
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: GCP_PROJECT_ID
               valueFrom:
                 secretKeyRef:
@@ -57,13 +63,13 @@ spec:
           livenessProbe:
             httpGet:
               path: /actuator/health
-              port: 8082
+              port: 8064
             initialDelaySeconds: 60
             periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /actuator/health
-              port: 8082
+              port: 8064
             initialDelaySeconds: 30
             periodSeconds: 10
       volumes:
@@ -83,5 +89,5 @@ spec:
     app: analytics-service
   ports:
     - port: 80
-      targetPort: 8082
+      targetPort: 8064
   type: ClusterIP

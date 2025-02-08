@@ -14,7 +14,7 @@ export const options = {
 };
 
 export default function () {
-  const BASE_URL = __ENV.BASE_URL || "http://analytics-service:8082";
+  const BASE_URL = __ENV.BASE_URL || "http://analytics-service:8064";
 
   const responses = http.batch([
     ["GET", `${BASE_URL}/actuator/health`],

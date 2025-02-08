@@ -1,0 +1,49 @@
+name: Analytics Service Deploy
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'analytics-service/**'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          
+      - name: Build with Maven
+        run: |
+          cd analytics-service
+          mvn clean package -DskipTests
+          
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        
+      - name: Login to Docker Registry
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./analytics-service
+          push: true
+          tags: craftpilot/analytics-service:latest
+          
+      - name: Deploy to Kubernetes
+        uses: steebchen/kubectl@v2
+        with:
+          config: ${{ secrets.KUBE_CONFIG_DATA }}
+          command: |
+            kubectl apply -f analytics-service/k8s/
+            kubectl rollout restart deployment analytics-service -n craftpilot
