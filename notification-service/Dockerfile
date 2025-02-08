@@ -2,20 +2,23 @@
 FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /build
 
-# Copy pom.xml first
-COPY pom.xml ./
+# Copy maven files first
+COPY pom.xml .
+COPY .mvn/ .mvn/
+COPY mvnw .
+COPY mvnw.cmd .
 
-# Install dependencies
-RUN apk add --no-cache maven
+# Set execute permissions for mvnw
+RUN chmod +x mvnw
 
 # Download dependencies
-RUN mvn dependency:go-offline -B
+RUN ./mvnw dependency:go-offline -B
 
-# Copy source
-COPY src ./src
+# Copy source code
+COPY src/ src/
 
-# Build
-RUN mvn clean package -DskipTests
+# Build application
+RUN ./mvnw clean package -DskipTests
 
 # Run stage
 FROM eclipse-temurin:21-jre-alpine
