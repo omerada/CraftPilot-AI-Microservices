@@ -300,23 +300,8 @@ springdoc:
       - url: /v3/api-docs
         name: API Gateway
   show-actuator: true
-
-springdoc:
-  api-docs:
-    enabled: true
-    path: /v3/api-docs
-  swagger-ui:
-    enabled: true
-    path: /swagger-ui.html
-    config-url: /v3/api-docs/swagger-config
-    urls:
-      - url: /v3/api-docs
-        name: API Gateway
-    disable-swagger-default-url: true
-    use-root-path: true
   cache:
     disabled: true
-  show-actuator: true
   packages-to-scan:
     - com.craftpilot.apigateway.controller
   paths-to-match:
