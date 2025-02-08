@@ -3,35 +3,33 @@ FROM public.ecr.aws/amazoncorretto/amazoncorretto:21 AS build
 
 WORKDIR /build
 
-# Tüm projeyi kopyala
-COPY . .
-
 # Maven kurulumu ve versiyonu belirleme
-RUN yum install -y wget tar gzip
-RUN wget https://dlcdn.apache.org/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz
-RUN tar -xzf apache-maven-3.9.6-bin.tar.gz -C /opt/
-RUN ln -s /opt/apache-maven-3.9.6 /opt/maven
+COPY .mvn/ .mvn/
+COPY mvnw pom.xml ./
+RUN chmod +x mvnw
+RUN ./mvnw dependency:go-offline
 
-ENV M2_HOME=/opt/maven
-ENV MAVEN_HOME=/opt/maven
-ENV PATH=${M2_HOME}/bin:${PATH}
-
-# Maven build için platform ayarı
-ARG TARGETARCH=arm64
-RUN echo "Building for ARM64 architecture"
-
-# Projeyi derle
-RUN mvn clean package -DskipTests
+# Kaynak kodları kopyala ve derle
+COPY src ./src/
+RUN ./mvnw clean package -DskipTests
 
 # Run stage
 FROM public.ecr.aws/amazoncorretto/amazoncorretto:21
 
 WORKDIR /app
+
+# Uygulama dizinini oluştur
+RUN mkdir -p /app/config
+
+# JAR dosyasını kopyala
 COPY --from=build /build/target/*.jar app.jar
 
 # JVM ayarları
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
-RUN echo "Running on ARM64 architecture"
 
-EXPOSE 8063 
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]
+# Sağlık kontrolü için bekleme
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD curl -f http://localhost:8063/actuator/health || exit 1
+
+EXPOSE 8063
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

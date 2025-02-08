@@ -15,26 +15,28 @@ import java.io.IOException;
 public class FirestoreConfig {
     private static final Logger logger = LoggerFactory.getLogger(FirestoreConfig.class);
 
-    @Value("${GOOGLE_APPLICATION_CREDENTIALS:/gcp-credentials.json}")
+    @Value("${GOOGLE_APPLICATION_CREDENTIALS}")
     private String credentialsPath;
 
     @Bean
     public Firestore firestore() throws IOException {
         try {
-            logger.debug("Loading credentials from: {}", credentialsPath);
+            logger.info("Firestore yapılandırması başlatılıyor. Kimlik dosyası yolu: {}", credentialsPath);
             
-            GoogleCredentials credentials = GoogleCredentials.fromStream(
-                new FileInputStream(credentialsPath)
-            );
+            GoogleCredentials credentials;
+            try (FileInputStream serviceAccountStream = new FileInputStream(credentialsPath)) {
+                credentials = GoogleCredentials.fromStream(serviceAccountStream);
+            }
 
             FirestoreOptions firestoreOptions = FirestoreOptions.newBuilder()
                 .setCredentials(credentials)
                 .build();
 
+            logger.info("Firestore başarıyla yapılandırıldı");
             return firestoreOptions.getService();
         } catch (IOException e) {
-            logger.error("Failed to initialize Firestore: {}", e.getMessage());
-            throw e;
+            logger.error("Firestore yapılandırması başarısız oldu: {}", e.getMessage(), e);
+            throw new RuntimeException("Firestore yapılandırması başarısız oldu: " + e.getMessage(), e);
         }
     }
 } 

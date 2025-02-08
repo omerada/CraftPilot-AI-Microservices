@@ -60,6 +60,15 @@ jobs:
             # Infrastructure containers
             docker network create craftpilot-network || true
 
+            # GCP kimlik bilgilerini kontrol et ve oluştur
+            if [ ! -d "/opt/craftpilot" ]; then
+              sudo mkdir -p /opt/craftpilot
+            fi
+
+            # GCP kimlik bilgilerini oluştur
+            echo '${{ secrets.GCP_CREDENTIALS_JSON }}' | sudo tee /opt/craftpilot/gcp-credentials.json > /dev/null
+            sudo chmod 640 /opt/craftpilot/gcp-credentials.json
+
             # Remove existing container
             docker stop admin-service || true
             docker rm admin-service || true
@@ -70,42 +79,31 @@ jobs:
               --network craftpilot-network \
               --restart unless-stopped \
               -p 8063:8063 \
-              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
+              -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
               -e SPRING_CLOUD_GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               ${{ secrets.DOCKERHUB_USERNAME }}/admin-service:latest-arm64
 
-            # Health check with more detailed output
-            echo "Starting health checks..."
+            # Sağlık kontrolü için bekleme süresi
+            echo "Servis başlatılıyor ve sağlık kontrolü yapılıyor..."
             for i in {1..30}; do
-              echo "Attempt $i: Checking service health..."
-              
-              HEALTH_STATUS=$(curl -s http://localhost:8063/actuator/health || echo "Failed to connect")
-              echo "Health status: $HEALTH_STATUS"
-              
-              if echo "$HEALTH_STATUS" | grep -q "UP"; then
-                echo "Service is healthy!"
+              if curl -s http://localhost:8063/actuator/health | grep -q "UP"; then
+                echo "Servis başarıyla başlatıldı!"
                 exit 0
               fi
-              
-              if [ $i -eq 15 ]; then
-                echo "Mid-point container logs:"
-                docker logs admin-service
-              fi
-              
+              echo "Deneme $i: Servis başlatılıyor..."
               sleep 10
             done
 
-            echo "Service failed to become healthy within timeout"
-            echo "Final container logs:"
+            echo "Servis başlatılamadı - Container logları:"
             docker logs admin-service
             exit 1
 
