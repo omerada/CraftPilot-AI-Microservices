@@ -142,7 +142,8 @@ spec:
               subPath: gcp-credentials.json
               readOnly: true
             - name: firebase-credentials
-              mountPath: "/etc/gcp/credentials"
+              mountPath: /app/config/firebase-service-account.json
+              subPath: firebase-service-account.json
               readOnly: true
             - name: logs
               mountPath: "/app/logs"
@@ -159,6 +160,7 @@ spec:
             secretName: firebase-credentials
             items:
               - key: credentials.json
-                path: firebase-credentials.json
+                path: firebase-service-account.json
+            defaultMode: 0444
         - name: logs
           emptyDir: {}

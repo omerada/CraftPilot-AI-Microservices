@@ -39,11 +39,10 @@ COPY --from=builder /build/target/*.jar app.jar
 COPY healthcheck.sh /healthcheck.sh
 RUN chmod +x /healthcheck.sh
 
-# Create all necessary directories and set permissions
-RUN mkdir -p /app/config /app/logs /app/firebase /gcp-credentials && \
-    mkdir -p /etc/gcp/credentials && \
-    chown -R 1000:1000 /app /gcp-credentials /etc/gcp && \
-    chmod 755 /app/config /app/logs /app/firebase /gcp-credentials /etc/gcp
+# Create directories with correct paths
+RUN mkdir -p /app/config /app/logs /gcp/credentials && \
+    chown -R 1000:1000 /app /gcp && \
+    chmod 755 /app/config /app/logs /gcp/credentials
 
 # Switch to non-root user
 USER 1000

@@ -122,6 +122,8 @@ jobs:
               --cpus="1.0" \
               -p 8053:8053 \
               -v /opt/craftpilot/config/notification-service:/app/config:ro \
+              -v "/opt/craftpilot/config/notification-service/gcp-credentials.json:/app/config/gcp-credentials.json:ro" \
+              -v "/opt/craftpilot/config/notification-service/firebase-service-account.json:/app/config/firebase-service-account.json:ro" \
               -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
               -e FIREBASE_CONFIG=/app/config/firebase-service-account.json \
               -e GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}' \
