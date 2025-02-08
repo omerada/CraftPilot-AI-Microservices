@@ -9,6 +9,8 @@ import org.springframework.context.annotation.Configuration;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.FileInputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 @Configuration
@@ -23,9 +25,16 @@ public class FirestoreConfig {
 
     @Bean
     public Firestore firestore() throws IOException {
-        log.info("Firebase kimlik bilgileri yükleniyor: {}", credentialsPath);
+        log.info("Firestore kimlik bilgileri yükleniyor: {}", credentialsPath);
+        
+        // Dosya yolunu kontrol et
+        File credentialsFile = new File(credentialsPath);
+        if (!credentialsFile.exists()) {
+            throw new FileNotFoundException("Credentials dosyası bulunamadı: " + credentialsPath);
+        }
+
         GoogleCredentials credentials = GoogleCredentials.fromStream(
-            new FileInputStream(credentialsPath));
+            new FileInputStream(credentialsFile));
         
         FirestoreOptions firestoreOptions = FirestoreOptions.newBuilder()
             .setCredentials(credentials)

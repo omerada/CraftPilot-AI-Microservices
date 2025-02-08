@@ -81,32 +81,27 @@ jobs:
             docker stop notification-service || true
             docker rm notification-service || true
 
-            # Create config directory if not exists
+            # Create config directory
             mkdir -p /opt/craftpilot/config/notification-service
 
             # Create Firebase credentials file
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/notification-service/firebase-credentials.json
-            chmod 600 /opt/craftpilot/config/notification-service/firebase-credentials.json
+            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/notification-service/service-account.json
+            chmod 600 /opt/craftpilot/config/notification-service/service-account.json
 
-            # Run new container
+            # Run container
             docker run -d \
               --name notification-service \
               --network craftpilot-network \
               --restart unless-stopped \
-              -p 8065:8065 \
+              -p 8094:8094 \
               -v /opt/craftpilot/config/notification-service:/app/config:ro \
+              -e GCP_SA_KEY=/app/config/service-account.json \
+              -e GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-credentials.json \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
-              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics \
-              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
 
             # Verify credentials file exists in container
-            docker exec notification-service ls -l /app/config/firebase-credentials.json || echo "Credentials file not found!"
+            docker exec notification-service ls -l /app/config/service-account.json || echo "Credentials file not found!"
 
             # Check container logs
             docker logs notification-service
