@@ -39,10 +39,16 @@ COPY --from=builder /build/target/*.jar app.jar
 COPY healthcheck.sh /healthcheck.sh
 RUN chmod +x /healthcheck.sh
 
-# Create directories with correct paths
-RUN mkdir -p /app/config /app/logs /gcp/credentials && \
-    chown -R 1000:1000 /app /gcp && \
-    chmod 755 /app/config /app/logs /gcp/credentials
+# Create directories with correct paths and permissions
+RUN mkdir -p /app/config /app/logs && \
+    mkdir -p /app/credentials && \
+    chmod 755 /app/config /app/logs /app/credentials && \
+    chown -R 1000:1000 /app
+
+# Copy application files
+COPY --chown=1000:1000 --from=builder /build/target/*.jar app.jar
+COPY --chown=1000:1000 healthcheck.sh /healthcheck.sh
+RUN chmod +x /healthcheck.sh
 
 # Switch to non-root user
 USER 1000
@@ -51,8 +57,8 @@ USER 1000
 ENV SERVER_PORT=8053 \
     SPRING_PROFILES_ACTIVE=prod
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+# Healthcheck with increased intervals
+HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=5 \
     CMD /healthcheck.sh
 
 # Update JVM tuning with ARM64-optimized settings
@@ -66,9 +72,8 @@ ENV JAVA_OPTS="\
     -Dio.netty.noNative=true \
     -Dio.netty.noUnsafe=true \
     -Dio.netty.tryReflectionSetAccessible=true \
-    -Dio.grpc.netty.shaded.io.netty.transport.noNative=true \
-    -Dio.netty.transport.noNative=true \
-    -Dio.netty.native.workdir=/tmp \
+    --add-opens java.base/java.time=ALL-UNNAMED \
+    --add-opens java.base/java.time.chrono=ALL-UNNAMED \
     -Djava.security.egd=file:/dev/./urandom \
     -Dserver.port=8053 \
     -Dspring.profiles.active=prod \
