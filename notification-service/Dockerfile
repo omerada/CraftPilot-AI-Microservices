@@ -31,6 +31,7 @@ RUN apk add --no-cache \
     libc6-compat \
     gcompat \
     libstdc++ \
+    linux-headers \
     &&  cp /usr/share/zoneinfo/UTC /etc/localtime \
     && echo "UTC" > /etc/timezone
 
@@ -58,6 +59,10 @@ ENV JAVA_OPTS="\
     -XX:+ExitOnOutOfMemoryError \
     -Dio.netty.tryReflectionSetAccessible=true \
     -Dio.netty.noUnsafe=true \
+    -Dfile.encoding=UTF-8 \
+    -Dio.netty.noPreferDirect=true \
+    -Dio.netty.recycler.maxCapacity=0 \
+    -Dio.netty.nativeEpoll=false \
     -Djava.security.egd=file:/dev/./urandom \
     -Dserver.port=8053 \
     -Dspring.profiles.active=prod \
