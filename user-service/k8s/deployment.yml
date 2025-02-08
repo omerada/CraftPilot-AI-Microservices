@@ -54,7 +54,7 @@ spec:
               mountPath: "/etc/gcp"
               readOnly: true
             - name: logs
-              mountPath: "/var/log/craftpilot"
+              mountPath: "/app/logs"
           resources:
             requests:
               memory: "512Mi"
@@ -76,7 +76,7 @@ spec:
             periodSeconds: 10
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: false
             capabilities:
               drop:
                 - ALL

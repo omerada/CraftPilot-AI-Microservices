@@ -34,6 +34,11 @@ RUN yum update -y && \
 
 WORKDIR /app
 
+# Create log directories with proper permissions
+RUN mkdir -p /app/logs && \
+    chown -R 1000:1000 /app/logs && \
+    chmod 755 /app/logs
+
 USER 1000
 
 COPY --from=build --chown=1000:1000 /build/target/*.jar app.jar

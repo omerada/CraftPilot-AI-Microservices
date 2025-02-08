@@ -46,7 +46,11 @@ data:
 
     logging:
       file:
-        path: /var/log/craftpilot
+        path: /app/logs
+        name: /app/logs/user-service.log
+      pattern:
+        file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+        console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
       level:
         com.craftpilot.userservice: INFO
         org.springframework.data: INFO
