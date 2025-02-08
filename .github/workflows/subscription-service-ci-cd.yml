@@ -128,24 +128,21 @@ jobs:
               --name subscription-service \
               --network craftpilot-network \
               --restart unless-stopped \
-              --memory="1g" \
-              --memory-reservation="512m" \
-              --cpus="0.5" \
               -p 8052:8052 \
-              -v /opt/craftpilot/gcp-credentials:/gcp-credentials:ro \
+              -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e SPRING_CLOUD_GCP_PROJECT_ID=craftpilot-ai \
-              -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/gcp-credentials/credentials.json \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/ \
-              -e EUREKA_INSTANCE_HOSTNAME=subscription-service \
-              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=true \
-              -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=true \
-              -e EUREKA_CLIENT_FETCH_REGISTRY=true \
-              -e EUREKA_USERNAME=craftpilot \
-              -e EUREKA_PASSWORD=13579ada \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
+              -e SPRING_CLOUD_GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
+              -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/gcp-credentials.json \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+              -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
+              -e LOGGING_LEVEL_COM_GOOGLE_CLOUD=DEBUG \
               ${{ secrets.DOCKERHUB_USERNAME }}/subscription-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
