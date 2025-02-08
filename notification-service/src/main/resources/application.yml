@@ -20,17 +20,6 @@ spring:
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
-  cloud:
-    gcp:
-      project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
-      credentials:
-        location: file:${GCP_SA_KEY_PATH:/app/config/firebase-credentials.json}
-      firestore:
-        enabled: true
-        project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
-        database-id: ${GCP_FIRESTORE_DATABASE_ID:default}
-    discovery:
-      enabled: true
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
@@ -122,8 +111,3 @@ springdoc:
   paths-to-match: /**
   default-produces-media-type: application/json
   default-consumes-media-type: application/json
-
-gcp:
-  sa:
-    key:
-      path: ${GCP_SA_KEY_PATH:/app/config/firebase-credentials.json}
