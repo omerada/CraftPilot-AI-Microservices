@@ -131,15 +131,15 @@ jobs:
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
-
               -e EUREKA_PASSWORD=13579ada \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
+              -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
               ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 60  # Biraz daha uzun bekleyelim
+            sleep 60
 
             echo "=== Container Logs ==="
             docker logs image-service
@@ -148,7 +148,6 @@ jobs:
             if curl -f http://localhost:8056/actuator/health; then
               echo "Service is healthy"
             else
-
               echo "Service failed health check"
               docker logs image-service
               exit 1
