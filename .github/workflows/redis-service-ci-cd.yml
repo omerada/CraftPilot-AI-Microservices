@@ -79,7 +79,8 @@ jobs:
             docker stop redis-service || true
             docker rm redis-service || true
 
-            # Run new container
+            # Run new container with detailed logging
+            echo "Starting redis-service container..."
             docker run -d \
               --name redis-service \
               --network craftpilot-network \
@@ -98,13 +99,23 @@ jobs:
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
 
+            echo "Container started, waiting for initialization..."
+            sleep 10
+
+            # Detailed container inspection
+            echo "Container status:"
+            docker inspect redis-service --format='{{.State.Status}}'
+
+            echo "Container logs:"
+            docker logs redis-service
+
             # Health check with more detailed output
             echo "Starting health checks..."
             for i in {1..30}; do
               echo "Attempt $i: Checking service health..."
               
               HEALTH_STATUS=$(curl -s http://localhost:8064/actuator/health || echo "Failed to connect")
-              echo "Health status: $HEALTH_STATUS"
+              echo "Health check response: $HEALTH_STATUS"
               
               if echo "$HEALTH_STATUS" | grep -q "UP"; then
                 echo "Service is healthy!"
@@ -122,6 +133,7 @@ jobs:
             echo "Service failed to become healthy within timeout"
             echo "Final container logs:"
             docker logs redis-service
+            docker inspect redis-service
             exit 1
 
       - name: Trigger Deploy Services Workflow
