@@ -46,23 +46,20 @@ ENV SERVER_PORT=8053 \
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8053/actuator/health || exit 1
 
-# Update JVM tuning with ARM64-optimized settings and Netty configurations
+# Update JVM tuning with ARM64-optimized settings
 ENV JAVA_OPTS="\
     -XX:+UseContainerSupport \
     -XX:MaxRAMPercentage=75.0 \
     -XX:+UseG1GC \
     -XX:+UseStringDeduplication \
     -XX:+ExitOnOutOfMemoryError \
-    -Dio.netty.tryReflectionSetAccessible=true \
-    -Dio.netty.noUnsafe=true \
     -Dfile.encoding=UTF-8 \
-    -Dio.netty.noPreferDirect=true \
-    -Dio.netty.recycler.maxCapacity=0 \
-    -Dio.netty.transport.noNative=true \
-    -Dio.netty.nativeEpoll=false \
+    -Dio.netty.noNative=true \
+    -Dio.netty.noUnsafe=true \
+    -Dio.netty.tryReflectionSetAccessible=true \
     -Dio.grpc.netty.shaded.io.netty.transport.noNative=true \
+    -Dio.netty.transport.noNative=true \
     -Dio.netty.native.workdir=/tmp \
-    -Dio.netty.native.try.embedded=false \
     -Djava.security.egd=file:/dev/./urandom \
     -Dserver.port=8053 \
     -Dspring.profiles.active=prod \
