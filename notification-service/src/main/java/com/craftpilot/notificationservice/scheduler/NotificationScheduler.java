@@ -2,9 +2,10 @@ package com.craftpilot.notificationservice.scheduler;
 
 import com.craftpilot.notificationservice.model.EmailRequest;
 import com.craftpilot.notificationservice.model.Notification;
-import com.craftpilot.notificationservice.service.EmailService;
 import com.craftpilot.notificationservice.service.NotificationService;
 import com.craftpilot.notificationservice.service.PushNotificationService;
+import com.craftpilot.notificationservice.service.impl.SendGridService;
+import com.craftpilot.notificationservice.service.EmailService;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
@@ -21,28 +22,36 @@ import java.time.LocalDateTime;
 public class NotificationScheduler {
 
     private final NotificationService notificationService;
-    private final EmailService emailService;
     private final PushNotificationService pushNotificationService;
+    private final SendGridService sendGridService;
     private final MeterRegistry meterRegistry;
+    private final EmailService emailService;
 
-    @Scheduled(cron = "${notification.scheduler.cron:0 */5 * * * *}")
+    @Scheduled(fixedRate = 60000)
     @CircuitBreaker(name = "processScheduledNotifications")
     public void processScheduledNotifications() {
-        log.info("Starting scheduled notification processing");
+        LocalDateTime now = LocalDateTime.now();
         
         notificationService.getScheduledNotifications()
-                .flatMap(notification -> sendNotification(notification)
-                        .then(markNotificationAsSent(notification))
-                        .onErrorResume(error -> {
-                            log.error("Failed to process notification: {}", notification.getId(), error);
-                            meterRegistry.counter("notification.scheduled.failed").increment();
-                            return Mono.empty();
-                        }))
-                .doOnComplete(() -> {
-                    log.info("Completed scheduled notification processing");
-                    meterRegistry.counter("notification.scheduled.processed").increment();
-                })
-                .subscribe();
+            .filter(notification -> notification.getScheduledTime().isBefore(now))
+            .flatMap(this::processAndUpdateNotification)
+            .subscribe();
+    }
+
+    private Mono<Notification> processAndUpdateNotification(Notification notification) {
+        try {
+            sendGridService.sendEmail(
+                notification.getRecipientEmail(),
+                notification.getTitle(),
+                notification.getBody()
+            );
+            notification.setProcessed(true);
+            notification.setProcessedTime(LocalDateTime.now());
+            return notificationService.saveNotification(notification);
+        } catch (Exception e) {
+            log.error("Failed to process notification: {}", notification.getId(), e);
+            return Mono.empty();
+        }
     }
 
     private Mono<Void> sendNotification(Notification notification) {

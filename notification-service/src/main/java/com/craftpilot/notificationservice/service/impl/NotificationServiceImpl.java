@@ -6,10 +6,11 @@ import com.craftpilot.notificationservice.model.EmailRequest;
 import com.craftpilot.notificationservice.model.Notification;
 import com.craftpilot.notificationservice.model.NotificationTemplate;
 import com.craftpilot.notificationservice.repository.NotificationRepository;
-import com.craftpilot.notificationservice.service.EmailService;
 import com.craftpilot.notificationservice.service.NotificationService;
 import com.craftpilot.notificationservice.service.NotificationTemplateService;
 import com.craftpilot.notificationservice.service.PushNotificationService;
+import com.craftpilot.notificationservice.service.EmailService;
+import com.craftpilot.notificationservice.model.enums.NotificationType;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -28,9 +29,10 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final NotificationTemplateService templateService;
-    private final EmailService emailService;
     private final PushNotificationService pushNotificationService;
     private final MeterRegistry meterRegistry;
+    private final SendGridService sendGridService;
+    private final EmailService emailService;
 
     @Override
     @CircuitBreaker(name = "createNotification")
@@ -41,10 +43,11 @@ public class NotificationServiceImpl implements NotificationService {
                 .flatMap(notification -> {
                     if (notification.getScheduledAt() != null && 
                             notification.getScheduledAt().isAfter(LocalDateTime.now())) {
-                        return saveNotification(notification);
+                        return saveNotification(notification).map(NotificationResponse::fromEntity);
                     }
                     return sendNotification(notification)
-                            .then(saveNotification(notification));
+                            .then(saveNotification(notification))
+                            .map(NotificationResponse::fromEntity);
                 })
                 .doOnSuccess(response -> {
                     meterRegistry.counter("notification.created").increment();
@@ -116,7 +119,7 @@ public class NotificationServiceImpl implements NotificationService {
         Notification notification = new Notification();
         notification.setUserId(request.getUserId());
         notification.setTemplateId(template.getId());
-        notification.setType(request.getType());
+        notification.setType(NotificationType.valueOf(request.getType()));
         notification.setTitle(processTemplate(template.getTitleTemplate(), request.getVariables()));
         notification.setContent(processTemplate(template.getContentTemplate(), request.getVariables()));
         notification.setData(request.getAdditionalData());
@@ -148,9 +151,11 @@ public class NotificationServiceImpl implements NotificationService {
         };
     }
 
-    private Mono<NotificationResponse> saveNotification(Notification notification) {
+    @Override
+    public Mono<Notification> saveNotification(Notification notification) {
         return notificationRepository.save(notification)
-                .map(NotificationResponse::fromEntity);
+                .doOnSuccess(saved -> log.debug("Saved notification: {}", saved.getId()))
+                .doOnError(error -> log.error("Error saving notification: {}", error.getMessage()));
     }
 
     private Mono<Void> sendEmail(Notification notification) {
@@ -163,5 +168,20 @@ public class NotificationServiceImpl implements NotificationService {
         return emailService.sendEmail(emailRequest)
                 .doOnSuccess(v -> log.info("Email sent successfully to: {}", notification.getRecipient()))
                 .doOnError(e -> log.error("Failed to send email to: {}", notification.getRecipient(), e));
+    }
+
+    private void sendEmailNotification(Notification notification) {
+        try {
+            sendGridService.sendEmail(
+                notification.getRecipientEmail(),
+                notification.getTitle(),
+                notification.getBody()
+            );
+            notification.setProcessed(true);
+            notification.setProcessedTime(LocalDateTime.now());
+            notificationRepository.save(notification).subscribe();
+        } catch (Exception e) {
+            log.error("Failed to send email notification: {}", e.getMessage());
+        }
     }
 }

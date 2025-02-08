@@ -1,8 +1,8 @@
 package com.craftpilot.notificationservice.dto;
 
 import com.craftpilot.notificationservice.model.Notification;
-import com.craftpilot.notificationservice.model.Notification.NotificationType;
-import com.craftpilot.notificationservice.model.Notification.NotificationStatus;
+import com.craftpilot.notificationservice.model.enums.NotificationStatus;
+import com.craftpilot.notificationservice.model.enums.NotificationType;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -49,4 +49,4 @@ public class NotificationResponse {
                 .isRead(notification.isRead())
                 .build();
     }
-} 
+}

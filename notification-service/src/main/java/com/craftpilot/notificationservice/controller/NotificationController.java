@@ -5,7 +5,7 @@ import com.craftpilot.notificationservice.dto.NotificationRequest;
 import com.craftpilot.notificationservice.dto.NotificationResponse;
 import com.craftpilot.notificationservice.service.NotificationService;
 import com.craftpilot.notificationservice.service.impl.FCMNotificationService;
-import com.craftpilot.notificationservice.service.impl.GmailService;
+import com.craftpilot.notificationservice.service.impl.SendGridService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,7 +27,7 @@ public class NotificationController {
 
     private final NotificationService notificationService;
     private final FCMNotificationService fcmNotificationService;
-    private final GmailService gmailService;
+    private final SendGridService sendGridService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -88,11 +88,11 @@ public class NotificationController {
     @Operation(summary = "Send email notification")
     public ResponseEntity<String> sendEmail(@RequestBody EmailRequest request) {
         try {
-            gmailService.sendEmail(request.getTo(), request.getSubject(), request.getBody());
+            sendGridService.sendEmail(request.getTo(), request.getSubject(), request.getBody());
             return ResponseEntity.ok("E-posta başarıyla gönderildi");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("E-posta gönderilirken hata oluştu: " + e.getMessage());
         }
     }
-} 
+}
