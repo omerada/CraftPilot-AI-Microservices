@@ -9,32 +9,27 @@ import org.springframework.context.annotation.Configuration;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.FileInputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 
 @Configuration
 @Slf4j
 public class FirestoreConfig {
 
-    @Value("${GCP_SA_KEY}")
+    @Value("${spring.cloud.gcp.credentials.location}")
     private String credentialsPath;
     
-    @Value("${GCP_PROJECT_ID}")
+    @Value("${spring.cloud.gcp.project-id}")
     private String projectId;
 
     @Bean
     public Firestore firestore() throws IOException {
         log.info("Firestore kimlik bilgileri yükleniyor: {}", credentialsPath);
         
-        // Dosya yolunu kontrol et
-        File credentialsFile = new File(credentialsPath);
-        if (!credentialsFile.exists()) {
-            throw new FileNotFoundException("Credentials dosyası bulunamadı: " + credentialsPath);
-        }
-
+        // file: prefix'ini kaldır
+        String actualPath = credentialsPath.replace("file:", "");
+        
         GoogleCredentials credentials = GoogleCredentials.fromStream(
-            new FileInputStream(credentialsFile));
+            new FileInputStream(actualPath));
         
         FirestoreOptions firestoreOptions = FirestoreOptions.newBuilder()
             .setCredentials(credentials)

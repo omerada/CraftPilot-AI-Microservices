@@ -16,7 +16,7 @@ spring:
   cloud:
     gcp:
       credentials:
-        location: file:${GCP_SA_KEY}
+        location: file:${GCP_SA_KEY:/app/config/service-account.json}
       project-id: ${GCP_PROJECT_ID}
       firestore:
         enabled: true

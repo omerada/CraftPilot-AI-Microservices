@@ -294,26 +294,21 @@ services:
 
   # Notification Service
   notification-service:
+    image: ${DOCKERHUB_USERNAME}/notification-service:latest-arm64
     container_name: notification-service
-    build:
-      context: .
-      dockerfile: notification-service/Dockerfile
     ports:
       - "8094:8094"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
-      - GMAIL_SERVICE_ACCOUNT=${GMAIL_SERVICE_ACCOUNT}
       - GCP_SA_KEY=/app/config/service-account.json
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
-      - SPRING_SECURITY_USER_NAME=${EUREKA_USERNAME}
-      - SPRING_SECURITY_USER_PASSWORD=${EUREKA_PASSWORD}
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=13579ada
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/config/service-account.json
+      - SPRING_CLOUD_GCP_PROJECT_ID=${GCP_PROJECT_ID}
     volumes:
       - ${GCP_SA_KEY_PATH}:/app/config/service-account.json:ro
+    networks:
+      - craftpilot-network
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -321,8 +316,6 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
-    networks:
-      - craftpilot-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8094/actuator/health"]
       interval: 30s
