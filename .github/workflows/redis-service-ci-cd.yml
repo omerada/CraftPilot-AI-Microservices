@@ -99,29 +99,43 @@ jobs:
               --name redis-service \
               --network craftpilot-network \
               --restart unless-stopped \
-              -p 8061:8061 \
+              -p 8079:8079 \
               -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
+              -e SERVER_PORT=8079 \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=true \
+              -e EUREKA_INSTANCE_INSTANCE_ID=${HOSTNAME}:redis-service:8079 \
               -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
               -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/gcp-credentials.json \
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
-              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+              -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e SPRING_KAFKA_CONSUMER_GROUP_ID=redis-service-group \
               -e SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET=earliest \
               ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
 
-            # Health check
+            # Health check - port 8079'u kontrol et
             echo "Checking service health..."
             for i in {1..30}; do
-              if curl -s http://localhost:8061/actuator/health | grep -q "UP"; then
+              HEALTH_STATUS=$(curl -s http://localhost:8079/actuator/health || echo "Failed to connect")
+              echo "Health check response: $HEALTH_STATUS"
+              
+              if echo "$HEALTH_STATUS" | grep -q "UP"; then
                 echo "Service is healthy"
                 exit 0
               fi
+              
+              if [ $i -eq 15 ]; then
+                echo "Mid-point container logs:"
+                docker logs redis-service
+              fi
+              
               echo "Waiting for service to be healthy... (attempt $i/30)"
               sleep 10
             done
