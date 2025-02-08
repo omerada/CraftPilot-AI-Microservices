@@ -51,12 +51,13 @@ data:
                 backOffMultiplier: 2.0
             notificationEventProducer-out-0:
               destination: notifications
-      cache:
-        type: redis
       data:
         redis:
           repositories:
             enabled: false
+          host: ${REDIS_HOST:redis}
+          port: ${REDIS_PORT:6379}
+          password: ${REDIS_PASSWORD:13579ada}
       mail:
         host: smtp.sendgrid.net
         port: 587
@@ -92,9 +93,12 @@ data:
 
     logging:
       level:
-        com.craftpilot.notificationservice: INFO
-        org.springframework.data: INFO
-        org.springframework.security: INFO
+        '[com.craftpilot.notificationservice]': INFO
+        '[org.springframework.data]': INFO
+        '[org.springframework.security]': INFO
+        '[org.springframework.web]': INFO
+        '[org.springframework.cloud]': INFO
+        root: INFO
 
     resilience4j:
       circuitbreaker:

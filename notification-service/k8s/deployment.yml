@@ -96,13 +96,13 @@ spec:
                   name: notification-service-secrets
                   key: fcm-service-account
             - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: "/etc/gcp/credentials/firebase-credentials.json"
+              value: "/app/credentials/gcp-credentials.json"
             - name: SPRING_CLOUD_GCP_PROJECT_ID
               value: craft-pilot-ai
             - name: JAVA_OPTS
               value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Dio.netty.transport.noNative=true"
             - name: FIREBASE_CONFIG
-              value: /app/config/firebase-service-account.json
+              value: /app/credentials/firebase-credentials.json
             - name: SPRING_MAIL_SENDGRID_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -113,6 +113,8 @@ spec:
                 configMapKeyRef:
                   name: notification-service-config
                   key: sendgrid-from-email
+            - name: SPRING_CLOUD_GCP_CREDENTIALS_LOCATION
+              value: "file:/app/credentials/gcp-credentials.json"
           resources:
             requests:
               memory: "512Mi"
@@ -136,14 +138,22 @@ spec:
             periodSeconds: 20
             timeoutSeconds: 10
             failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8053
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 10
           volumeMounts:
             - name: gcp-credentials
-              mountPath: /app/config/gcp-credentials.json
+              mountPath: /app/credentials/gcp-credentials.json
               subPath: gcp-credentials.json
               readOnly: true
             - name: firebase-credentials
-              mountPath: /app/config/firebase-service-account.json
-              subPath: firebase-service-account.json
+              mountPath: /app/credentials/firebase-credentials.json
+              subPath: firebase-credentials.json
               readOnly: true
             - name: logs
               mountPath: "/app/logs"

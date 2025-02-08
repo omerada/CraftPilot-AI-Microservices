@@ -27,6 +27,8 @@
 		<firebase-admin.version>9.2.0</firebase-admin.version>
 		<caffeine.version>3.1.8</caffeine.version>
 		<micrometer.version>1.12.0</micrometer.version>
+		<springdoc.version>2.3.0</springdoc.version>
+		<swagger.version>2.2.20</swagger.version>
 	</properties>
 
 	<dependencies>
@@ -173,6 +175,38 @@
 			<groupId>io.grpc</groupId>
 			<artifactId>grpc-core</artifactId>
 			<version>1.60.0</version>
+		</dependency>
+
+		<!-- SpringDoc OpenAPI Dependencies -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+			<version>${springdoc.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webflux-api</artifactId>
+			<version>${springdoc.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.swagger.core.v3</groupId>
+			<artifactId>swagger-core</artifactId>
+			<version>${swagger.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.swagger.core.v3</groupId>
+			<artifactId>swagger-annotations</artifactId>
+			<version>${swagger.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.swagger.core.v3</groupId>
+			<artifactId>swagger-models</artifactId>
+			<version>${swagger.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.swagger.core.v3</groupId>
+			<artifactId>swagger-core-jakarta</artifactId>
+			<version>2.2.19</version>
 		</dependency>
 
 	</dependencies>
