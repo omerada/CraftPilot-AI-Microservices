@@ -7,6 +7,8 @@ server:
   shutdown: graceful
 
 spring:
+  main:
+    allow-bean-definition-overriding: true
   application:
     name: notification-service
   profiles:
@@ -17,25 +19,29 @@ spring:
     gcp:
       project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
       credentials:
-        location: file:/gcp-credentials.json
+        location: ${GOOGLE_APPLICATION_CREDENTIALS:/gcp-credentials.json}
       firestore:
         enabled: true
+        project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
+        emulator:
+          enabled: false
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: ${spring.application.name}-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "com.craftpilot.*"
+        spring.json.trusted.packages: "*"
+        spring.json.value.default.type: java.util.Map
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
   redis:
-    host: ${REDIS_HOST:redis}
+    host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}
     password: ${REDIS_PASSWORD:13579ada}
     timeout: 2000

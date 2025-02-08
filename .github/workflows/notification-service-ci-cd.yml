@@ -108,8 +108,8 @@ jobs:
               --network craftpilot-network \
               --restart unless-stopped \
               -p 8053:8053 \
-              -v /opt/craftpilot/config/notification-service/gcp-credentials.json:/app/firebase-credentials.json:ro \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-credentials.json \
+              -v /opt/craftpilot/config/notification-service/gcp-credentials.json:/gcp-credentials.json:ro \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}' \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8053 \

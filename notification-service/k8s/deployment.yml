@@ -72,6 +72,10 @@ spec:
                 secretKeyRef:
                   name: notification-service-secrets
                   key: fcm-service-account
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /gcp-credentials.json
+            - name: SPRING_CLOUD_GCP_PROJECT_ID
+              value: craft-pilot-ai
           resources:
             requests:
               memory: "512Mi"
@@ -95,8 +99,8 @@ spec:
             timeoutSeconds: 5
           volumeMounts:
             - name: firebase-credentials
-              mountPath: /app/firebase-service-account.json
-              subPath: firebase-service-account.json
+              mountPath: /gcp-credentials.json
+              subPath: gcp-credentials.json
       volumes:
         - name: firebase-credentials
           secret:
