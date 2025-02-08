@@ -68,9 +68,9 @@ services:
       - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - SPRING_REDIS_HOST=redis
-      - SPRING_REDIS_PORT=6379
-      - SPRING_REDIS_PASSWORD=13579ada
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=13579ada
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
     volumes:

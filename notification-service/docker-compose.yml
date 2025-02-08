@@ -26,9 +26,9 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
-      - SPRING_REDIS_HOST=redis
-      - SPRING_REDIS_PORT=6379
-      - SPRING_REDIS_PASSWORD=13579ada
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=13579ada
       - GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-credentials.json
     volumes:
       - /opt/craftpilot/firebase-credentials.json:/app/firebase-credentials.json:ro
@@ -37,4 +37,4 @@ services:
 
 networks:
   craftpilot-network:
-    external: true 
+    external: true

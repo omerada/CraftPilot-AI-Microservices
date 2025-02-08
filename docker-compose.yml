@@ -35,9 +35,9 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
-      - SPRING_REDIS_HOST=redis
-      - SPRING_REDIS_PORT=6379
-      - SPRING_REDIS_PASSWORD=13579ada
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=13579ada
       - SPRING_CLOUD_GCP_SA_KEY_LOCATION=file:/app/gcp-credentials.json
       - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
@@ -164,9 +164,9 @@ services:
       - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
       - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
-      - SPRING_REDIS_HOST=redis
-      - SPRING_REDIS_PORT=6379
-      - SPRING_REDIS_PASSWORD=13579ada
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=13579ada
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS=kafka:9092
       - SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS=kafka:9092
@@ -204,9 +204,9 @@ services:
       - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
       - SPRING_SECURITY_USER_NAME=${EUREKA_USERNAME}
       - SPRING_SECURITY_USER_PASSWORD=${EUREKA_PASSWORD}
-      - SPRING_REDIS_HOST=redis
-      - SPRING_REDIS_PORT=6379
-      - SPRING_REDIS_PASSWORD=13579ada
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=13579ada
     volumes:
       - ./credit-service/src/main/resources/firebase-service-account.json:/app/config/firebase-service-account.json
     depends_on:
@@ -308,8 +308,9 @@ services:
       - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
       - SPRING_SECURITY_USER_NAME=${EUREKA_USERNAME}
       - SPRING_SECURITY_USER_PASSWORD=${EUREKA_PASSWORD}
+      - GCP_SA_KEY=/secrets/service-account.json
     volumes:
-      - ./notification-service/src/main/resources/firebase-service-account.json:/app/config/firebase-service-account.json
+      - ./service-account.json:/secrets/service-account.json:ro
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -382,9 +383,9 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
       - SPRING_CLOUD_GCP_SA_KEY_LOCATION=file:/app/gcp-credentials.json
       - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
-      - SPRING_REDIS_HOST=redis
-      - SPRING_REDIS_PORT=6379
-      - SPRING_REDIS_PASSWORD=13579ada
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=13579ada
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     volumes:
       - ${GCP_SA_KEY_PATH:-./admin-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
@@ -421,9 +422,9 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
       - FIREBASE_CREDENTIAL_PATH=/app/config/firebase-service-account.json
       - GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-service-account.json
-      - SPRING_REDIS_HOST=redis
-      - SPRING_REDIS_PORT=6379
-      - SPRING_REDIS_PASSWORD=13579ada
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=13579ada
     volumes:
       - ${GCP_SA_KEY_PATH}:/app/config/firebase-service-account.json:ro
     networks:

@@ -50,9 +50,9 @@ docker run -d \
     -v /tmp/firebase-credentials.json:/app/firebase-credentials.json:ro \
     -e SPRING_PROFILES_ACTIVE=prod \
     -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-    -e SPRING_REDIS_HOST=redis \
-    -e SPRING_REDIS_PORT=6379 \
-    -e SPRING_REDIS_PASSWORD=13579ada \
+    -e REDIS_HOST=redis \
+    -e REDIS_PORT=6379 \
+    -e REDIS_PASSWORD=13579ada \
     ${DOCKERHUB_USERNAME}/${SERVICE_NAME}:latest-arm64
 
 echo "=== Waiting for Container to Start ==="

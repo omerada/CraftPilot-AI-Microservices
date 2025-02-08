@@ -151,9 +151,9 @@ springdoc:
     enabled: true
 
 redis:
-  host: ${SPRING_REDIS_HOST:redis}
-  port: ${SPRING_REDIS_PORT:6379}
-  password: ${SPRING_REDIS_PASSWORD:13579ada}
+  host: ${REDIS_HOST:redis}
+  port: ${REDIS_PORT:6379}
+  password: ${REDIS_PASSWORD:13579ada}
   lettuce:
     pool:
       max-active: 8

@@ -94,9 +94,9 @@ jobs:
               -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e SPRING_REDIS_HOST=redis \
-              -e SPRING_REDIS_PORT=6379 \
-              -e SPRING_REDIS_PASSWORD=13579ada \
+              -e REDIS_HOST=redis \
+              -e REDIS_PORT=6379 \
+              -e REDIS_PASSWORD=13579ada \
               -e SPRING_CLOUD_GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
               -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
               -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/gcp-credentials.json \

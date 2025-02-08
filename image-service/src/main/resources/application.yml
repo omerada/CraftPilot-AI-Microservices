@@ -37,8 +37,8 @@ spring:
       use-key-prefix: true
       key-prefix: craftpilot
   redis:
-    host: ${SPRING_REDIS_HOST:localhost}
-    port: ${SPRING_REDIS_PORT:6379}
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
     timeout: 2000
     connect-timeout: 2000
     lettuce:

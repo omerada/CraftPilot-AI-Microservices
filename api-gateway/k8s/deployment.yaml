@@ -29,9 +29,9 @@ spec:
               value: "prod"
             - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
               value: "http://eureka-server:8761/eureka/"
-            - name: SPRING_REDIS_HOST
+            - name: REDIS_HOST
               value: "redis-master"
-            - name: SPRING_REDIS_PORT
+            - name: REDIS_PORT
               value: "6379"
             - name: FIREBASE_CONFIG_PATH
               value: "/etc/firebase/firebase-service-account.json"
