@@ -61,9 +61,11 @@ spring:
             value.deserializer: org.apache.kafka.common.serialization.StringDeserializer
             auto.offset.reset: earliest
     gcp:
-      project-id: craftpilot-ai
+      project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
       credentials:
-        location: classpath:firebase-service-account.json
+        location: file:/gcp-credentials/credentials.json
+      firestore:
+        enabled: true
 
 iyzico:
   api-key: ${IYZICO_API_KEY:sandbox-api-key}

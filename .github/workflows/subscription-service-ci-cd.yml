@@ -133,9 +133,10 @@ jobs:
               --cpus="0.5" \
               -p 8052:8052 \
               -v /opt/craftpilot/gcp-credentials:/gcp-credentials:ro \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials/credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SPRING_CLOUD_GCP_PROJECT_ID=craftpilot-ai \
+              -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/gcp-credentials/credentials.json \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \
               -e REDIS_HOST=redis \
