@@ -72,11 +72,11 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Check if port 8064 is in use
-            echo "Checking if port 8064 is already in use..."
-            if netstat -tulpn 2>/dev/null | grep ":8064 "; then
-              echo "Port 8064 is already in use. Killing the process..."
-              PID=$(netstat -tulpn 2>/dev/null | grep ":8064 " | awk '{print $7}' | cut -d'/' -f1)
+            # Check if port 8079 is in use
+            echo "Checking if port 8079 is already in use..."
+            if netstat -tulpn 2>/dev/null | grep ":8079 "; then
+              echo "Port 8079 is already in use. Killing the process..."
+              PID=$(netstat -tulpn 2>/dev/null | grep ":8079 " | awk '{print $7}' | cut -d'/' -f1)
               if [ ! -z "$PID" ]; then
                 kill -9 $PID || true
               fi
@@ -117,7 +117,7 @@ jobs:
               --name redis-service \
               --network craftpilot-network \
               --restart unless-stopped \
-              -p 8064:8064 \
+              -p 8079:8079 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
@@ -160,7 +160,7 @@ jobs:
             for i in {1..30}; do
               echo "Attempt $i: Checking service health..."
               
-              HEALTH_STATUS=$(curl -s http://localhost:8064/actuator/health || echo "Failed to connect")
+              HEALTH_STATUS=$(curl -s http://localhost:8079/actuator/health || echo "Failed to connect")
               echo "Health check response: $HEALTH_STATUS"
               
               if echo "$HEALTH_STATUS" | grep -q "UP"; then

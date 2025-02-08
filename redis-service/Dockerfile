@@ -13,5 +13,5 @@ COPY --from=build /build/target/*.jar app.jar
 
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 
-EXPOSE 8064
+EXPOSE 8079
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
