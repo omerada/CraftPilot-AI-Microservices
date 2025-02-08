@@ -16,6 +16,7 @@ public class FirestoreConfig {
 
     @Value("${GOOGLE_APPLICATION_CREDENTIALS:/gcp-credentials.json}")
     private String credentialsPath;
+    
 
     @Bean
     public Firestore firestore() throws IOException {

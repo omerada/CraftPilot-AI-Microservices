@@ -14,17 +14,21 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
   mail:
-    from: ${GMAIL_SERVICE_ACCOUNT}
+    sendgrid:
+      api-key: ${SENDGRID_API_KEY}
+      from: ${SENDGRID_FROM_EMAIL}
   cloud:
     gcp:
       project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
       credentials:
-        location: ${GOOGLE_APPLICATION_CREDENTIALS:/gcp-credentials.json}
+        location: ${GOOGLE_APPLICATION_CREDENTIALS:/app/credentials/gcp-credentials.json}
       firestore:
         enabled: true
         project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
         emulator:
           enabled: false
+      core:
+        enabled: true
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
@@ -112,6 +116,8 @@ logging:
     org.springframework.web: ${LOG_LEVEL_SPRING_WEB:INFO}
     org.springframework.kafka: ${LOG_LEVEL_SPRING_KAFKA:INFO}
     com.google.cloud: ${LOG_LEVEL_GOOGLE_CLOUD:DEBUG}
+    com.google.cloud.firestore: DEBUG
+    com.craftpilot.notificationservice: DEBUG
 
 springdoc:
   swagger-ui:
