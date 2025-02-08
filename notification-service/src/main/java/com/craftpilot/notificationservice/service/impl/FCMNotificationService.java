@@ -12,8 +12,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-@Service
 @Slf4j
+@Service
 @RequiredArgsConstructor
 public class FCMNotificationService {
 
@@ -73,4 +73,4 @@ public class FCMNotificationService {
             throw new RuntimeException("Topic bildirimi gönderilemedi", e);
         }
     }
-} 
+}

@@ -38,4 +38,4 @@ public class NotificationRequest {
     private String topic;
     private String title;
     private String body;
-} 
+}

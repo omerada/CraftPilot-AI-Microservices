@@ -28,4 +28,4 @@ public class NotificationPreference {
     private boolean deleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-} 
+}
