@@ -93,12 +93,13 @@ data:
 
     logging:
       level:
-        '[com.craftpilot.notificationservice]': INFO
-        '[org.springframework.data]': INFO
-        '[org.springframework.security]': INFO
-        '[org.springframework.web]': INFO
-        '[org.springframework.cloud]': INFO
         root: INFO
+        '[com.craftpilot.notificationservice]': INFO
+        '[org.springframework]':
+          data: INFO
+          security: INFO
+          web: INFO
+          cloud: INFO
 
     resilience4j:
       circuitbreaker:

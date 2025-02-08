@@ -112,12 +112,12 @@ resilience4j:
 
 logging:
   level:
-    com.craftpilot.notificationservice: ${LOG_LEVEL_APP:INFO}
-    org.springframework.web: ${LOG_LEVEL_SPRING_WEB:INFO}
-    org.springframework.kafka: ${LOG_LEVEL_SPRING_KAFKA:INFO}
-    com.google.cloud: ${LOG_LEVEL_GOOGLE_CLOUD:DEBUG}
-    com.google.cloud.firestore: DEBUG
-    com.craftpilot.notificationservice: DEBUG
+    root: INFO
+    '[com.craftpilot.notificationservice]': INFO
+    '[org.springframework.data]': INFO
+    '[org.springframework.security]': INFO
+    '[org.springframework.web]': INFO
+    '[org.springframework.cloud]': INFO
 
 springdoc:
   swagger-ui:
