@@ -124,6 +124,12 @@ jobs:
               -e REDIS_PASSWORD=13579ada \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e JAVA_OPTS="-Xmx768m -Xms384m -XX:+UseContainerSupport -XX:+UseG1GC -Dio.netty.tryReflectionSetAccessible=true -Dio.netty.noUnsafe=true" \
+              -e SPRING_MAIL_HOST=smtp.gmail.com \
+              -e SPRING_MAIL_PORT=587 \
+              -e SPRING_MAIL_USERNAME=${{ secrets.SMTP_USERNAME }} \
+              -e SPRING_MAIL_PASSWORD=${{ secrets.SMTP_PASSWORD }} \
+              -e SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true \
+              -e SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true \
               ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
             
             echo "Waiting for container to start..."
