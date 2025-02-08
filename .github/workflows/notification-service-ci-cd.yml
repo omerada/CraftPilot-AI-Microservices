@@ -92,7 +92,7 @@ jobs:
             docker run -d \
               --name notification-service \
               --network craftpilot-network \
-              -p 8057:8057 \
+              -p 8094:8094 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
