@@ -1,5 +1,5 @@
-# Build stage
-FROM eclipse-temurin:21-jdk-alpine AS builder
+# Build stage - ARM64 specific
+FROM --platform=linux/arm64 maven:3.9.6-eclipse-temurin-21 AS builder
 WORKDIR /build
 
 # Copy maven files first
@@ -20,19 +20,16 @@ COPY src/ src/
 # Build application
 RUN ./mvnw clean package -DskipTests
 
-# Run stage
-FROM eclipse-temurin:21-jre-alpine
+# Run stage - ARM64 specific
+FROM --platform=linux/arm64 eclipse-temurin:21-jre-jammy
 WORKDIR /app
 
-# Add necessary tools and native libraries
-RUN apk add --no-cache \
+# Add necessary tools and native libraries for ARM64
+RUN apt-get update && apt-get install -y \
     curl \
     tzdata \
-    gcompat \
-    libstdc++ \
-    linux-headers \
-    libc6-compat \
-    && rm -rf /var/cache/apk/*
+    libc6 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy jar from build stage
 COPY --from=builder /build/target/*.jar app.jar
@@ -49,7 +46,7 @@ ENV SERVER_PORT=8053 \
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8053/actuator/health || exit 1
 
-# Update JVM tuning with optimized settings
+# Update JVM tuning with ARM64-optimized settings and Netty configurations
 ENV JAVA_OPTS="\
     -XX:+UseContainerSupport \
     -XX:MaxRAMPercentage=75.0 \
@@ -63,6 +60,9 @@ ENV JAVA_OPTS="\
     -Dio.netty.recycler.maxCapacity=0 \
     -Dio.netty.transport.noNative=true \
     -Dio.netty.nativeEpoll=false \
+    -Dio.grpc.netty.shaded.io.netty.transport.noNative=true \
+    -Dio.netty.native.workdir=/tmp \
+    -Dio.netty.native.try.embedded=false \
     -Djava.security.egd=file:/dev/./urandom \
     -Dserver.port=8053 \
     -Dspring.profiles.active=prod \
