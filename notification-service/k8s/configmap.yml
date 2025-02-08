@@ -27,20 +27,18 @@ data:
           repositories:
             enabled: false
       mail:
-        host: ${SPRING_MAIL_HOST:smtp.gmail.com}
-        port: ${SPRING_MAIL_PORT:587}
-        username: ${SPRING_MAIL_USERNAME}
-        password: ${SPRING_MAIL_PASSWORD}
+        host: smtp.sendgrid.net
+        port: 587
+        username: apikey
+        password: ${SENDGRID_API_KEY}
         properties:
           mail:
             smtp:
               auth: true
               starttls:
                 enable: true
-                required: true
-              connectiontimeout: 5000
-              timeout: 5000
-              writetimeout: 5000
+            transport:
+              protocol: smtp
         provider: sendgrid
         sendgrid:
           api-key: ${SENDGRID_API_KEY}
