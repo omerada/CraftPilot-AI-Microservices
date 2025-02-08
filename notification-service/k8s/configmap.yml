@@ -29,29 +29,24 @@ data:
           value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       cloud:
         function:
-          definition: processNotification
+          definition: notificationEventConsumer;notificationEventProducer
         stream:
           kafka:
             binder:
               brokers: ${KAFKA_BOOTSTRAP_SERVERS}
-              auto-add-partitions: true
-              min-partition-count: 1
-              replication-factor: 1
+              autoCreateTopics: true
               configuration:
-                auto.create.topics.enable: true
+                security.protocol: PLAINTEXT
+                auto.offset.reset: earliest
           bindings:
-            processNotification-in-0:
+            notificationEventConsumer-in-0:
               destination: notifications
               group: notification-service-group
               consumer:
-                maxAttempts: 3
-                backOffInitialInterval: 1000
-                backOffMaxInterval: 10000
-                backOffMultiplier: 2.0
-            processNotification-out-0:
+                bindQueue: true
+                startOffset: earliest
+            notificationEventProducer-out-0:
               destination: notifications
-              producer:
-                sync: true
       cache:
         type: redis
       data:
