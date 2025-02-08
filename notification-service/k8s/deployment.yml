@@ -42,15 +42,9 @@ spec:
                   name: redis-config
                   key: redis-port
             - name: KAFKA_BOOTSTRAP_SERVERS
-              valueFrom:
-                configMapKeyRef:
-                  name: kafka-config
-                  key: bootstrap-servers
+              value: "kafka:9092"
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              valueFrom:
-                configMapKeyRef:
-                  name: kafka-config
-                  key: bootstrap-servers
+              value: "kafka:9092"
             - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_BROKERS
               value: "kafka:9092"
             - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_AUTO_CREATE_TOPICS
@@ -68,16 +62,15 @@ spec:
             - name: SPRING_CLOUD_STREAM_BINDINGS_PROCESSNOTIFICATION_OUT_0_DESTINATION
               value: "notifications"
             - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_BROKERS
-              valueFrom:
-                configMapKeyRef:
-                  name: kafka-config
-                  key: bootstrap-servers
+              value: "kafka:9092"
             - name: SPRING_CLOUD_STREAM_DEFAULTBINDER
               value: "kafka"
             - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_REPLICATIONFACTOR
               value: "1"
             - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_REQUIRED_ACKS
               value: "1"
+            - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_CONFIGURATION_AUTO_CREATE_TOPICS_ENABLE
+              value: "true"
             - name: EUREKA_SERVER_URL
               valueFrom:
                 configMapKeyRef:
