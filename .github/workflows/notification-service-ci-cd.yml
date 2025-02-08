@@ -132,6 +132,7 @@ jobs:
               -e JAVA_OPTS="-Xmx768m -Xms384m -XX:+UseContainerSupport -XX:+UseG1GC -Dio.netty.tryReflectionSetAccessible=true -Dio.netty.noUnsafe=true" \
               -e SENDGRID_API_KEY='${{ secrets.SENDGRID_API_KEY }}' \
               -e SENDGRID_FROM_EMAIL='${{ secrets.SENDGRID_FROM_EMAIL }}' \
+              -e FIREBASE_SERVICE_ACCOUNT='${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' \
               ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
             
             echo "Waiting for container to start..."
