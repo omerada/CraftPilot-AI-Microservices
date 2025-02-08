@@ -9,9 +9,13 @@ COPY ./pom.xml .
 COPY ./notification-service/pom.xml ./notification-service/
 COPY ./notification-service/src ./notification-service/src
 
-# Build with Maven
+# Build with Maven - only notification-service module
 RUN apk add --no-cache maven && \
-    mvn clean package -DskipTests -pl notification-service
+    mvn clean package -DskipTests \
+    -pl notification-service \
+    -am \
+    -Dspring.profiles.active=prod \
+    -Dmaven.repo.local=/root/.m2/repository
 
 # Run stage
 FROM eclipse-temurin:21-jre-alpine
