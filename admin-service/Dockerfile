@@ -3,7 +3,10 @@ FROM public.ecr.aws/amazoncorretto/amazoncorretto:21 AS build
 
 WORKDIR /build
 
-# Maven kurulumu ve versiyonu belirleme
+# Gerekli araçları yükle
+RUN yum install -y tar gzip
+
+# Maven wrapper ve bağımlılıkları kopyala
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
 RUN chmod +x mvnw
@@ -23,6 +26,9 @@ RUN mkdir -p /app/config
 
 # JAR dosyasını kopyala
 COPY --from=build /build/target/*.jar app.jar
+
+# curl yükle (health check için)
+RUN yum install -y curl
 
 # JVM ayarları
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
