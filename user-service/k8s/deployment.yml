@@ -49,6 +49,8 @@ spec:
             - name: gcp-credentials
               mountPath: "/etc/gcp"
               readOnly: true
+            - name: logs
+              mountPath: "/var/log/craftpilot"
           resources:
             requests:
               memory: "512Mi"
@@ -75,3 +77,5 @@ spec:
             items:
               - key: credentials.json
                 path: credentials.json
+        - name: logs
+          emptyDir: {}

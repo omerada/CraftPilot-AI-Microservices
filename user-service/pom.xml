@@ -35,6 +35,7 @@
 		<caffeine.version>3.1.8</caffeine.version>
 		<lombok.version>1.18.30</lombok.version>
 		<mapstruct.version>1.5.5.Final</mapstruct.version>
+		<logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
 	</properties>
 
 	<dependencies>
@@ -111,6 +112,13 @@
 			<artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
 			<version>${springdoc.version}</version>
 		</dependency>
+
+		 <!-- Logstash Encoder -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>${logstash-logback-encoder.version}</version>
+        </dependency>
 
 		<!-- Test Dependencies -->
 		<dependency>

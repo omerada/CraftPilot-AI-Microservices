@@ -36,6 +36,8 @@ data:
           enabled: true
 
     logging:
+      file:
+        path: /var/log/craftpilot
       level:
         com.craftpilot.userservice: INFO
         org.springframework.data: INFO

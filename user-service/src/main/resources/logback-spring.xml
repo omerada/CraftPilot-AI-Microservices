@@ -1,54 +1,43 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <property name="LOG_PATH" value="logs"/>
-    <property name="LOG_FILE" value="${LOG_PATH}/user-service"/>
-
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    
+    <springProperty scope="context" name="applicationName" source="spring.application.name"/>
+    
     <appender name="Console" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-            <includeMdcKeyName>correlationId</includeMdcKeyName>
-            <includeMdcKeyName>userId</includeMdcKeyName>
-            <customFields>{"app":"user-service","environment":"${SPRING_PROFILES_ACTIVE:-local}"}</customFields>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
     <appender name="File" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_FILE}.log</file>
-        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-            <includeMdcKeyName>correlationId</includeMdcKeyName>
-            <includeMdcKeyName>userId</includeMdcKeyName>
-            <customFields>{"app":"user-service","environment":"${SPRING_PROFILES_ACTIVE:-local}"}</customFields>
+        <file>logs/${applicationName}.log</file>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_FILE}.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>logs/${applicationName}.%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>30</maxHistory>
-            <totalSizeCap>3GB</totalSizeCap>
         </rollingPolicy>
     </appender>
 
-    <!-- Async appender -->
-    <appender name="Async" class="ch.qos.logback.classic.AsyncAppender">
-        <queueSize>512</queueSize>
-        <appender-ref ref="File"/>
+    <appender name="Logstash" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/${applicationName}-json.log</file>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>correlationId</includeMdcKeyName>
+            <customFields>{"app_name":"${applicationName}"}</customFields>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/${applicationName}-json.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
     </appender>
 
-    <!-- Application Loggers -->
-    <logger name="com.craftpilot.userservice" level="DEBUG" additivity="false">
-        <appender-ref ref="Console"/>
-        <appender-ref ref="Async"/>
-    </logger>
-
-    <!-- Framework Loggers -->
-    <logger name="org.springframework" level="INFO"/>
-    <logger name="org.springframework.web" level="INFO"/>
-    <logger name="org.springframework.security" level="INFO"/>
-    <logger name="org.springframework.data" level="INFO"/>
-    <logger name="org.springframework.cache" level="INFO"/>
-    <logger name="org.springframework.kafka" level="INFO"/>
-
-    <!-- Root Logger -->
     <root level="INFO">
         <appender-ref ref="Console"/>
-        <appender-ref ref="Async"/>
+        <appender-ref ref="File"/>
+        <appender-ref ref="Logstash"/>
     </root>
-
-</configuration> 
+    
+    <logger name="com.craftpilot" level="DEBUG"/>
+</configuration>
