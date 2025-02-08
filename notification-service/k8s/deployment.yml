@@ -15,13 +15,17 @@ spec:
       labels:
         app: notification-service
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
         - name: notification-service
-          image: craftpilot/notification-service:1.0.0
+          image: craftpilot/notification-service:latest
           imagePullPolicy: Always
           ports:
             - name: http
-              containerPort: 8053
+              containerPort: 8070
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
@@ -63,7 +67,7 @@ spec:
                   name: notification-service-secrets
                   key: fcm-service-account
             - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: /app/config/gcp-credentials.json
+              value: "/etc/gcp/credentials/firebase-credentials.json"
             - name: SPRING_CLOUD_GCP_PROJECT_ID
               value: craft-pilot-ai
             - name: JAVA_OPTS
@@ -97,9 +101,10 @@ spec:
               subPath: gcp-credentials.json
               readOnly: true
             - name: firebase-credentials
-              mountPath: /app/config/firebase-service-account.json
-              subPath: firebase-service-account.json
+              mountPath: "/etc/gcp/credentials"
               readOnly: true
+            - name: logs
+              mountPath: "/app/logs"
       volumes:
         - name: gcp-credentials
           secret:
@@ -110,8 +115,9 @@ spec:
             defaultMode: 0444
         - name: firebase-credentials
           secret:
-            secretName: notification-service-secrets
+            secretName: firebase-credentials
             items:
-              - key: firebase-service-account
-                path: firebase-service-account.json
-            defaultMode: 0444
+              - key: credentials.json
+                path: firebase-credentials.json
+        - name: logs
+          emptyDir: {}

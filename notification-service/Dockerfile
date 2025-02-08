@@ -39,6 +39,11 @@ RUN mkdir -p /app/config /app/logs /app/firebase /gcp-credentials && \
     chown -R nobody:nogroup /app /gcp-credentials && \
     chmod 755 /app/config /app/logs /app/firebase /gcp-credentials
 
+# Create necessary directories
+RUN mkdir -p /app/logs /etc/gcp/credentials && \
+    chown -R 1000:1000 /app/logs /etc/gcp && \
+    chmod 755 /app/logs /etc/gcp
+
 USER nobody
 
 # Set environment variables
