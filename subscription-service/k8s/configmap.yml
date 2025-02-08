@@ -34,25 +34,32 @@ data:
         preferIpAddress: true
         leaseRenewalIntervalInSeconds: 10
         health-check-url-path: /actuator/health
+        instanceId: ${spring.application.name}:${spring.cloud.client.hostname}:${server.port}
+        statusPageUrlPath: /actuator/info
+        healthCheckUrlPath: /actuator/health
       client:
         registerWithEureka: true
         fetchRegistry: true
         serviceUrl:
-          defaultZone: ${EUREKA_SERVER_URL}/eureka/
-        username: ${EUREKA_USERNAME}
-        password: ${EUREKA_PASSWORD}
+          defaultZone: ${EUREKA_SERVER_URL:http://eureka-server:8761}/eureka/
+        username: ${EUREKA_USERNAME:craftpilot}
+        password: ${EUREKA_PASSWORD:13579ada}
 
     management:
       endpoints:
         web:
+          base-path: /actuator
           exposure:
-            include: health,info,metrics,prometheus
+            include: "*"
       endpoint:
         health:
           show-details: always
-        metrics:
+          probes:
+            enabled: true
+      health:
+        livenessState:
           enabled: true
-        prometheus:
+        readinessState:
           enabled: true
 
     logging:

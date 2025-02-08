@@ -167,18 +167,6 @@ logging:
     org.springframework.web: INFO
 
 eureka:
-  instance:
-    preferIpAddress: true
-    hostname: ${HOSTNAME:subscription-service}
-    lease-renewal-interval-in-seconds: 10
-    lease-expiration-duration-in-seconds: 20
-    instance-id: ${spring.application.name}:${spring.cloud.client.hostname}:${server.port}
-    health-check-url-path: /actuator/health
-    statusPageUrlPath: /actuator/info
-    healthCheckUrlPath: /actuator/health
-    instanceId: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
-    metadata-map:
-      startup: ${random.int}
   client:
     serviceUrl:
       defaultZone: ${EUREKA_SERVER_URL:http://craftpilot:13579ada@eureka-server:8761/eureka/}
@@ -186,7 +174,13 @@ eureka:
     fetch-registry: true
     healthcheck:
       enabled: true
-    registerWithEureka: true
-    fetchRegistry: true
-    serviceUrl:
-      defaultZone: http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+    hostname: ${HOSTNAME:subscription-service}
+    instance-id: ${spring.application.name}:${spring.cloud.client.hostname}:${server.port}
+    lease-renewal-interval-in-seconds: 10
+    health-check-url-path: /actuator/health
+    metadata-map:
+      startup: ${random.int}
+      user.name: ${spring.security.user.name}
+      user.password: ${spring.security.user.password}
