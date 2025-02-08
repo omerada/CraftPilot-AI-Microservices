@@ -100,7 +100,9 @@ jobs:
                 --name redis \
                 --network craftpilot-network \
                 -p 6379:6379 \
-                redis:latest
+                -e REDIS_PASSWORD=13579ada \
+                redis:latest \
+                redis-server --requirepass 13579ada
             fi
 
             # Eureka server'ı başlat (eğer çalışmıyorsa)
@@ -148,7 +150,7 @@ jobs:
                 echo "Eureka Server is healthy"
                 break
               fi
-              if [ $i -eq 30 ]; then
+              if [ $i -eq 30]; then
                 echo "Eureka Server failed to start"
                 docker logs eureka-server
                 exit 1
@@ -164,7 +166,7 @@ jobs:
                 echo "Image Service is healthy"
                 break
               fi
-              if [ $i -eq 30 ]; then
+              if [ $i -eq 30]; then
                 echo "Image Service failed to start"
                 docker logs image-service
                 exit 1
