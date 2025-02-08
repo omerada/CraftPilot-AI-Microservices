@@ -1,10 +1,16 @@
 server:
-  port: 8053
+  port: 8065
+  compression:
+    enabled: true
+    mime-types: application/json,text/plain
+    min-response-size: 1024
+  shutdown: graceful
 
 spring:
   application:
     name: notification-service
-
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   mail:
     from: noreply@craftpilot.com
     host: smtp.sendgrid.net
@@ -14,36 +20,35 @@ spring:
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
-
   cloud:
     gcp:
       project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
       credentials:
-        location: ${GOOGLE_APPLICATION_CREDENTIALS:/app/config/firebase-service-account.json}
+        location: file:${GCP_SA_KEY_PATH:/app/config/firebase-credentials.json}
       firestore:
         enabled: true
         project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
         database-id: ${GCP_FIRESTORE_DATABASE_ID:default}
+    discovery:
+      enabled: true
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     consumer:
-      group-id: notification-service-group
+      group-id: ${spring.application.name}-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "*"
+        spring.json.trusted.packages: "com.craftpilot.*"
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      properties:
-        spring.json.add.type.headers: false
 
   redis:
-    host: ${REDIS_HOST:localhost}
-    port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:}
+    host: ${SPRING_REDIS_HOST:redis}
+    port: ${SPRING_REDIS_PORT:6379}
+    password: ${SPRING_REDIS_PASSWORD:13579ada}
     timeout: 2000
     lettuce:
       pool:
@@ -61,6 +66,8 @@ management:
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
     metrics:
       enabled: true
     prometheus:
@@ -69,7 +76,7 @@ management:
 eureka:
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka}
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8761/eureka/}
     register-with-eureka: true
     fetch-registry: true
   instance:
@@ -108,7 +115,6 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     enabled: true
-    disable-swagger-default-url: true
   api-docs:
     path: /v3/api-docs
     enabled: true
@@ -116,3 +122,8 @@ springdoc:
   paths-to-match: /**
   default-produces-media-type: application/json
   default-consumes-media-type: application/json
+
+gcp:
+  sa:
+    key:
+      path: ${GCP_SA_KEY_PATH:/app/config/firebase-credentials.json}

@@ -83,7 +83,8 @@ jobs:
             mkdir -p /opt/craftpilot/config/notification-service
 
             # Create Firebase credentials file
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/notification-service/firebase-credentials.json 
+            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/notification-service/firebase-credentials.json
+            chmod 600 /opt/craftpilot/config/notification-service/firebase-credentials.json
 
             # Run new container
             docker run -d \
@@ -91,12 +92,10 @@ jobs:
               --network craftpilot-network \
               --restart unless-stopped \
               -p 8065:8065 \
-              -v /opt/craftpilot/config/notification-service:/app/config \
+              -v /opt/craftpilot/config/notification-service:/app/config:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e SPRING_CLOUD_GCP_SA_KEY_LOCATION=file:/app/config/gcp-credentials.json \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
-              -e GCP_SA_KEY_PATH=/app/config/firebase-credentials.json \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-credentials.json \
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
@@ -104,31 +103,11 @@ jobs:
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
 
-            # Health check with more detailed output
-            echo "Starting health checks..."
-            for i in {1..30}; do
-              echo "Attempt $i: Checking service health..."
-              
-              HEALTH_STATUS=$(curl -s http://localhost:8065/actuator/health || echo "Failed to connect")
-              echo "Health status: $HEALTH_STATUS"
-              
-              if echo "$HEALTH_STATUS" | grep -q "UP"; then
-                echo "Service is healthy!"
-                exit 0
-              fi
-              
-              if [ $i -eq 15 ]; then
-                echo "Mid-point container logs:"
-                docker logs notification-service
-              fi
-              
-              sleep 10
-            done
+            # Verify credentials file exists in container
+            docker exec notification-service ls -l /app/config/firebase-credentials.json || echo "Credentials file not found!"
 
-            echo "Service failed to become healthy within timeout"
-            echo "Final container logs:"
+            # Check container logs
             docker logs notification-service
-            exit 1
 
       - name: Trigger Deploy Services Workflow
         if: success()

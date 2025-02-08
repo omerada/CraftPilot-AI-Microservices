@@ -5,35 +5,29 @@ import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.FirestoreOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.context.annotation.Configuration; 
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.FileInputStream;
 import java.io.IOException;
 
 @Configuration
+@Slf4j
 public class FirestoreConfig {
 
-    @Value("${spring.cloud.gcp.project-id}")
-    private String projectId;
-
-    @Value("${google.credentials.path:/app/config/gcp-credentials.json}")
+    @Value("${GOOGLE_APPLICATION_CREDENTIALS:/app/config/firebase-credentials.json}")
     private String credentialsPath;
 
     @Bean
     public Firestore firestore() throws IOException {
-        GoogleCredentials credentials;
-        try {
-            credentials = GoogleCredentials.fromStream(new FileInputStream(credentialsPath));
-        } catch (IOException e) {
-            throw new IllegalStateException("GCP kimlik bilgileri yüklenemedi: " + e.getMessage(), e);
-        }
-        
+        GoogleCredentials credentials = GoogleCredentials.fromStream(
+            new FileInputStream(credentialsPath)
+        );
+
         FirestoreOptions firestoreOptions = FirestoreOptions.newBuilder()
-                .setProjectId(projectId)
-                .setCredentials(credentials)
-                .build();
-        
+            .setCredentials(credentials)
+            .build();
+
         return firestoreOptions.getService();
     }
 } 
