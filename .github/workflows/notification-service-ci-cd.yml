@@ -79,8 +79,11 @@ jobs:
             docker stop notification-service || true
             docker rm notification-service || true
 
+            # Create config directory if not exists
+            mkdir -p /opt/craftpilot/config/notification-service
+
             # Create Firebase credentials file
-            echo '${{ secrets.FIREBASE_CREDENTIALS }}' > /tmp/firebase-credentials.json
+            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/notification-service/firebase-credentials.json 
 
             # Run new container
             docker run -d \
@@ -88,16 +91,17 @@ jobs:
               --network craftpilot-network \
               --restart unless-stopped \
               -p 8065:8065 \
-              -v /tmp/firebase-credentials.json:/firebase-credentials.json:ro \
-              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
+              -v /opt/craftpilot/config/notification-service:/app/config \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e SPRING_CLOUD_GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
-              -e FIREBASE_CREDENTIALS_PATH=/firebase-credentials.json \
+              -e SPRING_CLOUD_GCP_SA_KEY_LOCATION=file:/app/config/gcp-credentials.json \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
+              -e GCP_SA_KEY_PATH=/app/config/firebase-credentials.json \
+              -e SPRING_REDIS_HOST=redis \
+              -e SPRING_REDIS_PORT=6379 \
+              -e SPRING_REDIS_PASSWORD=13579ada \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-              -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
-              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
 
             # Health check with more detailed output

@@ -46,7 +46,7 @@ Bu servis, CraftPilot platformunda bildirim yönetiminden sorumludur. E-posta bi
 KAFKA_BROKERS=localhost:9092
 REDIS_HOST=localhost
 REDIS_PORT=6379
-FIREBASE_CREDENTIALS_PATH=path/to/firebase-credentials.json
+GCP_SA_KEY_PATH=path/to/firebase-credentials.json
 SENDGRID_API_KEY=your-sendgrid-api-key
 GOOGLE_CLOUD_PROJECT_ID=your-project-id
 EUREKA_SERVER_URL=http://localhost:8761/eureka

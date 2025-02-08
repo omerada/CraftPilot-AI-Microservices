@@ -5,10 +5,10 @@ export DOCKERHUB_USERNAME=$DOCKERHUB_USERNAME
 export EUREKA_USERNAME=$EUREKA_USERNAME
 export EUREKA_PASSWORD=$EUREKA_PASSWORD
 export GCP_SA_KEY=$GCP_SA_KEY
-export GCP_CREDENTIALS_PATH="/opt/craftpilot/gcp-credentials.json"
+export GCP_SA_KEY_PATH="/opt/craftpilot/gcp-credentials.json"
 
 # GCP credentials dosyasını oluştur
-echo "$GCP_SA_KEY" > $GCP_CREDENTIALS_PATH
+echo "$GCP_SA_KEY" > $GCP_SA_KEY_PATH
 
 # Docker compose dosyasını çalıştır
 docker-compose up -d

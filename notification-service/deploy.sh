@@ -32,7 +32,7 @@ echo "=== Starting Dependencies ==="
 wait_for_redis
 
 echo "=== Creating Firebase Credentials ==="
-echo "${FIREBASE_CREDENTIALS}" > /tmp/firebase-credentials.json
+echo "${GCP_SA_KEY}" > /tmp/firebase-credentials.json
 
 echo "=== Pulling ARM64 Image ==="
 docker pull ${DOCKERHUB_USERNAME}/${SERVICE_NAME}:latest-arm64

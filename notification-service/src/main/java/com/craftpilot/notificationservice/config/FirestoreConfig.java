@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 
 @Configuration
@@ -16,11 +17,17 @@ public class FirestoreConfig {
     @Value("${spring.cloud.gcp.project-id}")
     private String projectId;
 
+    @Value("${google.credentials.path:/app/config/gcp-credentials.json}")
+    private String credentialsPath;
+
     @Bean
     public Firestore firestore() throws IOException {
-        ClassPathResource serviceAccount = new ClassPathResource("firebase-service-account.json");
-        
-        GoogleCredentials credentials = GoogleCredentials.fromStream(serviceAccount.getInputStream());
+        GoogleCredentials credentials;
+        try {
+            credentials = GoogleCredentials.fromStream(new FileInputStream(credentialsPath));
+        } catch (IOException e) {
+            throw new IllegalStateException("GCP kimlik bilgileri yüklenemedi: " + e.getMessage(), e);
+        }
         
         FirestoreOptions firestoreOptions = FirestoreOptions.newBuilder()
                 .setProjectId(projectId)

@@ -38,11 +38,11 @@ services:
       - SPRING_REDIS_HOST=redis
       - SPRING_REDIS_PORT=6379
       - SPRING_REDIS_PASSWORD=13579ada
-      - SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/gcp-credentials.json
+      - SPRING_CLOUD_GCP_SA_KEY_LOCATION=file:/app/gcp-credentials.json
       - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
     volumes:
-      - ${GCP_CREDENTIALS_PATH:-./redis-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
+      - ${GCP_SA_KEY_PATH:-./redis-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
     networks:
       - craftpilot-network
     depends_on:
@@ -147,7 +147,7 @@ services:
       - GCP_SA_KEY=${GCP_SA_KEY}
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
     volumes:
-      - ${GCP_CREDENTIALS_PATH}:/gcp-credentials.json:ro
+      - ${GCP_SA_KEY_PATH}:/gcp-credentials.json:ro
     networks:
       - craftpilot-network
     depends_on:
@@ -172,7 +172,7 @@ services:
       - SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS=kafka:9092
       - SPRING_KAFKA_ADMIN_BOOTSTRAP_SERVERS=kafka:9092
     volumes:
-      - ${GCP_CREDENTIALS_PATH:-./llm-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
+      - ${GCP_SA_KEY_PATH:-./llm-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
     networks:
       - craftpilot-network
     depends_on:
@@ -380,14 +380,14 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
-      - SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/gcp-credentials.json
+      - SPRING_CLOUD_GCP_SA_KEY_LOCATION=file:/app/gcp-credentials.json
       - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
       - SPRING_REDIS_HOST=redis
       - SPRING_REDIS_PORT=6379
       - SPRING_REDIS_PASSWORD=13579ada
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     volumes:
-      - ${GCP_CREDENTIALS_PATH:-./admin-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
+      - ${GCP_SA_KEY_PATH:-./admin-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
     networks:
       - craftpilot-network
     depends_on:
@@ -425,7 +425,7 @@ services:
       - SPRING_REDIS_PORT=6379
       - SPRING_REDIS_PASSWORD=13579ada
     volumes:
-      - ${FIREBASE_CREDENTIALS_PATH}:/app/config/firebase-service-account.json:ro
+      - ${GCP_SA_KEY_PATH}:/app/config/firebase-service-account.json:ro
     networks:
       - craftpilot-network
     healthcheck:

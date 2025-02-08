@@ -38,7 +38,7 @@ echo "=== Waiting for Service to Start ==="
 wait_for_service
 
 echo "=== Creating GCP Credentials ==="
-echo "${GCP_CREDENTIALS}" > /tmp/gcp-credentials.json
+echo "${GCP_SA_KEY}" > /tmp/gcp-credentials.json
 
 echo "=== Pulling ARM64 Image ==="
 docker pull ${DOCKERHUB_USERNAME}/${SERVICE_NAME}:latest-arm64

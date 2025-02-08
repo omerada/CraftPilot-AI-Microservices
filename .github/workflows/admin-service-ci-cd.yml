@@ -66,7 +66,7 @@ jobs:
             fi
 
             # GCP kimlik bilgilerini oluştur
-            echo '${{ secrets.GCP_CREDENTIALS_JSON }}' | sudo tee /opt/craftpilot/gcp-credentials.json > /dev/null
+            echo '${{ secrets.GCP_SA_KEY_JSON }}' | sudo tee /opt/craftpilot/gcp-credentials.json > /dev/null
             sudo chmod 640 /opt/craftpilot/gcp-credentials.json
 
             # Remove existing container
