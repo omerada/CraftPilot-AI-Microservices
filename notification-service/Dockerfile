@@ -2,18 +2,14 @@
 FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /build
 
-# Copy root pom.xml
-COPY ./pom.xml .
+# Copy only notification service files
+COPY notification-service/pom.xml pom.xml
+COPY notification-service/src src
 
-# Copy service specific files
-COPY ./notification-service/pom.xml ./notification-service/
-COPY ./notification-service/src ./notification-service/src
-
-# Build with Maven - only notification-service module
+# Build with Maven
 RUN apk add --no-cache maven && \
-    mvn clean package -DskipTests \
-    -pl notification-service \
-    -am \
+    mvn clean package \
+    -DskipTests \
     -Dspring.profiles.active=prod \
     -Dmaven.repo.local=/root/.m2/repository
 
@@ -25,7 +21,10 @@ WORKDIR /app
 RUN apk add --no-cache curl
 
 # Copy jar from build stage
-COPY --from=builder /build/notification-service/target/*.jar app.jar
+COPY --from=builder /build/target/*.jar app.jar
+
+# Create config directory
+RUN mkdir -p /app/config
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
