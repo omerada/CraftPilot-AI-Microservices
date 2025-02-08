@@ -16,12 +16,11 @@ ENV M2_HOME=/opt/maven
 ENV MAVEN_HOME=/opt/maven
 ENV PATH=${M2_HOME}/bin:${PATH}
 
-# Maven build için platform ayarı
-ARG TARGETARCH=arm64
-RUN echo "Building for ARM64 architecture"
+# ARM64 uyumluluğu için Java seçeneklerini ayarla
+ENV JAVA_TOOL_OPTIONS="-Dos.arch=aarch64"
 
 # Projeyi derle
-RUN mvn clean package -DskipTests --platform linux/arm64
+RUN mvn clean package -DskipTests
 
 # Run stage
 FROM public.ecr.aws/amazoncorretto/amazoncorretto:21
