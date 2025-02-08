@@ -10,9 +10,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import reactor.core.publisher.Mono;
 
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
+import java.util.Optional;
+import java.util.function.Predicate;
 
 @Configuration
 public class GoogleCloudConfig {
@@ -20,15 +25,44 @@ public class GoogleCloudConfig {
     @Value("${spring.cloud.gcp.project-id}")
     private String projectId;
 
+    @Value("${GOOGLE_APPLICATION_CREDENTIALS:classpath:firebase-service-account.json}")
+    private String credentialsPath;
+
     private final Environment environment;
 
     public GoogleCloudConfig(Environment environment) {
         this.environment = environment;
     }
 
+    @PostConstruct
+    public void initialize() throws IOException {
+        if (isFirebaseInitialized()) {
+            return;
+        }
+
+        Resource serviceAccount;
+        if (credentialsPath.startsWith("classpath:")) {
+            serviceAccount = new ClassPathResource(credentialsPath.substring("classpath:".length()));
+        } else {
+            serviceAccount = new ClassPathResource(credentialsPath);
+        }
+
+        FirebaseOptions options = FirebaseOptions.builder()
+                .setCredentials(GoogleCredentials.fromStream(serviceAccount.getInputStream()))
+                .build();
+
+        FirebaseApp.initializeApp(options);
+    }
+
+    private boolean isFirebaseInitialized() {
+        return Optional.ofNullable(FirebaseApp.getApps())
+                .filter(Predicate.not(apps -> apps.isEmpty()))
+                .isPresent();
+    }
+
     @Bean
     public GoogleCredentials googleCredentials() throws IOException {
-        if (environment.acceptsProfiles(profiles -> profiles.test())) {
+        if (environment.acceptsProfiles(profiles -> profiles.test("test"))) {
             return GoogleCredentials.create(null);
         }
         return GoogleCredentials.getApplicationDefault();
