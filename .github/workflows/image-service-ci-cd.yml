@@ -137,6 +137,7 @@ jobs:
               -e REDIS_PASSWORD=13579ada \
               -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
               -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/ \
               ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
 
             # Container'ın başlaması için bekle

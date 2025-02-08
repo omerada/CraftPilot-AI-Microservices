@@ -37,17 +37,18 @@ spring:
       use-key-prefix: true
       key-prefix: craftpilot
   redis:
-    host: ${REDIS_HOST:localhost}
+    host: ${REDIS_HOST:redis}
     port: ${REDIS_PORT:6379}
-    timeout: 2000
-    connect-timeout: 2000
+    password: ${REDIS_PASSWORD:13579ada}
+    timeout: 5000
+    connect-timeout: 5000
     lettuce:
       pool:
         max-active: 16
         max-idle: 8
         min-idle: 4
-        max-wait: 1000ms
-      shutdown-timeout: 200ms
+        max-wait: 2000ms
+      shutdown-timeout: 500ms
   main:
     web-application-type: reactive
   codec:
@@ -89,10 +90,12 @@ eureka:
     lease-expiration-duration-in-seconds: 10
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_SERVICE_URL:http://localhost:8761/eureka/}
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://eureka-server:8761/eureka/}
     registry-fetch-interval-seconds: 5
     register-with-eureka: true
     fetch-registry: true
+    eureka-server-connect-timeout-seconds: 5
+    eureka-server-read-timeout-seconds: 10
 
 management:
   endpoints:
@@ -102,10 +105,8 @@ management:
   endpoint:
     health:
       show-details: always
-      validate-group-membership: false
-      group:
-        readiness:
-          include: db,redis,diskSpace
+      probes:
+        enabled: true
   health:
     livenessstate:
       enabled: ${MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED:true}

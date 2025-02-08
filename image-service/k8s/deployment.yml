@@ -46,6 +46,8 @@ spec:
                 secretKeyRef:
                   name: openai-credentials
                   key: api-key
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              value: "http://eureka-server:8761/eureka/"
           volumeMounts:
             - name: gcp-credentials
               mountPath: "/gcp-credentials"
@@ -57,17 +59,24 @@ spec:
             limits:
               memory: "1Gi"
               cpu: "500m"
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8056
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8056
-            initialDelaySeconds: 30
+            initialDelaySeconds: 20
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8056
-            initialDelaySeconds: 60
+            initialDelaySeconds: 40
             periodSeconds: 15
       volumes:
         - name: gcp-credentials
