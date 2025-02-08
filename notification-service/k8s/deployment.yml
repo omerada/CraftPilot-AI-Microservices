@@ -52,10 +52,32 @@ spec:
                   name: kafka-config
                   key: bootstrap-servers
             - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_BROKERS
+              value: "kafka:9092"
+            - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_AUTO_CREATE_TOPICS
+              value: "true"
+            - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_MIN_PARTITION_COUNT
+              value: "1"
+            - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_REPLICATION_FACTOR
+              value: "1"
+            - name: SPRING_CLOUD_FUNCTION_DEFINITION
+              value: "processNotification"
+            - name: SPRING_CLOUD_STREAM_BINDINGS_PROCESSNOTIFICATION_IN_0_DESTINATION
+              value: "notifications"
+            - name: SPRING_CLOUD_STREAM_BINDINGS_PROCESSNOTIFICATION_IN_0_GROUP
+              value: "notification-service-group"
+            - name: SPRING_CLOUD_STREAM_BINDINGS_PROCESSNOTIFICATION_OUT_0_DESTINATION
+              value: "notifications"
+            - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_BROKERS
               valueFrom:
                 configMapKeyRef:
                   name: kafka-config
                   key: bootstrap-servers
+            - name: SPRING_CLOUD_STREAM_DEFAULTBINDER
+              value: "kafka"
+            - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_REPLICATIONFACTOR
+              value: "1"
+            - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_REQUIRED_ACKS
+              value: "1"
             - name: EUREKA_SERVER_URL
               valueFrom:
                 configMapKeyRef:

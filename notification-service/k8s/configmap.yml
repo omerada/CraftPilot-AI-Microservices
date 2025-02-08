@@ -6,7 +6,7 @@ metadata:
 data:
   application.yml: |
     server:
-      port: 8053  # Port doğrulaması
+      port: 8053
 
     spring:
       application:
@@ -22,24 +22,39 @@ data:
           value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
           properties:
             spring.json.trusted.packages: "*"
+            spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+            spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         producer:
           key-serializer: org.apache.kafka.common.serialization.StringSerializer
           value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+          properties:
+            spring.json.add.type.headers: false
+            spring.json.trusted.packages: "*"
       cloud:
         stream:
+          defaultBinder: kafka
+          function:
+            definition: processNotification
           kafka:
             binder:
               brokers: ${KAFKA_BOOTSTRAP_SERVERS}
+              autoCreateTopics: true
+              minPartitionCount: 1
+              replicationFactor: 1
               configuration:
                 security.protocol: PLAINTEXT
+                auto.offset.reset: earliest
           bindings:
-            input:
+            processNotification-in-0:
               destination: notifications
-              content-type: application/json
+              contentType: application/json
               group: notification-service-group
-            output:
+              consumer:
+                concurrency: 1
+                maxAttempts: 3
+            processNotification-out-0:
               destination: notifications
-              content-type: application/json
+              contentType: application/json
       data:
         redis:
           repositories:
