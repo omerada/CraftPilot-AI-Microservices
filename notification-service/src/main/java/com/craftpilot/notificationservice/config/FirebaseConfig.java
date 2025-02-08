@@ -9,28 +9,33 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 
 @Configuration
 @Slf4j
 public class FirebaseConfig {
 
-    @Value("${GOOGLE_APPLICATION_CREDENTIALS}")
+    @Value("${GCP_SA_KEY}")
     private String credentialsPath;
 
     @Bean
-    public FirebaseMessaging firebaseMessaging() throws IOException {
-        log.info("Firebase kimlik bilgileri yükleniyor: {}", credentialsPath);
-        GoogleCredentials credentials = GoogleCredentials.getApplicationDefault();
-        
-        FirebaseOptions options = FirebaseOptions.builder()
+    public FirebaseApp firebaseApp() throws IOException {
+        if (FirebaseApp.getApps().isEmpty()) {
+            GoogleCredentials credentials = GoogleCredentials.fromStream(
+                new FileInputStream(credentialsPath));
+
+            FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(credentials)
                 .build();
-        
-        if (FirebaseApp.getApps().isEmpty()) {
-            FirebaseApp.initializeApp(options);
+
+            return FirebaseApp.initializeApp(options);
         }
-        
-        return FirebaseMessaging.getInstance();
+        return FirebaseApp.getInstance();
+    }
+
+    @Bean
+    public FirebaseMessaging firebaseMessaging(FirebaseApp firebaseApp) {
+        return FirebaseMessaging.getInstance(firebaseApp);
     }
 } 

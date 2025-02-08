@@ -15,18 +15,17 @@ import java.io.IOException;
 @Slf4j
 public class FirestoreConfig {
 
-    @Value("${spring.cloud.gcp.credentials.location}")
+    @Value("${GCP_SA_KEY}")
     private String credentialsPath;
     
-    @Value("${spring.cloud.gcp.project-id}")
+    @Value("${GCP_PROJECT_ID}")
     private String projectId;
 
     @Bean
     public Firestore firestore() throws IOException {
         log.info("Firebase kimlik bilgileri yükleniyor: {}", credentialsPath);
-        String path = credentialsPath.substring(5); // "file:" prefix'ini kaldır
         GoogleCredentials credentials = GoogleCredentials.fromStream(
-            new FileInputStream(path));
+            new FileInputStream(credentialsPath));
         
         FirestoreOptions firestoreOptions = FirestoreOptions.newBuilder()
             .setCredentials(credentials)

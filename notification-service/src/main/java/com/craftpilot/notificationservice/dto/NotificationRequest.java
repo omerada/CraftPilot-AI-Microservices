@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -31,4 +32,10 @@ public class NotificationRequest {
     private LocalDateTime scheduledAt;
     
     private Map<String, Object> additionalData;
+
+    private String token;
+    private List<String> tokens;
+    private String topic;
+    private String title;
+    private String body;
 } 

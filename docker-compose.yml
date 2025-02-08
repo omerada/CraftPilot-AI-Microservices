@@ -303,6 +303,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
+      - GMAIL_SERVICE_ACCOUNT=${GMAIL_SERVICE_ACCOUNT}
       - GCP_SA_KEY=/app/config/service-account.json
       - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
       - SPRING_SECURITY_USER_NAME=${EUREKA_USERNAME}

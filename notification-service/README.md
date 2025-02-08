@@ -4,8 +4,7 @@ Bu servis, CraftPilot platformunda bildirim yönetiminden sorumludur. E-posta bi
 
 ## Özellikler
 
-- Reaktif programlama ile yüksek performanslı bildirim işleme
-- E-posta bildirimleri (SendGrid entegrasyonu)
+- Reaktif programlama ile yüksek performanslı bildirim işleme 
 - Push bildirimleri (Firebase Cloud Messaging entegrasyonu)
 - Bildirim şablonları yönetimi
 - Kullanıcı bildirim tercihleri yönetimi
@@ -23,8 +22,7 @@ Bu servis, CraftPilot platformunda bildirim yönetiminden sorumludur. E-posta bi
 - Spring Cloud Stream
 - Apache Kafka
 - Redis
-- Firebase Admin SDK
-- SendGrid API
+- Firebase Admin SDK 
 - Resilience4j
 - Prometheus
 - OpenAPI 3.0
@@ -37,8 +35,7 @@ Bu servis, CraftPilot platformunda bildirim yönetiminden sorumludur. E-posta bi
 - Maven
 - Redis
 - Kafka
-- Firebase hesabı ve yapılandırması
-- SendGrid API anahtarı
+- Firebase hesabı ve yapılandırması 
 
 ### Ortam Değişkenleri
 
@@ -46,8 +43,7 @@ Bu servis, CraftPilot platformunda bildirim yönetiminden sorumludur. E-posta bi
 KAFKA_BROKERS=localhost:9092
 REDIS_HOST=localhost
 REDIS_PORT=6379
-GCP_SA_KEY_PATH=path/to/firebase-credentials.json
-SENDGRID_API_KEY=your-sendgrid-api-key
+GCP_SA_KEY_PATH=path/to/firebase-credentials.json 
 GOOGLE_CLOUD_PROJECT_ID=your-project-id
 EUREKA_SERVER_URL=http://localhost:8761/eureka
 ```

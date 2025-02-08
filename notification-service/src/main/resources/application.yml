@@ -12,22 +12,15 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
   mail:
-    from: noreply@craftpilot.com
-    host: smtp.sendgrid.net
-    port: 587
-    username: apikey
-    password: ${SENDGRID_API_KEY}
-    properties:
-      mail.smtp.auth: true
-      mail.smtp.starttls.enable: true
+    from: ${GMAIL_SERVICE_ACCOUNT}
   cloud:
     gcp:
       credentials:
         location: file:${GCP_SA_KEY}
       project-id: ${GCP_PROJECT_ID}
       firestore:
-        project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
         enabled: true
+        project-id: ${GCP_PROJECT_ID}
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
