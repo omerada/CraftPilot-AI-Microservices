@@ -148,9 +148,9 @@ spring:
         - id: openapi
           uri: http://localhost:${server.port}
           predicates:
-            - Path=/v3/api-docs/**
+            - Path=/v3/api-docs/**,/swagger-ui/**,/swagger-ui.html
           filters:
-            - RewritePath=/v3/api-docs/(?<path>.*), /$\{path}/v3/api-docs
+            - RewritePath=/swagger-ui.html, /webjars/swagger-ui/index.html
 
   data:
     redis:
@@ -307,6 +307,7 @@ springdoc:
   paths-to-match:
     - /api/**
     - /auth/**
+  use-management-port: false
 
 security:
-  require-ssl: false  # Nginx handle edecek
+  require-ssl: false # Nginx handle edecek
