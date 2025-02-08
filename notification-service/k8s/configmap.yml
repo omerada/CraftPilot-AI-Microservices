@@ -14,14 +14,32 @@ data:
       cache:
         type: redis
       kafka:
+        bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
         consumer:
           group-id: notification-service-group
           auto-offset-reset: earliest
           key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
           value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+          properties:
+            spring.json.trusted.packages: "*"
         producer:
           key-serializer: org.apache.kafka.common.serialization.StringSerializer
           value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      cloud:
+        stream:
+          kafka:
+            binder:
+              brokers: ${KAFKA_BOOTSTRAP_SERVERS}
+              configuration:
+                security.protocol: PLAINTEXT
+          bindings:
+            input:
+              destination: notifications
+              content-type: application/json
+              group: notification-service-group
+            output:
+              destination: notifications
+              content-type: application/json
       data:
         redis:
           repositories:

@@ -46,6 +46,16 @@ spec:
                 configMapKeyRef:
                   name: kafka-config
                   key: bootstrap-servers
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: kafka-config
+                  key: bootstrap-servers
+            - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: kafka-config
+                  key: bootstrap-servers
             - name: EUREKA_SERVER_URL
               valueFrom:
                 configMapKeyRef:

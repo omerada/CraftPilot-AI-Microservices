@@ -126,6 +126,8 @@ jobs:
               -e SERVER_PORT=8053 \
               -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e SPRING_CLOUD_STREAM_KAFKA_BINDER_BROKERS=kafka:9092 \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
