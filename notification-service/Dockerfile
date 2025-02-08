@@ -34,21 +34,12 @@ RUN apt-get update && apt-get install -y \
 # Copy jar from build stage
 COPY --from=builder /build/target/*.jar app.jar
 
-# Create config directory and set permissions
-RUN mkdir -p /app/config && \
-    chown -R nobody:nogroup /app/config && \
-    chmod 755 /app/config
-
-# Create a directory for Firebase config
-RUN mkdir -p /app/firebase && \
-    chown -R nobody:nogroup /app/firebase && \
-    chmod 755 /app/firebase
+# Create all necessary directories and set permissions
+RUN mkdir -p /app/config /app/logs /app/firebase /gcp-credentials && \
+    chown -R nobody:nogroup /app /gcp-credentials && \
+    chmod 755 /app/config /app/logs /app/firebase /gcp-credentials
 
 USER nobody
-
-# Create necessary directories with correct permissions
-RUN mkdir -p /app/config /app/logs /gcp-credentials && \
-    chmod 755 /app/config /app/logs /gcp-credentials
 
 # Set environment variables
 ENV SERVER_PORT=8053 \
