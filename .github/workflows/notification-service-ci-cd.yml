@@ -122,10 +122,11 @@ jobs:
               --cpus="1.0" \
               -p 8053:8053 \
               -v /opt/craftpilot/config/notification-service:/app/config:ro \
-              -v "/opt/craftpilot/config/notification-service/gcp-credentials.json:/app/config/gcp-credentials.json:ro" \
-              -v "/opt/craftpilot/config/notification-service/firebase-service-account.json:/app/config/firebase-service-account.json:ro" \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
-              -e FIREBASE_CONFIG=/app/config/firebase-service-account.json \
+              -v "/opt/craftpilot/config/notification-service/gcp-credentials.json:/app/credentials/gcp-credentials.json:ro" \
+              -v "/opt/craftpilot/config/notification-service/firebase-service-account.json:/app/credentials/firebase-credentials.json:ro" \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-credentials.json \
+              -e FIREBASE_CONFIG=/app/credentials/firebase-credentials.json \
+              -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/credentials/gcp-credentials.json \
               -e GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}' \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8053 \
@@ -155,12 +156,12 @@ jobs:
               --health-cmd="/healthcheck.sh" \
               --health-interval=30s \
               --health-timeout=10s \
-              --health-retries=3 \
-              --health-start-period=120s \
+              --health-retries=5 \
+              --health-start-period=180s \
               ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
             
             echo "Waiting for container to start..."
-            sleep 120
+            sleep 180  # Increased wait time
             
             echo "Checking container status..."
             if [ "$(docker ps -q -f name=notification-service)" ]; then
