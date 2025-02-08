@@ -23,7 +23,10 @@ spec:
         - name: api-gateway
           image: craftpilot/api-gateway:latest
           ports:
-            - containerPort: 8080
+            - name: http
+              containerPort: 8080
+            - name: https
+              containerPort: 8443
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
@@ -35,9 +38,19 @@ spec:
               value: "6379"
             - name: FIREBASE_CONFIG_PATH
               value: "/etc/firebase/firebase-service-account.json"
+            - name: SSL_KEYSTORE_PATH
+              value: /etc/ssl/keystore.p12
+            - name: SSL_KEYSTORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: api-gateway-ssl
+                  key: keystore-password
           volumeMounts:
             - name: firebase-credentials
               mountPath: "/etc/firebase"
+              readOnly: true
+            - name: ssl-cert
+              mountPath: /etc/ssl
               readOnly: true
           resources:
             requests:
@@ -65,3 +78,9 @@ spec:
             items:
               - key: credentials.json
                 path: firebase-service-account.json
+        - name: ssl-cert
+          secret:
+            secretName: api-gateway-ssl
+            items:
+              - key: keystore.p12
+                path: keystore.p12
