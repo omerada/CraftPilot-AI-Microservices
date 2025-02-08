@@ -5,6 +5,7 @@ on:
     branches: [master]
     paths:
       - "notification-service/**"
+      - "pom.xml"
       - ".github/workflows/notification-service-ci-cd.yml"
   workflow_dispatch:
 
@@ -56,7 +57,8 @@ jobs:
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: ./notification-service
+          context: .
+          file: ./notification-service/Dockerfile
           platforms: linux/arm64
           push: true
           tags: |
