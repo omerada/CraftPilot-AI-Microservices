@@ -21,7 +21,7 @@ ARG TARGETARCH=arm64
 RUN echo "Building for ARM64 architecture"
 
 # Projeyi derle
-RUN mvn clean package -DskipTests
+RUN mvn clean package -DskipTests --platform linux/arm64
 
 # Run stage
 FROM public.ecr.aws/amazoncorretto/amazoncorretto:21
