@@ -72,6 +72,17 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Check if port 8064 is in use
+            echo "Checking if port 8064 is already in use..."
+            if netstat -tulpn 2>/dev/null | grep ":8064 "; then
+              echo "Port 8064 is already in use. Killing the process..."
+              PID=$(netstat -tulpn 2>/dev/null | grep ":8064 " | awk '{print $7}' | cut -d'/' -f1)
+              if [ ! -z "$PID" ]; then
+                kill -9 $PID || true
+              fi
+              sleep 5
+            fi
+
             # Infrastructure network
             echo "Checking network..."
             docker network ls | grep craftpilot-network
@@ -81,18 +92,23 @@ jobs:
             echo "Checking redis status..."
             docker ps | grep redis
 
-            # Check existing redis-service
+            # Check and remove any existing redis-service containers
             echo "Checking existing redis-service..."
-            docker ps -a | grep redis-service
-
-            # Remove existing container
-            echo "Removing existing container if any..."
-            docker stop redis-service || true
-            docker rm redis-service || true
+            if docker ps -a | grep redis-service; then
+              echo "Found existing redis-service container, removing it..."
+              docker stop redis-service || true
+              docker rm redis-service || true
+            fi
 
             # Pull the latest image
             echo "Pulling latest image..."
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
+
+            # Install jq if not present
+            if ! command -v jq &> /dev/null; then
+              echo "Installing jq..."
+              apt-get update && apt-get install -y jq
+            fi
 
             # Run new container with detailed logging
             echo "Starting redis-service container..."
