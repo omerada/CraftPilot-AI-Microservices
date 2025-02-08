@@ -28,12 +28,11 @@ WORKDIR /app
 RUN apk add --no-cache \
     curl \
     tzdata \
-    libc6-compat \
     gcompat \
     libstdc++ \
     linux-headers \
-    &&  cp /usr/share/zoneinfo/UTC /etc/localtime \
-    && echo "UTC" > /etc/timezone
+    libc6-compat \
+    && rm -rf /var/cache/apk/*
 
 # Copy jar from build stage
 COPY --from=builder /build/target/*.jar app.jar
@@ -50,7 +49,7 @@ ENV SERVER_PORT=8053 \
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8053/actuator/health || exit 1
 
-# Update JVM tuning
+# Update JVM tuning with optimized settings
 ENV JAVA_OPTS="\
     -XX:+UseContainerSupport \
     -XX:MaxRAMPercentage=75.0 \
@@ -62,6 +61,7 @@ ENV JAVA_OPTS="\
     -Dfile.encoding=UTF-8 \
     -Dio.netty.noPreferDirect=true \
     -Dio.netty.recycler.maxCapacity=0 \
+    -Dio.netty.transport.noNative=true \
     -Dio.netty.nativeEpoll=false \
     -Djava.security.egd=file:/dev/./urandom \
     -Dserver.port=8053 \

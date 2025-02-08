@@ -76,6 +76,8 @@ spec:
               value: /gcp-credentials.json
             - name: SPRING_CLOUD_GCP_PROJECT_ID
               value: craft-pilot-ai
+            - name: JAVA_OPTS
+              value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Dio.netty.transport.noNative=true"
           resources:
             requests:
               memory: "512Mi"
