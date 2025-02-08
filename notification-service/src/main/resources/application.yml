@@ -46,6 +46,13 @@ spring:
         min-idle: 2
         max-wait: -1ms
       shutdown-timeout: 100ms
+    client-type: lettuce
+    connect-timeout: 2000
+    retry:
+      max-attempts: 3
+      initial-interval: 1000
+      multiplier: 2.0
+      max-interval: 5000
 
 management:
   endpoints:
