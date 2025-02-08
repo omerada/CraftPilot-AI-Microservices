@@ -13,6 +13,7 @@ public class UserEvent {
     private String userId;
     private String eventType;
     private long timestamp;
+    // Add other necessary fields
     
     public static UserEvent fromUser(String eventType, String userId) {
         return UserEvent.builder()
@@ -21,4 +22,4 @@ public class UserEvent {
                 .timestamp(System.currentTimeMillis())
                 .build();
     }
-} 
+}

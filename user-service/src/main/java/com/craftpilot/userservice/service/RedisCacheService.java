@@ -44,4 +44,4 @@ public class RedisCacheService {
                 .set(USER_PREFERENCES_KEY + userId, preferences)
                 .then();
     }
-} 
+}
