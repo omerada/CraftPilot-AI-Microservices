@@ -47,6 +47,10 @@ spec:
               value: "kafka:9092"
             - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_BROKERS
               value: "kafka:9092"
+            - name: SPRING_CLOUD_STREAM_DEFAULT_BINDER
+              value: "kafka"
+            - name: SPRING_CLOUD_FUNCTION_DEFINITION
+              value: "notificationEventConsumer;notificationEventProducer"
             - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_AUTO_CREATE_TOPICS
               value: "true"
             - name: SPRING_CLOUD_STREAM_KAFKA_BINDER_MIN_PARTITION_COUNT
