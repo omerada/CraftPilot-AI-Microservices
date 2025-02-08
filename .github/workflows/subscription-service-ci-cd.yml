@@ -118,6 +118,11 @@ jobs:
             docker stop subscription-service || true
             docker rm subscription-service || true
 
+            echo "=== Setting up GCP Credentials ==="
+            mkdir -p /opt/craftpilot/gcp-credentials
+            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials/credentials.json
+            chmod 600 /opt/craftpilot/gcp-credentials/credentials.json
+
             echo "=== Starting New Container ==="
             docker run -d \
               --name subscription-service \
@@ -127,9 +132,10 @@ jobs:
               --memory-reservation="512m" \
               --cpus="0.5" \
               -p 8052:8052 \
-              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+              -v /opt/craftpilot/gcp-credentials:/gcp-credentials:ro \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials/credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
+              -e SPRING_CLOUD_GCP_PROJECT_ID=craftpilot-ai \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \
               -e REDIS_HOST=redis \

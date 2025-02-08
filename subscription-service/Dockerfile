@@ -19,7 +19,7 @@ WORKDIR /app
 COPY --from=build /build/target/*.jar app.jar
 
 # GCP credentials için volume mount noktası
-RUN mkdir -p /gcp-credentials
+RUN mkdir -p /gcp-credentials && chmod 700 /gcp-credentials
 
 # JVM ayarları ve sistem optimizasyonları
 ENV JAVA_OPTS="-XX:+UseContainerSupport \

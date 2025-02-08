@@ -6,11 +6,15 @@ import com.google.cloud.firestore.FirestoreOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 @Slf4j
 @Configuration
@@ -19,16 +23,33 @@ public class FirestoreConfig {
     @Value("${spring.cloud.gcp.project-id}")
     private String projectId;
 
-    @Value("${spring.cloud.gcp.credentials.location}")
-    private String credentialsPath;
-
     @Bean
     public Firestore firestore() throws IOException {
         log.info("Initializing Firestore with project ID: {}", projectId);
         
         try {
-            InputStream serviceAccount = new ClassPathResource(credentialsPath.replace("classpath:", "")).getInputStream();
-            GoogleCredentials credentials = GoogleCredentials.fromStream(serviceAccount);
+            // Önce container içindeki credentials dosyasını kontrol et
+            Path credentialsPath = Paths.get("/gcp-credentials/credentials.json");
+            GoogleCredentials credentials;
+            
+            if (Files.exists(credentialsPath)) {
+                log.info("Using GCP credentials from mounted volume");
+                try (InputStream serviceAccount = new FileInputStream(credentialsPath.toFile())) {
+                    credentials = GoogleCredentials.fromStream(serviceAccount);
+                }
+            } else {
+                // Environment variable'dan credentials'ı al
+                String gcpCredentials = System.getenv("GOOGLE_APPLICATION_CREDENTIALS");
+                if (gcpCredentials != null && !gcpCredentials.isEmpty()) {
+                    log.info("Using GCP credentials from environment variable");
+                    try (InputStream serviceAccount = new ByteArrayInputStream(gcpCredentials.getBytes())) {
+                        credentials = GoogleCredentials.fromStream(serviceAccount);
+                    }
+                } else {
+                    log.error("No GCP credentials found");
+                    throw new IOException("GCP credentials not found");
+                }
+            }
 
             FirestoreOptions firestoreOptions = FirestoreOptions.getDefaultInstance()
                     .toBuilder()
