@@ -74,34 +74,84 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Infrastructure network
+            echo "Starting deployment process..."
+            
+            # Debug mode enabled
+            set -x
+            
+            echo "Checking Docker service status..."
+            systemctl status docker || true
+            
+            echo "Checking existing containers..."
+            docker ps -a | grep notification-service || true
+            
+            echo "Creating network if not exists..."
             docker network create craftpilot-network || true
-
-            # Remove existing container
+            
+            echo "Pulling latest image..."
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
+            
+            echo "Stopping and removing existing container..."
             docker stop notification-service || true
             docker rm notification-service || true
-
-            # Create config directory
+            
+            echo "Setting up directories and permissions..."
             mkdir -p /opt/craftpilot/config/notification-service
-
-            # Create GCP credentials file
+            
+            echo "Creating GCP credentials..."
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/notification-service/gcp-credentials.json
             chmod 600 /opt/craftpilot/config/notification-service/gcp-credentials.json
-
-            # Run container
+            
+            echo "Starting container..."
             docker run -d \
               --name notification-service \
               --network craftpilot-network \
+              --restart unless-stopped \
               -p 8053:8053 \
               -v /opt/craftpilot/config/notification-service/gcp-credentials.json:/app/firebase-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-credentials.json \
               -e GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}' \
               -e SPRING_PROFILES_ACTIVE=prod \
+              -e SERVER_PORT=8053 \
               -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
+              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e REDIS_HOST=redis \
+              -e REDIS_PORT=6379 \
+              -e REDIS_PASSWORD=13579ada \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+              -e JAVA_OPTS="-Xmx512m -Xms256m" \
               ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
-
-            # Check container logs
-            docker logs notification-service
+            
+            echo "Waiting for container to start..."
+            sleep 15
+            
+            echo "Checking container status..."
+            if [ "$(docker ps -q -f name=notification-service)" ]; then
+              echo "Container is running successfully"
+              echo "Container logs:"
+              docker logs notification-service --tail 50
+              
+              echo "Container network info:"
+              docker inspect notification-service | grep -i ip
+              
+              echo "Testing container health:"
+              curl -v http://localhost:8053/actuator/health || true
+            else
+              echo "Container failed to start"
+              echo "Container logs:"
+              docker logs notification-service
+              
+              echo "Docker events:"
+              docker events --filter container=notification-service --since 5m || true
+              
+              echo "System logs:"
+              journalctl -u docker.service --since "5 minutes ago" || true
+              
+              exit 1
+            fi
+            
+            # Disable debug mode
+            set +x
 
       - name: Trigger Deploy Services Workflow
         if: success()
