@@ -17,7 +17,7 @@ COPY src ./src/
 RUN ./mvnw clean package -DskipTests
 
 # Run stage
-FROM public.ecr.aws/amazoncorretto/amazoncorretto:21-al2023-slim
+FROM public.ecr.aws/amazoncorretto/amazoncorretto:21-al2023
 
 WORKDIR /app
 
@@ -26,7 +26,8 @@ USER 1000
 # Install required native dependencies
 RUN yum update -y && \
     yum install -y glibc-devel openssl-devel apr-devel && \
-    yum clean all
+    yum clean all && \
+    rm -rf /var/cache/yum
 
 COPY --from=build --chown=1000:1000 /build/target/*.jar app.jar
 
