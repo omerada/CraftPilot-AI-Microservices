@@ -4,12 +4,6 @@ server:
   netty:
     connection-timeout: 2s
     idle-timeout: 15s
-  ssl:
-    enabled: true
-    key-store: ${SSL_KEYSTORE_PATH:/etc/ssl/keystore.p12}
-    key-store-password: ${SSL_KEYSTORE_PASSWORD:your-keystore-password}
-    key-store-type: PKCS12
-    key-alias: api-gateway
   forward-headers-strategy: framework
 
 spring:
@@ -293,6 +287,19 @@ firebase:
     token-cache:
       maximum-size: 1000
       expire-after-write: 3600s
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    config-url: /v3/api-docs/swagger-config
+    urls:
+      - url: /v3/api-docs
+        name: API Gateway
+  show-actuator: true
 
 springdoc:
   api-docs:
