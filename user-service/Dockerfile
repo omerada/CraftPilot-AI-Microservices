@@ -1,6 +1,10 @@
 # Build stage
 FROM public.ecr.aws/amazoncorretto/amazoncorretto:21-al2023 AS build
 
+# Install required packages for build
+RUN yum update -y && \
+    yum install -y tar gzip
+
 WORKDIR /build
 
 # Copy Maven wrapper files first
@@ -22,15 +26,15 @@ RUN ./mvnw clean package -DskipTests
 # Run stage
 FROM public.ecr.aws/amazoncorretto/amazoncorretto:21-al2023
 
-WORKDIR /app
-
-USER 1000
-
-# Install required native dependencies
+# Install required runtime packages first
 RUN yum update -y && \
     yum install -y glibc-devel openssl-devel apr-devel && \
     yum clean all && \
     rm -rf /var/cache/yum
+
+WORKDIR /app
+
+USER 1000
 
 COPY --from=build --chown=1000:1000 /build/target/*.jar app.jar
 
