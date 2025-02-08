@@ -73,14 +73,30 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             # Infrastructure network
+            echo "Checking network..."
+            docker network ls | grep craftpilot-network
             docker network create craftpilot-network || true
 
+            # Check if redis is running
+            echo "Checking redis status..."
+            docker ps | grep redis
+
+            # Check existing redis-service
+            echo "Checking existing redis-service..."
+            docker ps -a | grep redis-service
+
             # Remove existing container
+            echo "Removing existing container if any..."
             docker stop redis-service || true
             docker rm redis-service || true
 
+            # Pull the latest image
+            echo "Pulling latest image..."
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
+
             # Run new container with detailed logging
             echo "Starting redis-service container..."
+            set -x  # Enable command echo
             docker run -d \
               --name redis-service \
               --network craftpilot-network \
@@ -97,7 +113,13 @@ jobs:
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+              -e JAVA_TOOL_OPTIONS="-Xms256m -Xmx512m" \
               ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
+            set +x  # Disable command echo
+
+            # Check if container was created
+            echo "Checking if container was created..."
+            docker ps -a | grep redis-service
 
             echo "Container started, waiting for initialization..."
             sleep 10
@@ -106,8 +128,16 @@ jobs:
             echo "Container status:"
             docker inspect redis-service --format='{{.State.Status}}'
 
+            echo "Container state details:"
+            docker inspect redis-service --format='{{json .State}}' | jq
+
             echo "Container logs:"
-            docker logs redis-service
+            docker logs redis-service 2>&1
+
+            # Check network connectivity
+            echo "Checking network connectivity..."
+            docker exec redis-service ping redis -c 1 || echo "Cannot ping redis"
+            docker exec redis-service ping eureka-server -c 1 || echo "Cannot ping eureka-server"
 
             # Health check with more detailed output
             echo "Starting health checks..."
@@ -124,7 +154,9 @@ jobs:
               
               if [ $i -eq 15 ]; then
                 echo "Mid-point container logs:"
-                docker logs redis-service
+                docker logs redis-service 2>&1
+                echo "Mid-point container state:"
+                docker inspect redis-service --format='{{json .State}}' | jq
               fi
               
               sleep 10
@@ -132,8 +164,9 @@ jobs:
 
             echo "Service failed to become healthy within timeout"
             echo "Final container logs:"
-            docker logs redis-service
-            docker inspect redis-service
+            docker logs redis-service 2>&1
+            echo "Final container state:"
+            docker inspect redis-service --format='{{json .State}}' | jq
             exit 1
 
       - name: Trigger Deploy Services Workflow
