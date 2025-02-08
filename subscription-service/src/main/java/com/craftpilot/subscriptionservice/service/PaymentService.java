@@ -178,7 +178,7 @@ public class PaymentService {
                 .planId(subscription.getPlanId())
                 .amount(subscription.getAmount())
                 .description(subscription.getDescription())
-                .callbackUrl("http://localhost:8070/api/v1/payments/callback")
+                .callbackUrl("http://localhost:8080/api/v1/payments/callback")
                 .build();
 
         return iyzicoService.createPaymentLink(paymentRequest)

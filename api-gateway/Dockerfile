@@ -35,5 +35,5 @@ ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
 
 RUN echo "Running on ARM64 architecture"
 
-EXPOSE 8070
+EXPOSE 8080
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]

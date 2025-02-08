@@ -25,7 +25,7 @@ spec:
           imagePullPolicy: Always
           ports:
             - name: http
-              containerPort: 8070
+              containerPort: 8080
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"

@@ -137,7 +137,7 @@ services:
     image: ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
     container_name: api-gateway
     ports:
-      - "8070:8070"
+      - "8080:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_USERNAME=${EUREKA_USERNAME}
