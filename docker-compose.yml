@@ -301,21 +301,17 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
-      - GCP_SA_KEY=/app/config/service-account.json
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
       - SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/config/service-account.json
       - SPRING_CLOUD_GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GMAIL_SERVICE_ACCOUNT=${GMAIL_SERVICE_ACCOUNT}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=13579ada
     volumes:
       - ${GCP_SA_KEY_PATH}:/app/config/service-account.json:ro
     networks:
       - craftpilot-network
-    depends_on:
-      eureka-server:
-        condition: service_healthy
-      kafka:
-        condition: service_started
-      redis:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8094/actuator/health"]
       interval: 30s
