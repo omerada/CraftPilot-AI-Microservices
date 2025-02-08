@@ -137,19 +137,19 @@ jobs:
               --name redis-service \
               --network craftpilot-network \
               --restart unless-stopped \
-              -p 8079:8079 \
-              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
+              -p 8061:8061 \
+              -v /opt/craftpilot/gcp-credentials.json:/app/src/main/resources/firebase-service-account.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
+              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
-              -e SPRING_CLOUD_GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
-              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-              -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/src/main/resources/firebase-service-account.json \
+              -e SPRING_REDIS_HOST=redis \
+              -e SPRING_REDIS_PORT=6379 \
+              -e SPRING_REDIS_PASSWORD=13579ada \
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
-              -e JAVA_TOOL_OPTIONS="-Xms256m -Xmx512m" \
+              -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e SPRING_KAFKA_CONSUMER_GROUP_ID=redis-service-group \
+              -e SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET=earliest \
               ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
             set +x  # Disable command echo
 
