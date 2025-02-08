@@ -303,13 +303,12 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
-      - FIREBASE_CREDENTIAL_PATH=/app/config/firebase-service-account.json
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-service-account.json
+      - GCP_SA_KEY=/app/config/service-account.json
       - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
       - SPRING_SECURITY_USER_NAME=${EUREKA_USERNAME}
       - SPRING_SECURITY_USER_PASSWORD=${EUREKA_PASSWORD}
     volumes:
-      - ./notification-service/src/main/resources/firebase-service-account.json:/app/config/firebase-service-account.json
+      - ${GCP_SA_KEY_PATH:-./service-account.json}:/app/config/service-account.json:ro
     depends_on:
       eureka-server:
         condition: service_healthy

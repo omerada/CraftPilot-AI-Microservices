@@ -24,7 +24,7 @@ spring:
     gcp:
       credentials:
         location: file:${GCP_SA_KEY}
-      project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
+      project-id: ${GCP_PROJECT_ID}
       firestore:
         project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
         enabled: true
