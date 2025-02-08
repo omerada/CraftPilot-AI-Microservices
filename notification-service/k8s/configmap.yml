@@ -95,7 +95,7 @@ data:
         enabled: true
         provider: firebase
         firebase:
-          credentials-path: classpath:firebase-service-account.json
+          credentials-path: /app/firebase-service-account.json
           project-id: ${GOOGLE_CLOUD_PROJECT_ID}
       retry:
         max-attempts: 3

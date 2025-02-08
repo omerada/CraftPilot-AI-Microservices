@@ -58,8 +58,8 @@ spec:
                   key: sendgrid-api-key
             - name: SENDGRID_FROM_EMAIL
               valueFrom:
-                secretKeyRef:
-                  name: notification-service-secrets
+                configMapKeyRef:
+                  name: notification-service-config
                   key: sendgrid-from-email
             - name: FCM_SERVICE_ACCOUNT_KEY
               valueFrom:
