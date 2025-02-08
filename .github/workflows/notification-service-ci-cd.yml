@@ -108,6 +108,9 @@ jobs:
             chmod 644 /opt/craftpilot/config/notification-service/firebase-service-account.json
             chown 65532:65532 /opt/craftpilot/config/notification-service/firebase-service-account.json
             
+            # Create function definition in a variable to avoid semicolon issues
+            FUNCTION_DEF="notificationEventConsumer;notificationEventProducer"
+            
             echo "Starting container..."
             docker run -d \
               --name notification-service \
@@ -129,7 +132,7 @@ jobs:
               -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e SPRING_CLOUD_STREAM_KAFKA_BINDER_BROKERS=kafka:9092 \
               -e SPRING_CLOUD_STREAM_DEFAULT_BINDER=kafka \
-              -e SPRING_CLOUD_FUNCTION_DEFINITION=notificationEventConsumer;notificationEventProducer \
+              -e "SPRING_CLOUD_FUNCTION_DEFINITION=${FUNCTION_DEF}" \
               -e SPRING_CLOUD_STREAM_BINDINGS_PROCESSNOTIFICATION_IN_0_DESTINATION=notifications \
               -e SPRING_CLOUD_STREAM_BINDINGS_PROCESSNOTIFICATION_IN_0_GROUP=notification-service-group \
               -e SPRING_CLOUD_STREAM_BINDINGS_PROCESSNOTIFICATION_OUT_0_DESTINATION=notifications \
@@ -137,7 +140,7 @@ jobs:
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e JAVA_OPTS="-Xmx768m -Xms384m -XX:+UseContainerSupport -XX:+UseG1GC -Dio.netty.tryReflectionSetAccessible=true -Dio.netty.noUnsafe=true" \
+              -e "JAVA_OPTS=-Xmx768m -Xms384m -XX:+UseContainerSupport -XX:+UseG1GC -Dio.netty.tryReflectionSetAccessible=true -Dio.netty.noUnsafe=true" \
               -e SENDGRID_API_KEY='${{ secrets.SENDGRID_API_KEY }}' \
               -e SENDGRID_FROM_EMAIL='${{ secrets.SENDGRID_FROM_EMAIL }}' \
               -e FIREBASE_SERVICE_ACCOUNT='${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' \
