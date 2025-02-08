@@ -30,7 +30,12 @@ COPY --from=build /build/target/*.jar app.jar
 
 # JVM ayarları
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+ENV SERVER_PORT=8080
+
 RUN echo "Running on ARM64 architecture"
 
-EXPOSE 8092
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]
+EXPOSE ${SERVER_PORT}
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD curl -f http://localhost:${SERVER_PORT}/actuator/health || exit 1
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${SERVER_PORT} -Dspring.profiles.active=prod -jar app.jar"]
