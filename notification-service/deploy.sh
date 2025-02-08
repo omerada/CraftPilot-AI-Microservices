@@ -59,4 +59,4 @@ echo "=== Waiting for Container to Start ==="
 wait_for_service
 
 echo "=== Cleanup ==="
-rm -f /tmp/firebase-credentials.json 
+rm -f /tmp/firebase-credentials.json

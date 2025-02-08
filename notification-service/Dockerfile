@@ -34,7 +34,7 @@ RUN mkdir -p /gcp-credentials
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
-  CMD curl -f http://localhost:8094/actuator/health || exit 1
+  CMD curl -f http://localhost:8053/actuator/health || exit 1
 
 # JVM tuning
 ENV JAVA_OPTS="\
@@ -45,5 +45,5 @@ ENV JAVA_OPTS="\
     -XX:+ExitOnOutOfMemoryError \
     -Dspring.output.ansi.enabled=ALWAYS"
 
-EXPOSE 8094
+EXPOSE 8053
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

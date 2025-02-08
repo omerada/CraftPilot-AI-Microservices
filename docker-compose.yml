@@ -297,7 +297,7 @@ services:
     image: ${DOCKERHUB_USERNAME}/notification-service:latest-arm64
     container_name: notification-service
     ports:
-      - "8094:8094"
+      - "8053:8053"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
@@ -313,7 +313,7 @@ services:
     networks:
       - craftpilot-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8094/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8053/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
