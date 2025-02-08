@@ -24,10 +24,15 @@ RUN ./mvnw clean package -DskipTests
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# Add necessary tools
-RUN apk add --no-cache curl tzdata && \
-    cp /usr/share/zoneinfo/UTC /etc/localtime && \
-    echo "UTC" > /etc/timezone
+# Add necessary tools and native libraries
+RUN apk add --no-cache \
+    curl \
+    tzdata \
+    libc6-compat \
+    gcompat \
+    libstdc++ \
+    &&  cp /usr/share/zoneinfo/UTC /etc/localtime \
+    && echo "UTC" > /etc/timezone
 
 # Copy jar from build stage
 COPY --from=builder /build/target/*.jar app.jar
@@ -44,13 +49,15 @@ ENV SERVER_PORT=8053 \
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8053/actuator/health || exit 1
 
-# JVM tuning
+# Update JVM tuning
 ENV JAVA_OPTS="\
     -XX:+UseContainerSupport \
     -XX:MaxRAMPercentage=75.0 \
     -XX:+UseG1GC \
     -XX:+UseStringDeduplication \
     -XX:+ExitOnOutOfMemoryError \
+    -Dio.netty.tryReflectionSetAccessible=true \
+    -Dio.netty.noUnsafe=true \
     -Djava.security.egd=file:/dev/./urandom \
     -Dserver.port=8053 \
     -Dspring.profiles.active=prod \

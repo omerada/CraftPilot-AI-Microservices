@@ -107,6 +107,10 @@ jobs:
               --name notification-service \
               --network craftpilot-network \
               --restart unless-stopped \
+              --memory="1g" \
+              --memory-swap="2g" \
+              --memory-reservation="512m" \
+              --cpus="1.0" \
               -p 8053:8053 \
               -v /opt/craftpilot/config/notification-service/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
@@ -119,7 +123,7 @@ jobs:
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e JAVA_OPTS="-Xmx512m -Xms256m" \
+              -e JAVA_OPTS="-Xmx768m -Xms384m -XX:+UseContainerSupport -XX:+UseG1GC -Dio.netty.tryReflectionSetAccessible=true -Dio.netty.noUnsafe=true" \
               ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
             
             echo "Waiting for container to start..."
