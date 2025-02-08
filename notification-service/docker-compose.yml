@@ -32,6 +32,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-credentials.json
     volumes:
       - /opt/craftpilot/firebase-credentials.json:/app/firebase-credentials.json:ro
+      - /opt/craftpilot/firebase-credentials.json:/app/firebase-service-account.json:ro
     networks:
       - craftpilot-network
 

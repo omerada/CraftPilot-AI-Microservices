@@ -23,6 +23,9 @@ RUN apk add --no-cache curl
 # Copy jar from build stage
 COPY --from=builder /build/target/*.jar app.jar
 
+# Copy firebase-service-account.json
+COPY notification-service/src/main/resources/firebase-service-account.json /app/firebase-service-account.json
+
 # Create config directory
 RUN mkdir -p /app/config
 

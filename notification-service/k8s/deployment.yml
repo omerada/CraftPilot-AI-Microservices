@@ -87,3 +87,14 @@ spec:
               port: 8087
             initialDelaySeconds: 30
             periodSeconds: 10
+          volumeMounts:
+            - name: firebase-credentials
+              mountPath: /app/firebase-service-account.json
+              subPath: firebase-service-account.json
+      volumes:
+        - name: firebase-credentials
+          secret:
+            secretName: notification-service-secrets
+            items:
+              - key: firebase-service-account
+                path: firebase-service-account.json
