@@ -11,9 +11,9 @@ spring:
     name: admin-service
   cloud:
     gcp:
-      project-id: ${SPRING_CLOUD_GCP_PROJECT_ID}
       credentials:
-        location: file:${GOOGLE_APPLICATION_CREDENTIALS}
+        location: file:${GCP_SA_KEY}
+      project-id: ${GCP_PROJECT_ID}
       firestore:
         project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
         enabled: true
@@ -24,9 +24,9 @@ spring:
         enabled: false
   data:
     redis:
-      host: ${SPRING_REDIS_HOST:redis}
-      port: ${SPRING_REDIS_PORT:6379}
-      password: ${SPRING_REDIS_PASSWORD:13579ada}
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:13579ada}
       timeout: 5000
       lettuce:
         pool:
