@@ -18,11 +18,15 @@ spec:
       containers:
         - name: notification-service
           image: craftpilot/notification-service:1.0.0
+          imagePullPolicy: Always
           ports:
-            - containerPort: 8087
+            - name: http
+              containerPort: 8053
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
+            - name: SERVER_PORT
+              value: "8053"
             - name: REDIS_HOST
               valueFrom:
                 configMapKeyRef:
@@ -78,15 +82,17 @@ spec:
           livenessProbe:
             httpGet:
               path: /actuator/health
-              port: 8087
+              port: 8053
             initialDelaySeconds: 60
             periodSeconds: 15
+            timeoutSeconds: 5
           readinessProbe:
             httpGet:
               path: /actuator/health
-              port: 8087
+              port: 8053
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
           volumeMounts:
             - name: firebase-credentials
               mountPath: /app/firebase-service-account.json

@@ -48,3 +48,4 @@ ENV JAVA_OPTS="\
 
 EXPOSE 8053
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+
