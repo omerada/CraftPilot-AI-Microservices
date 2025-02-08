@@ -15,6 +15,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 
@@ -27,13 +28,15 @@ public class RedisConfig {
     @Value("${spring.data.redis.port}")
     private int redisPort;
 
-    @Value("${spring.data.redis.password}")
+    @Value("${spring.data.redis.password:}")
     private String redisPassword;
 
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration(redisHost, redisPort);
-        config.setPassword(redisPassword);
+        if (StringUtils.hasText(redisPassword)) {
+            config.setPassword(redisPassword);
+        }
         
         LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
             .commandTimeout(Duration.ofSeconds(5))
@@ -63,13 +66,16 @@ public class RedisConfig {
         
         SingleServerConfig serverConfig = config.useSingleServer()
             .setAddress(address)
-            .setPassword(redisPassword)
             .setConnectionMinimumIdleSize(1)
             .setConnectionPoolSize(2)
             .setRetryAttempts(5)
             .setRetryInterval(1500)
             .setTimeout(3000)
             .setConnectTimeout(3000);
+
+        if (StringUtils.hasText(redisPassword)) {
+            serverConfig.setPassword(redisPassword);
+        }
 
         try {
             return Redisson.create(config);

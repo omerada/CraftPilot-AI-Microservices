@@ -185,6 +185,16 @@ jobs:
             docker inspect redis-service --format='{{json .State}}' | jq
             exit 1
 
+            # Redis container'ını yeniden başlat (eğer yoksa)
+            if ! docker ps | grep -q redis; then
+              echo "Starting Redis container..."
+              docker run -d \
+                --name redis \
+                --network craftpilot-network \
+                -p 6379:6379 \
+                redis:latest --requirepass 13579ada
+            fi
+
       - name: Trigger Deploy Services Workflow
         if: success()
         uses: peter-evans/repository-dispatch@v2
