@@ -50,6 +50,26 @@ jobs:
               -e KAFKA_AUTO_CREATE_TOPICS_ENABLE="true" \
               confluentinc/cp-kafka:latest
 
+            # Redis container'ını başlat
+            echo "=== Starting Redis ==="
+            if [ ! "$(docker ps -q -f name=redis)" ]; then
+                if [ "$(docker ps -aq -f status=exited -f name=redis)" ]; then
+                    # Eğer container varsa ama çalışmıyorsa, kaldır
+                    docker rm redis
+                fi
+                # Yeni Redis container'ı başlat
+                docker run -d \
+                  --name redis \
+                  --network craftpilot-network \
+                  -p 6379:6379 \
+                  redis:latest
+                
+                # Redis'in başlamasını bekle
+                sleep 10
+            else
+                echo "Redis container zaten çalışıyor"
+            fi
+
             # Kafka'nın başlamasını bekle
             sleep 20
 
