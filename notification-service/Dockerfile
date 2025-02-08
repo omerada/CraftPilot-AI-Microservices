@@ -27,6 +27,7 @@ WORKDIR /app
 # Add necessary tools and native libraries for ARM64
 RUN apt-get update && apt-get install -y \
     curl \
+    netcat \
     tzdata \
     libc6 \
     && rm -rf /var/lib/apt/lists/*
@@ -50,9 +51,13 @@ USER nobody
 ENV SERVER_PORT=8053 \
     SPRING_PROFILES_ACTIVE=prod
 
+# Create healthcheck script
+COPY healthcheck.sh /healthcheck.sh
+RUN chmod +x /healthcheck.sh
+
 # Healthcheck
-HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8053/actuator/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD /healthcheck.sh
 
 # Update JVM tuning with ARM64-optimized settings
 ENV JAVA_OPTS="\

@@ -147,16 +147,32 @@ jobs:
               -e SPRING_MAIL_PORT=587 \
               -e SPRING_MAIL_USERNAME=apikey \
               -e SPRING_MAIL_PASSWORD='${{ secrets.SENDGRID_API_KEY }}' \
+              --health-cmd="/healthcheck.sh" \
+              --health-interval=30s \
+              --health-timeout=10s \
+              --health-retries=3 \
+              --health-start-period=120s \
               ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
             
             echo "Waiting for container to start..."
-            sleep 15
+            sleep 120
             
             echo "Checking container status..."
             if [ "$(docker ps -q -f name=notification-service)" ]; then
               echo "Container is running successfully"
               echo "Container logs:"
-              docker logs notification-service --tail 50
+              docker logs notification-service --tail 100
+              
+              echo "Container health status:"
+              docker inspect --format='{{json .State.Health}}' notification-service
+              
+              echo "Testing container health:"
+              if docker exec notification-service /healthcheck.sh; then
+                echo "Health check passed"
+              else
+                echo "Health check failed"
+                exit 1
+              fi
               
               echo "Container network info:"
               docker inspect notification-service | grep -i ip
