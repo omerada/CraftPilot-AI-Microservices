@@ -79,70 +79,33 @@ jobs:
                 --name redis \
                 --network craftpilot-network \
                 -p 6379:6379 \
-                redis:latest /bin/sh -c 'redis-server --requirepass "$REDIS_PASSWORD"' \
-                -e REDIS_PASSWORD=13579ada
+                -e REDIS_PASSWORD=13579ada \
+                redis:latest redis-server --requirepass 13579ada
             fi
 
-            # Bekle ve Redis'in hazır olduğunu kontrol et
+            # Redis'in hazır olmasını bekle
             echo "Redis'in hazır olması bekleniyor..."
-            sleep 10
-            docker exec redis redis-cli -a 13579ada ping || {
-              echo "Redis hazır değil!"
-              docker logs redis
-              exit 1
-            }
+            until docker exec redis redis-cli -a 13579ada ping | grep -q "PONG"; do
+              sleep 2
+            done
 
-            # Check if port 8079 is in use
-            echo "Checking if port 8079 is already in use..."
-            if netstat -tulpn 2>/dev/null | grep ":8079 "; then
-              echo "Port 8079 is already in use. Killing the process..."
-              PID=$(netstat -tulpn 2>/dev/null | grep ":8079 " | awk '{print $7}' | cut -d'/' -f1)
-              if [ ! -z "$PID" ]; then
-                kill -9 $PID || true
-              fi
-              sleep 5
-            fi
-
-            # Infrastructure network
-            echo "Checking network..."
-            docker network ls | grep craftpilot-network
-            docker network create craftpilot-network || true
-
-            # Check if redis is running
-            echo "Checking redis status..."
-            docker ps | grep redis
-
-            # Check and remove any existing redis-service containers
-            echo "Checking existing redis-service..."
-            if docker ps -a | grep redis-service; then
-              echo "Found existing redis-service container, removing it..."
-              docker stop redis-service || true
-              docker rm redis-service || true
-            fi
-
-            # Pull the latest image
-            echo "Pulling latest image..."
+            # Redis Service'i başlat
+            echo "Starting redis-service..."
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
+            docker stop redis-service || true
+            docker rm redis-service || true
 
-            # Install jq if not present
-            if ! command -v jq &> /dev/null; then
-              echo "Installing jq..."
-              apt-get update && apt-get install -y jq
-            fi
-
-            # Run new container with detailed logging
-            echo "Starting redis-service container..."
-            set -x  # Enable command echo
             docker run -d \
               --name redis-service \
               --network craftpilot-network \
               --restart unless-stopped \
               -p 8061:8061 \
-              -v /opt/craftpilot/gcp-credentials.json:/app/src/main/resources/firebase-service-account.json:ro \
+              -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/app/src/main/resources/firebase-service-account.json \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
+              -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/gcp-credentials.json \
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
@@ -151,58 +114,20 @@ jobs:
               -e SPRING_KAFKA_CONSUMER_GROUP_ID=redis-service-group \
               -e SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET=earliest \
               ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
-            set +x  # Disable command echo
 
-            # Check if container was created
-            echo "Checking if container was created..."
-            docker ps -a | grep redis-service
-
-            echo "Container started, waiting for initialization..."
-            sleep 10
-
-            # Detailed container inspection
-            echo "Container status:"
-            docker inspect redis-service --format='{{.State.Status}}'
-
-            echo "Container state details:"
-            docker inspect redis-service --format='{{json .State}}' | jq
-
-            echo "Container logs:"
-            docker logs redis-service 2>&1
-
-            # Check network connectivity
-            echo "Checking network connectivity..."
-            docker exec redis-service ping redis -c 1 || echo "Cannot ping redis"
-            docker exec redis-service ping eureka-server -c 1 || echo "Cannot ping eureka-server"
-
-            # Health check with more detailed output
-            echo "Starting health checks..."
+            # Health check
+            echo "Checking service health..."
             for i in {1..30}; do
-              echo "Attempt $i: Checking service health..."
-              
-              HEALTH_STATUS=$(curl -s http://localhost:8079/actuator/health || echo "Failed to connect")
-              echo "Health check response: $HEALTH_STATUS"
-              
-              if echo "$HEALTH_STATUS" | grep -q "UP"; then
-                echo "Service is healthy!"
+              if curl -s http://localhost:8061/actuator/health | grep -q "UP"; then
+                echo "Service is healthy"
                 exit 0
               fi
-              
-              if [ $i -eq 15 ]; then
-                echo "Mid-point container logs:"
-                docker logs redis-service 2>&1
-                echo "Mid-point container state:"
-                docker inspect redis-service --format='{{json .State}}' | jq
-              fi
-              
+              echo "Waiting for service to be healthy... (attempt $i/30)"
               sleep 10
             done
 
-            echo "Service failed to become healthy within timeout"
-            echo "Final container logs:"
-            docker logs redis-service 2>&1
-            echo "Final container state:"
-            docker inspect redis-service --format='{{json .State}}' | jq
+            echo "Service failed to become healthy"
+            docker logs redis-service
             exit 1
 
       - name: Trigger Deploy Services Workflow
