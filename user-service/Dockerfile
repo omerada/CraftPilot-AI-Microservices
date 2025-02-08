@@ -7,8 +7,8 @@ WORKDIR /build
 COPY . .
 
 # Maven kurulumu ve versiyonu belirleme
-RUN yum install -y wget tar gzip
-RUN wget https://dlcdn.apache.org/maven/maven-3/3.9.7/binaries/apache-maven-3.9.7-bin.tar.gz
+RUN yum install -y curl tar gzip
+RUN curl -o apache-maven-3.9.7-bin.tar.gz https://dlcdn.apache.org/maven/maven-3/3.9.7/binaries/apache-maven-3.9.7-bin.tar.gz
 RUN tar -xzf apache-maven-3.9.7-bin.tar.gz -C /opt/
 RUN ln -s /opt/apache-maven-3.9.7 /opt/maven
 
