@@ -158,11 +158,15 @@ eureka:
   instance:
     preferIpAddress: true
     hostname: ${HOSTNAME:subscription-service}
-    instanceId: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 20
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
+    health-check-url-path: /actuator/health
+    statusPageUrlPath: /actuator/info
   client:
-    registerWithEureka: true
-    fetchRegistry: true
     serviceUrl:
-      defaultZone: http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
     healthcheck:
       enabled: true

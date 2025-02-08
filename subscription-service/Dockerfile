@@ -29,6 +29,8 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport \
     -XX:+UseStringDeduplication \
     -XX:+ExitOnOutOfMemoryError \
     -Djava.security.egd=file:/dev/./urandom \
+    -Dserver.port=8052 \
+    -Dspring.profiles.active=prod \
     -Dspring.output.ansi.enabled=ALWAYS"
 
 # Healthcheck yapılandırması

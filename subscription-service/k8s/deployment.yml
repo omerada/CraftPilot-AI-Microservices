@@ -41,7 +41,7 @@ spec:
           image: craftpilot/subscription-service:latest-arm64
           imagePullPolicy: Always
           ports:
-            - containerPort: 8052
+            - containerPort: 8085
               name: http
           env:
             - name: SPRING_PROFILES_ACTIVE
@@ -62,10 +62,13 @@ spec:
                   name: kafka-config
                   key: bootstrap-servers
             - name: EUREKA_SERVER_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: eureka-config
-                  key: eureka-url
+              value: "http://eureka-server:8761"
+            - name: SPRING_CLOUD_CONFIG_URI
+              value: "http://config-server:8888"
+            - name: SERVER_PORT
+              value: "8085"
+            - name: SPRING_CLOUD_KUBERNETES_ENABLED
+              value: "true"
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: "/gcp-credentials/credentials.json"
             - name: EUREKA_USERNAME

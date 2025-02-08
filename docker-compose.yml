@@ -229,35 +229,35 @@ services:
   # Subscription Service
   subscription-service:
     container_name: subscription-service
-    build:
-      context: .
-      dockerfile: subscription-service/Dockerfile
+    image: ${DOCKERHUB_USERNAME}/subscription-service:latest-arm64
     ports:
-      - "8091:8091"
+      - "8052:8052"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
-      - FIREBASE_CREDENTIAL_PATH=/app/config/firebase-service-account.json
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-service-account.json
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
-      - SPRING_SECURITY_USER_NAME=${EUREKA_USERNAME}
-      - SPRING_SECURITY_USER_PASSWORD=${EUREKA_PASSWORD}
+      - SPRING_PROFILES_ACTIVE=prod
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
+      - EUREKA_INSTANCE_HOSTNAME=subscription-service
+      - EUREKA_USERNAME=craftpilot
+      - EUREKA_PASSWORD=13579ada
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=13579ada
+      - GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials/credentials.json
+      - SPRING_CLOUD_GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
     volumes:
-      - ./subscription-service/src/main/resources/firebase-service-account.json:/app/config/firebase-service-account.json
+      - ${GCP_SA_KEY_PATH:-./subscription-service/src/main/resources/firebase-service-account.json}:/gcp-credentials/credentials.json:ro
+    networks:
+      - craftpilot-network
     depends_on:
       eureka-server:
         condition: service_healthy
-    networks:
-      - craftpilot-network
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8091/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8052/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 512M
+    restart: unless-stopped
 
   # User Service
   user-service:

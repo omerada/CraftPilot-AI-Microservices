@@ -21,6 +21,26 @@ data:
         redis:
           repositories:
             enabled: false
+      cloud:
+        kubernetes:
+          discovery:
+            enabled: true
+        service-registry:
+          auto-registration:
+            enabled: true
+
+    eureka:
+      instance:
+        preferIpAddress: true
+        leaseRenewalIntervalInSeconds: 10
+        health-check-url-path: /actuator/health
+      client:
+        registerWithEureka: true
+        fetchRegistry: true
+        serviceUrl:
+          defaultZone: ${EUREKA_SERVER_URL}/eureka/
+        username: ${EUREKA_USERNAME}
+        password: ${EUREKA_PASSWORD}
 
     management:
       endpoints:
