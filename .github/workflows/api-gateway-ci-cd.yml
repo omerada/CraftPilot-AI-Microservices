@@ -63,13 +63,15 @@ jobs:
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true
-          debug: true
-          command_timeout: "20m"
+          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD
           script: |
             echo "=== Testing SSH Connection ==="
             whoami
@@ -109,7 +111,7 @@ jobs:
                 -p 8761:8761 \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e EUREKA_USERNAME=craftpilot \
-                -e EUREKA_PASSWORD=13579ada \
+                -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
                 ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
             fi
 
@@ -126,40 +128,39 @@ jobs:
               --network craftpilot-network \
               -p 8080:8080 \
               -e SPRING_PROFILES_ACTIVE=prod \
+              -e SPRING_CONFIG_LOCATION=classpath:/application.yml \
               -e SERVER_PORT=8080 \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e SPRING_REDIS_HOST=redis \
-              -e SPRING_REDIS_PORT=6379 \
-              -e SPRING_REDIS_PASSWORD=13579ada \
-              -e SPRING_CLOUD_GATEWAY_ROUTES_0_ID=user-service \
-              -e SPRING_CLOUD_GATEWAY_ROUTES_0_URI=lb://user-service \
-              -e SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0=Path=/api/v1/users/** \
+              -e SPRING_APPLICATION_NAME=api-gateway \
+              -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
+              -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_LOWER_CASE_SERVICE_ID=true \
+              -e SPRING_DATA_REDIS_HOST=redis \
+              -e SPRING_DATA_REDIS_PORT=6379 \
+              -e SPRING_DATA_REDIS_PASSWORD=${REDIS_PASSWORD} \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
+              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=true \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
-              ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
+              ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
 
             echo "=== Waiting for API Gateway ==="
-            for i in {1..30}; do
-              echo "Health check attempt $i/30..."
-              
-              # Check container logs for startup completion
-              if docker logs api-gateway | grep -q "Started ApiGatewayApplication in"; then
-                echo "Application startup completed"
-                
-                # Verify health endpoint
-                if curl -sf http://localhost:8080/actuator/health; then
-                  echo "API Gateway is healthy"
-                  exit 0
+            for i in {1..60}; do
+              echo "Health check attempt $i/60..."
+              if docker ps | grep -q api-gateway; then
+                if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
+                  echo "Application started successfully"
+                  if curl -sf http://localhost:8080/actuator/health; then
+                    echo "Health check passed"
+                    exit 0
+                  fi
                 fi
               fi
+              sleep 5
               
-              # Show recent logs
+              # Show logs for debugging
               echo "Recent logs:"
-              docker logs --tail 20 api-gateway
-              
-              sleep 10
+              docker logs --tail 50 api-gateway
             done
 
-            echo "API Gateway failed health check"
+            echo "API Gateway failed to start"
             docker logs api-gateway
             exit 1
 

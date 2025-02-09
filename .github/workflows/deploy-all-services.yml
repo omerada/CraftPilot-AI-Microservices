@@ -105,14 +105,60 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD
           script: |
-            echo "=== Deploying ${{ matrix.service.name }} ==="
+            if [ "${{ matrix.service.name }}" = "api-gateway" ]; then
+              echo "=== Deploying API Gateway ==="
+              docker pull ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
+              docker stop api-gateway || true
+              docker rm api-gateway || true
 
-            # Pull and start service
-            docker pull ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
-            docker stop ${{ matrix.service.name }} || true
-            docker rm ${{ matrix.service.name }} || true
+              docker run -d \
+                --name api-gateway \
+                --network craftpilot-network \
+                -p 8080:8080 \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e SPRING_CONFIG_LOCATION=classpath:/application.yml \
+                -e SERVER_PORT=8080 \
+                -e SPRING_APPLICATION_NAME=api-gateway \
+                -e SPRING_DATA_REDIS_HOST=redis \
+                -e SPRING_DATA_REDIS_PORT=6379 \
+                -e SPRING_DATA_REDIS_PASSWORD=${REDIS_PASSWORD} \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
+                -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=true \
+                -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
+                -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_LOWER_CASE_SERVICE_ID=true \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
+                ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
 
-            if [ "${{ matrix.service.name }}" = "eureka-server" ]; then
+              # Enhanced health check for API Gateway
+              echo "Waiting for API Gateway to start..."
+              for i in {1..60}; do
+                echo "Health check attempt $i/60..."
+                if docker ps | grep -q api-gateway; then
+                  if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
+                    echo "Application started successfully"
+                    if curl -sf http://localhost:8080/actuator/health; then
+                      echo "Health check passed"
+                      exit 0
+                    fi
+                  fi
+                fi
+                sleep 5
+                echo "Recent logs:"
+                docker logs --tail 20 api-gateway
+              done
+
+              echo "API Gateway failed to start"
+              docker logs api-gateway
+              exit 1
+
+            elif [ "${{ matrix.service.name }}" = "eureka-server" ]; then
+              echo "=== Deploying ${{ matrix.service.name }} ==="
+
+              # Pull and start service
+              docker pull ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
+              docker stop ${{ matrix.service.name }} || true
+              docker rm ${{ matrix.service.name }} || true
+
               docker run -d \
                 --name ${{ matrix.service.name }} \
                 --network craftpilot-network \
@@ -122,65 +168,44 @@ jobs:
                 -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
                 -e SERVER_PORT=${{ matrix.service.port }} \
                 ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
-            elif [ "${{ matrix.service.name }}" = "api-gateway" ]; then
-              docker run -d \
-                --name ${{ matrix.service.name }} \
-                --network craftpilot-network \
-                -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
-                -e SPRING_PROFILES_ACTIVE=prod \
-                -e SERVER_PORT=${{ matrix.service.port }} \
-                -e SPRING_REDIS_HOST=redis \
-                -e SPRING_REDIS_PORT=6379 \
-                -e SPRING_REDIS_PASSWORD=${REDIS_PASSWORD} \
-                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
-                ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
-            else
-              docker run -d \
-                --name ${{ matrix.service.name }} \
-                --network craftpilot-network \
-                -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
-                -e SPRING_PROFILES_ACTIVE=prod \
-                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
-                -e SERVER_PORT=${{ matrix.service.port }} \
-                ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
-            fi
 
-            # Initial wait
-            echo "Waiting for container to initialize..."
-            sleep 30
+              # Initial wait
+              echo "Waiting for container to initialize..."
+              sleep 30
 
-            # Verify container is running
-            if ! docker ps | grep -q ${{ matrix.service.name }}; then
-              echo "Container failed to start"
+              # Verify container is running
+              if ! docker ps | grep -q ${{ matrix.service.name }}; then
+                echo "Container failed to start"
+                docker logs ${{ matrix.service.name }}
+                exit 1
+              fi
+
+              # Enhanced health check
+              for i in {1..30}; do
+                echo "Health check attempt $i/30..."
+                
+                # Check container logs for startup completion
+                if docker logs ${{ matrix.service.name }} | grep -q "Started .* in"; then
+                  echo "Application startup completed"
+                  
+                  # Verify health endpoint
+                  if curl -sf http://localhost:${{ matrix.service.port }}/actuator/health; then
+                    echo "${{ matrix.service.name }} is healthy"
+                    exit 0
+                  fi
+                fi
+                
+                # Show recent logs
+                echo "Recent logs:"
+                docker logs --tail 20 ${{ matrix.service.name }}
+                
+                sleep 10
+              done
+
+              echo "${{ matrix.service.name }} failed health check"
               docker logs ${{ matrix.service.name }}
               exit 1
             fi
-
-            # Enhanced health check
-            for i in {1..30}; do
-              echo "Health check attempt $i/30..."
-              
-              # Check container logs for startup completion
-              if docker logs ${{ matrix.service.name }} | grep -q "Started .* in"; then
-                echo "Application startup completed"
-                
-                # Verify health endpoint
-                if curl -sf http://localhost:${{ matrix.service.port }}/actuator/health; then
-                  echo "${{ matrix.service.name }} is healthy"
-                  exit 0
-                fi
-              fi
-              
-              # Show recent logs
-              echo "Recent logs:"
-              docker logs --tail 20 ${{ matrix.service.name }}
-              
-              sleep 10
-            done
-
-            echo "${{ matrix.service.name }} failed health check"
-            docker logs ${{ matrix.service.name }}
-            exit 1
 
   deploy-data-services:
     needs: deploy-core-services
