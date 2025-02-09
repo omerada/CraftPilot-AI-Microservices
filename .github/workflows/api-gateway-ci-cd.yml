@@ -66,9 +66,10 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Infrastructure setup
-            echo "=== Setting up infrastructure ==="
-            docker network create craftpilot-network || true
+            # Create network if not exists
+            if ! docker network ls | grep -q craftpilot-network; then
+              docker network create --subnet=172.18.0.0/16 craftpilot-network
+            fi
 
             # Start Redis if not running
             if ! docker ps | grep -q redis; then
@@ -90,6 +91,7 @@ jobs:
               --name api-gateway \
               --hostname api-gateway \
               --network craftpilot-network \
+              --ip 172.18.0.14 \
               --restart unless-stopped \
               -p 8080:8080 \
               -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
@@ -110,62 +112,46 @@ jobs:
               -e REDIS_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
 
-            # Initial wait for container startup
             echo "=== Waiting for initial startup ==="
             sleep 20
 
             echo "=== Performing health checks ==="
-            max_attempts=10
-            counter=0
-            success=false
+            # Container check
+            if ! docker ps -q -f name=api-gateway; then
+              echo "Container not running"
+              docker logs api-gateway
+              exit 1
+            fi
 
-            while [ $counter -lt $max_attempts ]; do
-              counter=$((counter + 1))
-              echo "Health check attempt $counter/$max_attempts"
-              
-              # Basic container check
-              if ! docker ps -q -f name=api-gateway; then
-                echo "Container not running"
-                docker logs api-gateway
-                exit 1
-              fi
-              
-              # Log check
-              if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
-                echo "✓ Application startup detected"
-                
-                # Port check
-                if docker logs api-gateway 2>&1 | grep -q "Netty started on port 8080"; then
-                  echo "✓ Server port is listening"
-                  
-                  # Simple connectivity test
-                  HEALTH_RESPONSE=$(curl -s http://localhost:8080/actuator/health)
-                  if [ $? -eq 0 ] && echo "$HEALTH_RESPONSE" | grep -q "UP"; then
-                    echo "✓ Health endpoint is responding with UP status"
-                    echo "=== API Gateway is healthy and running ==="
-                    success=true
-                    break
-                  fi
-                fi
-              fi
-              
-              if [ $counter -lt $max_attempts ]; then
-                echo "Waiting 5 seconds before next attempt..."
-                sleep 5
-              fi
-            done
+            # Application startup check
+            if ! docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
+              echo "Application failed to start"
+              docker logs api-gateway
+              exit 1
+            fi
+            echo "✓ Application startup confirmed"
 
-            if [ "$success" = true ]; then
+            # Port listening check
+            if ! docker logs api-gateway 2>&1 | grep -q "Netty started on port 8080"; then
+              echo "Server port not listening"
+              docker logs api-gateway
+              exit 1
+            fi
+            echo "✓ Server port confirmed listening"
+
+            # Final health check
+            HEALTH_RESPONSE=$(curl -s http://localhost:8080/actuator/health)
+            if [ $? -eq 0 ] && echo "$HEALTH_RESPONSE" | grep -q "UP"; then
+              echo "✓ Health check passed - Service is UP"
+              echo "=== API Gateway successfully deployed ==="
               exit 0
             else
-              echo "=== Health Check Failed - Debug Information ==="
-              echo "Docker Status:"
-              docker ps -a | grep api-gateway
-              echo "Container Logs:"
+              echo "Health check failed"
+              echo "Health Response:"
+              echo "$HEALTH_RESPONSE"
               docker logs api-gateway
-              echo "Health Check Response:"
-              curl -v http://localhost:8080/actuator/health || true
               exit 1
+            fi
 
       - name: Trigger Deploy Services Workflow
         if: success()
