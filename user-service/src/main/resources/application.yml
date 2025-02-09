@@ -44,29 +44,22 @@ spring:
   redis:
     host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:your_redis_password}
+    password: ${REDIS_PASSWORD:13579ada}
     timeout: 2000
     lettuce:
       pool:
-        max-active: 16
+        max-active: 8
         max-idle: 8
-        min-idle: 4
-        max-wait: 1000ms
-      shutdown-timeout: 200ms
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
-      connect-timeout: 2000
-      timeout: 1000
-      database: 0
-  webflux:
-    base-path: /api
-  main:
-    web-application-type: reactive
-  codec:
-    max-in-memory-size: 16MB
+        min-idle: 2
+        max-wait: -1ms
+      shutdown-timeout: 100ms
+    client-type: lettuce
+    connect-timeout: 2000
+    retry:
+      max-attempts: 3
+      initial-interval: 1000
+      multiplier: 2.0
+      max-interval: 5000
 
 eureka:
   instance:
