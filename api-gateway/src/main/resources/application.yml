@@ -99,26 +99,11 @@ spring:
 
         # Swagger UI Routes
         - id: swagger-ui
-          uri: lb://api-gateway
+          uri: ${spring.cloud.gateway.uri:http://localhost:8080}
           predicates:
-            - Path=/swagger-ui/**
-            - Path=/v3/api-docs/**
-            - Path=/swagger-ui.html
+            - Path=/swagger-ui/**,/swagger-ui.html,/v3/api-docs/**
           filters:
-            - RewritePath=/swagger-ui.html, /swagger-ui/index.html
-        - id: openapi
-          uri: http://localhost:${server.port}
-          predicates:
-            - Path=/v3/api-docs/**
-          filters:
-            - RewritePath=/v3/api-docs/(?<segment>.*), /$\{segment}/v3/api-docs
-
-        - id: swagger-ui
-          uri: http://localhost:${server.port}
-          predicates:
-            - Path=/swagger-ui/**
-          filters:
-            - RewritePath=/swagger-ui/(?<segment>.*), /swagger-ui/$\{segment}
+            - StripPrefix=0
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin
         - AddResponseHeader=Access-Control-Allow-Origin, *
@@ -141,11 +126,15 @@ springdoc:
   swagger-ui:
     enabled: true
     path: /swagger-ui.html
-    doc-expansion: none
-    disable-swagger-default-url: true
+    config-url: /v3/api-docs/swagger-config
     urls:
-      - name: API Gateway
-        url: /v3/api-docs
+      - url: /v3/api-docs
+        name: API Gateway
+    disable-swagger-default-url: true
+    try-it-out-enabled: true
+    filter: true
+  cache:
+    disabled: true
   show-actuator: true
   use-management-port: false
   packages-to-scan: com.craftpilot.apigateway
