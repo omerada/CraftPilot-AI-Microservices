@@ -2,13 +2,11 @@ name: Deploy Services
 
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types: [trigger-deploy-services]
   push:
     branches: [master]
     paths:
       - "docker-compose.yml"
-      - "start-services.sh"
+      - "deploy.sh"
 
 jobs:
   deploy-infrastructure:
@@ -78,50 +76,54 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          EUREKA_USERNAME: ${{ secrets.EUREKA_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          EUREKA_USERNAME: craftpilot
           EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          GMAIL_SERVICE_ACCOUNT: ${{ secrets.GMAIL_SERVICE_ACCOUNT }}
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DOCKERHUB_USERNAME,EUREKA_USERNAME,EUREKA_PASSWORD,GCP_SA_KEY
-          script_stop: true
+          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,EUREKA_USERNAME,EUREKA_PASSWORD,GCP_SA_KEY,GCP_PROJECT_ID,REDIS_PASSWORD,GMAIL_SERVICE_ACCOUNT,GRAFANA_ADMIN_PASSWORD
           script: |
-            echo "=== Starting Deployment Process ==="
-
-            # Environment variables'ları export et
-            export DOCKERHUB_USERNAME="$DOCKERHUB_USERNAME"
-            export EUREKA_USERNAME="$EUREKA_USERNAME"
-            export EUREKA_PASSWORD="$EUREKA_PASSWORD"
-            export GCP_SA_KEY="$GCP_SA_KEY"
-
             # Proje dizinine git
             cd /opt/craftpilot
 
-            # Mevcut docker-compose.yml ve start-services.sh dosyalarını yedekle
-            timestamp=$(date +%Y%m%d_%H%M%S)
-            mkdir -p backups
-            cp docker-compose.yml backups/docker-compose_$timestamp.yml || true
-            cp start-services.sh backups/start-services_$timestamp.sh || true
+            # Git repo'yu klonla veya güncelle
+            if [ -d ".git" ]; then
+              git pull origin master
+            else
+              git clone https://github.com/yourusername/Craft-Pilot-Ai.git .
+            fi
 
-            # Yeni dosyaları kopyala
-            echo "$DOCKER_COMPOSE_CONTENT" > docker-compose.yml
-            echo "$START_SCRIPT_CONTENT" > start-services.sh
+            # Deploy script'i çalıştırılabilir yap ve çalıştır
+            chmod +x deploy.sh
+            ./deploy.sh
 
-            # Yetkileri ayarla
-            chmod +x start-services.sh
+            # Hata kontrolü
+            if [ $? -ne 0 ]; then
+              echo "Deployment failed!"
+              docker-compose logs
+              exit 1
+            fi
 
-            echo "=== Starting Services ==="
-            ./start-services.sh
+            # Sağlık kontrolü
+            echo "Checking service health..."
+            sleep 30
 
-            echo "=== Checking Services Status ==="
-            docker ps
+            # Eureka kontrolü
+            if ! curl -s http://localhost:8761/actuator/health | grep -q "UP"; then
+              echo "Eureka Server is not healthy!"
+              docker-compose logs eureka-server
+              exit 1
+            fi
 
-            echo "=== Deployment Complete ==="
+            echo "Deployment completed successfully!"

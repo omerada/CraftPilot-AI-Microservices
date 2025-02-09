@@ -40,3 +40,13 @@ build/
 
 # Firebase credentials
 **/firebase-service-account.json
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Credentials
+**/credentials.json
+**/firebase-service-account.json
+**/gcp-credentials.json
