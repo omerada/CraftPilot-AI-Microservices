@@ -86,46 +86,15 @@ spring:
               args:
                 name: notificationServiceCircuitBreaker
 
-        # Utility Services
-        - id: redis-service
-          uri: lb://redis-service
-          predicates:
-            - Path=/api/cache/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: redisServiceCircuitBreaker
-
-        - id: kafka-service
-          uri: lb://kafka-service
-          predicates:
-            - Path=/api/events/**,/api/streams/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: kafkaServiceCircuitBreaker
-
         # Swagger UI Routes
         - id: swagger-ui
           uri: lb://api-gateway
           predicates:
-            - Path=/swagger-ui/**,/v3/api-docs/**,/swagger-ui.html
+            - Path=/swagger-ui/**
+            - Path=/v3/api-docs/**
+            - Path=/swagger-ui.html
           filters:
-            - RewritePath=/swagger-ui.html, /webjars/swagger-ui/index.html
-
-redis:
-  host: ${REDIS_HOST:localhost}
-  port: ${REDIS_PORT:6379}
-  password: ${REDIS_PASSWORD:13579ada}
-  lettuce:
-    pool:
-      max-active: 8
-      max-idle: 8
-      min-idle: 2
-      max-wait: -1ms
-    shutdown-timeout: 100ms
-  connect-timeout: 2000ms
-  timeout: 1000ms
+            - RewritePath=/swagger-ui.html, /swagger-ui/index.html
 
 eureka:
   client:
