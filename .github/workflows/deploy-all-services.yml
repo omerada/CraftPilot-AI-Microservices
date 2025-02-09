@@ -99,45 +99,70 @@ jobs:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
-          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD,GCP_SA_KEY
+          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD
           script: |
-            # Setup GCP credentials if needed
-            if [ ! -f "/opt/craftpilot/gcp-credentials.json" ]; then
-              mkdir -p /opt/craftpilot
-              echo "${GCP_SA_KEY}" > /opt/craftpilot/gcp-credentials.json
-              chmod 600 /opt/craftpilot/gcp-credentials.json
-            fi
+            echo "=== Deploying ${{ matrix.service.name }} ==="
 
-            # Deploy service
+            # Pull and start service
             docker pull ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
             docker stop ${{ matrix.service.name }} || true
             docker rm ${{ matrix.service.name }} || true
 
-            docker run -d \
-              --name ${{ matrix.service.name }} \
-              --network craftpilot-network \
-              -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
-              -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
-              -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=${REDIS_PASSWORD} \
-              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
-              ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
+            if [ "${{ matrix.service.name }}" = "eureka-server" ]; then
+              docker run -d \
+                --name ${{ matrix.service.name }} \
+                --network craftpilot-network \
+                -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e EUREKA_USERNAME=craftpilot \
+                -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
+                -e SERVER_PORT=${{ matrix.service.port }} \
+                ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
+            else
+              docker run -d \
+                --name ${{ matrix.service.name }} \
+                --network craftpilot-network \
+                -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
+                -e SERVER_PORT=${{ matrix.service.port }} \
+                ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
+            fi
 
-            # Health check
+            # Initial wait
+            echo "Waiting for container to initialize..."
+            sleep 30
+
+            # Verify container is running
+            if ! docker ps | grep -q ${{ matrix.service.name }}; then
+              echo "Container failed to start"
+              docker logs ${{ matrix.service.name }}
+              exit 1
+            fi
+
+            # Enhanced health check
             for i in {1..30}; do
-              if curl -sf http://localhost:${{ matrix.service.port }}/actuator/health; then
-                echo "${{ matrix.service.name }} is healthy"
-                exit 0
+              echo "Health check attempt $i/30..."
+              
+              # Check container logs for startup completion
+              if docker logs ${{ matrix.service.name }} | grep -q "Started .* in"; then
+                echo "Application startup completed"
+                
+                # Verify health endpoint
+                if curl -sf http://localhost:${{ matrix.service.port }}/actuator/health; then
+                  echo "${{ matrix.service.name }} is healthy"
+                  exit 0
+                fi
               fi
+              
+              # Show recent logs
+              echo "Recent logs:"
+              docker logs --tail 20 ${{ matrix.service.name }}
+              
               sleep 10
             done
 
