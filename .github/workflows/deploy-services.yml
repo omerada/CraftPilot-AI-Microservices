@@ -63,9 +63,70 @@ jobs:
             # Docker Hub login
             echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
 
+            # Utility functions
+            wait_for_service() {
+              local service=$1
+              local port=$2
+              local max_attempts=${3:-30}  # Default 30 deneme
+              local sleep_time=${4:-20}    # Default 20 saniye bekleme
+              
+              echo "=== Checking $service on port $port ==="
+              
+              for i in $(seq 1 $max_attempts); do
+                echo "Attempt $i/$max_attempts: Checking $service..."
+                
+                # Container çalışıyor mu kontrol et
+                if ! docker ps | grep -q $service; then
+                  echo "Container $service is not running!"
+                  docker logs $service
+                  return 1
+                fi
+                
+                # Container loglarını kontrol et
+                if docker logs $service 2>&1 | grep -q "ERROR"; then
+                  echo "Found ERROR in $service logs:"
+                  docker logs $service | grep "ERROR"
+                fi
+                
+                # Health check
+                if curl -sf "http://localhost:${port}/actuator/health"; then
+                  echo "$service is healthy!"
+                  return 0
+                fi
+                
+                # Her 5 denemede bir detaylı log göster
+                if [ $((i % 5)) -eq 0 ]; then
+                  echo "Recent logs for $service:"
+                  docker logs --tail 50 $service
+                fi
+                
+                sleep $sleep_time
+              done
+              
+              echo "$service failed to start. Full logs:"
+              docker logs $service
+              return 1
+            }
+
+            deploy_service() {
+              local service=$1
+              local image_tag="${DOCKERHUB_USERNAME}/${service}:latest-arm64"
+              
+              echo "=== Deploying ${service} ==="
+              
+              # Stop and remove existing container
+              docker stop ${service} 2>/dev/null || true
+              docker rm ${service} 2>/dev/null || true
+              
+              # Pull or use existing image
+              if ! docker pull ${image_tag} 2>/dev/null; then
+                echo "Warning: Could not pull ${image_tag}"
+              fi
+            }
+
             # 1. Infrastructure Services
             echo "=== Starting Infrastructure Services ==="
-            docker network create craftpilot-network || true
+            docker network create craftpilot-network 2>/dev/null || true
 
             # Start Redis
             if ! docker ps -q -f name=redis; then
@@ -106,42 +167,35 @@ jobs:
               sleep 20
             fi
 
-            # 2. Core Services (sıralı başlatma)
+            # 2. Core Services
             echo "=== Starting Core Services ==="
 
-            # Service update order
-            core_services=(
-              "eureka-server"      # Service Discovery
-              "api-gateway"        # API Gateway
-              "redis-service"      # Redis Service
-              "kafka-service"      # Kafka Service
-            )
+            # Deploy Eureka first
+            deploy_service "eureka-server"
+            wait_for_service "eureka-server" "8761" "30" "10" || exit 1
 
-            # Update and start core services
+            # Deploy other core services
+            core_services=("api-gateway" "redis-service" "kafka-service")
             for service in "${core_services[@]}"; do
-              update_service ${service}
-              echo "Waiting for ${service} to be ready..."
-              sleep 20
+              deploy_service "$service"
+              sleep 15
             done
 
             # 3. Business Services
             echo "=== Starting Business Services ==="
-
-            # Service update order
             business_services=(
-              "user-service"           # User Management
-              "credit-service"         # Credit Management
-              "subscription-service"    # Subscription Management
-              "notification-service"    # Notifications
-              "analytics-service"      # Analytics
-              "admin-service"          # Admin Operations
-              "llm-service"           # LLM Operations
-              "image-service"         # Image Operations
+              "user-service"
+              "credit-service"
+              "subscription-service"
+              "notification-service"
+              "analytics-service"
+              "admin-service"
+              "llm-service"
+              "image-service"
             )
 
-            # Update and start business services
             for service in "${business_services[@]}"; do
-              update_service ${service}
+              deploy_service "$service"
               sleep 10
             done
 
@@ -188,27 +242,70 @@ jobs:
 
             for service in "${!service_ports[@]}"; do
               port="${service_ports[$service]}"
-              echo "Kontrol ediliyor: ${service} on port ${port}"
-              
-              for i in {1..5}; do
-                if curl -sf "http://localhost:${port}/actuator/health"; then
-                  echo "${service} sağlıklı!"
-                  break
-                fi
-                
-                if [ $i -eq 5 ]; then
-                  echo "${service} başlatılamadı!"
-                  docker logs ${service}
-                  docker-compose logs ${service}
-                  exit 1
-                fi
-                
-                echo "Deneme $i: ${service} bekleniyor..."
-                sleep 10
-              done
+              wait_for_service "$service" "$port" "5" "10" || {
+                echo "Failed to start $service"
+                docker-compose logs "$service"
+                exit 1
+              }
             done
 
             echo "Tüm servisler başarıyla güncellendi ve başlatıldı!"
 
             # Kullanılmayan container ve image'ları temizle
             docker system prune -f --volumes
+
+            # Servisleri sırayla başlat ve health check yap
+            deploy_and_check_service() {
+              local service=$1
+              local port=$2
+              
+              echo "=== Deploying and checking $service ==="
+              deploy_service "$service"
+              sleep 30  # İlk başlatma için daha uzun bekle
+              
+              if ! wait_for_service "$service" "$port" 30 20; then
+                echo "Failed to start $service. Attempting recovery..."
+                
+                # Bağımlılıkları kontrol et
+                docker ps
+                echo "Network status:"
+                docker network inspect craftpilot-network
+                
+                # Servisi yeniden başlatmayı dene
+                docker restart $service
+                sleep 30
+                
+                if ! wait_for_service "$service" "$port" 15 20; then
+                  echo "Recovery failed for $service"
+                  exit 1
+                fi
+              fi
+            }
+
+            # Core services için güncellenmiş deployment
+            echo "=== Starting Core Services ==="
+            deploy_and_check_service "eureka-server" "8761"
+            deploy_and_check_service "api-gateway" "8080"
+            deploy_and_check_service "redis-service" "8079"
+            deploy_and_check_service "kafka-service" "9092"
+
+            # Business services için güncellenmiş deployment
+            echo "=== Starting Business Services ==="
+            for service in "${business_services[@]}"; do
+              port="${service_ports[$service]}"
+              deploy_and_check_service "$service" "$port"
+            done
+
+            # Final health check
+            echo "=== Final Health Check ==="
+            for service in "${!service_ports[@]}"; do
+              port="${service_ports[$service]}"
+              if ! curl -sf "http://localhost:${port}/actuator/health"; then
+                echo "Final check failed for $service"
+                docker logs $service
+                exit 1
+              fi
+              echo "$service is healthy"
+            done
+
+            echo "=== All services successfully deployed and verified ==="
