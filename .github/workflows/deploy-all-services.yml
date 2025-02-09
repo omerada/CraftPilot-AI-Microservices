@@ -98,11 +98,12 @@ jobs:
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD
+          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD
           script: |
             if [ "${{ matrix.service.name }}" = "api-gateway" ]; then
               echo "=== Deploying API Gateway ==="
@@ -110,17 +111,22 @@ jobs:
               docker stop api-gateway || true
               docker rm api-gateway || true
 
-              docker run -d \
-                --name api-gateway \
-                --network craftpilot-network \
-                -p 8080:8080 \
-                -e SERVER_PORT=8080 \
-                -e SPRING_APPLICATION_NAME=api-gateway \
-                -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
-                -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
-                -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_LOWER_CASE_SERVICE_ID=true \
-                -e LOGGING_LEVEL_ROOT=INFO \
-                ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
+              
+            docker run -d \
+              --name api-gateway \
+              --network craftpilot-network \
+              -p 8080:8080 \
+              -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e SERVER_PORT=8080 \
+              -e EUREKA_USERNAME=craftpilot \
+              -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
+              -e EUREKA_SERVER_HOST=eureka-server \
+              -e EUREKA_SERVER_PORT=8761 \
+              -e SPRING_APPLICATION_NAME=api-gateway \
+              -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
+              -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_LOWER_CASE_SERVICE_ID=true \
+              ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
 
               # Health check with shorter timeout
               echo "=== Waiting for API Gateway ==="

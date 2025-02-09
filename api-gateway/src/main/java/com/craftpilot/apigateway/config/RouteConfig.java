@@ -19,68 +19,62 @@ public class RouteConfig {
     @Bean
     public RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
         return builder.routes()
+
                 // User Service Routes
-                .route("user-service", r -> r.path("/api/users/**")
+                .route("user-service", r -> r.path("/api/users/**", "/api/profiles/**")
                         .filters(f -> f.circuitBreaker(config -> config
                                 .setName("userServiceCircuitBreaker")
                                 .setFallbackUri("forward:/fallback/user")))
                         .uri("lb://user-service"))
-                
+
                 // Admin Service Routes
-                .route("admin-service", r -> r.path("/api/admin/**")
+                .route("admin-service", r -> r.path("/api/admin/**", "/api/management/**", "/api/system/**")
                         .filters(f -> f.circuitBreaker(config -> config
                                 .setName("adminServiceCircuitBreaker")
                                 .setFallbackUri("forward:/fallback/admin")))
                         .uri("lb://admin-service"))
-                
-                // Question Service Routes
-                .route("question-service", r -> r.path("/api/questions/**")
+
+                // LLM Service Routes
+                .route("llm-service", r -> r.path("/api/questions/**", "/api/chat/**", "/api/completions/**", "/api/prompts/**")
                         .filters(f -> f.circuitBreaker(config -> config
-                                .setName("questionServiceCircuitBreaker")
-                                .setFallbackUri("forward:/fallback/question")))
-                        .uri("lb://question-service"))
-                
-                // Chat Service Routes
-                .route("chat-service", r -> r.path("/api/chat/**")
-                        .filters(f -> f.circuitBreaker(config -> config
-                                .setName("chatServiceCircuitBreaker")
-                                .setFallbackUri("forward:/fallback/chat")))
-                        .uri("lb://chat-service"))
+                                .setName("llmServiceCircuitBreaker")
+                                .setFallbackUri("forward:/fallback/llm")))
+                        .uri("lb://llm-service"))
 
                 // Image Service Routes
-                .route("image-service", r -> r.path("/api/images/**")
+                .route("image-service", r -> r.path("/api/images/**", "/api/media/**", "/api/gallery/**")
                         .filters(f -> f.circuitBreaker(config -> config
                                 .setName("imageServiceCircuitBreaker")
                                 .setFallbackUri("forward:/fallback/image")))
                         .uri("lb://image-service"))
- 
+
                 // Analytics Service Routes
-                .route("analytics-service", r -> r.path("/api/analytics/**")
+                .route("analytics-service", r -> r.path("/api/analytics/**", "/api/reports/**", "/api/metrics/**", "/api/statistics/**")
                         .filters(f -> f.circuitBreaker(config -> config
                                 .setName("analyticsServiceCircuitBreaker")
                                 .setFallbackUri("forward:/fallback/analytics")))
                         .uri("lb://analytics-service"))
 
-                // Notification Service Routes
-                .route("notification-service", r -> r.path("/api/notifications/**")
-                        .filters(f -> f.circuitBreaker(config -> config
-                                .setName("notificationServiceCircuitBreaker")
-                                .setFallbackUri("forward:/fallback/notification")))
-                        .uri("lb://notification-service"))
-
                 // Credit Service Routes
-                .route("credit-service", r -> r.path("/api/credits/**")
+                .route("credit-service", r -> r.path("/api/credits/**", "/api/payments/**", "/api/billing/**", "/api/transactions/**")
                         .filters(f -> f.circuitBreaker(config -> config
                                 .setName("creditServiceCircuitBreaker")
                                 .setFallbackUri("forward:/fallback/credit")))
                         .uri("lb://credit-service"))
 
                 // Subscription Service Routes
-                .route("subscription-service", r -> r.path("/api/subscriptions/**")
+                .route("subscription-service", r -> r.path("/api/subscriptions/**", "/api/plans/**", "/api/packages/**")
                         .filters(f -> f.circuitBreaker(config -> config
                                 .setName("subscriptionServiceCircuitBreaker")
                                 .setFallbackUri("forward:/fallback/subscription")))
                         .uri("lb://subscription-service"))
+
+                // Notification Service Routes
+                .route("notification-service", r -> r.path("/api/notifications/**", "/api/messages/**", "/api/emails/**", "/api/push/**")
+                        .filters(f -> f.circuitBreaker(config -> config
+                                .setName("notificationServiceCircuitBreaker")
+                                .setFallbackUri("forward:/fallback/notification")))
+                        .uri("lb://notification-service"))
                 
                 .build();
     }
@@ -115,4 +109,4 @@ public class RouteConfig {
             exchange.getRequest().getRemoteAddress().getAddress().getHostAddress()
         );
     }
-} 
+}

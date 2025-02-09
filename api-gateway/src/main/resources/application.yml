@@ -97,15 +97,14 @@ spring:
             - RewritePath=/swagger-ui.html, /swagger-ui/index.html
 
 eureka:
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${vcap.application.instance_id:${spring.application.instance_id:${random.value}}}
   client:
     serviceUrl:
       defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:password}@${EUREKA_SERVER_HOST:eureka-server}:${EUREKA_SERVER_PORT:8761}/eureka/
     fetch-registry: true
     register-with-eureka: true
-  instance:
-    prefer-ip-address: true
-    instance-id: ${spring.application.name}:${spring.cloud.client.hostname}:${server.port}
-    hostname: ${HOSTNAME:localhost}
 
 management:
   endpoints:
@@ -115,3 +114,8 @@ management:
   endpoint:
     health:
       show-details: always
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.cloud.netflix.eureka: DEBUG
