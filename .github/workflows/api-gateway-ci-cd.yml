@@ -124,6 +124,7 @@ jobs:
             docker run -d \
               --name api-gateway \
               --network craftpilot-network \
+              --ip 172.18.0.12 \
               -p 8080:8080 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \

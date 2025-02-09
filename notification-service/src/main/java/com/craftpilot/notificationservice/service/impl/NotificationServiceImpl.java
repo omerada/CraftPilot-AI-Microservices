@@ -99,7 +99,11 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public Flux<Notification> getScheduledNotifications() {
         return notificationRepository.findByScheduledAtAfter(LocalDateTime.now())
-                .doOnComplete(() -> log.debug("Retrieved scheduled notifications"));
+                .doOnError(e -> log.error("Error fetching scheduled notifications: {}", e.getMessage()))
+                .onErrorResume(e -> {
+                    log.error("Falling back to empty flux for scheduled notifications", e);
+                    return Flux.empty();
+                });
     }
 
     @Override

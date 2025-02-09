@@ -57,7 +57,7 @@ jobs:
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: ./notification-service  # Değiştirildi
+          context: ./notification-service # Değiştirildi
           file: ./notification-service/Dockerfile
           platforms: linux/arm64
           push: true
@@ -75,42 +75,51 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             echo "Starting deployment process..."
-            
+
             # Debug mode enabled
             set -x
-            
+
             echo "Checking Docker service status..."
             systemctl status docker || true
-            
+
             echo "Checking existing containers..."
             docker ps -a | grep notification-service || true
-            
+
             echo "Creating network if not exists..."
             docker network create craftpilot-network || true
-            
+
             echo "Pulling latest image..."
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
-            
+
             echo "Stopping and removing existing container..."
             docker stop notification-service || true
             docker rm notification-service || true
-            
+
             echo "Setting up directories and permissions..."
             mkdir -p /opt/craftpilot/config/notification-service
-            
+
             echo "Creating GCP credentials..."
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/notification-service/gcp-credentials.json
             chmod 644 /opt/craftpilot/config/notification-service/gcp-credentials.json
             chown 65532:65532 /opt/craftpilot/config/notification-service/gcp-credentials.json
-            
+
             echo "Creating Firebase credentials..."
             echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /opt/craftpilot/config/notification-service/firebase-service-account.json
             chmod 644 /opt/craftpilot/config/notification-service/firebase-service-account.json
             chown 65532:65532 /opt/craftpilot/config/notification-service/firebase-service-account.json
-            
+
             # Create function definition in a variable to avoid semicolon issues
             FUNCTION_DEF="notificationEventConsumer;notificationEventProducer"
-            
+
+            # GCP ve DNS ayarlarını güncelle
+            echo "Setting up networking config..."
+            cat > /opt/craftpilot/config/notification-service/grpc-netty.properties << EOF
+            io.grpc.netty.negotiationType=TLS
+            io.grpc.netty.keepAliveTime=60
+            io.grpc.netty.keepAliveTimeout=20
+            io.netty.handler.ssl.openssl.useKeyManagerFactory=true
+            EOF
+
             echo "Starting container..."
             docker run -d \
               --name notification-service \
@@ -124,6 +133,7 @@ jobs:
               -v /opt/craftpilot/config/notification-service:/app/config:ro \
               -v "/opt/craftpilot/config/notification-service/gcp-credentials.json:/app/credentials/gcp-credentials.json:ro" \
               -v "/opt/craftpilot/config/notification-service/firebase-service-account.json:/app/credentials/firebase-credentials.json:ro" \
+              -v "/opt/craftpilot/config/notification-service/grpc-netty.properties:/app/config/grpc-netty.properties:ro" \
               -e GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-credentials.json \
               -e FIREBASE_CONFIG=/app/credentials/firebase-credentials.json \
               -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/credentials/gcp-credentials.json \
@@ -146,7 +156,7 @@ jobs:
               -e SPRING_DATA_REDIS_PORT=6379 \
               -e SPRING_DATA_REDIS_PASSWORD=13579ada \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e "JAVA_OPTS=-Xmx768m -Xms384m -XX:+UseContainerSupport -XX:+UseG1GC -Dio.netty.tryReflectionSetAccessible=true -Dio.netty.noUnsafe=true --add-opens java.base/java.time=ALL-UNNAMED --add-opens java.base/java.time.chrono=ALL-UNNAMED" \
+              -e "JAVA_OPTS=-Xmx768m -Xms384m -XX:+UseContainerSupport -XX:+UseG1GC -Dio.netty.tryReflectionSetAccessible=true -Dio.netty.noUnsafe=true --add-opens java.base/java.time=ALL-UNNAMED --add-opens java.base/java.time.chrono=ALL-UNNAMED -Dgrpc.netty.handler.ssl.useOpenSSL=true -Dio.grpc.netty.useCustomAllocator=false --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED -Dspring.cloud.gcp.firestore.emulator.enabled=false -Dspring.cloud.gcp.firestore.enabled=true" \
               -e SENDGRID_API_KEY='${{ secrets.SENDGRID_API_KEY }}' \
               -e SENDGRID_FROM_EMAIL='${{ secrets.SENDGRID_FROM_EMAIL }}' \
               -e FIREBASE_SERVICE_ACCOUNT='${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' \
@@ -156,16 +166,22 @@ jobs:
               -e SPRING_MAIL_PORT=587 \
               -e SPRING_MAIL_USERNAME=apikey \
               -e SPRING_MAIL_PASSWORD='${{ secrets.SENDGRID_API_KEY }}' \
+              -e MANAGEMENT_HEALTH_MAIL_ENABLED=false \
+              -e SPRING_MAIL_ENABLED=false \
+              -e SPRING_SENDGRID_API_KEY='${{ secrets.SENDGRID_API_KEY }}' \
+              -e SPRING_SENDGRID_ENABLED=true \
+              --dns 8.8.8.8 \
+              --dns 8.8.4.4 \
               --health-cmd="/healthcheck.sh" \
               --health-interval=30s \
               --health-timeout=10s \
               --health-retries=5 \
               --health-start-period=180s \
               ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
-            
+
             echo "Waiting for container to start..."
             sleep 180  # Increased wait time
-            
+
             echo "Checking container status..."
             if [ "$(docker ps -q -f name=notification-service)" ]; then
               echo "Container is running successfully"
@@ -188,6 +204,12 @@ jobs:
               
               echo "Testing container health:"
               curl -v http://localhost:8053/actuator/health || true
+              
+              echo "Verifying Firestore connectivity..."
+              docker exec notification-service curl -v https://firestore.googleapis.com/
+              
+              echo "Verifying SendGrid API connectivity..."
+              docker exec notification-service curl -v https://api.sendgrid.com/v3/mail/send -H "Authorization: Bearer $SENDGRID_API_KEY"
             else
               echo "Container failed to start"
               echo "Container logs:"
@@ -201,7 +223,7 @@ jobs:
               
               exit 1
             fi
-            
+
             # Disable debug mode
             set +x
 

@@ -2,18 +2,19 @@ package com.craftpilot.notificationservice.repository;
 
 import com.craftpilot.notificationservice.model.Notification;
 import com.google.api.core.ApiFuture;
-import com.google.cloud.firestore.DocumentSnapshot;
-import com.google.cloud.firestore.Firestore;
-import com.google.cloud.firestore.QuerySnapshot;
-import com.google.cloud.firestore.WriteResult;
+import com.google.cloud.firestore.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
+@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class NotificationRepository {
@@ -120,4 +121,44 @@ public class NotificationRepository {
             }
         }));
     }
-} 
+
+    public Flux<Notification> findByScheduledAtAfter(Instant time) {
+        return Mono.fromCallable(() -> {
+            try {
+                CollectionReference notificationsRef = firestore.collection(COLLECTION_NAME);
+                
+                // Compound query with index
+                Query query = notificationsRef
+                    .whereEqualTo("deleted", false)
+                    .whereGreaterThan("scheduledAt", time)
+                    .orderBy("scheduledAt", Query.Direction.ASCENDING);
+
+                return query.get().get().getDocuments().stream()
+                    .map(doc -> doc.toObject(Notification.class))
+                    .toList();
+
+            } catch (ExecutionException e) {
+                if (e.getCause() instanceof com.google.firebase.firestore.FirestoreException 
+                    && e.getCause().getMessage().contains("FAILED_PRECONDITION")) {
+                    log.error("Missing Firestore index. Please create the index using the following URL: {}", 
+                        extractIndexUrl(e.getMessage()));
+                }
+                throw new RuntimeException("Error querying Firestore", e);
+            } catch (Exception e) {
+                log.error("Error querying notifications", e);
+                throw new RuntimeException("Error querying notifications", e);
+            }
+        }).flatMapMany(Flux::fromIterable)
+        .doOnError(e -> log.error("Error in findByScheduledAtAfter: {}", e.getMessage()))
+        .onErrorResume(e -> Flux.empty());
+    }
+
+    private String extractIndexUrl(String errorMessage) {
+        // Extract index creation URL from error message
+        int startIndex = errorMessage.indexOf("https://console.firebase.google.com");
+        if (startIndex != -1) {
+            return errorMessage.substring(startIndex).split("\\s")[0];
+        }
+        return "No index URL found in error message";
+    }
+}

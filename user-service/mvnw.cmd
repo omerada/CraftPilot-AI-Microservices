@@ -52,6 +52,7 @@ if ($env:MVNW_VERBOSE -eq "true") {
 
 # calculate distributionUrl, requires .mvn/wrapper/maven-wrapper.properties
 $distributionUrl = (Get-Content -Raw "$scriptDir/.mvn/wrapper/maven-wrapper.properties" | ConvertFrom-StringData).distributionUrl
+$distributionUrl = "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.7/apache-maven-3.9.7-bin.zip"
 if (!$distributionUrl) {
   Write-Error "cannot read distributionUrl property in $scriptDir/.mvn/wrapper/maven-wrapper.properties"
 }

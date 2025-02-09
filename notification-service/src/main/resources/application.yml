@@ -29,6 +29,32 @@ spring:
           enabled: false
       core:
         enabled: true
+    discovery:
+      enabled: true
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+          autoAddPartitions: true
+          configuration:
+            security.protocol: PLAINTEXT
+      bindings:
+        notificationEventConsumer-in-0:
+          destination: notifications
+          group: notification-service-group
+          consumer:
+            maxAttempts: 3
+            backOffInitialInterval: 1000
+            backOffMaxInterval: 10000
+            backOffMultiplier: 2.0
+        notificationEventProducer-out-0:
+          destination: notifications
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:13579ada}
+      timeout: 2000
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
@@ -64,6 +90,11 @@ spring:
       multiplier: 2.0
       max-interval: 5000
 
+  sendgrid:
+    api-key: ${SENDGRID_API_KEY}
+    enabled: true
+    from: ${SENDGRID_FROM_EMAIL:support@craftpilot.com}
+
 management:
   endpoints:
     web:
@@ -87,8 +118,7 @@ eureka:
     fetch-registry: true
   instance:
     prefer-ip-address: true
-    lease-renewal-interval-in-seconds: 5
-    lease-expiration-duration-in-seconds: 10
+    lease-renewal-interval-in-seconds: 10
 
 resilience4j:
   circuitbreaker:
@@ -97,7 +127,7 @@ resilience4j:
         slidingWindowSize: 10
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
-        permittedNumberOfCallsInHalfOpenState: 5
+        permittedNumberOfCallsInHalfOpenState: 3
   retry:
     instances:
       notificationService:
@@ -113,11 +143,13 @@ resilience4j:
 logging:
   level:
     root: INFO
-    '[com.craftpilot.notificationservice]': INFO
-    '[org.springframework.data]': INFO
-    '[org.springframework.security]': INFO
-    '[org.springframework.web]': INFO
-    '[org.springframework.cloud]': INFO
+    "[com.craftpilot.notificationservice]": INFO
+    "[org.springframework.data]": INFO
+    "[org.springframework.security]": INFO
+    "[org.springframework.web]": INFO
+    "[org.springframework.cloud]": INFO
+    com.craftpilot: DEBUG
+    org.springframework: INFO
 
 springdoc:
   swagger-ui:

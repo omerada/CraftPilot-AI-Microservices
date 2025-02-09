@@ -31,6 +31,8 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport \
     -Djava.security.egd=file:/dev/./urandom \
     -Dserver.port=8052 \
     -Dspring.profiles.active=prod \
+    -Deureka.instance.preferIpAddress=true \
+    -Dspring.cloud.service-registry.auto-registration.enabled=true \
     -Dspring.output.ansi.enabled=ALWAYS"
 
 # Healthcheck yapılandırması
