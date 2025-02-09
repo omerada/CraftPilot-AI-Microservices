@@ -97,21 +97,24 @@ spring:
             - RewritePath=/swagger-ui.html, /swagger-ui/index.html
       httpclient:
         connect-timeout: 5000
-        response-timeout: 10000
+        response-timeout: 5000
 
 eureka:
   instance:
-    prefer-ip-address: true
-    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
-    hostname: ${HOSTNAME:localhost}
-    lease-renewal-interval-in-seconds: 30
-    lease-expiration-duration-in-seconds: 90
+    prefer-ip-address: false
+    hostname: ${HOSTNAME:api-gateway}
+    instance-id: ${spring.application.name}:${vcap.application.instance_id:${random.value}}
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
   client:
-    serviceUrl:
+    service-url:
       defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:password}@${EUREKA_SERVER_HOST:eureka-server}:${EUREKA_SERVER_PORT:8761}/eureka/
     fetch-registry: true
     register-with-eureka: true
-    registry-fetch-interval-seconds: 30
+    registry-fetch-interval-seconds: 5
+    eureka-server-connect-timeout-seconds: 5
+    eureka-server-read-timeout-seconds: 5
+    eureka-service-url-poll-interval-seconds: 5
 
 management:
   endpoints:
@@ -124,5 +127,6 @@ management:
 
 logging:
   level:
-    org.springframework.cloud.gateway: DEBUG
+    com.netflix.discovery: DEBUG
     org.springframework.cloud.netflix.eureka: DEBUG
+    org.springframework.cloud.gateway: DEBUG

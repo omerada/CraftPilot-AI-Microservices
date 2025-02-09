@@ -125,8 +125,8 @@ jobs:
             echo "=== Starting New Container ==="
             docker run -d \
               --name api-gateway \
-              --network craftpilot-network \
               --hostname api-gateway \
+              --network craftpilot-network \
               -p 8080:8080 \
               -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -137,6 +137,8 @@ jobs:
               -e EUREKA_SERVER_HOST=eureka-server \
               -e EUREKA_SERVER_PORT=8761 \
               -e SPRING_APPLICATION_NAME=api-gateway \
+              -e SPRING_CLOUD_CONFIG_ENABLED=false \
+              -e SPRING_CLOUD_DISCOVERY_ENABLED=true \
               ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
 
             echo "=== Waiting for API Gateway ==="
