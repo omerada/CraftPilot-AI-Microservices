@@ -64,7 +64,7 @@ jobs:
             sleep 20
 
   deploy-services:
-    needs: deploy-core-services
+    needs: deploy-infrastructure
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -139,7 +139,7 @@ jobs:
             exit 1
 
   deploy-monitoring:
-    needs: deploy-business-services
+    needs: deploy-services
     runs-on: ubuntu-latest
     steps:
       - name: Deploy Monitoring Stack
