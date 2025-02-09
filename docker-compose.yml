@@ -26,40 +26,6 @@ services:
         limits:
           memory: 512M
 
-  # Redis Service
-  redis-service:
-    image: ${DOCKERHUB_USERNAME}/redis-service:latest-arm64
-    container_name: redis-service
-    ports:
-      - "8085:8085"
-    environment:
-      - SPRING_PROFILES_ACTIVE=prod
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=13579ada
-      - SPRING_CLOUD_GCP_SA_KEY_LOCATION=file:/app/gcp-credentials.json
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
-    volumes:
-      - ${GCP_SA_KEY_PATH:-./redis-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
-    networks:
-      - craftpilot-network
-    depends_on:
-      redis:
-        condition: service_healthy
-      eureka-server:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
     container_name: zookeeper
@@ -132,34 +98,71 @@ services:
       timeout: 5s
       retries: 3
 
-  # API Gateway
-  api-gateway:
-    image: ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
-    container_name: api-gateway
+  # Redis Service
+  redis-service:
+    image: ${DOCKERHUB_USERNAME}/redis-service:latest-arm64
+    container_name: redis-service
     ports:
-      - "8080:8080"
+      - "8085:8085"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - EUREKA_USERNAME=${EUREKA_USERNAME}
-      - EUREKA_PASSWORD=${EUREKA_PASSWORD}
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - GCP_SA_KEY=${GCP_SA_KEY}
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
-      - SERVER_FORWARD_HEADERS_STRATEGY=framework
+      - REDIS_PASSWORD=13579ada
+      - SPRING_CLOUD_GCP_SA_KEY_LOCATION=file:/app/gcp-credentials.json
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
     volumes:
-      - ${GCP_SA_KEY_PATH}:/gcp-credentials.json:ro
+      - ${GCP_SA_KEY_PATH:-./redis-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
     networks:
       - craftpilot-network
     depends_on:
+      redis:
+        condition: service_healthy
       eureka-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 40s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+
+  # KAFKA Service
+  kafka-service:
+    container_name: kafka-service
+    image: ${DOCKERHUB_USERNAME}/kafka-service:latest-arm64
+    ports:
+      - "9092:9092"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_KAFKA_ADMIN_BOOTSTRAP_SERVERS=kafka:9092
+    networks:
+      - craftpilot-network
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9092/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
 
   # LLM Service
   llm-service:
@@ -231,7 +234,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1024M
 
   # Subscription Service
   subscription-service:
@@ -297,7 +300,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1024M
 
   # Notification Service
   notification-service:
@@ -327,7 +330,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1024M
 
   # Monitoring
   prometheus:
@@ -373,41 +376,6 @@ services:
         limits:
           memory: 512M
 
-  # Admin Service
-  admin-service:
-    image: ${DOCKERHUB_USERNAME}/admin-service:latest-arm64
-    container_name: admin-service
-    ports:
-      - "8097:8097"
-    environment:
-      - SPRING_PROFILES_ACTIVE=prod
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
-      - SPRING_CLOUD_GCP_SA_KEY_LOCATION=file:/app/gcp-credentials.json
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=13579ada
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-    volumes:
-      - ${GCP_SA_KEY_PATH:-./admin-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
-    networks:
-      - craftpilot-network
-    depends_on:
-      eureka-server:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8097/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 512M
 
   # Analytics Service
   analytics-service:
@@ -443,29 +411,34 @@ services:
       redis:
         condition: service_healthy
 
-  kafka-service:
-    container_name: kafka-service
-    image: ${DOCKERHUB_USERNAME}/kafka-service:latest-arm64
+  # Admin Service
+  admin-service:
+    image: ${DOCKERHUB_USERNAME}/admin-service:latest-arm64
+    container_name: admin-service
     ports:
-      - "9092:9092"
+      - "8097:8097"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
+      - SPRING_CLOUD_GCP_SA_KEY_LOCATION=file:/app/gcp-credentials.json
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-craft-pilot-ai}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=13579ada
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS=kafka:9092
-      - SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS=kafka:9092
-      - SPRING_KAFKA_ADMIN_BOOTSTRAP_SERVERS=kafka:9092
+    volumes:
+      - ${GCP_SA_KEY_PATH:-./admin-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
     networks:
       - craftpilot-network
     depends_on:
-      zookeeper:
+      eureka-server:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       kafka:
         condition: service_healthy
-      eureka-server:
-        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9092/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8097/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -473,6 +446,36 @@ services:
       resources:
         limits:
           memory: 512M
+        
+  # API Gateway
+  api-gateway:
+    image: ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - EUREKA_USERNAME=${EUREKA_USERNAME}
+      - EUREKA_PASSWORD=${EUREKA_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - GCP_SA_KEY=${GCP_SA_KEY}
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@eureka-server:8761/eureka/
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
+    volumes:
+      - ${GCP_SA_KEY_PATH}:/gcp-credentials.json:ro
+    networks:
+      - craftpilot-network
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
 
 volumes:
   redis-data:

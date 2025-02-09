@@ -6,6 +6,7 @@ import reactor.core.publisher.Mono;
 
 @Repository
 public interface UserPreferenceRepository {
+    Mono<UserPreference> findById(String id);
     Mono<UserPreference> findByUserId(String userId);
     Mono<UserPreference> save(UserPreference preference);
-} 
+}
