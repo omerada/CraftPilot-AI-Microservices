@@ -124,6 +124,97 @@ jobs:
               fi
             }
 
+            # Infrastructure setup function
+            setup_infrastructure() {
+              echo "=== Setting up Infrastructure ==="
+              
+              # Create network if not exists
+              docker network create craftpilot-network 2>/dev/null || true
+              
+              # Start Redis
+              if ! docker ps -q -f name=redis; then
+                echo "Starting Redis..."
+                docker stop redis 2>/dev/null || true
+                docker rm redis 2>/dev/null || true
+                docker run -d \
+                  --name redis \
+                  --network craftpilot-network \
+                  -p 6379:6379 \
+                  -e REDIS_PASSWORD=${REDIS_PASSWORD} \
+                  redis:latest --requirepass ${REDIS_PASSWORD}
+                
+                echo "Waiting for Redis to start..."
+                sleep 10
+                
+                # Redis health check
+                if ! docker exec redis redis-cli -a ${REDIS_PASSWORD} ping | grep -q "PONG"; then
+                  echo "Redis failed to start properly"
+                  docker logs redis
+                  exit 1
+                fi
+                echo "Redis is running and healthy"
+              fi
+
+              # Start Zookeeper
+              if ! docker ps -q -f name=zookeeper; then
+                echo "Starting Zookeeper..."
+                docker stop zookeeper 2>/dev/null || true
+                docker rm zookeeper 2>/dev/null || true
+                docker run -d \
+                  --name zookeeper \
+                  --network craftpilot-network \
+                  -e ZOOKEEPER_CLIENT_PORT=2181 \
+                  -e ZOOKEEPER_TICK_TIME=2000 \
+                  confluentinc/cp-zookeeper:latest
+                
+                echo "Waiting for Zookeeper to start..."
+                sleep 20
+                
+                # Zookeeper health check
+                if ! echo ruok | nc localhost 2181; then
+                  echo "Zookeeper failed to start properly"
+                  docker logs zookeeper
+                  exit 1
+                fi
+                echo "Zookeeper is running and healthy"
+              fi
+
+              # Start Kafka
+              if ! docker ps -q -f name=kafka; then
+                echo "Starting Kafka..."
+                docker stop kafka 2>/dev/null || true
+                docker rm kafka 2>/dev/null || true
+                docker run -d \
+                  --name kafka \
+                  --network craftpilot-network \
+                  -p 9092:9092 \
+                  -e KAFKA_BROKER_ID=1 \
+                  -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
+                  -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
+                  -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+                  -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
+                  -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 \
+                  confluentinc/cp-kafka:latest
+                
+                echo "Waiting for Kafka to start..."
+                sleep 30
+                
+                # Kafka health check
+                if ! nc -z localhost 9092; then
+                  echo "Kafka failed to start properly"
+                  docker logs kafka
+                  exit 1
+                fi
+                echo "Kafka is running and healthy"
+              fi
+
+              echo "All infrastructure services are running"
+              docker ps
+            }
+
+            # Infrastructure setup
+            setup_infrastructure
+
             # 1. Infrastructure Services
             echo "=== Starting Infrastructure Services ==="
             docker network create craftpilot-network 2>/dev/null || true
@@ -172,7 +263,20 @@ jobs:
 
             # Deploy Eureka first
             deploy_service "eureka-server"
-            wait_for_service "eureka-server" "8761" "30" "10" || exit 1
+            echo "Verifying infrastructure before starting Eureka..."
+            docker ps | grep -E "redis|zookeeper|kafka"
+
+            if ! wait_for_service "eureka-server" "8761" "30" "10"; then
+              echo "Infrastructure status:"
+              docker ps
+              echo "Eureka logs:"
+              docker logs eureka-server
+              echo "Redis logs:"
+              docker logs redis
+              echo "Kafka logs:"
+              docker logs kafka
+              exit 1
+            fi
 
             # Deploy other core services
             core_services=("api-gateway" "redis-service" "kafka-service")
