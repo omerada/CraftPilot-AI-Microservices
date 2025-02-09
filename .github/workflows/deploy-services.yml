@@ -9,73 +9,11 @@ on:
       - "deploy.sh"
 
 jobs:
-  deploy-infrastructure:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy Infrastructure Services
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            echo "=== Creating Docker Network ==="
-            docker network create craftpilot-network || true
-
-            echo "=== Starting Zookeeper and Kafka ==="
-            # Zookeeper için Docker container başlat
-            docker run -d \
-              --name zookeeper \
-              --network craftpilot-network \
-              -e ZOOKEEPER_CLIENT_PORT=2181 \
-              -e ZOOKEEPER_TICK_TIME=2000 \
-              confluentinc/cp-zookeeper:latest
-
-            # Zookeeper'ın başlamasını bekle
-            sleep 10
-
-            # Kafka için Docker container başlat
-            docker run -d \
-              --name kafka \
-              --network craftpilot-network \
-              -p 9092:9092 \
-              -e KAFKA_BROKER_ID=1 \
-              -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
-              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
-              -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT \
-              -e KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT \
-              -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
-              -e KAFKA_AUTO_CREATE_TOPICS_ENABLE="true" \
-              confluentinc/cp-kafka:latest
-
-            # Redis container'ını başlat
-            echo "=== Starting Redis ==="
-            if [ ! "$(docker ps -q -f name=redis)" ]; then
-                if [ "$(docker ps -aq -f status=exited -f name=redis)" ]; then
-                    # Eğer container varsa ama çalışmıyorsa, kaldır
-                    docker rm redis
-                fi
-                # Yeni Redis container'ı başlat
-                docker run -d \
-                  --name redis \
-                  --network craftpilot-network \
-                  -p 6379:6379 \
-                  redis:latest
-                
-                # Redis'in başlamasını bekle
-                sleep 10
-            else
-                echo "Redis container zaten çalışıyor"
-            fi
-
-            # Kafka'nın başlamasını bekle
-            sleep 20
-
-            echo "=== Infrastructure Services Started ==="
-
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
+
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         env:
@@ -94,18 +32,62 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,EUREKA_USERNAME,EUREKA_PASSWORD,GCP_SA_KEY,GCP_PROJECT_ID,REDIS_PASSWORD,GMAIL_SERVICE_ACCOUNT,GRAFANA_ADMIN_PASSWORD
           script: |
-            # Proje dizinine git
+            # Proje dizinini oluştur
+            mkdir -p /opt/craftpilot
             cd /opt/craftpilot
 
-            # Git repo'yu klonla veya güncelle
-            if [ -d ".git" ]; then
-              git pull origin master
-            else
-              git clone https://github.com/yourusername/Craft-Pilot-Ai.git .
+            # Mevcut dosyaları yedekle
+            if [ -f "docker-compose.yml" ]; then
+              mv docker-compose.yml docker-compose.yml.backup
+            fi
+            if [ -f "deploy.sh" ]; then
+              mv deploy.sh deploy.sh.backup
             fi
 
-            # Deploy script'i çalıştırılabilir yap ve çalıştır
+            # Gerekli dosyaları oluştur
+            cat << 'EOF' > docker-compose.yml
+            $(cat $GITHUB_WORKSPACE/docker-compose.yml)
+            EOF
+
+            cat << 'EOF' > deploy.sh
+            #!/bin/bash
+
+            # .env dosyasını oluştur
+            cat << ENVEOF > .env
+            DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME}
+            EUREKA_USERNAME=${EUREKA_USERNAME}
+            EUREKA_PASSWORD=${EUREKA_PASSWORD}
+            GCP_SA_KEY_PATH=/opt/craftpilot/gcp-credentials.json
+            GCP_PROJECT_ID=${GCP_PROJECT_ID}
+            REDIS_PASSWORD=${REDIS_PASSWORD}
+            GMAIL_SERVICE_ACCOUNT=${GMAIL_SERVICE_ACCOUNT}
+            GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+            VERSION=latest
+            ENVEOF
+
+            # GCP credentials dosyasını oluştur
+            echo "${GCP_SA_KEY}" > /opt/craftpilot/gcp-credentials.json
+            chmod 600 /opt/craftpilot/gcp-credentials.json
+
+            # Docker Compose ile servisleri başlat
+            docker-compose pull
+            docker-compose up -d
+
+            # Servislerin durumunu kontrol et
+            docker-compose ps
+            EOF
+
+            # Dosya izinlerini ayarla
             chmod +x deploy.sh
+
+            # GCP credentials dizinini oluştur
+            mkdir -p /opt/craftpilot
+
+            # GCP credentials dosyasını oluştur
+            echo "$GCP_SA_KEY" > /opt/craftpilot/gcp-credentials.json
+            chmod 600 /opt/craftpilot/gcp-credentials.json
+
+            # Deploy script'i çalıştır
             ./deploy.sh
 
             # Hata kontrolü
