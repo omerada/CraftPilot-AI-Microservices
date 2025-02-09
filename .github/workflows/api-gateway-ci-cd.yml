@@ -99,7 +99,7 @@ jobs:
               -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
               -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
               -e SPRING_CLOUD_CONFIG_ENABLED=false \
-              -e SPRING_CLOUD_DISCOVERY_ENABLED=true \
+              -e SPRING_SECURITY_BASIC_ENABLED=false \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e SPRING_APPLICATION_NAME=api-gateway \
@@ -109,45 +109,45 @@ jobs:
               -e REDIS_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
 
-            echo "=== Waiting for container to start ==="
-            sleep 20
+            # Initial wait for container startup
+            echo "=== Waiting for initial startup ==="
+            sleep 30
 
-            echo "=== Performing Health Checks ==="
-            attempts=0
+            echo "=== Starting health checks ==="
             max_attempts=5
+            attempt=1
 
-            while [ $attempts -lt $max_attempts ]; do
-                # Container check
-                if ! docker ps | grep -q api-gateway; then
-                    echo "Container not running"
-                    docker logs api-gateway
-                    exit 1
+            while [ $attempt -le $max_attempts ]; do
+              echo "Health check attempt $attempt of $max_attempts"
+              
+              # Check if container is running
+              if ! docker ps | grep -q api-gateway; then
+                echo "Container not running!"
+                docker logs api-gateway
+                exit 1
+              fi
+              
+              # Check application logs for startup
+              if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
+                echo "Application startup confirmed"
+                
+                # Simplified health check
+                HEALTH_RESPONSE=$(curl -s http://localhost:8080/actuator/health)
+                if echo "$HEALTH_RESPONSE" | grep -q "UP"; then
+                  echo "Health check passed - Service is UP"
+                  exit 0
                 fi
-
-                # Log check
-                if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
-                    # Direct curl test
-                    if response=$(curl -s -w "\n%{http_code}" http://localhost:8080/actuator/health); then
-                        status_code=$(echo "$response" | tail -n1)
-                        body=$(echo "$response" | head -n1)
-                        
-                        if [ "$status_code" = "200" ] && echo "$body" | grep -q "UP"; then
-                            echo "Health check passed successfully"
-                            echo "Service is UP and running"
-                            exit 0
-                        fi
-                    fi
-                fi
-
-                attempts=$((attempts + 1))
-                if [ $attempts -lt $max_attempts ]; then
-                    echo "Attempt $attempts failed, waiting 10 seconds..."
-                    sleep 10
-                fi
+              fi
+              
+              attempt=$((attempt + 1))
+              if [ $attempt -le $max_attempts ]; then
+                echo "Waiting 10 seconds before next attempt..."
+                sleep 10
+              fi
             done
 
             echo "=== Health Check Failed - Debug Information ==="
-            echo "Docker Status:"
+            echo "Container Status:"
             docker ps -a | grep api-gateway
             echo "Container Logs:"
             docker logs api-gateway
