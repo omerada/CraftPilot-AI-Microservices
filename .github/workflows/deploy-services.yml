@@ -14,6 +14,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # Docker compose içeriğini base64'e çevir
+      - name: Encode docker-compose
+        run: |
+          DOCKER_COMPOSE_CONTENT=$(cat docker-compose.yml | base64 -w 0)
+          echo "DOCKER_COMPOSE_CONTENT=$DOCKER_COMPOSE_CONTENT" >> $GITHUB_ENV
+
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         env:
@@ -30,30 +36,17 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,EUREKA_USERNAME,EUREKA_PASSWORD,GCP_SA_KEY,GCP_PROJECT_ID,REDIS_PASSWORD,GMAIL_SERVICE_ACCOUNT,GRAFANA_ADMIN_PASSWORD
+          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,EUREKA_USERNAME,EUREKA_PASSWORD,GCP_SA_KEY,GCP_PROJECT_ID,REDIS_PASSWORD,GMAIL_SERVICE_ACCOUNT,GRAFANA_ADMIN_PASSWORD,DOCKER_COMPOSE_CONTENT
           script: |
             # Proje dizinini oluştur
             mkdir -p /opt/craftpilot
             cd /opt/craftpilot
 
-            # Mevcut dosyaları yedekle
-            if [ -f "docker-compose.yml" ]; then
-              mv docker-compose.yml docker-compose.yml.backup
-            fi
-            if [ -f "deploy.sh" ]; then
-              mv deploy.sh deploy.sh.backup
-            fi
-
-            # Gerekli dosyaları oluştur
-            cat << 'EOF' > docker-compose.yml
-            $(cat $GITHUB_WORKSPACE/docker-compose.yml)
-            EOF
-
-            cat << 'EOF' > deploy.sh
-            #!/bin/bash
+            # docker-compose.yml dosyasını oluştur
+            echo "$DOCKER_COMPOSE_CONTENT" | base64 -d > docker-compose.yml
 
             # .env dosyasını oluştur
-            cat << ENVEOF > .env
+            cat << EOF > .env
             DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME}
             EUREKA_USERNAME=${EUREKA_USERNAME}
             EUREKA_PASSWORD=${EUREKA_PASSWORD}
@@ -63,32 +56,14 @@ jobs:
             GMAIL_SERVICE_ACCOUNT=${GMAIL_SERVICE_ACCOUNT}
             GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
             VERSION=latest
-            ENVEOF
+            EOF
 
             # GCP credentials dosyasını oluştur
             echo "${GCP_SA_KEY}" > /opt/craftpilot/gcp-credentials.json
             chmod 600 /opt/craftpilot/gcp-credentials.json
 
             # Docker Compose ile servisleri başlat
-            docker-compose pull
-            docker-compose up -d
-
-            # Servislerin durumunu kontrol et
-            docker-compose ps
-            EOF
-
-            # Dosya izinlerini ayarla
-            chmod +x deploy.sh
-
-            # GCP credentials dizinini oluştur
-            mkdir -p /opt/craftpilot
-
-            # GCP credentials dosyasını oluştur
-            echo "$GCP_SA_KEY" > /opt/craftpilot/gcp-credentials.json
-            chmod 600 /opt/craftpilot/gcp-credentials.json
-
-            # Deploy script'i çalıştır
-            ./deploy.sh
+            docker-compose pull && docker-compose up -d
 
             # Hata kontrolü
             if [ $? -ne 0 ]; then
