@@ -122,6 +122,18 @@ jobs:
                 -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
                 -e SERVER_PORT=${{ matrix.service.port }} \
                 ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
+            elif [ "${{ matrix.service.name }}" = "api-gateway" ]; then
+              docker run -d \
+                --name ${{ matrix.service.name }} \
+                --network craftpilot-network \
+                -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e SERVER_PORT=${{ matrix.service.port }} \
+                -e SPRING_REDIS_HOST=redis \
+                -e SPRING_REDIS_PORT=6379 \
+                -e SPRING_REDIS_PASSWORD=${REDIS_PASSWORD} \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
+                ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
             else
               docker run -d \
                 --name ${{ matrix.service.name }} \
