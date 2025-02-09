@@ -120,16 +120,16 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD
           script: |
-            echo "Cleaning up existing core services..."
+            echo "Cleaning up core services..."
             docker stop eureka-server api-gateway >/dev/null 2>&1 || true
             docker rm eureka-server api-gateway >/dev/null 2>&1 || true
 
-            echo "Pulling core service images..."
+            echo "Pulling images in parallel..."
             docker pull ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64 &
             docker pull ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64 &
             wait
 
-            echo "Deploying Eureka..."
+            echo "Starting Eureka Server..."
             docker run -d \
               --name eureka-server \
               --hostname eureka-server \
@@ -145,27 +145,28 @@ jobs:
               -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
               -e EUREKA_CLIENT_FETCH_REGISTRY=false \
               -e SPRING_APPLICATION_NAME=eureka-server \
-              -e JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC" \
+              -e JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom -XX:+ExitOnOutOfMemoryError" \
+              -e SPRING_CLOUD_CONFIG_ENABLED=false \
+              -e SPRING_CLOUD_CONFIG_IMPORT_CHECK_ENABLED=false \
               ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
 
-            # Optimize Eureka startup check
-            echo "Waiting for Eureka..."
-            timeout 45 bash -c '
-              until curl -s http://localhost:8761/actuator/health | grep -q "UP"; do
-                if docker logs eureka-server 2>&1 | grep -q "Started Eureka"; then
-                  echo "Eureka started successfully"
-                  break
-                fi
-                echo -n "."
-                sleep 1
-              done
-            ' || {
-              echo "Eureka failed to start in time"
-              docker logs eureka-server
-              exit 1
-            }
+            # Optimize Eureka health check
+            echo "Verifying Eureka..."
+            for i in {1..15}; do
+              if curl -s "http://localhost:8761/actuator/health" | grep -q "UP"; then
+                echo "Eureka is UP"
+                break
+              fi
+              if [ $i -eq 15 ]; then
+                echo "Eureka health check timeout"
+                docker logs eureka-server --tail 50
+                exit 1
+              fi
+              echo -n "."
+              sleep 2
+            done
 
-            echo "Deploying API Gateway..."
+            echo "Starting API Gateway..."
             docker run -d \
               --name api-gateway \
               --hostname api-gateway \
@@ -177,24 +178,30 @@ jobs:
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8080 \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
+              -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
               -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
               -e SPRING_APPLICATION_NAME=api-gateway \
-              -e JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC" \
+              -e JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom" \
               -e REDIS_HOST=redis \
               -e REDIS_PASSWORD=${REDIS_PASSWORD} \
+              -e SPRING_CLOUD_CONFIG_ENABLED=false \
               ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
 
-            # Quick Gateway check
-            timeout 30 bash -c '
-              until curl -s http://localhost:8080/actuator/health | grep -q "UP"; do
-                echo -n "."
-                sleep 1
-              done
-            ' || {
-              echo "API Gateway failed to start in time"
-              docker logs api-gateway
-              exit 1
-            }
+            # Quick Gateway health check
+            echo "Verifying API Gateway..."
+            for i in {1..10}; do
+              if curl -s "http://localhost:8080/actuator/health" | grep -q "UP"; then
+                echo "API Gateway is UP"
+                break
+              fi
+              if [ $i -eq 10]; then
+                echo "API Gateway health check timeout"
+                docker logs api-gateway --tail 50
+                exit 1
+              fi
+              echo -n "."
+              sleep 2
+            done
 
   deploy-core-services:
     needs: deploy-core
