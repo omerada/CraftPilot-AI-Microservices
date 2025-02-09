@@ -6,7 +6,7 @@ x-common-variables: &common-variables
   REDIS_HOST: redis
   REDIS_PORT: 6379
   REDIS_PASSWORD: ${REDIS_PASSWORD}
-  KAFKA_BOOTSTRAP_SERVERS: kafka:29092 # Düzeltildi: 9092'den 29092'ye
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092 # Düzeltildi: 9092'den 9092'ye
   GOOGLE_APPLICATION_CREDENTIALS: /gcp-credentials.json
   MANAGEMENT_ENDPOINTS_WEB_BASE_PATH: /actuator
   MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
@@ -87,7 +87,7 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -95,13 +95,13 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     ports:
-      - "29092:29092" # Ana port değişikliği
+      - "9092:9092" # Ana port değişikliği
     networks:
       craftpilot-network:
         ipv4_address: 172.18.0.12
     <<: *common-deploy
     healthcheck:
-      test: nc -z localhost 29092 || exit 1
+      test: nc -z localhost 9092 || exit 1
       interval: 10s
       timeout: 5s
       retries: 5
@@ -178,10 +178,10 @@ services:
     container_name: kafka-service
     image: ${DOCKERHUB_USERNAME}/kafka-service:latest-arm64
     ports:
-      - "8090:8090"
+      - "9093:9093"
     environment:
       <<: *common-variables
-      SERVER_PORT: 8090
+      SERVER_PORT: 9093
     networks:
       craftpilot-network:
         ipv4_address: 172.18.0.16
@@ -194,7 +194,7 @@ services:
         condition: service_healthy
     <<: *common-deploy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9093/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3

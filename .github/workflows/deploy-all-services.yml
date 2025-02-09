@@ -1,0 +1,248 @@
+name: Deploy All Services
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [trigger-deploy-services]
+
+jobs:
+  deploy-infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Base Infrastructure
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Setup network
+            docker network create craftpilot-network 2>/dev/null || true
+
+            # Stop existing infrastructure
+            docker stop redis zookeeper kafka || true
+            docker rm redis zookeeper kafka || true
+
+            # Start Redis
+            docker run -d \
+              --name redis \
+              --network craftpilot-network \
+              -p 6379:6379 \
+              -e REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }} \
+              redis:latest redis-server --requirepass ${{ secrets.REDIS_PASSWORD }}
+
+            # Verify Redis
+            sleep 10
+            if ! docker exec redis redis-cli -a ${{ secrets.REDIS_PASSWORD }} ping | grep -q "PONG"; then
+              echo "Redis failed to start"
+              exit 1
+            fi
+
+            # Start Zookeeper
+            docker run -d \
+              --name zookeeper \
+              --network craftpilot-network \
+              -e ZOOKEEPER_CLIENT_PORT=2181 \
+              -e ZOOKEEPER_TICK_TIME=2000 \
+              confluentinc/cp-zookeeper:latest
+
+            sleep 15
+
+            # Start Kafka
+            docker run -d \
+              --name kafka \
+              --network craftpilot-network \
+              -p 29092:29092 \
+              -e KAFKA_BROKER_ID=1 \
+              -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
+              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:29092 \
+              -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT \
+              -e KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT \
+              -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+              confluentinc/cp-kafka:latest
+
+            sleep 20
+
+  deploy-core-services:
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Core Services
+        uses: appleboy/ssh-action@master
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD
+          script: |
+            # Deploy Eureka Server
+            docker pull ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
+            docker stop eureka-server || true
+            docker rm eureka-server || true
+
+            docker run -d \
+              --name eureka-server \
+              --network craftpilot-network \
+              -p 8761:8761 \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e EUREKA_USERNAME=craftpilot \
+              -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
+              ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
+
+            # Wait for Eureka
+            for i in {1..30}; do
+              if curl -sf http://localhost:8761/actuator/health; then
+                break
+              fi
+              sleep 10
+            done
+
+            # Deploy API Gateway
+            docker pull ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
+            docker stop api-gateway || true
+            docker rm api-gateway || true
+
+            docker run -d \
+              --name api-gateway \
+              --network craftpilot-network \
+              -p 8080:8080 \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
+              ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
+
+  deploy-business-services:
+    needs: deploy-core-services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          [
+            { name: "user-service", port: 8060 },
+            { name: "credit-service", port: 8058 },
+            { name: "subscription-service", port: 8052 },
+            { name: "notification-service", port: 8053 },
+            { name: "analytics-service", port: 8064 },
+            { name: "admin-service", port: 8063 },
+            { name: "llm-service", port: 8062 },
+            { name: "image-service", port: 8056 },
+          ]
+    steps:
+      - name: Deploy ${{ matrix.service.name }}
+        uses: appleboy/ssh-action@master
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD,GCP_SA_KEY
+          script: |
+            # Setup GCP credentials if needed
+            if [ ! -f "/opt/craftpilot/gcp-credentials.json" ]; then
+              mkdir -p /opt/craftpilot
+              echo "${GCP_SA_KEY}" > /opt/craftpilot/gcp-credentials.json
+              chmod 600 /opt/craftpilot/gcp-credentials.json
+            fi
+
+            # Deploy service
+            docker pull ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
+            docker stop ${{ matrix.service.name }} || true
+            docker rm ${{ matrix.service.name }} || true
+
+            docker run -d \
+              --name ${{ matrix.service.name }} \
+              --network craftpilot-network \
+              -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
+              -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
+              -e REDIS_HOST=redis \
+              -e REDIS_PORT=6379 \
+              -e REDIS_PASSWORD=${REDIS_PASSWORD} \
+              -e KAFKA_BOOTSTRAP_SERVERS=kafka:29092 \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
+              ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
+
+            # Health check
+            for i in {1..30}; do
+              if curl -sf http://localhost:${{ matrix.service.port }}/actuator/health; then
+                echo "${{ matrix.service.name }} is healthy"
+                exit 0
+              fi
+              sleep 10
+            done
+
+            echo "${{ matrix.service.name }} failed health check"
+            docker logs ${{ matrix.service.name }}
+            exit 1
+
+  deploy-monitoring:
+    needs: deploy-business-services
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Monitoring Stack
+        uses: appleboy/ssh-action@master
+        env:
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: GRAFANA_ADMIN_PASSWORD
+          script: |
+            # Deploy Prometheus
+            docker pull prom/prometheus:v2.49.1
+            docker stop prometheus || true
+            docker rm prometheus || true
+
+            docker run -d \
+              --name prometheus \
+              --network craftpilot-network \
+              -p 9090:9090 \
+              prom/prometheus:v2.49.1
+
+            # Deploy Grafana
+            docker pull grafana/grafana:10.3.1
+            docker stop grafana || true
+            docker rm grafana || true
+
+            docker run -d \
+              --name grafana \
+              --network craftpilot-network \
+              -p 3000:3000 \
+              -e GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD} \
+              grafana/grafana:10.3.1
+
+  verify-deployment:
+    needs: [deploy-monitoring]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify All Services
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "Verifying all services..."
+
+            # Check infrastructure
+            docker ps | grep redis
+            docker ps | grep zookeeper
+            docker ps | grep kafka
+
+            # Check core services
+            curl -sf http://localhost:8761/actuator/health
+            curl -sf http://localhost:8080/actuator/health
+
+            # Check all services
+            docker ps --format "{{.Names}}" | while read container; do
+              echo "Checking $container..."
+              docker logs --tail 10 $container
+            done

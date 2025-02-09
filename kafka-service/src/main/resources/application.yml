@@ -1,5 +1,5 @@
 server:
-  port: 9092
+  port: 9093
   compression:
     enabled: true
     mime-types: application/json,text/plain
