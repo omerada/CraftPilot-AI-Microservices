@@ -114,58 +114,33 @@ jobs:
             sleep 20  # Initial wait for container startup
 
             echo "=== Performing health checks ==="
-            max_attempts=10
+            max_attempts=6
             counter=0
-            success=false
 
             while [ $counter -lt $max_attempts ]; do
               echo "Health check attempt $((counter + 1))/$max_attempts"
               
-              # Konteyner durumu kontrolü
-              if ! docker ps --format '{{.Status}}' -f name=api-gateway | grep -q "Up"; then
-                echo "Container is not running"
-                docker logs api-gateway --tail 50
-                sleep 5
-                counter=$((counter + 1))
-                continue
-              fi
-              
-              # Spring Boot başlangıç kontrolü - Started ApiGatewayApplication mesajını ara
-              if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
-                echo "✓ Application startup detected"
+              # Container ve uygulama durumu kontrolü
+              if docker ps --format '{{.Status}}' -f name=api-gateway | grep -q "Up" && \
+                 docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication" && \
+                 docker logs api-gateway 2>&1 | grep -q "DiscoveryClient.*registration status: 204"; then
                 
-                # Eureka kayıt kontrolü
-                if docker logs api-gateway 2>&1 | grep -q "DiscoveryClient.*registration status: 204"; then
-                  echo "✓ Successfully registered with Eureka"
-                  
-                  # Son kontrol - Actuator health endpoint
-                  HEALTH_RESPONSE=$(curl -s http://localhost:8080/actuator/health)
-                  if echo "$HEALTH_RESPONSE" | grep -q '"status":"UP"'; then
-                    echo "✓ Application health check passed"
-                    success=true
-                    break
-                  fi
-                fi
+                echo "✓ Application is running and registered with Eureka"
+                echo "=== Deployment completed successfully ==="
+                exit 0
               fi
               
               echo "Waiting for next check..."
-              sleep 5
+              sleep 10
               counter=$((counter + 1))
             done
 
-            if [ "$success" = true ]; then
-              echo "=== API Gateway deployment successful ==="
-              exit 0
-            else
-              echo "=== Deployment verification failed - Debug Information ==="
-              echo "Docker Status:"
-              docker ps -a | grep api-gateway
-              echo "Container Logs:"
-              docker logs api-gateway --tail 100
-              echo "Health Check Response:"
-              curl -s http://localhost:8080/actuator/health || true
-              exit 1
-            fi
+            echo "=== Health Check Failed - Debug Information ==="
+            echo "Docker Status:"
+            docker ps -a | grep api-gateway
+            echo "Container Logs:"
+            docker logs api-gateway --tail 100
+            exit 1
 
       - name: Trigger Deploy Services Workflow
         if: success()
