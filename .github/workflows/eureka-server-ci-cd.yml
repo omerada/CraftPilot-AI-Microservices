@@ -67,35 +67,48 @@ jobs:
             echo "=== Starting New Container ==="
             docker run -d \
               --name eureka-server \
-              --network craftpilot-network \
               --hostname eureka-server \
+              --network craftpilot-network \
               -p 8761:8761 \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
-              -e EUREKA_PASSWORD=13579ada \
-              -e SERVER_PORT=8761 \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@localhost:8761/eureka/ \
-              -e EUREKA_INSTANCE_HOSTNAME=localhost \
+              -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
+              -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
               -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
               -e EUREKA_CLIENT_FETCH_REGISTRY=false \
-              ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
             sleep 30
 
             echo "=== Health Check ==="
-            for i in {1..5}; do
-              if curl -f -u craftpilot:13579ada http://localhost:8761/actuator/health; then
-                echo "Service is healthy"
-                exit 0
+            max_attempts=30
+            counter=0
+            while [ $counter -lt $max_attempts ]; do
+              if curl -s --fail http://localhost:8761/actuator/health | grep -q "UP"; then
+                echo "Eureka Server is healthy"
+                break
+              elif curl -s --fail http://localhost:8761 | grep -q "Eureka"; then
+                echo "Eureka Server UI is accessible"
+                break
+              elif docker logs eureka-server 2>&1 | grep -q "Started EurekaServerApplication"; then
+                echo "Eureka Server started successfully"
+                break
+              else
+                echo "Attempt $((counter+1))/$max_attempts: Waiting for Eureka Server to be healthy..."
+                sleep 10
+                counter=$((counter+1))
               fi
-              echo "Waiting for service to start... Attempt $i"
-              sleep 10
             done
 
-            echo "Service failed health check"
-            docker logs eureka-server
-            exit 1
+            if [ $counter -eq $max_attempts ]; then
+              echo "=== Eureka Server Logs ==="
+              docker logs eureka-server
+              echo "Failed to verify Eureka Server health after $max_attempts attempts"
+              exit 1
+            fi
 
       - name: Trigger Deploy Services Workflow
         if: success()
