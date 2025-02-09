@@ -5,6 +5,12 @@ spring:
   application:
     name: api-gateway
   cloud:
+    config:
+      enabled: false
+    discovery:
+      client:
+        composite-indicator:
+          enabled: false
     gateway:
       discovery:
         locator:
@@ -98,12 +104,17 @@ spring:
       httpclient:
         connect-timeout: 5000
         response-timeout: 5000
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: false
+      unwrap-root-value: false
+      accept-single-value-as-array: true
 
 eureka:
   instance:
     prefer-ip-address: false
     hostname: ${HOSTNAME:api-gateway}
-    instance-id: ${spring.application.name}:${vcap.application.instance_id:${random.value}}
+    instance-id: ${spring.application.name}:${random.uuid}
     lease-renewal-interval-in-seconds: 10
     lease-expiration-duration-in-seconds: 30
   client:
@@ -112,9 +123,10 @@ eureka:
     fetch-registry: true
     register-with-eureka: true
     registry-fetch-interval-seconds: 5
-    eureka-server-connect-timeout-seconds: 5
+    eureka-server-connection-timeout-seconds: 5
     eureka-server-read-timeout-seconds: 5
     eureka-service-url-poll-interval-seconds: 5
+    eureka-registration-enabled: true
 
 management:
   endpoints:

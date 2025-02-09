@@ -111,7 +111,6 @@ jobs:
               docker stop api-gateway || true
               docker rm api-gateway || true
 
-              
             docker run -d \
               --name api-gateway \
               --network craftpilot-network \
