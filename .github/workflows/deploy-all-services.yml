@@ -93,7 +93,8 @@ jobs:
             { name: "api-gateway", port: 8080 },
           ]
     steps:
-      - uses: actions/checkout@v3ervice.name }}
+      - uses: actions/checkout@v3
+      - name: Deploy ${{ matrix.service.name }}
         uses: appleboy/ssh-action@master
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
