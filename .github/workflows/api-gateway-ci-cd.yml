@@ -66,78 +66,30 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "=== Setting up network ==="
-            # Remove existing containers and network safely
-            containers_to_remove=(redis api-gateway)
-            for container in "${containers_to_remove[@]}"; do
-              if docker ps -a | grep -q $container; then
-                echo "Stopping and removing $container"
-                docker stop $container || true
-                docker rm $container || true
-              fi
-            done
+            # Infrastructure setup
+            echo "=== Setting up infrastructure ==="
+            docker network create craftpilot-network || true
 
-            # Remove all disconnected networks
-            docker network prune -f
-
-            # Remove existing network if exists
-            if docker network ls | grep -q craftpilot-network; then
-              docker network rm craftpilot-network || true
-              sleep 5
+            # Start Redis if not running
+            if ! docker ps | grep -q redis; then
+              docker run -d \
+                --name redis \
+                --network craftpilot-network \
+                -p 6379:6379 \
+                -e REDIS_PASSWORD=13579ada \
+                redis:latest --requirepass 13579ada
             fi
 
-            # Create new network with retries
-            max_attempts=3
-            attempt=1
-            network_created=false
-
-            while [ $attempt -le $max_attempts ] && [ "$network_created" = false ]; do
-              echo "Creating network attempt $attempt/$max_attempts"
-              if docker network create \
-                --driver bridge \
-                --subnet 172.18.0.0/16 \
-                --gateway 172.18.0.1 \
-                craftpilot-network; then
-                network_created=true
-                echo "Network created successfully"
-              else
-                attempt=$((attempt + 1))
-                sleep 5
-              fi
-            done
-
-            if [ "$network_created" = false ]; then
-              echo "Failed to create network after $max_attempts attempts"
-              exit 1
-            fi
-
-            echo "=== Starting Redis ==="
-            if ! docker run -d \
-              --name redis \
-              --network craftpilot-network \
-              --ip 172.18.0.2 \
-              -p 6379:6379 \
-              -e REDIS_PASSWORD=13579ada \
-              redis:latest --requirepass 13579ada; then
-              echo "Failed to start Redis"
-              exit 1
-            fi
-
+            # Deploy API Gateway
             echo "=== Deploying API Gateway ==="
-            # Pull latest image
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
+            docker stop api-gateway || true
+            docker rm api-gateway || true
 
-            # Clean up any existing container
-            docker stop api-gateway 2>/dev/null || true
-            docker rm api-gateway 2>/dev/null || true
-            sleep 5
-
-            # Start API Gateway
-            if ! docker run -d \
+            docker run -d \
               --name api-gateway \
               --hostname api-gateway \
               --network craftpilot-network \
-              --ip 172.18.0.14 \
               --restart unless-stopped \
               -p 8080:8080 \
               -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
@@ -146,6 +98,7 @@ jobs:
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
               -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               -e SPRING_CLOUD_CONFIG_ENABLED=false \
               -e SPRING_SECURITY_BASIC_ENABLED=false \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
@@ -155,61 +108,64 @@ jobs:
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
-              ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64; then
-              echo "Failed to start API Gateway"
-              exit 1
-            fi
+              ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
 
-            echo "=== Waiting for services to initialize ==="
-            sleep 30
-
-            # Verify network connectivity
-            echo "=== Verifying network connectivity ==="
-            if ! docker network inspect craftpilot-network >/dev/null 2>&1; then
-              echo "Network verification failed"
-              exit 1
-            fi
-
+            # Initial wait for container startup
             echo "=== Waiting for initial startup ==="
             sleep 20
 
             echo "=== Performing health checks ==="
-            # Container check
-            if ! docker ps -q -f name=api-gateway; then
-              echo "Container not running"
-              docker logs api-gateway
-              exit 1
-            fi
+            max_attempts=10
+            counter=0
+            success=false
 
-            # Application startup check
-            if ! docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
-              echo "Application failed to start"
-              docker logs api-gateway
-              exit 1
-            fi
-            echo "✓ Application startup confirmed"
+            while [ $counter -lt $max_attempts ]; do
+              counter=$((counter + 1))
+              echo "Health check attempt $counter/$max_attempts"
+              
+              # Basic container check
+              if ! docker ps -q -f name=api-gateway; then
+                echo "Container not running"
+                docker logs api-gateway
+                exit 1
+              fi
+              
+              # Log check
+              if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
+                echo "✓ Application startup detected"
+                
+                # Port check
+                if docker logs api-gateway 2>&1 | grep -q "Netty started on port 8080"; then
+                  echo "✓ Server port is listening"
+                  
+                  # Simple connectivity test
+                  HEALTH_RESPONSE=$(curl -s http://localhost:8080/actuator/health)
+                  if [ $? -eq 0 ] && echo "$HEALTH_RESPONSE" | grep -q "UP"; then
+                    echo "✓ Health endpoint is responding with UP status"
+                    echo "=== API Gateway is healthy and running ==="
+                    success=true
+                    break
+                  fi
+                fi
+              fi
+              
+              if [ $counter -lt $max_attempts ]; then
+                echo "Waiting 5 seconds before next attempt..."
+                sleep 5
+              fi
+            done
 
-            # Port listening check
-            if ! docker logs api-gateway 2>&1 | grep -q "Netty started on port 8080"; then
-              echo "Server port not listening"
-              docker logs api-gateway
-              exit 1
-            fi
-            echo "✓ Server port confirmed listening"
-
-            # Final health check
-            HEALTH_RESPONSE=$(curl -s http://localhost:8080/actuator/health)
-            if [ $? -eq 0 ] && echo "$HEALTH_RESPONSE" | grep -q "UP"; then
-              echo "✓ Health check passed - Service is UP"
-              echo "=== API Gateway successfully deployed ==="
+            if [ "$success" = true ]; then
               exit 0
             else
-              echo "Health check failed"
-              echo "Health Response:"
-              echo "$HEALTH_RESPONSE"
+              echo "=== Health Check Failed - Debug Information ==="
+              echo "Docker Status:"
+              docker ps -a | grep api-gateway
+              echo "Container Logs:"
               docker logs api-gateway
+              echo "Health Check Response:"
+              curl -v http://localhost:8080/actuator/health || true
               exit 1
-            fi
 
       - name: Trigger Deploy Services Workflow
         if: success()
