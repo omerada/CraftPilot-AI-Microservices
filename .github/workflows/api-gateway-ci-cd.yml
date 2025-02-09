@@ -66,9 +66,13 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Create network if not exists
+            # Create network with proper subnet
             if ! docker network ls | grep -q craftpilot-network; then
-              docker network create --subnet=172.18.0.0/16 craftpilot-network
+              docker network create \
+                --driver bridge \
+                --subnet 172.18.0.0/16 \
+                --gateway 172.18.0.1 \
+                craftpilot-network
             fi
 
             # Start Redis if not running
