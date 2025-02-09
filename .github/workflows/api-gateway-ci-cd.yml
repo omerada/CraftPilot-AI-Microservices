@@ -66,14 +66,14 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Create network with proper subnet
-            if ! docker network ls | grep -q craftpilot-network; then
-              docker network create \
-                --driver bridge \
-                --subnet 172.18.0.0/16 \
-                --gateway 172.18.0.1 \
-                craftpilot-network
-            fi
+            # Remove existing network and recreate
+            docker network rm craftpilot-network || true
+            docker network create \
+              --driver bridge \
+              --subnet 172.18.0.0/16 \
+              --ip-range 172.18.0.0/24 \
+              --gateway 172.18.0.1 \
+              craftpilot-network
 
             # Start Redis if not running
             if ! docker ps | grep -q redis; then
@@ -91,6 +91,7 @@ jobs:
             docker stop api-gateway || true
             docker rm api-gateway || true
 
+            # Run with macvlan network
             docker run -d \
               --name api-gateway \
               --hostname api-gateway \

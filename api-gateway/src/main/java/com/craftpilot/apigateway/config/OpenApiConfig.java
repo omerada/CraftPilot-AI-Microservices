@@ -12,18 +12,12 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
     @Bean
-    public OpenAPI craftPilotOpenAPI() {
+    public OpenAPI apiGatewayOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
                         .title("CraftPilot API Gateway")
                         .description("CraftPilot Microservices API Documentation")
-                        .version("1.0")
-                        .license(new License()
-                                .name("CraftPilot License")
-                                .url("https://craftpilot.io/licenses")))
-                .addServersItem(new Server()
-                        .url("/")
-                        .description("Default Server URL"));
+                        .version("1.0"));
     }
 
     @Bean
