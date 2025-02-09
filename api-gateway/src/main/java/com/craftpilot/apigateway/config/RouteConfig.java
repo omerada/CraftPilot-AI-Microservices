@@ -12,7 +12,7 @@ import java.time.Duration;
 public class RouteConfig {
 
     @Bean
-    public Customizer<ReactiveResilience4JCircuitBreakerFactory] defaultCustomizer() {
+    public Customizer<ReactiveResilience4JCircuitBreakerFactory> defaultCustomizer() {
         return factory -> factory.configure(
             builder -> builder
                 .circuitBreakerConfig(CircuitBreakerConfig.custom()
