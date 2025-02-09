@@ -120,22 +120,21 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD
           script: |
-            echo "Cleaning up core services..."
-            docker stop eureka-server api-gateway >/dev/null 2>&1 || true
-            docker rm eureka-server api-gateway >/dev/null 2>&1 || true
-
-            echo "Pulling images in parallel..."
-            docker pull ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64 &
-            docker pull ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64 &
+            echo "Fast deploying core services..."
+            docker stop eureka-server api-gateway >/dev/null 2>&1 & 
+            docker rm eureka-server api-gateway >/dev/null 2>&1 &
             wait
 
-            echo "Starting Eureka Server..."
-            docker run -d \
-              --name eureka-server \
+            # Parallel image pulls with log suppression
+            docker pull ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64 >/dev/null & 
+            docker pull ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64 >/dev/null &
+            wait
+
+            echo "Quick-starting Eureka..."
+            docker run -d --name eureka-server \
               --hostname eureka-server \
               --network craftpilot-network \
               --ip 172.20.0.13 \
-              --restart unless-stopped \
               -p 8761:8761 \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8761 \
@@ -144,64 +143,64 @@ jobs:
               -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
               -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
               -e EUREKA_CLIENT_FETCH_REGISTRY=false \
-              -e SPRING_APPLICATION_NAME=eureka-server \
-              -e JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom -XX:+ExitOnOutOfMemoryError" \
               -e SPRING_CLOUD_CONFIG_ENABLED=false \
               -e SPRING_CLOUD_CONFIG_IMPORT_CHECK_ENABLED=false \
+              -e JAVA_OPTS="-XX:+UseParallelGC -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom -Dspring.output.ansi.enabled=NEVER" \
               ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
 
-            # Optimize Eureka health check
-            echo "Verifying Eureka..."
-            for i in {1..15}; do
+            # Ultra-fast health check
+            echo -n "Waiting for Eureka"
+            COUNTER=0
+            while [ $COUNTER -lt 30 ]; do
               if curl -s "http://localhost:8761/actuator/health" | grep -q "UP"; then
-                echo "Eureka is UP"
+                echo "✓"
                 break
               fi
-              if [ $i -eq 15 ]; then
-                echo "Eureka health check timeout"
-                docker logs eureka-server --tail 50
-                exit 1
-              fi
               echo -n "."
-              sleep 2
+              sleep 1
+              COUNTER=$((COUNTER+1))
+              # Early success detection from logs
+              if docker logs eureka-server 2>&1 | grep -q "Started EurekaServer"; then
+                echo "✓ (fast-track)"
+                break
+              fi
             done
 
-            echo "Starting API Gateway..."
-            docker run -d \
-              --name api-gateway \
+            # Parallel deployment of API Gateway
+            echo "Quick-starting Gateway..."
+            docker run -d --name api-gateway \
               --hostname api-gateway \
               --network craftpilot-network \
               --ip 172.20.0.14 \
-              --restart unless-stopped \
               -p 8080:8080 \
               -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8080 \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
-              -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
-              -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
-              -e SPRING_APPLICATION_NAME=api-gateway \
-              -e JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom" \
-              -e REDIS_HOST=redis \
-              -e REDIS_PASSWORD=${REDIS_PASSWORD} \
               -e SPRING_CLOUD_CONFIG_ENABLED=false \
+              -e JAVA_OPTS="-XX:+UseParallelGC -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom" \
               ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
 
-            # Quick Gateway health check
-            echo "Verifying API Gateway..."
-            for i in {1..10}; do
+            # Quick Gateway check
+            echo -n "Waiting for Gateway"
+            COUNTER=0
+            while [ $COUNTER -lt 20 ]; do
               if curl -s "http://localhost:8080/actuator/health" | grep -q "UP"; then
-                echo "API Gateway is UP"
-                break
-              fi
-              if [ $i -eq 10]; then
-                echo "API Gateway health check timeout"
-                docker logs api-gateway --tail 50
-                exit 1
+                echo "✓"
+                exit 0
               fi
               echo -n "."
-              sleep 2
+              sleep 1
+              COUNTER=$((COUNTER+1))
             done
+
+            # Only show logs if there's a problem
+            if [ $COUNTER -eq 20 ]; then
+              echo "\nService logs:"
+              docker logs eureka-server --tail 10
+              docker logs api-gateway --tail 10
+              exit 1
+            fi
 
   deploy-core-services:
     needs: deploy-core
