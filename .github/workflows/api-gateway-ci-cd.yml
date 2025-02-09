@@ -98,6 +98,7 @@ jobs:
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
               -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               -e SPRING_CLOUD_CONFIG_ENABLED=false \
               -e SPRING_SECURITY_BASIC_ENABLED=false \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
@@ -111,49 +112,60 @@ jobs:
 
             # Initial wait for container startup
             echo "=== Waiting for initial startup ==="
-            sleep 30
+            sleep 20
 
-            echo "=== Starting health checks ==="
-            max_attempts=5
-            attempt=1
+            echo "=== Performing health checks ==="
+            max_attempts=10
+            counter=0
+            success=false
 
-            while [ $attempt -le $max_attempts ]; do
-              echo "Health check attempt $attempt of $max_attempts"
+            while [ $counter -lt $max_attempts ]; do
+              counter=$((counter + 1))
+              echo "Health check attempt $counter/$max_attempts"
               
-              # Check if container is running
-              if ! docker ps | grep -q api-gateway; then
-                echo "Container not running!"
+              # Basic container check
+              if ! docker ps -q -f name=api-gateway; then
+                echo "Container not running"
                 docker logs api-gateway
                 exit 1
               fi
               
-              # Check application logs for startup
+              # Log check
               if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
-                echo "Application startup confirmed"
+                echo "✓ Application startup detected"
                 
-                # Simplified health check
-                HEALTH_RESPONSE=$(curl -s http://localhost:8080/actuator/health)
-                if echo "$HEALTH_RESPONSE" | grep -q "UP"; then
-                  echo "Health check passed - Service is UP"
-                  exit 0
+                # Port check
+                if docker logs api-gateway 2>&1 | grep -q "Netty started on port 8080"; then
+                  echo "✓ Server port is listening"
+                  
+                  # Simple connectivity test
+                  HEALTH_RESPONSE=$(curl -s http://localhost:8080/actuator/health)
+                  if [ $? -eq 0 ] && echo "$HEALTH_RESPONSE" | grep -q "UP"; then
+                    echo "✓ Health endpoint is responding with UP status"
+                    echo "=== API Gateway is healthy and running ==="
+                    success=true
+                    break
+                  fi
                 fi
               fi
               
-              attempt=$((attempt + 1))
-              if [ $attempt -le $max_attempts ]; then
-                echo "Waiting 10 seconds before next attempt..."
-                sleep 10
+              if [ $counter -lt $max_attempts ]; then
+                echo "Waiting 5 seconds before next attempt..."
+                sleep 5
               fi
             done
 
-            echo "=== Health Check Failed - Debug Information ==="
-            echo "Container Status:"
-            docker ps -a | grep api-gateway
-            echo "Container Logs:"
-            docker logs api-gateway
-            echo "Health Check Response:"
-            curl -v http://localhost:8080/actuator/health || true
-            exit 1
+            if [ "$success" = true ]; then
+              exit 0
+            else
+              echo "=== Health Check Failed - Debug Information ==="
+              echo "Docker Status:"
+              docker ps -a | grep api-gateway
+              echo "Container Logs:"
+              docker logs api-gateway
+              echo "Health Check Response:"
+              curl -v http://localhost:8080/actuator/health || true
+              exit 1
 
       - name: Trigger Deploy Services Workflow
         if: success()
