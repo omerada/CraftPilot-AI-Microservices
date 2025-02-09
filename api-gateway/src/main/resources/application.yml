@@ -95,16 +95,23 @@ spring:
             - Path=/swagger-ui.html
           filters:
             - RewritePath=/swagger-ui.html, /swagger-ui/index.html
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 10000
 
 eureka:
   instance:
     prefer-ip-address: true
-    instance-id: ${spring.application.name}:${vcap.application.instance_id:${spring.application.instance_id:${random.value}}}
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
+    hostname: ${HOSTNAME:localhost}
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
   client:
     serviceUrl:
       defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:password}@${EUREKA_SERVER_HOST:eureka-server}:${EUREKA_SERVER_PORT:8761}/eureka/
     fetch-registry: true
     register-with-eureka: true
+    registry-fetch-interval-seconds: 30
 
 management:
   endpoints:
