@@ -124,34 +124,42 @@ jobs:
             docker run -d \
               --name api-gateway \
               --network craftpilot-network \
-              --ip 172.18.0.12 \
               -p 8080:8080 \
-              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_USERNAME=craftpilot \
-              -e EUREKA_PASSWORD=13579ada \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
+              -e SERVER_PORT=8080 \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+              -e SPRING_REDIS_HOST=redis \
+              -e SPRING_REDIS_PORT=6379 \
+              -e SPRING_REDIS_PASSWORD=13579ada \
+              -e SPRING_CLOUD_GATEWAY_ROUTES_0_ID=user-service \
+              -e SPRING_CLOUD_GATEWAY_ROUTES_0_URI=lb://user-service \
+              -e SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0=Path=/api/v1/users/** \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
               ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
 
-            echo "=== Waiting for Container to Start ==="
-            sleep 60
-
-            echo "=== Container Logs ==="
-            docker logs api-gateway
-
-            echo "=== Health Check ==="
-            for i in {1..5}; do
-              if curl -f http://localhost:8080/actuator/health; then
-                echo "Service is healthy"
-                exit 0
+            echo "=== Waiting for API Gateway ==="
+            for i in {1..30}; do
+              echo "Health check attempt $i/30..."
+              
+              # Check container logs for startup completion
+              if docker logs api-gateway | grep -q "Started ApiGatewayApplication in"; then
+                echo "Application startup completed"
+                
+                # Verify health endpoint
+                if curl -sf http://localhost:8080/actuator/health; then
+                  echo "API Gateway is healthy"
+                  exit 0
+                fi
               fi
-              echo "Waiting for service to start... Attempt $i"
+              
+              # Show recent logs
+              echo "Recent logs:"
+              docker logs --tail 20 api-gateway
+              
               sleep 10
             done
-            echo "Service failed health check"
+
+            echo "API Gateway failed health check"
             docker logs api-gateway
             exit 1
 

@@ -152,57 +152,6 @@ spring:
           filters:
             - RewritePath=/swagger-ui.html, /webjars/swagger-ui/index.html
 
-  data: # Swagger UI Routes
-    redis:id: openapi
-      host: ${REDIS_HOST:localhost}erver.port}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
-      database: 0:
-            - RewritePath=/v3/api-docs/(?<path>.*), /$\{path}/v3/api-docs
-
-        - id: swagger-ui
-          uri: http://localhost:${server.port}
-          predicates:
-            - Path=/swagger-ui/**
-          filters:
-            - RewritePath=/swagger-ui/(?<path>.*), /swagger-ui/$\{path}
-
-        # Service Swagger Documentation Routes
-        - id: user-service-docs
-          uri: lb://user-service
-          predicates:
-            - Path=/user-service/v3/api-docs/**
-          filters:
-            - RewritePath=/user-service/v3/api-docs, /v3/api-docs
-
-        - id: admin-service-docs
-          uri: lb://admin-service
-          predicates:
-            - Path=/admin-service/v3/api-docs/**
-          filters:
-            - RewritePath=/admin-service/v3/api-docs, /v3/api-docs
-
-        - id: analytics-service-docs
-          uri: lb://analytics-service
-          predicates:
-            - Path=/analytics-service/v3/api-docs/**
-          filters:
-            - RewritePath=/analytics-service/v3/api-docs, /v3/api-docs
-
-        - id: llm-service-docs
-          uri: lb://llm-service
-          predicates:
-            - Path=/llm-service/v3/api-docs/**
-          filters:
-            - RewritePath=/llm-service/v3/api-docs, /v3/api-docs
-
-        - id: credit-service-docs
-          uri: lb://credit-service
-          predicates:
-            - Path=/credit-service/v3/api-docs/**
-          filters:
-            - RewritePath=/credit-service/v3/api-docs, /v3/api-docs
-
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -294,31 +243,25 @@ resilience4j:
   timelimiter:
     instances:
       default:
-        timeoutDuration: 5sr-ui.html
+        timeoutDuration: 5s
 
 management:
   endpoints:
     web:
-      exposure:rvice
-        include: health,info,metrics,prometheusurl: /user-service/v3/api-docs
-  endpoint:n Service
-    health:-service/v3/api-docs
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
       show-details: always
-        url: /analytics-service/v3/api-docs
-      - name: LLM Serviceed: true
-        url: /llm-service/v3/api-docs
-      - name: Credit Service
-        url: /credit-service/v3/api-docs    prometheus:
-  cache:bled: true
-    disabled: true
-  packages-to-scan:logging:
+      probes:
+        enabled: true
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
 
-
-
-
-
-
-  require-ssl: false # Nginx handle edeceksecurity:  use-management-port: false    - com.craftpilot.apigateway.controller  pattern:
+logging:
+  pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] [%X{spanId}] %-5level %logger{36} - %msg%n"
   level:
     org.springframework.cloud.gateway: INFO
