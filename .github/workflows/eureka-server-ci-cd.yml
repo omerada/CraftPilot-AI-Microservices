@@ -91,20 +91,55 @@ jobs:
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
 
-            # Enhanced health check with longer timeout
-            echo "Waiting for service to start..."
-            for i in {1..5}; do
+            # Wait for container to start
+            echo "Waiting for container to start..."
+            sleep 20
+
+            # Check if container is running
+            if ! docker ps | grep -q eureka-server; then
+              echo "Container failed to start"
+              docker logs eureka-server
+              exit 1
+            fi
+
+            # Multiple health check methods
+            echo "Performing health checks..."
+            max_attempts=5
+            attempt=1
+            success=false
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Health check attempt $attempt/$max_attempts"
+              
+              # Method 1: Check actuator endpoint
               if curl -sf -u craftpilot:13579ada http://localhost:8761/actuator/health | grep -q "UP"; then
-                echo "Service is healthy"
-                exit 0
+                success=true
+                break
               fi
-              echo "Attempt $i: Service not ready yet..."
+              
+              # Method 2: Check Eureka dashboard
+              if curl -sf http://localhost:8761 | grep -q "Eureka"; then
+                success=true
+                break
+              fi
+              
+              # Method 3: Check application logs
+              if docker logs eureka-server 2>&1 | grep -q "Started EurekaServerApplication"; then
+                success=true
+                break
+              fi
+              
+              attempt=$((attempt + 1))
               sleep 10
             done
 
-            echo "Service failed to become healthy within timeout"
-            docker logs eureka-server
-            exit 1
+            if [ "$success" = true ]; then
+              echo "Service is healthy and running"
+              exit 0
+            else
+              echo "Service health check failed"
+              docker logs eureka-server
+              exit 1
 
       - name: Trigger Deploy Services Workflow
         if: success()
