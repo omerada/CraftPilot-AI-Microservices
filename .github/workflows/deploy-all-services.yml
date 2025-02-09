@@ -120,16 +120,28 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD
           script: |
-            # Parallel pull
+            echo "Cleaning up existing core services..."
+            for service in eureka-server api-gateway; do
+              if docker ps -a | grep -q $service; then
+                echo "Stopping and removing $service..."
+                docker stop $service || true
+                docker rm $service || true
+              fi
+            done
+
             echo "Pulling core service images..."
             docker pull ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64 &
             docker pull ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64 &
             wait
 
-            # Deploy Eureka first
             echo "Deploying Eureka..."
-            docker run -d --name eureka-server --hostname eureka-server --network craftpilot-network \
-              --ip 172.20.0.13 --restart unless-stopped -p 8761:8761 \
+            docker run -d \
+              --name eureka-server \
+              --hostname eureka-server \
+              --network craftpilot-network \
+              --ip 172.20.0.13 \
+              --restart unless-stopped \
+              -p 8761:8761 \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8761 \
               -e EUREKA_USERNAME=craftpilot \
@@ -139,13 +151,29 @@ jobs:
               -e EUREKA_CLIENT_FETCH_REGISTRY=false \
               ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
 
-            # Quick health check for Eureka
-            timeout 15 bash -c 'until curl -s http://localhost:8761/actuator/health; do sleep 2; done' || exit 1
+            # Verify Eureka is running
+            echo "Waiting for Eureka to start..."
+            for i in {1..30}; do
+              if curl -sf http://localhost:8761/actuator/health >/dev/null 2>&1; then
+                echo "Eureka is healthy"
+                break
+              fi
+              if [ $i -eq 30 ]; then
+                echo "Eureka failed to start"
+                docker logs eureka-server
+                exit 1
+              fi
+              sleep 2
+            done
 
-            # Deploy API Gateway
             echo "Deploying API Gateway..."
-            docker run -d --name api-gateway --hostname api-gateway --network craftpilot-network \
-              --ip 172.20.0.14 --restart unless-stopped -p 8080:8080 \
+            docker run -d \
+              --name api-gateway \
+              --hostname api-gateway \
+              --network craftpilot-network \
+              --ip 172.20.0.14 \
+              --restart unless-stopped \
+              -p 8080:8080 \
               -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8080 \
@@ -155,8 +183,20 @@ jobs:
               -e REDIS_PASSWORD=${REDIS_PASSWORD} \
               ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
 
-            # Quick health check for Gateway
-            timeout 15 bash -c 'until curl -s http://localhost:8080/actuator/health; do sleep 2; done' || exit 1
+            # Verify API Gateway is running
+            echo "Waiting for API Gateway to start..."
+            for i in {1..30}; do
+              if curl -sf http://localhost:8080/actuator/health >/dev/null 2>&1; then
+                echo "API Gateway is healthy"
+                break
+              fi
+              if [ $i -eq 30 ]; then
+                echo "API Gateway failed to start"
+                docker logs api-gateway
+                exit 1
+              fi
+              sleep 2
+            done
 
   deploy-core-services:
     needs: deploy-core
