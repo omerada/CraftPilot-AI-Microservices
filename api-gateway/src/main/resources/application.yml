@@ -8,6 +8,7 @@ spring:
     config:
       enabled: false
     discovery:
+      enabled: true
       client:
         composite-indicator:
           enabled: false
@@ -15,7 +16,7 @@ spring:
       discovery:
         locator:
           enabled: true
-          lowerCaseServiceId: true
+          lower-case-service-id: true
       routes:
         # Core Services
         - id: user-service
@@ -104,50 +105,23 @@ spring:
       httpclient:
         connect-timeout: 5000
         response-timeout: 5000
-  jackson:
-    deserialization:
-      fail-on-unknown-properties: false
-      unwrap-root-value: false
-      accept-single-value-as-array: true
-  cloud:
     loadbalancer:
       cache:
         enabled: true
         caffeine:
           spec: maximumSize=500,expireAfterWrite=5s
-    discovery:
-      enabled: true
-      client:
-        composite-indicator:
-          enabled: false
-    gateway:
-      discovery:
-        locator:
-          enabled: true
-          lower-case-service-id: true
-      httpclient:
-        connect-timeout: 5000
-        response-timeout: 5000
 
 eureka:
-  client:
-    serviceUrl:
-      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka}
-    register-with-eureka: true
-    fetch-registry: true
-    healthcheck:
-      enabled: true
   instance:
-    prefer-ip-address: true
-    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
-    lease-renewal-interval-in-seconds: 30
-    lease-expiration-duration-in-seconds: 30
-    health-check-url-path: /actuator/health
-    statusPageUrlPath: /actuator/info
-    metadataMap:
-      instanceId: ${spring.application.name}:${server.port}
-      zone: primary
-      profile: ${spring.profiles.active}
+    prefer-ip-address: false
+    hostname: ${HOSTNAME:api-gateway}
+    instance-id: ${spring.application.name}:${random.uuid}
+  client:
+    service-url:
+      defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:13579ada}@${EUREKA_SERVER_HOST:eureka-server}:${EUREKA_SERVER_PORT:8761}/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+    registry-fetch-interval-seconds: 5
 
 management:
   endpoints:
