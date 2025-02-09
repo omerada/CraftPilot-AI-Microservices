@@ -144,8 +144,8 @@ jobs:
               ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
 
             echo "=== Waiting for API Gateway ==="
-            for i in {1..60}; do
-              echo "Health check attempt $i/60..."
+            for i in {1..5}; do
+              echo "Health check attempt $i/5..."
               if docker ps | grep -q api-gateway; then
                 if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
                   echo "Application started successfully"
