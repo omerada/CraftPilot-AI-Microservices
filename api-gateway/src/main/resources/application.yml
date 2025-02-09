@@ -6,6 +6,8 @@ server:
     min-response-size: 1024
 
 spring:
+  main:
+    allow-bean-definition-overriding: true
   application:
     name: api-gateway
   security:
