@@ -95,51 +95,35 @@ jobs:
             echo "Waiting for container to start..."
             sleep 20
 
-            # Check if container is running
-            if ! docker ps | grep -q eureka-server; then
-              echo "Container failed to start"
-              docker logs eureka-server
-              exit 1
-            fi
+            # Health check
+            echo "Starting health checks..."
+            max_retries=5
+            count=0
 
-            # Multiple health check methods
-            echo "Performing health checks..."
-            max_attempts=5
-            attempt=1
-            success=false
-
-            while [ $attempt -le $max_attempts ]; do
-              echo "Health check attempt $attempt/$max_attempts"
+            while [ $count -lt $max_retries ]; do
+              count=$((count + 1))
+              echo "Health check attempt $count/$max_retries"
               
-              # Method 1: Check actuator endpoint
-              if curl -sf -u craftpilot:13579ada http://localhost:8761/actuator/health | grep -q "UP"; then
-                success=true
-                break
+              if docker ps | grep -q "eureka-server"; then
+                if curl -s "http://localhost:8761" | grep -q "Eureka"; then
+                  echo "Eureka Server is running and responding"
+                  exit 0
+                elif curl -s -u craftpilot:13579ada "http://localhost:8761/actuator/health" | grep -q "UP"; then
+                  echo "Eureka Server health check passed"
+                  exit 0
+                elif docker logs eureka-server 2>&1 | grep -q "Started EurekaServerApplication"; then
+                  echo "Eureka Server logs indicate successful startup"
+                  exit 0
+                fi
               fi
               
-              # Method 2: Check Eureka dashboard
-              if curl -sf http://localhost:8761 | grep -q "Eureka"; then
-                success=true
-                break
-              fi
-              
-              # Method 3: Check application logs
-              if docker logs eureka-server 2>&1 | grep -q "Started EurekaServerApplication"; then
-                success=true
-                break
-              fi
-              
-              attempt=$((attempt + 1))
+              echo "Waiting 10 seconds before next attempt..."
               sleep 10
             done
 
-            if [ "$success" = true ]; then
-              echo "Service is healthy and running"
-              exit 0
-            else
-              echo "Service health check failed"
-              docker logs eureka-server
-              exit 1
+            echo "Eureka Server failed to start properly"
+            docker logs eureka-server
+            exit 1
 
       - name: Trigger Deploy Services Workflow
         if: success()
