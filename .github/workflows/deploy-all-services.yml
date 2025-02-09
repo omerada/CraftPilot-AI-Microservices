@@ -95,8 +95,116 @@ jobs:
 
             sleep 20
 
-  deploy-core-services:
+  deploy-eureka:
     needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Eureka Server
+        uses: appleboy/ssh-action@master
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD
+          script: |
+            echo "=== Deploying Eureka Server ==="
+            docker pull ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
+            docker stop eureka-server || true
+            docker rm eureka-server || true
+
+            docker run -d \
+              --name eureka-server \
+              --hostname eureka-server \
+              --network craftpilot-network \
+              --ip 172.20.0.13 \
+              --restart unless-stopped \
+              -p 8761:8761 \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e SERVER_PORT=8761 \
+              -e EUREKA_USERNAME=craftpilot \
+              -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
+              -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
+              -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
+              -e EUREKA_CLIENT_FETCH_REGISTRY=false \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
+              ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
+
+            # Health check
+            for i in {1..5}; do
+              if curl -sf http://localhost:8761/actuator/health; then
+                echo "Eureka Server is healthy"
+                exit 0
+              fi
+              sleep 10
+            done
+
+            echo "Eureka Server failed health check"
+            docker logs eureka-server
+            exit 1
+
+  deploy-gateway:
+    needs: deploy-eureka
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy API Gateway
+        uses: appleboy/ssh-action@master
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD
+          script: |
+            echo "=== Deploying API Gateway ==="
+            docker pull ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
+            docker stop api-gateway || true
+            docker rm api-gateway || true
+
+            docker run -d \
+              --name api-gateway \
+              --hostname api-gateway \
+              --network craftpilot-network \
+              --ip 172.20.0.14 \
+              --restart unless-stopped \
+              -p 8080:8080 \
+              -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e SERVER_PORT=8080 \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
+              -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
+              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e SPRING_APPLICATION_NAME=api-gateway \
+              -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
+              -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_LOWER_CASE_SERVICE_ID=true \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
+              -e REDIS_HOST=redis \
+              -e REDIS_PORT=6379 \
+              -e REDIS_PASSWORD=${REDIS_PASSWORD} \
+              ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
+
+            # Health check
+            for i in {1..5}; do
+              if curl -sf http://localhost:8080/actuator/health; then
+                echo "API Gateway is healthy"
+                exit 0
+              fi
+              sleep 10
+            done
+
+            echo "API Gateway failed health check"
+            docker logs api-gateway
+            exit 1
+
+  deploy-core-services:
+    needs: deploy-gateway
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -228,7 +336,7 @@ jobs:
             fi
 
   deploy-data-services:
-    needs: deploy-core-services
+    needs: deploy-gateway
     runs-on: ubuntu-latest
     strategy:
       matrix:
