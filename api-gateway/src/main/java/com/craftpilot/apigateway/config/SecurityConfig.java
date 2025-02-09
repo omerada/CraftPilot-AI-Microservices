@@ -5,6 +5,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.util.matcher.NegatedServerWebExchangeMatcher;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -13,18 +15,23 @@ public class SecurityConfig {
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
-            .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
-            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+            .securityMatcher(new NegatedServerWebExchangeMatcher(
+                ServerWebExchangeMatchers.pathMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**")
+            ))
+            .csrf().disable()
+            .cors().disable()
+            .httpBasic().disable()
+            .formLogin().disable()
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(
-                    "/**",                    // Tüm path'lere geçici olarak izin ver
                     "/",
-                    "/swagger-ui.html",
-                    "/webjars/**",
-                    "/v3/api-docs/**",
                     "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/swagger-resources/**",
+                    "/v3/api-docs/**",
+                    "/webjars/**",
                     "/actuator/**",
+                    "/favicon.ico",
                     "/api/**"
                 ).permitAll()
                 .anyExchange().permitAll()

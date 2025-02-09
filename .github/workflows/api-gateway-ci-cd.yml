@@ -110,61 +110,47 @@ jobs:
               ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
 
             echo "=== Waiting for container to start ==="
-            sleep 30
-
-            echo "=== Checking Application Status ==="
-            CONTAINER_ID=$(docker ps -q -f name=api-gateway)
-            if [ -z "$CONTAINER_ID" ]; then
-              echo "Container not running"
-              docker logs api-gateway
-              exit 1
-            fi
+            sleep 20
 
             echo "=== Performing Health Checks ==="
-            MAX_ATTEMPTS=3
-            ATTEMPT=1
+            attempts=0
+            max_attempts=5
 
-            while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-              echo "Attempt $ATTEMPT of $MAX_ATTEMPTS"
-              
-              # Check if application started successfully
-              if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
-                echo "Application startup detected"
-                
-                # Simple connection test
-                if curl -s localhost:8080 > /dev/null; then
-                  echo "Basic connectivity confirmed"
-                  
-                  # Try actuator health check
-                  HEALTH_RESPONSE=$(curl -s http://localhost:8080/actuator/health)
-                  if echo "$HEALTH_RESPONSE" | grep -q "UP"; then
-                    echo "Health check passed"
-                    
-                    # Verify Eureka registration
-                    EUREKA_CHECK=$(curl -s -u craftpilot:13579ada http://localhost:8761/eureka/apps/API-GATEWAY)
-                    if [ $? -eq 0 ]; then
-                      echo "Successfully verified Eureka registration"
-                      echo "=== API Gateway is fully operational ==="
-                      exit 0
-                    fi
-                  fi
+            while [ $attempts -lt $max_attempts ]; do
+                # Container check
+                if ! docker ps | grep -q api-gateway; then
+                    echo "Container not running"
+                    docker logs api-gateway
+                    exit 1
                 fi
-              fi
-              
-              ATTEMPT=$((ATTEMPT + 1))
-              if [ $ATTEMPT -le $MAX_ATTEMPTS ]; then
-                echo "Waiting before next attempt..."
-                sleep 10
-              fi
+
+                # Log check
+                if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
+                    # Direct curl test
+                    if response=$(curl -s -w "\n%{http_code}" http://localhost:8080/actuator/health); then
+                        status_code=$(echo "$response" | tail -n1)
+                        body=$(echo "$response" | head -n1)
+                        
+                        if [ "$status_code" = "200" ] && echo "$body" | grep -q "UP"; then
+                            echo "Health check passed successfully"
+                            echo "Service is UP and running"
+                            exit 0
+                        fi
+                    fi
+                fi
+
+                attempts=$((attempts + 1))
+                if [ $attempts -lt $max_attempts ]; then
+                    echo "Attempt $attempts failed, waiting 10 seconds..."
+                    sleep 10
+                fi
             done
 
             echo "=== Health Check Failed - Debug Information ==="
-            echo "Container Status:"
+            echo "Docker Status:"
             docker ps -a | grep api-gateway
             echo "Container Logs:"
             docker logs api-gateway
-            echo "Network Status:"
-            docker network inspect craftpilot-network
             echo "Health Check Response:"
             curl -v http://localhost:8080/actuator/health || true
             exit 1

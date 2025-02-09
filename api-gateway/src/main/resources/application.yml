@@ -104,6 +104,7 @@ spring:
             - Path=/swagger-ui/**,/swagger-ui.html,/v3/api-docs/**
           filters:
             - StripPrefix=0
+            - AddResponseHeader=Access-Control-Allow-Origin, *
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin
         - AddResponseHeader=Access-Control-Allow-Origin, *
@@ -119,6 +120,11 @@ spring:
         caffeine:
           spec: maximumSize=500,expireAfterWrite=5s
 
+spring:
+  security:
+    basic:
+      enabled: false
+
 springdoc:
   api-docs:
     enabled: true
@@ -130,9 +136,12 @@ springdoc:
     urls:
       - url: /v3/api-docs
         name: API Gateway
+    operationsSorter: method
     disable-swagger-default-url: true
-    try-it-out-enabled: true
-    filter: true
+    csrf:
+      enabled: false
+    security:
+      enabled: false
   cache:
     disabled: true
   show-actuator: true
