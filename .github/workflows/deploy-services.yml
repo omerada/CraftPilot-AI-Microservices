@@ -53,16 +53,28 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,EUREKA_USERNAME,EUREKA_PASSWORD,GCP_SA_KEY,GCP_PROJECT_ID,REDIS_PASSWORD,GMAIL_SERVICE_ACCOUNT,GRAFANA_ADMIN_PASSWORD,DOCKER_COMPOSE_CONTENT
           script: |
-            # 1. Preparation
-            mkdir -p /opt/craftpilot
             cd /opt/craftpilot
 
-            # Setup env and credentials
-            echo "$DOCKER_COMPOSE_CONTENT" | base64 -d > docker-compose.yml
-            echo "${GCP_SA_KEY}" > /opt/craftpilot/gcp-credentials.json
-            chmod 600 /opt/craftpilot/gcp-credentials.json
+            # Ensure docker is running
+            if ! systemctl is-active --quiet docker; then
+              echo "Docker is not running"
+              sudo systemctl start docker
+              sleep 10
+            fi
 
-            # Create environment file
+            # Clean old files
+            rm -f docker-compose.yml start-services.sh .env
+
+            # Setup new files
+            echo "$DOCKER_COMPOSE_CONTENT" | base64 -d > docker-compose.yml
+
+            # Copy start-services script
+            cat << 'EOF' > start-services.sh
+            $(cat $GITHUB_WORKSPACE/start-services.sh)
+            EOF
+            chmod +x start-services.sh
+
+            # Create env file
             cat << EOF > .env
             DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME}
             EUREKA_USERNAME=craftpilot
@@ -75,108 +87,56 @@ jobs:
             VERSION=latest
             EOF
 
-            # 2. Infrastructure Services
-            echo "=== Starting Infrastructure Services ==="
+            # Setup GCP credentials
+            echo "${GCP_SA_KEY}" > /opt/craftpilot/gcp-credentials.json
+            chmod 600 /opt/craftpilot/gcp-credentials.json
 
-            # Stop existing infrastructure containers
-            docker stop redis zookeeper kafka || true
-            docker rm redis zookeeper kafka || true
+            # Run deployment script function
+            ./start-services.sh 2>&1 | tee deployment.log || {
+                echo "=== Deployment Failed ==="
+                echo "=== Last 100 lines of logs ==="
+                tail -n 100 deployment.log}
+                exit 1
+            }   echo "Checking $service on port $port..."
+                for i in $(seq 1 $max_attempts); do
 
-            # Start Redis with proper configuration
-            docker run -d \
-              --name redis \
-              --network craftpilot-network \
-              -p 6379:6379 \
-              -e REDIS_PASSWORD=${REDIS_PASSWORD} \
-              redis:latest redis-server --requirepass ${REDIS_PASSWORD}
 
-            # Wait and verify Redis
-            sleep 10
-            if ! docker exec redis redis-cli -a ${REDIS_PASSWORD} ping | grep -q "PONG"; then
-              echo "Redis failed to start properly"
-              exit 1
-            fi
 
-            # Start Zookeeper
-            docker run -d \
-              --name zookeeper \
-              --network craftpilot-network \
-              -e ZOOKEEPER_CLIENT_PORT=2181 \
-              -e ZOOKEEPER_TICK_TIME=2000 \
-              confluentinc/cp-zookeeper:latest
 
-            # Wait for Zookeeper
-            sleep 15
 
-            # Start Kafka
-            docker run -d \
-              --name kafka \
-              --network craftpilot-network \
-              -p 9092:9092 \
-              -e KAFKA_BROKER_ID=1 \
-              -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
-              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
-              -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
-              confluentinc/cp-kafka:latest
 
-            # Wait for Kafka
-            sleep 20
 
-            # 3. Start Eureka Server
-            echo "=== Starting Eureka Server ==="
-            docker pull ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
-            docker stop eureka-server || true
-            docker rm eureka-server || true
 
-            docker run -d \
-              --name eureka-server \
-              --network craftpilot-network \
-              -p 8761:8761 \
-              -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_USERNAME=craftpilot \
-              -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
-              ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
 
-            # Wait for Eureka
-            echo "Waiting for Eureka Server..."
-            for i in {1..30}; do
-              if curl -sf http://localhost:8761/actuator/health; then
-                echo "Eureka Server is healthy"
-                break
-              fi
-              echo "Waiting for Eureka Server... Attempt $i/30"
-              sleep 10
-            done
 
-            # 4. Start Other Services using docker-compose
-            docker-compose pull
-            docker-compose up -d --remove-orphans
 
-            # 5. Health Checks
-            declare -A services=(
-              ["eureka-server"]=8761
-              ["api-gateway"]=8080
-              ["redis-service"]=8079
-              ["kafka-service"]=9092
-              ["user-service"]=8060
-              ["credit-service"]=8058
-              ["subscription-service"]=8052
-              ["notification-service"]=8053
-              ["analytics-service"]=8064
-              ["admin-service"]=8063
-              ["llm-service"]=8062
-              ["image-service"]=8056
-            )
 
-            for service in "${!services[@]}"; do
-              port="${services[$service]}"
-              echo "Checking $service on port $port..."
-              for i in {1..10}; do
-                if curl -sf "http://localhost:${port}/actuator/health"; then
-                  echo "$service is healthy"
-                  break
-                fi
-                echo "Attempt $i: Waiting for $service..."
-                sleep 15
-              done
-            done
+
+
+
+
+
+
+            }                fi                    exit 1                    echo "Recovery failed for $service"                if ! check_service_health $service; then                # Final check                                sleep 30                docker restart $service                # Restart attempt                                docker network inspect craftpilot-network                docker inspect $service                docker logs $service                echo "=== Failure Recovery for $service ==="                local service=$1            handle_failure() {                    if curl -sf "http://localhost:${port}/actuator/health"; then
+                        echo "$service is healthy!"
+                        return 0
+                    fi
+                    
+                    if [ $((i % 5)) -eq 0 ]; then
+                        echo "Container logs for $service:"
+                        docker logs $service
+                    fi
+                    
+                    sleep 10
+                done
+                
+                return 1
+            }
+
+            # Run deployment script
+            ./start-services.sh 2>&1 | tee deployment.log || {
+                echo "=== Deployment Failed ==="
+                echo "=== Last 100 lines of logs ==="
+                tail -n 100 deployment.log
+                exit 1
+            }
