@@ -109,24 +109,44 @@ spring:
       fail-on-unknown-properties: false
       unwrap-root-value: false
       accept-single-value-as-array: true
+  cloud:
+    loadbalancer:
+      cache:
+        enabled: true
+        caffeine:
+          spec: maximumSize=500,expireAfterWrite=5s
+    discovery:
+      enabled: true
+      client:
+        composite-indicator:
+          enabled: false
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 5000
 
 eureka:
   instance:
-    prefer-ip-address: false
+    prefer-ip-address: true
     hostname: ${HOSTNAME:api-gateway}
     instance-id: ${spring.application.name}:${random.uuid}
     lease-renewal-interval-in-seconds: 10
     lease-expiration-duration-in-seconds: 30
+    metadata-map:
+      zone: primary
+      profile: ${spring.profiles.active:prod}
   client:
     service-url:
-      defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:password}@${EUREKA_SERVER_HOST:eureka-server}:${EUREKA_SERVER_PORT:8761}/eureka/
+      defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:13579ada}@${EUREKA_SERVER_HOST:eureka-server}:${EUREKA_SERVER_PORT:8761}/eureka/
     fetch-registry: true
     register-with-eureka: true
     registry-fetch-interval-seconds: 5
-    eureka-server-connection-timeout-seconds: 5
+    eureka-server-connect-timeout-seconds: 5
     eureka-server-read-timeout-seconds: 5
-    eureka-service-url-poll-interval-seconds: 5
-    eureka-registration-enabled: true
 
 management:
   endpoints:

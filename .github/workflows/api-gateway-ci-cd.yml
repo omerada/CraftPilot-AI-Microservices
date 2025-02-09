@@ -139,6 +139,8 @@ jobs:
               -e SPRING_APPLICATION_NAME=api-gateway \
               -e SPRING_CLOUD_CONFIG_ENABLED=false \
               -e SPRING_CLOUD_DISCOVERY_ENABLED=true \
+              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+              -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
               ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
 
             echo "=== Waiting for API Gateway ==="
