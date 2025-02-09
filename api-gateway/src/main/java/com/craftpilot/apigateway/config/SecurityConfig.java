@@ -7,6 +7,14 @@ import org.springframework.security.config.annotation.web.reactive.EnableWebFlux
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.web.server.util.matcher.NegatedServerWebExchangeMatcher;
+import org.springframework.security.web.server.util.matcher.OrServerWebExchangeMatcher;
+import org.springframework.security.web.server.util.matcher.PathPatternParserServerWebExchangeMatcher;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher;
+import reactor.core.publisher.Mono;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -26,44 +34,39 @@ public class SecurityConfig {
         "/health/**"
     };
 
+    private ServerWebExchangeMatcher createMatcher(String[] patterns) {
+        List<ServerWebExchangeMatcher> matchers = Arrays.stream(patterns)
+            .map(pattern -> new PathPatternParserServerWebExchangeMatcher(pattern))
+            .collect(Collectors.toList());
+        return new OrServerWebExchangeMatcher(matchers);
+    }
+
     @Bean
     @Order(1)
     public SecurityWebFilterChain swaggerSecurityFilterChain(ServerHttpSecurity http) {
+        ServerWebExchangeMatcher swaggerMatcher = createMatcher(SWAGGER_WHITELIST);
+        
         return http
-            .securityMatcher(exchange -> {
-                String path = exchange.getRequest().getURI().getPath();
-                for (String pattern : SWAGGER_WHITELIST) {
-                    if (path.matches(pattern.replace("**", ".*"))) {
-                        return true;
-                    }
-                }
-                return false;
-            })
-            .csrf().disable()
-            .cors().disable()
-            .authorizeExchange()
-            .anyExchange().permitAll()
-            .and()
+            .securityMatcher(swaggerMatcher)
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.disable())
+            .authorizeExchange(exchanges -> exchanges
+                .anyExchange().permitAll()
+            )
             .build();
     }
 
     @Bean
     @Order(2)
     public SecurityWebFilterChain actuatorSecurityFilterChain(ServerHttpSecurity http) {
+        ServerWebExchangeMatcher actuatorMatcher = createMatcher(ACTUATOR_WHITELIST);
+        
         return http
-            .securityMatcher(exchange -> {
-                String path = exchange.getRequest().getURI().getPath();
-                for (String pattern : ACTUATOR_WHITELIST) {
-                    if (path.matches(pattern.replace("**", ".*"))) {
-                        return true;
-                    }
-                }
-                return false;
-            })
-            .csrf().disable()
-            .authorizeExchange()
-            .anyExchange().permitAll()
-            .and()
+            .securityMatcher(actuatorMatcher)
+            .csrf(csrf -> csrf.disable())
+            .authorizeExchange(exchanges -> exchanges
+                .anyExchange().permitAll()
+            )
             .build();
     }
 
@@ -71,13 +74,13 @@ public class SecurityConfig {
     @Order(3)
     public SecurityWebFilterChain mainSecurityFilterChain(ServerHttpSecurity http) {
         return http
-            .csrf().disable()
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.disable())
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
                 .pathMatchers("/api/**").authenticated()
                 .anyExchange().authenticated()
             )
-            // Firebase auth configuration will be here
             .build();
     }
 }
