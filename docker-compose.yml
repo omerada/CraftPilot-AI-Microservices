@@ -1,5 +1,3 @@
-version: "3.8"
-
 x-common-variables: &common-variables
   SPRING_PROFILES_ACTIVE: prod
   EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://craftpilot:13579ada@eureka-server:8761/eureka/
@@ -200,8 +198,13 @@ services:
 
   # LLM Service
   llm-service:
+    build:
+      context: ./llm-service
+      dockerfile: Dockerfile
+      platforms:
+        - linux/arm64
+    image: ${DOCKERHUB_USERNAME}/llm-service:latest-arm64
     container_name: llm-service
-    image: ${DOCKERHUB_USERNAME}/llm-service:${VERSION:-latest}
     ports:
       - "8062:8062"
     environment:
@@ -341,9 +344,11 @@ services:
   analytics-service:
     container_name: analytics-service
     build:
-      context: .
-      dockerfile: analytics-service/Dockerfile
-    image: ${DOCKERHUB_USERNAME}/analytics-service:${VERSION:-latest}
+      context: ./analytics-service
+      dockerfile: Dockerfile
+      platforms:
+        - linux/arm64
+    image: ${DOCKERHUB_USERNAME}/analytics-service:latest-arm64
     ports:
       - "8064:8064"
     environment:

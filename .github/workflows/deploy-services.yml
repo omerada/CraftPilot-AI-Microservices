@@ -14,6 +14,21 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # Docker setup
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       # Docker compose içeriğini base64'e çevir
       - name: Encode docker-compose
         run: |
@@ -45,7 +60,92 @@ jobs:
             # docker-compose.yml dosyasını oluştur
             echo "$DOCKER_COMPOSE_CONTENT" | base64 -d > docker-compose.yml
 
-            # .env dosyasını oluştur
+            # Docker Hub login
+            echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+
+            # 1. Infrastructure Services
+            echo "=== Starting Infrastructure Services ==="
+            docker network create craftpilot-network || true
+
+            # Start Redis
+            if ! docker ps -q -f name=redis; then
+              echo "Starting Redis..."
+              docker run -d \
+                --name redis \
+                --network craftpilot-network \
+                -p 6379:6379 \
+                -e REDIS_PASSWORD=${REDIS_PASSWORD} \
+                redis:latest --requirepass ${REDIS_PASSWORD}
+              sleep 10
+            fi
+
+            # Start Zookeeper
+            if ! docker ps -q -f name=zookeeper; then
+              echo "Starting Zookeeper..."
+              docker run -d \
+                --name zookeeper \
+                --network craftpilot-network \
+                -e ZOOKEEPER_CLIENT_PORT=2181 \
+                -e ZOOKEEPER_TICK_TIME=2000 \
+                confluentinc/cp-zookeeper:latest
+              sleep 15
+            fi
+
+            # Start Kafka
+            if ! docker ps -q -f name=kafka; then
+              echo "Starting Kafka..."
+              docker run -d \
+                --name kafka \
+                --network craftpilot-network \
+                -p 9092:9092 \
+                -e KAFKA_BROKER_ID=1 \
+                -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
+                -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
+                -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+                confluentinc/cp-kafka:latest
+              sleep 20
+            fi
+
+            # 2. Core Services (sıralı başlatma)
+            echo "=== Starting Core Services ==="
+
+            # Service update order
+            core_services=(
+              "eureka-server"      # Service Discovery
+              "api-gateway"        # API Gateway
+              "redis-service"      # Redis Service
+              "kafka-service"      # Kafka Service
+            )
+
+            # Update and start core services
+            for service in "${core_services[@]}"; do
+              update_service ${service}
+              echo "Waiting for ${service} to be ready..."
+              sleep 20
+            done
+
+            # 3. Business Services
+            echo "=== Starting Business Services ==="
+
+            # Service update order
+            business_services=(
+              "user-service"           # User Management
+              "credit-service"         # Credit Management
+              "subscription-service"    # Subscription Management
+              "notification-service"    # Notifications
+              "analytics-service"      # Analytics
+              "admin-service"          # Admin Operations
+              "llm-service"           # LLM Operations
+              "image-service"         # Image Operations
+            )
+
+            # Update and start business services
+            for service in "${business_services[@]}"; do
+              update_service ${service}
+              sleep 10
+            done
+
+            # Environment dosyasını oluştur
             cat << EOF > .env
             DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME}
             EUREKA_USERNAME=${EUREKA_USERNAME}
@@ -62,25 +162,53 @@ jobs:
             echo "${GCP_SA_KEY}" > /opt/craftpilot/gcp-credentials.json
             chmod 600 /opt/craftpilot/gcp-credentials.json
 
-            # Docker Compose ile servisleri başlat
-            docker-compose pull && docker-compose up -d
+            # Docker Compose ile yeni servisleri başlat
+            docker-compose pull || true
+            docker-compose up -d --remove-orphans
 
-            # Hata kontrolü
-            if [ $? -ne 0 ]; then
-              echo "Deployment failed!"
-              docker-compose logs
-              exit 1
-            fi
-
-            # Sağlık kontrolü
-            echo "Checking service health..."
+            # Health check
+            echo "Servislerin durumu kontrol ediliyor..."
             sleep 30
 
-            # Eureka kontrolü
-            if ! curl -s http://localhost:8761/actuator/health | grep -q "UP"; then
-              echo "Eureka Server is not healthy!"
-              docker-compose logs eureka-server
-              exit 1
-            fi
+            # Her servis için health check
+            declare -A service_ports=(
+              ["eureka-server"]="8761"
+              ["api-gateway"]="8080"
+              ["llm-service"]="8062"
+              ["credit-service"]="8058"
+              ["analytics-service"]="8064"
+              ["admin-service"]="8063"
+              ["user-service"]="8060"
+              ["kafka-service"]="9092"
+              ["redis-service"]="8079"
+              ["notification-service"]="8053"
+              ["subscription-service"]="8052"
+              ["image-service"]="8056"
+            )
 
-            echo "Deployment completed successfully!"
+            for service in "${!service_ports[@]}"; do
+              port="${service_ports[$service]}"
+              echo "Kontrol ediliyor: ${service} on port ${port}"
+              
+              for i in {1..5}; do
+                if curl -sf "http://localhost:${port}/actuator/health"; then
+                  echo "${service} sağlıklı!"
+                  break
+                fi
+                
+                if [ $i -eq 5 ]; then
+                  echo "${service} başlatılamadı!"
+                  docker logs ${service}
+                  docker-compose logs ${service}
+                  exit 1
+                fi
+                
+                echo "Deneme $i: ${service} bekleniyor..."
+                sleep 10
+              done
+            done
+
+            echo "Tüm servisler başarıyla güncellendi ve başlatıldı!"
+
+            # Kullanılmayan container ve image'ları temizle
+            docker system prune -f --volumes
