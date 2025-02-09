@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 spring:
   application:
@@ -10,11 +10,127 @@ spring:
         locator:
           enabled: true
           lowerCaseServiceId: true
+      routes:
+        # Core Services
+        - id: user-service
+          uri: lb://user-service
+          predicates:
+            - Path=/api/users/**,/api/auth/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: userServiceCircuitBreaker
+                fallbackUri: forward:/fallback/user
+
+        # Business Services
+        - id: admin-service
+          uri: lb://admin-service
+          predicates:
+            - Path=/api/admin/**,/api/management/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: adminServiceCircuitBreaker
+
+        - id: analytics-service
+          uri: lb://analytics-service
+          predicates:
+            - Path=/api/analytics/**,/api/reports/**,/api/metrics/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: analyticsServiceCircuitBreaker
+
+        - id: llm-service
+          uri: lb://llm-service
+          predicates:
+            - Path=/api/questions/**,/api/chat/**,/api/completions/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: llmServiceCircuitBreaker
+
+        - id: image-service
+          uri: lb://image-service
+          predicates:
+            - Path=/api/images/**,/api/media/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: imageServiceCircuitBreaker
+
+        - id: credit-service
+          uri: lb://credit-service
+          predicates:
+            - Path=/api/credits/**,/api/payments/**,/api/billing/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: creditServiceCircuitBreaker
+
+        - id: subscription-service
+          uri: lb://subscription-service
+          predicates:
+            - Path=/api/subscriptions/**,/api/plans/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: subscriptionServiceCircuitBreaker
+
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/notifications/**,/api/messages/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: notificationServiceCircuitBreaker
+
+        # Utility Services
+        - id: redis-service
+          uri: lb://redis-service
+          predicates:
+            - Path=/api/cache/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: redisServiceCircuitBreaker
+
+        - id: kafka-service
+          uri: lb://kafka-service
+          predicates:
+            - Path=/api/events/**,/api/streams/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: kafkaServiceCircuitBreaker
+
+        # Swagger UI Routes
+        - id: swagger-ui
+          uri: lb://api-gateway
+          predicates:
+            - Path=/swagger-ui/**,/v3/api-docs/**,/swagger-ui.html
+          filters:
+            - RewritePath=/swagger-ui.html, /webjars/swagger-ui/index.html
+
+redis:
+  host: ${REDIS_HOST:localhost}
+  port: ${REDIS_PORT:6379}
+  password: ${REDIS_PASSWORD:13579ada}
+  lettuce:
+    pool:
+      max-active: 8
+      max-idle: 8
+      min-idle: 2
+      max-wait: -1ms
+    shutdown-timeout: 100ms
+  connect-timeout: 2000ms
+  timeout: 1000ms
 
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://craftpilot:${EUREKA_PASSWORD:secret}@eureka-server:8761/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
   instance:
@@ -25,3 +141,6 @@ management:
     web:
       exposure:
         include: health,info
+  endpoint:
+    health:
+      show-details: always
