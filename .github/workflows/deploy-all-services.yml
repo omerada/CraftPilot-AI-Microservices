@@ -16,30 +16,76 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Hızlı temizlik için parallel işlem
             echo "Cleaning up existing containers..."
-            docker stop $(docker ps -aq) 2>/dev/null & 
-            docker rm $(docker ps -aq) 2>/dev/null &
-            wait
+            # Önce tüm containerları durdur
+            for container in redis zookeeper kafka; do
+              if docker ps -a | grep -q $container; then
+                echo "Stopping and removing $container..."
+                docker stop $container || true
+                docker rm $container || true
+              fi
+            done
 
-            # Network setup
             echo "Setting up network..."
-            docker network rm craftpilot-network 2>/dev/null || true
-            docker network create --driver bridge --subnet=172.20.0.0/16 --ip-range=172.20.0.0/24 craftpilot-network
+            # Ağı temizle ve yeniden oluştur
+            if docker network ls | grep -q craftpilot-network; then
+              echo "Removing existing network..."
+              # Önce bağlı containerları ayır
+              for container in $(docker network inspect craftpilot-network -f '{{range .Containers}}{{.Name}} {{end}}'); do
+                docker network disconnect -f craftpilot-network $container || true
+              done
+              docker network rm craftpilot-network
+            fi
 
-            # Parallel service deployment
-            echo "Starting core services..."
-            docker run -d --name redis --network craftpilot-network --ip 172.20.0.10 -p 6379:6379 \
-              -e REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }} redis:latest redis-server --requirepass ${{ secrets.REDIS_PASSWORD }} &
+            docker network create \
+              --driver bridge \
+              --subnet=172.20.0.0/16 \
+              --ip-range=172.20.0.0/24 \
+              --gateway=172.20.0.1 \
+              craftpilot-network
 
-            docker run -d --name zookeeper --network craftpilot-network --ip 172.20.0.11 \
-              -e ZOOKEEPER_CLIENT_PORT=2181 -e ZOOKEEPER_TICK_TIME=2000 confluentinc/cp-zookeeper:latest &
+            echo "Starting Redis..."
+            docker run -d \
+              --name redis \
+              --network craftpilot-network \
+              --ip 172.20.0.10 \
+              -p 6379:6379 \
+              -e REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }} \
+              redis:latest redis-server --requirepass ${{ secrets.REDIS_PASSWORD }}
 
-            wait
+            # Redis kontrolü
+            echo "Verifying Redis..."
             sleep 5
+            if ! docker ps | grep -q redis || ! docker exec redis redis-cli -a ${{ secrets.REDIS_PASSWORD }} ping | grep -q "PONG"; then
+              echo "Redis failed to start"
+              docker logs redis
+              exit 1
+            fi
 
-            # Kafka needs Zookeeper to be ready
-            docker run -d --name kafka --network craftpilot-network --ip 172.20.0.12 -p 9092:9092 \
+            echo "Starting Zookeeper..."
+            docker run -d \
+              --name zookeeper \
+              --network craftpilot-network \
+              --ip 172.20.0.11 \
+              -e ZOOKEEPER_CLIENT_PORT=2181 \
+              -e ZOOKEEPER_TICK_TIME=2000 \
+              confluentinc/cp-zookeeper:latest
+
+            # Zookeeper kontrolü
+            echo "Verifying Zookeeper..."
+            sleep 10
+            if ! docker ps | grep -q zookeeper; then
+              echo "Zookeeper failed to start"
+              docker logs zookeeper
+              exit 1
+            fi
+
+            echo "Starting Kafka..."
+            docker run -d \
+              --name kafka \
+              --network craftpilot-network \
+              --ip 172.20.0.12 \
+              -p 9092:9092 \
               -e KAFKA_BROKER_ID=1 \
               -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
               -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092 \
@@ -49,10 +95,14 @@ jobs:
               -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
               confluentinc/cp-kafka:latest
 
-            # Quick health checks
-            for service in redis zookeeper kafka; do
-              timeout 10 bash -c "until docker ps | grep -q $service; do sleep 1; done" || exit 1
-            done
+            # Kafka kontrolü
+            echo "Verifying Kafka..."
+            sleep 15
+            if ! docker ps | grep -q kafka; then
+              echo "Kafka failed to start"
+              docker logs kafka
+              exit 1
+            fi
 
   deploy-core:
     needs: deploy-infrastructure
