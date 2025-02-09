@@ -30,8 +30,12 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .cors(ServerHttpSecurity.CorsSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
-                        .pathMatchers("/actuator/**", "/eureka/**").permitAll()
-                        .anyExchange().permitAll()
+                        .pathMatchers("/swagger-ui.html", 
+                                      "/swagger-ui/**", 
+                                      "/v3/api-docs/**", 
+                                      "/webjars/**",
+                                      "/actuator/**").permitAll()
+                        .anyExchange().authenticated()
                 )
                 .build();
     }
