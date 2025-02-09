@@ -130,23 +130,24 @@ spring:
         response-timeout: 5000
 
 eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka}
+    register-with-eureka: true
+    fetch-registry: true
+    healthcheck:
+      enabled: true
   instance:
     prefer-ip-address: true
-    hostname: ${HOSTNAME:api-gateway}
-    instance-id: ${spring.application.name}:${random.uuid}
-    lease-renewal-interval-in-seconds: 10
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
+    lease-renewal-interval-in-seconds: 30
     lease-expiration-duration-in-seconds: 30
-    metadata-map:
+    health-check-url-path: /actuator/health
+    statusPageUrlPath: /actuator/info
+    metadataMap:
+      instanceId: ${spring.application.name}:${server.port}
       zone: primary
-      profile: ${spring.profiles.active:prod}
-  client:
-    service-url:
-      defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:13579ada}@${EUREKA_SERVER_HOST:eureka-server}:${EUREKA_SERVER_PORT:8761}/eureka/
-    fetch-registry: true
-    register-with-eureka: true
-    registry-fetch-interval-seconds: 5
-    eureka-server-connect-timeout-seconds: 5
-    eureka-server-read-timeout-seconds: 5
+      profile: ${spring.profiles.active}
 
 management:
   endpoints:

@@ -151,10 +151,7 @@ redis:
       max-wait: -1ms
     shutdown-timeout: 100ms
   connect-timeout: 2000ms
-  timeout: 1000ms
-
-openai:
-  api-key: ${OPENAI_API_KEY}
+  timeout: 1000ms 
 
 resilience4j:
   circuitbreaker:

@@ -11,158 +11,114 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./api-gateway
     steps:
       - uses: actions/checkout@v3
 
-      # QEMU kurulumu
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Grant execute permission for mvnw
+        run: |
+          cd api-gateway
+          chmod +x mvnw
+
+      - name: Build
+        run: |
+          cd api-gateway
+          ./mvnw clean package -DskipTests
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
         with:
           platforms: arm64
 
-      # Docker Buildx kurulumu
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-        with:
-          platforms: linux/arm64
 
-      # Docker Hub'a giriş yap
       - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          logout: true
 
-      # Sadece ARM64 için build ve push
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
           context: ./api-gateway
           platforms: linux/arm64
           push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
-            ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:${{ github.sha }}-arm64
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:buildcache-arm64
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:buildcache-arm64,mode=max
-
-      # Google Cloud kimlik doğrulaması
-      - id: "auth"
-        name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v1"
-        with:
-          credentials_json: "${{ secrets.GCP_SA_KEY }}"
-
-      # Google Cloud CLI kurulumu
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
-          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD
           script: |
-            echo "=== Testing SSH Connection ==="
-            whoami
-            pwd
-
-            echo "=== System Architecture ==="
-            uname -m
-
-            echo "=== Testing Directory Access ==="
-            ls -la /opt/craftpilot || mkdir -p /opt/craftpilot
-
-            echo "=== Continuing with Deployment ==="
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
-
-            echo "=== Testing Docker ==="
-            docker version
-            docker info
-            docker ps
-
-            # Docker ağını oluştur (eğer yoksa)
+            # Infrastructure setup
             docker network create craftpilot-network || true
 
-            # Redis container'ını başlat (eğer çalışmıyorsa)
+            # Start Redis if not running
             if ! docker ps | grep -q redis; then
               docker run -d \
                 --name redis \
                 --network craftpilot-network \
                 -p 6379:6379 \
-                redis:latest
+                -e REDIS_PASSWORD=13579ada \
+                redis:latest --requirepass 13579ada
             fi
 
-            # Eureka server'ı başlat (eğer çalışmıyorsa)
-            if ! docker ps | grep -q eureka-server; then
-              docker run -d \
-                --name eureka-server \
-                --network craftpilot-network \
-                -p 8761:8761 \
-                -e SPRING_PROFILES_ACTIVE=prod \
-                -e EUREKA_USERNAME=craftpilot \
-                -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
-                ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
-            fi
-
-            echo "=== Pulling ARM64 Image ==="
+            # Deploy API Gateway
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
-
-            echo "=== Stopping Old Container ==="
             docker stop api-gateway || true
             docker rm api-gateway || true
 
-            echo "=== Starting New Container ==="
             docker run -d \
               --name api-gateway \
               --hostname api-gateway \
               --network craftpilot-network \
+              --restart unless-stopped \
               -p 8080:8080 \
               -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8080 \
-              -e HOSTNAME=api-gateway \
-              -e EUREKA_USERNAME=craftpilot \
-              -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
-              -e EUREKA_SERVER_HOST=eureka-server \
-              -e EUREKA_SERVER_PORT=8761 \
-              -e SPRING_APPLICATION_NAME=api-gateway \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+              -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
+              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
               -e SPRING_CLOUD_CONFIG_ENABLED=false \
               -e SPRING_CLOUD_DISCOVERY_ENABLED=true \
-              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
-              -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
-              ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e SPRING_APPLICATION_NAME=api-gateway \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
+              -e REDIS_HOST=redis \
+              -e REDIS_PORT=6379 \
+              -e REDIS_PASSWORD=13579ada \
+              ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
 
-            echo "=== Waiting for API Gateway ==="
-            for i in {1..5}; do
-              echo "Health check attempt $i/5..."
-              if docker ps | grep -q api-gateway; then
-                if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
-                  echo "Application started successfully"
-                  if curl -sf http://localhost:8080/actuator/health; then
-                    echo "Health check passed"
-                    exit 0
-                  fi
-                fi
+            # Enhanced health check with longer timeout
+            echo "Waiting for service to start..."
+            for i in {1..12}; do
+              if curl -sf http://localhost:8080/actuator/health | grep -q "UP"; then
+                echo "Service is healthy"
+                exit 0
               fi
-              sleep 5
-              
-              # Show logs for debugging
-              echo "Recent logs:"
-              docker logs --tail 50 api-gateway
+              echo "Attempt $i: Service not ready yet..."
+              sleep 10
             done
 
-            echo "API Gateway failed to start"
+            echo "Service failed to become healthy within timeout"
             docker logs api-gateway
             exit 1
 
