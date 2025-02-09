@@ -8,6 +8,9 @@ server:
 spring:
   application:
     name: api-gateway
+  security:
+    basic:
+      enabled: false
   cloud:
     config:
       enabled: false
@@ -119,11 +122,6 @@ spring:
         enabled: true
         caffeine:
           spec: maximumSize=500,expireAfterWrite=5s
-
-spring:
-  security:
-    basic:
-      enabled: false
 
 springdoc:
   api-docs:
