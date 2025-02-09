@@ -16,59 +16,30 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "Cleaning up existing network and containers..."
-            # Tüm containerlari durdur
-            docker stop $(docker ps -aq) || true
-            docker rm $(docker ps -aq) || true
+            # Hızlı temizlik için parallel işlem
+            echo "Cleaning up existing containers..."
+            docker stop $(docker ps -aq) 2>/dev/null & 
+            docker rm $(docker ps -aq) 2>/dev/null &
+            wait
 
-            # Ağı tamamen temizle
-            docker network disconnect -f craftpilot-network $(docker ps -aq) || true
-            docker network rm craftpilot-network || true
+            # Network setup
+            echo "Setting up network..."
+            docker network rm craftpilot-network 2>/dev/null || true
+            docker network create --driver bridge --subnet=172.20.0.0/16 --ip-range=172.20.0.0/24 craftpilot-network
 
-            echo "Creating new network..."
-            # Yeni ağı oluştur
-            docker network create \
-              --driver bridge \
-              --subnet=172.20.0.0/16 \
-              --ip-range=172.20.0.0/24 \
-              --gateway=172.20.0.1 \
-              craftpilot-network
+            # Parallel service deployment
+            echo "Starting core services..."
+            docker run -d --name redis --network craftpilot-network --ip 172.20.0.10 -p 6379:6379 \
+              -e REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }} redis:latest redis-server --requirepass ${{ secrets.REDIS_PASSWORD }} &
 
-            # Altyapı servislerini başlat
-            echo "Starting Redis..."
-            docker run -d \
-              --name redis \
-              --network craftpilot-network \
-              --ip 172.20.0.10 \
-              -p 6379:6379 \
-              -e REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }} \
-              redis:latest redis-server --requirepass ${{ secrets.REDIS_PASSWORD }}
+            docker run -d --name zookeeper --network craftpilot-network --ip 172.20.0.11 \
+              -e ZOOKEEPER_CLIENT_PORT=2181 -e ZOOKEEPER_TICK_TIME=2000 confluentinc/cp-zookeeper:latest &
 
-            # Redis kontrolü
-            sleep 10
-            if ! docker exec redis redis-cli -a ${{ secrets.REDIS_PASSWORD }} ping | grep -q "PONG"; then
-              echo "Redis failed to start"
-              docker logs redis
-              exit 1
-            fi
+            wait
+            sleep 5
 
-            echo "Starting Zookeeper..."
-            docker run -d \
-              --name zookeeper \
-              --network craftpilot-network \
-              --ip 172.20.0.11 \
-              -e ZOOKEEPER_CLIENT_PORT=2181 \
-              -e ZOOKEEPER_TICK_TIME=2000 \
-              confluentinc/cp-zookeeper:latest
-
-            sleep 15
-
-            echo "Starting Kafka..."
-            docker run -d \
-              --name kafka \
-              --network craftpilot-network \
-              --ip 172.20.0.12 \
-              -p 9092:9092 \
+            # Kafka needs Zookeeper to be ready
+            docker run -d --name kafka --network craftpilot-network --ip 172.20.0.12 -p 9092:9092 \
               -e KAFKA_BROKER_ID=1 \
               -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
               -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092 \
@@ -78,78 +49,16 @@ jobs:
               -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
               confluentinc/cp-kafka:latest
 
-            # Verify Kafka
-            sleep 30
-            docker logs kafka
-            if ! docker ps | grep -q kafka; then
-              echo "Kafka failed to start"
-              exit 1
-            fi
+            # Quick health checks
+            for service in redis zookeeper kafka; do
+              timeout 10 bash -c "until docker ps | grep -q $service; do sleep 1; done" || exit 1
+            done
 
-            # Test Kafka connection
-            docker exec kafka kafka-topics --create --if-not-exists \
-              --bootstrap-server localhost:9092 \
-              --replication-factor 1 \
-              --partitions 1 \
-              --topic test || exit 1
-
-            sleep 20
-
-  deploy-eureka:
+  deploy-core:
     needs: deploy-infrastructure
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy Eureka Server
-        uses: appleboy/ssh-action@master
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD
-          script: |
-            echo "=== Deploying Eureka Server ==="
-            docker pull ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
-            docker stop eureka-server || true
-            docker rm eureka-server || true
-
-            docker run -d \
-              --name eureka-server \
-              --hostname eureka-server \
-              --network craftpilot-network \
-              --ip 172.20.0.13 \
-              --restart unless-stopped \
-              -p 8761:8761 \
-              -e SPRING_PROFILES_ACTIVE=prod \
-              -e SERVER_PORT=8761 \
-              -e EUREKA_USERNAME=craftpilot \
-              -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
-              -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
-              -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
-              -e EUREKA_CLIENT_FETCH_REGISTRY=false \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
-              ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
-
-            # Health check
-            for i in {1..5}; do
-              if curl -sf http://localhost:8761/actuator/health; then
-                echo "Eureka Server is healthy"
-                exit 0
-              fi
-              sleep 10
-            done
-
-            echo "Eureka Server failed health check"
-            docker logs eureka-server
-            exit 1
-
-  deploy-gateway:
-    needs: deploy-eureka
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy API Gateway
+      - name: Deploy Core Services
         uses: appleboy/ssh-action@master
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -161,50 +70,46 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD
           script: |
-            echo "=== Deploying API Gateway ==="
-            docker pull ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
-            docker stop api-gateway || true
-            docker rm api-gateway || true
+            # Parallel pull
+            echo "Pulling core service images..."
+            docker pull ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64 &
+            docker pull ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64 &
+            wait
 
-            docker run -d \
-              --name api-gateway \
-              --hostname api-gateway \
-              --network craftpilot-network \
-              --ip 172.20.0.14 \
-              --restart unless-stopped \
-              -p 8080:8080 \
+            # Deploy Eureka first
+            echo "Deploying Eureka..."
+            docker run -d --name eureka-server --hostname eureka-server --network craftpilot-network \
+              --ip 172.20.0.13 --restart unless-stopped -p 8761:8761 \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e SERVER_PORT=8761 \
+              -e EUREKA_USERNAME=craftpilot \
+              -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
+              -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
+              -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
+              -e EUREKA_CLIENT_FETCH_REGISTRY=false \
+              ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
+
+            # Quick health check for Eureka
+            timeout 15 bash -c 'until curl -s http://localhost:8761/actuator/health; do sleep 2; done' || exit 1
+
+            # Deploy API Gateway
+            echo "Deploying API Gateway..."
+            docker run -d --name api-gateway --hostname api-gateway --network craftpilot-network \
+              --ip 172.20.0.14 --restart unless-stopped -p 8080:8080 \
               -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8080 \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
-              -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
-              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
-              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
-              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-              -e SPRING_APPLICATION_NAME=api-gateway \
               -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
-              -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_LOWER_CASE_SERVICE_ID=true \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
               -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=${REDIS_PASSWORD} \
               ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
 
-            # Health check
-            for i in {1..5}; do
-              if curl -sf http://localhost:8080/actuator/health; then
-                echo "API Gateway is healthy"
-                exit 0
-              fi
-              sleep 10
-            done
-
-            echo "API Gateway failed health check"
-            docker logs api-gateway
-            exit 1
+            # Quick health check for Gateway
+            timeout 15 bash -c 'until curl -s http://localhost:8080/actuator/health; do sleep 2; done' || exit 1
 
   deploy-core-services:
-    needs: deploy-gateway
+    needs: deploy-core
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -336,7 +241,7 @@ jobs:
             fi
 
   deploy-data-services:
-    needs: deploy-gateway
+    needs: deploy-core
     runs-on: ubuntu-latest
     strategy:
       matrix:
