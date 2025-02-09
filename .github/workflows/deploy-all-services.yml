@@ -48,41 +48,112 @@ jobs:
 
             sleep 15
 
-            # Start Kafka
+            # Start Kafka with improved configuration
             docker run -d \
               --name kafka \
               --network craftpilot-network \
               -p 9092:9092 \
               -e KAFKA_BROKER_ID=1 \
               -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
-              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092 \
+              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092 \
               -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT \
+              -e KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092 \
               -e KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT \
               -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+              -e KAFKA_LOG_RETENTION_HOURS=168 \
+              -e KAFKA_MESSAGE_MAX_BYTES=1000000 \
+              -e KAFKA_AUTO_CREATE_TOPICS_ENABLE=true \
               confluentinc/cp-kafka:latest
+
+            # Verify Kafka
+            sleep 30
+            docker logs kafka
+            if ! docker ps | grep -q kafka; then
+              echo "Kafka failed to start"
+              exit 1
+            fi
+
+            # Test Kafka connection
+            docker exec kafka kafka-topics --create --if-not-exists \
+              --bootstrap-server localhost:9092 \
+              --replication-factor 1 \
+              --partitions 1 \
+              --topic test || exit 1
 
             sleep 20
 
-  deploy-services:
+  deploy-core-services:
     needs: deploy-infrastructure
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [
-            # Core Services
+        service:
+          [
             { name: "eureka-server", port: 8761 },
             { name: "api-gateway", port: 8080 },
+          ]
+    steps:
+      - name: Deploy ${{ matrix.service.name }}
+        uses: appleboy/ssh-action@master
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD,GCP_SA_KEY
+          script: |
+            # Setup GCP credentials if needed
+            if [ ! -f "/opt/craftpilot/gcp-credentials.json" ]; then
+              mkdir -p /opt/craftpilot
+              echo "${GCP_SA_KEY}" > /opt/craftpilot/gcp-credentials.json
+              chmod 600 /opt/craftpilot/gcp-credentials.json
+            fi
+
+            # Deploy service
+            docker pull ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
+            docker stop ${{ matrix.service.name }} || true
+            docker rm ${{ matrix.service.name }} || true
+
+            docker run -d \
+              --name ${{ matrix.service.name }} \
+              --network craftpilot-network \
+              -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
+              -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
+              -e REDIS_HOST=redis \
+              -e REDIS_PORT=6379 \
+              -e REDIS_PASSWORD=${REDIS_PASSWORD} \
+              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
+              ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
+
+            # Health check
+            for i in {1..30}; do
+              if curl -sf http://localhost:${{ matrix.service.port }}/actuator/health; then
+                echo "${{ matrix.service.name }} is healthy"
+                exit 0
+              fi
+              sleep 10
+            done
+
+            echo "${{ matrix.service.name }} failed health check"
+            docker logs ${{ matrix.service.name }}
+            exit 1
+
+  deploy-data-services:
+    needs: deploy-core-services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          [
             { name: "redis-service", port: 8079 },
             { name: "kafka-service", port: 9093 },
-
-            # Business Services
-            { name: "credit-service", port: 8058 },
-            { name: "subscription-service", port: 8052 },
-            { name: "notification-service", port: 8053 },
-            { name: "analytics-service", port: 8064 },
-            { name: "admin-service", port: 8063 },
-            { name: "llm-service", port: 8062 },
-            { name: "image-service", port: 8056 },
             { name: "user-service", port: 8060 },
           ]
     steps:
@@ -138,8 +209,137 @@ jobs:
             docker logs ${{ matrix.service.name }}
             exit 1
 
+  deploy-business-services:
+    needs: deploy-data-services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          [
+            { name: "credit-service", port: 8058 },
+            { name: "subscription-service", port: 8052 },
+            { name: "llm-service", port: 8062 },
+            { name: "image-service", port: 8056 },
+          ]
+    steps:
+      - name: Deploy ${{ matrix.service.name }}
+        uses: appleboy/ssh-action@master
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD,GCP_SA_KEY
+          script: |
+            # Setup GCP credentials if needed
+            if [ ! -f "/opt/craftpilot/gcp-credentials.json" ]; then
+              mkdir -p /opt/craftpilot
+              echo "${GCP_SA_KEY}" > /opt/craftpilot/gcp-credentials.json
+              chmod 600 /opt/craftpilot/gcp-credentials.json
+            fi
+
+            # Deploy service
+            docker pull ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
+            docker stop ${{ matrix.service.name }} || true
+            docker rm ${{ matrix.service.name }} || true
+
+            docker run -d \
+              --name ${{ matrix.service.name }} \
+              --network craftpilot-network \
+              -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
+              -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
+              -e REDIS_HOST=redis \
+              -e REDIS_PORT=6379 \
+              -e REDIS_PASSWORD=${REDIS_PASSWORD} \
+              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
+              ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
+
+            # Health check
+            for i in {1..30}; do
+              if curl -sf http://localhost:${{ matrix.service.port }}/actuator/health; then
+                echo "${{ matrix.service.name }} is healthy"
+                exit 0
+              fi
+              sleep 10
+            done
+
+            echo "${{ matrix.service.name }} failed health check"
+            docker logs ${{ matrix.service.name }}
+            exit 1
+
+  deploy-auxiliary-services:
+    needs: deploy-business-services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          [
+            { name: "notification-service", port: 8053 },
+            { name: "analytics-service", port: 8064 },
+            { name: "admin-service", port: 8063 },
+          ]
+    steps:
+      - name: Deploy ${{ matrix.service.name }}
+        uses: appleboy/ssh-action@master
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD,GCP_SA_KEY
+          script: |
+            # Setup GCP credentials if needed
+            if [ ! -f "/opt/craftpilot/gcp-credentials.json" ]; then
+              mkdir -p /opt/craftpilot
+              echo "${GCP_SA_KEY}" > /opt/craftpilot/gcp-credentials.json
+              chmod 600 /opt/craftpilot/gcp-credentials.json
+            fi
+
+            # Deploy service
+            docker pull ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
+            docker stop ${{ matrix.service.name }} || true
+            docker rm ${{ matrix.service.name }} || true
+
+            docker run -d \
+              --name ${{ matrix.service.name }} \
+              --network craftpilot-network \
+              -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
+              -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
+              -e REDIS_HOST=redis \
+              -e REDIS_PORT=6379 \
+              -e REDIS_PASSWORD=${REDIS_PASSWORD} \
+              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
+              ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
+
+            # Health check
+            for i in {1..30}; do
+              if curl -sf http://localhost:${{ matrix.service.port }}/actuator/health; then
+                echo "${{ matrix.service.name }} is healthy"
+                exit 0
+              fi
+              sleep 10
+            done
+
+            echo "${{ matrix.service.name }} failed health check"
+            docker logs ${{ matrix.service.name }}
+            exit 1
+
   deploy-monitoring:
-    needs: deploy-services
+    needs: deploy-auxiliary-services
     runs-on: ubuntu-latest
     steps:
       - name: Deploy Monitoring Stack

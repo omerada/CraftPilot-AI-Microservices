@@ -129,8 +129,8 @@ jobs:
               --name image-service \
               --network craftpilot-network \
               -p 8056:8056 \
-              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+              -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \
@@ -141,7 +141,16 @@ jobs:
               -e REDIS_PASSWORD=13579ada \
               -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
               -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
+              -e GCP_CREDENTIALS_PATH=/app/gcp-credentials.json \
               ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
+
+            # Verify container is running and healthy
+            sleep 10
+            if ! docker ps | grep -q image-service; then
+              echo "Container failed to start"
+              docker logs image-service
+              exit 1
+            fi
 
             # Eureka Server'ın hazır olmasını bekle
             echo "=== Waiting for Eureka Server ==="
