@@ -109,64 +109,48 @@ jobs:
               -e REDIS_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
 
-            # Multi-stage health check
-            echo "=== Starting health checks ==="
-            max_attempts=12
-            counter=0
-            success=false
+            echo "=== Waiting for container to start ==="
+            sleep 45
 
-            # Initial wait for container to start
-            echo "Waiting for initial startup..."
-            sleep 30
+            echo "=== Checking container status ==="
+            if ! docker ps | grep -q api-gateway; then
+              echo "Container failed to start"
+              docker logs api-gateway
+              exit 1
+            fi
 
-            while [ $counter -lt $max_attempts ] && [ "$success" = false ]; do
-              counter=$((counter + 1))
-              echo "Health check attempt $counter/$max_attempts"
-
-              # Series of health checks
-              if docker ps | grep -q api-gateway; then
-                # Check Eureka registration first
-                if curl -sf -u craftpilot:13579ada http://localhost:8761/eureka/apps/API-GATEWAY; then
-                  echo "Successfully registered with Eureka"
-                  success=true
-                  break
-                fi
-
-                # Check application logs
-                if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
-                  if docker logs api-gateway 2>&1 | grep -q "Netty started on port 8080"; then
-                    # Try basic connectivity
-                    if curl -sf http://localhost:8080/actuator/health > /dev/null; then
-                      echo "Health endpoint is responding"
-                      success=true
-                      break
-                    fi
-                  fi
+            echo "=== Performing health checks ==="
+            COUNTER=0
+            while [ $COUNTER -lt 5 ]; do
+              # Check container logs for successful startup
+              if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
+                echo "Application startup confirmed"
+                
+                # Try simple curl to actuator endpoint
+                HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health || true)
+                if [ "$HEALTH_CHECK" = "200" ]; then
+                  echo "Health check passed"
+                  exit 0
                 fi
               fi
-
-              if [ $counter -eq $max_attempts ]; then
+              
+              COUNTER=$((COUNTER + 1))
+              if [ $COUNTER -eq 5 ]; then
                 echo "=== Debug Information ==="
-                echo "Docker Container Status:"
+                echo "Container Status:"
                 docker ps | grep api-gateway
                 echo "Container Logs:"
                 docker logs api-gateway
-                echo "Network Information:"
-                docker network inspect craftpilot-network
-                echo "Eureka Status:"
-                curl -s -u craftpilot:13579ada http://localhost:8761/eureka/apps
+                echo "Actuator Response:"
+                curl -v http://localhost:8080/actuator/health || true
+                exit 1
               fi
-
-              echo "Waiting 10 seconds before next attempt..."
+              
+              echo "Waiting for service... Attempt $COUNTER/5"
               sleep 10
             done
 
-            if [ "$success" = true ]; then
-              echo "=== API Gateway is healthy and running ==="
-              exit 0
-            else
-              echo "=== API Gateway health check failed ==="
-              exit 1
+            exit 1
 
       - name: Trigger Deploy Services Workflow
         if: success()

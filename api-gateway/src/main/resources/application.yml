@@ -122,8 +122,9 @@ spring:
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin
         - AddResponseHeader=Access-Control-Allow-Origin, *
-        - AddResponseHeader=Access-Control-Allow-Methods, GET,POST,PUT,DELETE,OPTIONS
-        - AddResponseHeader=Access-Control-Allow-Headers, DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization
+        - AddResponseHeader=Access-Control-Allow-Methods, GET,POST,PUT,DELETE,OPTIONS,HEAD
+        - AddResponseHeader=Access-Control-Allow-Headers, Origin,Content-Type,Accept,Authorization,X-Request-With
+        - AddResponseHeader=Access-Control-Max-Age, 3600
       httpclient:
         connect-timeout: 5000
         response-timeout: 5000
@@ -140,10 +141,11 @@ springdoc:
   swagger-ui:
     enabled: true
     path: /swagger-ui.html
-    config-url: /v3/api-docs/swagger-config
+    doc-expansion: none
+    disable-swagger-default-url: true
     urls:
-      - url: /v3/api-docs
-        name: API Gateway
+      - name: API Gateway
+        url: /v3/api-docs
   show-actuator: true
   use-management-port: false
   packages-to-scan: com.craftpilot.apigateway

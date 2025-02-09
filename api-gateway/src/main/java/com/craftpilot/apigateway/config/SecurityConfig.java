@@ -9,9 +9,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
-import java.util.Arrays;
-import java.util.Collections;
-
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {
@@ -19,33 +16,35 @@ public class SecurityConfig {
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
-            .cors(corsSpec -> corsSpec.configurationSource(corsConfigurationSource()))
-            .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .authorizeExchange(exchanges -> exchanges
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.disable())
+            .authorizeExchange(exchange -> exchange
                 .pathMatchers(
                     "/",
-                    "/swagger-ui/**",
                     "/swagger-ui.html",
+                    "/swagger-ui/**",
                     "/v3/api-docs/**",
                     "/webjars/**",
                     "/actuator/**",
                     "/favicon.ico"
                 ).permitAll()
-                .anyExchange().permitAll()
+                .pathMatchers("/api/**").permitAll()  // Geçici olarak tüm API'lara erişime izin ver
+                .anyExchange().authenticated()
             )
+            .httpBasic(httpBasic -> httpBasic.disable())
+            .formLogin(formLogin -> formLogin.disable())
             .build();
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration corsConfig = new CorsConfiguration();
-        corsConfig.setAllowedOrigins(Collections.singletonList("*"));
-        corsConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
-        corsConfig.setAllowedHeaders(Arrays.asList("origin", "content-type", "accept", "authorization", "x-requested-with"));
-        corsConfig.setMaxAge(3600L);
-
+        CorsConfiguration config = new CorsConfiguration();
+        config.addAllowedOrigin("*");
+        config.addAllowedMethod("*");
+        config.addAllowedHeader("*");
+        
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", corsConfig);
+        source.registerCorsConfiguration("/**", config);
         return source;
     }
 }
