@@ -16,57 +16,66 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Mevcut ağı temizle ve yeniden oluştur
+            echo "Cleaning up existing network and containers..."
+            # Tüm containerlari durdur
+            docker stop $(docker ps -aq) || true
+            docker rm $(docker ps -aq) || true
+
+            # Ağı tamamen temizle
+            docker network disconnect -f craftpilot-network $(docker ps -aq) || true
             docker network rm craftpilot-network || true
-            docker network create --driver bridge --subnet=172.19.0.0/16 craftpilot-network
 
-            # Altyapı servislerini durdur ve temizle
-            docker stop redis zookeeper kafka || true
-            docker rm redis zookeeper kafka || true
+            echo "Creating new network..."
+            # Yeni ağı oluştur
+            docker network create \
+              --driver bridge \
+              --subnet=172.20.0.0/16 \
+              --ip-range=172.20.0.0/24 \
+              --gateway=172.20.0.1 \
+              craftpilot-network
 
-            # Redis'i statik IP ile başlat
+            # Altyapı servislerini başlat
+            echo "Starting Redis..."
             docker run -d \
               --name redis \
               --network craftpilot-network \
-              --ip 172.19.0.10 \
+              --ip 172.20.0.10 \
               -p 6379:6379 \
               -e REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }} \
               redis:latest redis-server --requirepass ${{ secrets.REDIS_PASSWORD }}
 
-            # Verify Redis
+            # Redis kontrolü
             sleep 10
             if ! docker exec redis redis-cli -a ${{ secrets.REDIS_PASSWORD }} ping | grep -q "PONG"; then
               echo "Redis failed to start"
+              docker logs redis
               exit 1
             fi
 
-            # Zookeeper'ı statik IP ile başlat
+            echo "Starting Zookeeper..."
             docker run -d \
               --name zookeeper \
               --network craftpilot-network \
-              --ip 172.19.0.11 \
+              --ip 172.20.0.11 \
               -e ZOOKEEPER_CLIENT_PORT=2181 \
               -e ZOOKEEPER_TICK_TIME=2000 \
               confluentinc/cp-zookeeper:latest
 
             sleep 15
 
-            # Kafka'yı statik IP ile başlat
+            echo "Starting Kafka..."
             docker run -d \
               --name kafka \
               --network craftpilot-network \
-              --ip 172.19.0.12 \
+              --ip 172.20.0.12 \
               -p 9092:9092 \
               -e KAFKA_BROKER_ID=1 \
-              -e KAFKA_ZOOKEEPER_CONNECT=172.19.0.11:2181 \
-              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://172.19.0.12:29092,PLAINTEXT_HOST://localhost:9092 \
+              -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
+              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092 \
               -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT \
               -e KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092 \
               -e KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT \
               -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
-              -e KAFKA_LOG_RETENTION_HOURS=168 \
-              -e KAFKA_MESSAGE_MAX_BYTES=1000000 \
-              -e KAFKA_AUTO_CREATE_TOPICS_ENABLE=true \
               confluentinc/cp-kafka:latest
 
             # Verify Kafka
@@ -120,7 +129,7 @@ jobs:
               --name api-gateway \
               --hostname api-gateway \
               --network craftpilot-network \
-              --ip 172.19.0.14 \
+              --ip 172.20.0.14 \
               --restart unless-stopped \
               -p 8080:8080 \
               -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
@@ -172,7 +181,7 @@ jobs:
               docker run -d \
                 --name ${{ matrix.service.name }} \
                 --network craftpilot-network \
-                --ip 172.19.0.13 \
+                --ip 172.20.0.13 \
                 -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e EUREKA_USERNAME=craftpilot \
@@ -258,7 +267,7 @@ jobs:
             docker run -d \
               --name ${{ matrix.service.name }} \
               --network craftpilot-network \
-              --ip 172.19.0.15 \
+              --ip 172.20.0.15 \
               -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
               -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -324,7 +333,7 @@ jobs:
             docker run -d \
               --name ${{ matrix.service.name }} \
               --network craftpilot-network \
-              --ip 172.19.0.18 \
+              --ip 172.20.0.18 \
               -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
               -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -389,7 +398,7 @@ jobs:
             docker run -d \
               --name ${{ matrix.service.name }} \
               --network craftpilot-network \
-              --ip 172.19.0.22 \
+              --ip 172.20.0.22 \
               -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
               -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -436,7 +445,7 @@ jobs:
             docker run -d \
               --name prometheus \
               --network craftpilot-network \
-              --ip 172.19.0.25 \
+              --ip 172.20.0.25 \
               -p 9090:9090 \
               prom/prometheus:v2.49.1
 
@@ -448,7 +457,7 @@ jobs:
             docker run -d \
               --name grafana \
               --network craftpilot-network \
-              --ip 172.19.0.26 \
+              --ip 172.20.0.26 \
               -p 3000:3000 \
               -e GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD} \
               grafana/grafana:10.3.1
