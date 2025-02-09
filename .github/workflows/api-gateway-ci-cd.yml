@@ -110,62 +110,66 @@ jobs:
               -e REDIS_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
 
-            # Initial wait for container startup
             echo "=== Waiting for initial startup ==="
-            sleep 20
+            sleep 15  # İlk başlangıç için biraz daha uzun bekleme süresi
 
             echo "=== Performing health checks ==="
-            max_attempts=10
+            max_retries=30
             counter=0
-            success=false
 
-            while [ $counter -lt $max_attempts ]; do
-              counter=$((counter + 1))
-              echo "Health check attempt $counter/$max_attempts"
+            until [ $counter -ge $max_retries ]
+            do
+              echo "Health check attempt $((counter + 1))/$max_retries"
               
-              # Basic container check
-              if ! docker ps -q -f name=api-gateway; then
-                echo "Container not running"
-                docker logs api-gateway
-                exit 1
+              # Konteyner çalışıyor mu?
+              if ! docker ps --format '{{.Status}}' -f name=api-gateway | grep -q "Up"; then
+                echo "Container is not running properly"
+                docker logs api-gateway --tail 50
+                sleep 10
+                counter=$((counter + 1))
+                continue
               fi
               
-              # Log check
-              if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
-                echo "✓ Application startup detected"
+              # Spring Boot başlangıç kontrolü
+              if ! docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
+                echo "Application not fully started yet..."
+                sleep 10
+                counter=$((counter + 1))
+                continue
+              fi
+              
+              # HTTP endpoint kontrolü
+              HEALTH_CHECK=$(curl -s -w "%{http_code}" http://localhost:8080/actuator/health -o /dev/null)
+              if [ "$HEALTH_CHECK" = "200" ]; then
+                echo "✓ Health endpoint is responding"
                 
-                # Port check
-                if docker logs api-gateway 2>&1 | grep -q "Netty started on port 8080"; then
-                  echo "✓ Server port is listening"
+                # Detaylı sağlık kontrolü
+                HEALTH_STATUS=$(curl -s http://localhost:8080/actuator/health | grep -o '"status":"[^"]*' | cut -d'"' -f4)
+                if [ "$HEALTH_STATUS" = "UP" ]; then
+                  echo "✓ Application is healthy and running"
                   
-                  # Simple connectivity test
-                  HEALTH_RESPONSE=$(curl -s http://localhost:8080/actuator/health)
-                  if [ $? -eq 0 ] && echo "$HEALTH_RESPONSE" | grep -q "UP"; then
-                    echo "✓ Health endpoint is responding with UP status"
-                    echo "=== API Gateway is healthy and running ==="
-                    success=true
-                    break
+                  # Eureka kayıt kontrolü
+                  if curl -s http://craftpilot:13579ada@localhost:8761/eureka/apps/API-GATEWAY | grep -q "API-GATEWAY"; then
+                    echo "✓ Successfully registered with Eureka"
+                    echo "=== Deployment completed successfully ==="
+                    exit 0
                   fi
                 fi
               fi
               
-              if [ $counter -lt $max_attempts ]; then
-                echo "Waiting 5 seconds before next attempt..."
-                sleep 5
-              fi
+              echo "Waiting for next health check..."
+              sleep 10
+              counter=$((counter + 1))
             done
 
-            if [ "$success" = true ]; then
-              exit 0
-            else
-              echo "=== Health Check Failed - Debug Information ==="
-              echo "Docker Status:"
-              docker ps -a | grep api-gateway
-              echo "Container Logs:"
-              docker logs api-gateway
-              echo "Health Check Response:"
-              curl -v http://localhost:8080/actuator/health || true
-              exit 1
+            echo "=== Health Check Failed - Debug Information ==="
+            echo "Docker Container Status:"
+            docker ps -a | grep api-gateway
+            echo "Container Logs:"
+            docker logs api-gateway --tail 100
+            echo "Eureka Registration Status:"
+            curl -s http://craftpilot:13579ada@localhost:8761/eureka/apps/API-GATEWAY || true
+            exit 1
 
       - name: Trigger Deploy Services Workflow
         if: success()
