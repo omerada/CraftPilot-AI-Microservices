@@ -16,17 +16,19 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Setup network
-            docker network create craftpilot-network 2>/dev/null || true
+            # Mevcut ağı temizle ve yeniden oluştur
+            docker network rm craftpilot-network || true
+            docker network create --driver bridge --subnet=172.19.0.0/16 craftpilot-network
 
-            # Stop existing infrastructure
+            # Altyapı servislerini durdur ve temizle
             docker stop redis zookeeper kafka || true
             docker rm redis zookeeper kafka || true
 
-            # Start Redis
+            # Redis'i statik IP ile başlat
             docker run -d \
               --name redis \
               --network craftpilot-network \
+              --ip 172.19.0.10 \
               -p 6379:6379 \
               -e REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }} \
               redis:latest redis-server --requirepass ${{ secrets.REDIS_PASSWORD }}
@@ -38,24 +40,26 @@ jobs:
               exit 1
             fi
 
-            # Start Zookeeper
+            # Zookeeper'ı statik IP ile başlat
             docker run -d \
               --name zookeeper \
               --network craftpilot-network \
+              --ip 172.19.0.11 \
               -e ZOOKEEPER_CLIENT_PORT=2181 \
               -e ZOOKEEPER_TICK_TIME=2000 \
               confluentinc/cp-zookeeper:latest
 
             sleep 15
 
-            # Start Kafka with improved configuration
+            # Kafka'yı statik IP ile başlat
             docker run -d \
               --name kafka \
               --network craftpilot-network \
+              --ip 172.19.0.12 \
               -p 9092:9092 \
               -e KAFKA_BROKER_ID=1 \
-              -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
-              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092 \
+              -e KAFKA_ZOOKEEPER_CONNECT=172.19.0.11:2181 \
+              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://172.19.0.12:29092,PLAINTEXT_HOST://localhost:9092 \
               -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT \
               -e KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092 \
               -e KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT \
@@ -112,22 +116,30 @@ jobs:
               docker stop api-gateway || true
               docker rm api-gateway || true
 
-              docker run -d \
+            docker run -d \
               --name api-gateway \
+              --hostname api-gateway \
               --network craftpilot-network \
+              --ip 172.19.0.14 \
+              --restart unless-stopped \
               -p 8080:8080 \
               -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e SPRING_CONFIG_LOCATION=classpath:/application.yml \
               -e SERVER_PORT=8080 \
-              -e SPRING_APPLICATION_NAME=api-gateway \
-              -e GCP_CREDENTIALS_PATH=file:/app/config/gcp-credentials.json \
-              -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
-              -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_LOWER_CASE_SERVICE_ID=true \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
-              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=true \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+              -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
+              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+              -e SPRING_CLOUD_CONFIG_ENABLED=false \
+              -e SPRING_SECURITY_BASIC_ENABLED=false \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
-              ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e SPRING_APPLICATION_NAME=api-gateway \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
+              -e REDIS_HOST=redis \
+              -e REDIS_PORT=6379 \
+              -e REDIS_PASSWORD=13579ada \
+              ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
 
               # Health check with shorter timeout
               echo "=== Waiting for API Gateway ==="
@@ -160,6 +172,7 @@ jobs:
               docker run -d \
                 --name ${{ matrix.service.name }} \
                 --network craftpilot-network \
+                --ip 172.19.0.13 \
                 -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e EUREKA_USERNAME=craftpilot \
@@ -245,6 +258,7 @@ jobs:
             docker run -d \
               --name ${{ matrix.service.name }} \
               --network craftpilot-network \
+              --ip 172.19.0.15 \
               -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
               -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -310,6 +324,7 @@ jobs:
             docker run -d \
               --name ${{ matrix.service.name }} \
               --network craftpilot-network \
+              --ip 172.19.0.18 \
               -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
               -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -374,6 +389,7 @@ jobs:
             docker run -d \
               --name ${{ matrix.service.name }} \
               --network craftpilot-network \
+              --ip 172.19.0.22 \
               -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
               -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -420,6 +436,7 @@ jobs:
             docker run -d \
               --name prometheus \
               --network craftpilot-network \
+              --ip 172.19.0.25 \
               -p 9090:9090 \
               prom/prometheus:v2.49.1
 
@@ -431,6 +448,7 @@ jobs:
             docker run -d \
               --name grafana \
               --network craftpilot-network \
+              --ip 172.19.0.26 \
               -p 3000:3000 \
               -e GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD} \
               grafana/grafana:10.3.1
