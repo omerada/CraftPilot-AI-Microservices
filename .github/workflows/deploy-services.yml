@@ -53,260 +53,19 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,EUREKA_USERNAME,EUREKA_PASSWORD,GCP_SA_KEY,GCP_PROJECT_ID,REDIS_PASSWORD,GMAIL_SERVICE_ACCOUNT,GRAFANA_ADMIN_PASSWORD,DOCKER_COMPOSE_CONTENT
           script: |
-            # Proje dizinini oluştur
+            # 1. Preparation
             mkdir -p /opt/craftpilot
             cd /opt/craftpilot
 
-            # docker-compose.yml dosyasını oluştur
+            # Setup env and credentials
             echo "$DOCKER_COMPOSE_CONTENT" | base64 -d > docker-compose.yml
+            echo "${GCP_SA_KEY}" > /opt/craftpilot/gcp-credentials.json
+            chmod 600 /opt/craftpilot/gcp-credentials.json
 
-            # Docker Hub login
-            echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
-
-            # Utility functions
-            wait_for_service() {
-              local service=$1
-              local port=$2
-              local max_attempts=${3:-30}  # Default 30 deneme
-              local sleep_time=${4:-20}    # Default 20 saniye bekleme
-              
-              echo "=== Checking $service on port $port ==="
-              
-              for i in $(seq 1 $max_attempts); do
-                echo "Attempt $i/$max_attempts: Checking $service..."
-                
-                # Container çalışıyor mu kontrol et
-                if ! docker ps | grep -q $service; then
-                  echo "Container $service is not running!"
-                  docker logs $service
-                  return 1
-                fi
-                
-                # Container loglarını kontrol et
-                if docker logs $service 2>&1 | grep -q "ERROR"; then
-                  echo "Found ERROR in $service logs:"
-                  docker logs $service | grep "ERROR"
-                fi
-                
-                # Health check
-                if curl -sf "http://localhost:${port}/actuator/health"; then
-                  echo "$service is healthy!"
-                  return 0
-                fi
-                
-                # Her 5 denemede bir detaylı log göster
-                if [ $((i % 5)) -eq 0 ]; then
-                  echo "Recent logs for $service:"
-                  docker logs --tail 50 $service
-                fi
-                
-                sleep $sleep_time
-              done
-              
-              echo "$service failed to start. Full logs:"
-              docker logs $service
-              return 1
-            }
-
-            deploy_service() {
-              local service=$1
-              local image_tag="${DOCKERHUB_USERNAME}/${service}:latest-arm64"
-              
-              echo "=== Deploying ${service} ==="
-              
-              # Stop and remove existing container
-              docker stop ${service} 2>/dev/null || true
-              docker rm ${service} 2>/dev/null || true
-              
-              # Pull or use existing image
-              if ! docker pull ${image_tag} 2>/dev/null; then
-                echo "Warning: Could not pull ${image_tag}"
-              fi
-            }
-
-            # Infrastructure setup function
-            setup_infrastructure() {
-              echo "=== Setting up Infrastructure ==="
-              
-              # Create network if not exists
-              docker network create craftpilot-network 2>/dev/null || true
-              
-              # Start Redis
-              if ! docker ps -q -f name=redis; then
-                echo "Starting Redis..."
-                docker stop redis 2>/dev/null || true
-                docker rm redis 2>/dev/null || true
-                docker run -d \
-                  --name redis \
-                  --network craftpilot-network \
-                  -p 6379:6379 \
-                  -e REDIS_PASSWORD=${REDIS_PASSWORD} \
-                  redis:latest --requirepass ${REDIS_PASSWORD}
-                
-                echo "Waiting for Redis to start..."
-                sleep 10
-                
-                # Redis health check
-                if ! docker exec redis redis-cli -a ${REDIS_PASSWORD} ping | grep -q "PONG"; then
-                  echo "Redis failed to start properly"
-                  docker logs redis
-                  exit 1
-                fi
-                echo "Redis is running and healthy"
-              fi
-
-              # Start Zookeeper
-              if ! docker ps -q -f name=zookeeper; then
-                echo "Starting Zookeeper..."
-                docker stop zookeeper 2>/dev/null || true
-                docker rm zookeeper 2>/dev/null || true
-                docker run -d \
-                  --name zookeeper \
-                  --network craftpilot-network \
-                  -e ZOOKEEPER_CLIENT_PORT=2181 \
-                  -e ZOOKEEPER_TICK_TIME=2000 \
-                  confluentinc/cp-zookeeper:latest
-                
-                echo "Waiting for Zookeeper to start..."
-                sleep 20
-                
-                # Zookeeper health check
-                if ! echo ruok | nc localhost 2181; then
-                  echo "Zookeeper failed to start properly"
-                  docker logs zookeeper
-                  exit 1
-                fi
-                echo "Zookeeper is running and healthy"
-              fi
-
-              # Start Kafka
-              if ! docker ps -q -f name=kafka; then
-                echo "Starting Kafka..."
-                docker stop kafka 2>/dev/null || true
-                docker rm kafka 2>/dev/null || true
-                docker run -d \
-                  --name kafka \
-                  --network craftpilot-network \
-                  -p 9092:9092 \
-                  -e KAFKA_BROKER_ID=1 \
-                  -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
-                  -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
-                  -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
-                  -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
-                  -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 \
-                  confluentinc/cp-kafka:latest
-                
-                echo "Waiting for Kafka to start..."
-                sleep 30
-                
-                # Kafka health check
-                if ! nc -z localhost 9092; then
-                  echo "Kafka failed to start properly"
-                  docker logs kafka
-                  exit 1
-                fi
-                echo "Kafka is running and healthy"
-              fi
-
-              echo "All infrastructure services are running"
-              docker ps
-            }
-
-            # Infrastructure setup
-            setup_infrastructure
-
-            # 1. Infrastructure Services
-            echo "=== Starting Infrastructure Services ==="
-            docker network create craftpilot-network 2>/dev/null || true
-
-            # Start Redis
-            if ! docker ps -q -f name=redis; then
-              echo "Starting Redis..."
-              docker run -d \
-                --name redis \
-                --network craftpilot-network \
-                -p 6379:6379 \
-                -e REDIS_PASSWORD=${REDIS_PASSWORD} \
-                redis:latest --requirepass ${REDIS_PASSWORD}
-              sleep 10
-            fi
-
-            # Start Zookeeper
-            if ! docker ps -q -f name=zookeeper; then
-              echo "Starting Zookeeper..."
-              docker run -d \
-                --name zookeeper \
-                --network craftpilot-network \
-                -e ZOOKEEPER_CLIENT_PORT=2181 \
-                -e ZOOKEEPER_TICK_TIME=2000 \
-                confluentinc/cp-zookeeper:latest
-              sleep 15
-            fi
-
-            # Start Kafka
-            if ! docker ps -q -f name=kafka; then
-              echo "Starting Kafka..."
-              docker run -d \
-                --name kafka \
-                --network craftpilot-network \
-                -p 9092:9092 \
-                -e KAFKA_BROKER_ID=1 \
-                -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
-                -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
-                -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
-                confluentinc/cp-kafka:latest
-              sleep 20
-            fi
-
-            # 2. Core Services
-            echo "=== Starting Core Services ==="
-
-            # Deploy Eureka first
-            deploy_service "eureka-server"
-            echo "Verifying infrastructure before starting Eureka..."
-            docker ps | grep -E "redis|zookeeper|kafka"
-
-            if ! wait_for_service "eureka-server" "8761" "30" "10"; then
-              echo "Infrastructure status:"
-              docker ps
-              echo "Eureka logs:"
-              docker logs eureka-server
-              echo "Redis logs:"
-              docker logs redis
-              echo "Kafka logs:"
-              docker logs kafka
-              exit 1
-            fi
-
-            # Deploy other core services
-            core_services=("api-gateway" "redis-service" "kafka-service")
-            for service in "${core_services[@]}"; do
-              deploy_service "$service"
-              sleep 15
-            done
-
-            # 3. Business Services
-            echo "=== Starting Business Services ==="
-            business_services=(
-              "user-service"
-              "credit-service"
-              "subscription-service"
-              "notification-service"
-              "analytics-service"
-              "admin-service"
-              "llm-service"
-              "image-service"
-            )
-
-            for service in "${business_services[@]}"; do
-              deploy_service "$service"
-              sleep 10
-            done
-
-            # Environment dosyasını oluştur
+            # Create environment file
             cat << EOF > .env
             DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME}
-            EUREKA_USERNAME=${EUREKA_USERNAME}
+            EUREKA_USERNAME=craftpilot
             EUREKA_PASSWORD=${EUREKA_PASSWORD}
             GCP_SA_KEY_PATH=/opt/craftpilot/gcp-credentials.json
             GCP_PROJECT_ID=${GCP_PROJECT_ID}
@@ -316,100 +75,108 @@ jobs:
             VERSION=latest
             EOF
 
-            # GCP credentials dosyasını oluştur
-            echo "${GCP_SA_KEY}" > /opt/craftpilot/gcp-credentials.json
-            chmod 600 /opt/craftpilot/gcp-credentials.json
+            # 2. Infrastructure Services
+            echo "=== Starting Infrastructure Services ==="
 
-            # Docker Compose ile yeni servisleri başlat
-            docker-compose pull || true
+            # Stop existing infrastructure containers
+            docker stop redis zookeeper kafka || true
+            docker rm redis zookeeper kafka || true
+
+            # Start Redis with proper configuration
+            docker run -d \
+              --name redis \
+              --network craftpilot-network \
+              -p 6379:6379 \
+              -e REDIS_PASSWORD=${REDIS_PASSWORD} \
+              redis:latest redis-server --requirepass ${REDIS_PASSWORD}
+
+            # Wait and verify Redis
+            sleep 10
+            if ! docker exec redis redis-cli -a ${REDIS_PASSWORD} ping | grep -q "PONG"; then
+              echo "Redis failed to start properly"
+              exit 1
+            fi
+
+            # Start Zookeeper
+            docker run -d \
+              --name zookeeper \
+              --network craftpilot-network \
+              -e ZOOKEEPER_CLIENT_PORT=2181 \
+              -e ZOOKEEPER_TICK_TIME=2000 \
+              confluentinc/cp-zookeeper:latest
+
+            # Wait for Zookeeper
+            sleep 15
+
+            # Start Kafka
+            docker run -d \
+              --name kafka \
+              --network craftpilot-network \
+              -p 9092:9092 \
+              -e KAFKA_BROKER_ID=1 \
+              -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
+              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
+              -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+              confluentinc/cp-kafka:latest
+
+            # Wait for Kafka
+            sleep 20
+
+            # 3. Start Eureka Server
+            echo "=== Starting Eureka Server ==="
+            docker pull ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
+            docker stop eureka-server || true
+            docker rm eureka-server || true
+
+            docker run -d \
+              --name eureka-server \
+              --network craftpilot-network \
+              -p 8761:8761 \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e EUREKA_USERNAME=craftpilot \
+              -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
+              ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
+
+            # Wait for Eureka
+            echo "Waiting for Eureka Server..."
+            for i in {1..30}; do
+              if curl -sf http://localhost:8761/actuator/health; then
+                echo "Eureka Server is healthy"
+                break
+              fi
+              echo "Waiting for Eureka Server... Attempt $i/30"
+              sleep 10
+            done
+
+            # 4. Start Other Services using docker-compose
+            docker-compose pull
             docker-compose up -d --remove-orphans
 
-            # Health check
-            echo "Servislerin durumu kontrol ediliyor..."
-            sleep 30
-
-            # Her servis için health check
-            declare -A service_ports=(
-              ["eureka-server"]="8761"
-              ["api-gateway"]="8080"
-              ["llm-service"]="8062"
-              ["credit-service"]="8058"
-              ["analytics-service"]="8064"
-              ["admin-service"]="8063"
-              ["user-service"]="8060"
-              ["kafka-service"]="9092"
-              ["redis-service"]="8079"
-              ["notification-service"]="8053"
-              ["subscription-service"]="8052"
-              ["image-service"]="8056"
+            # 5. Health Checks
+            declare -A services=(
+              ["eureka-server"]=8761
+              ["api-gateway"]=8080
+              ["redis-service"]=8079
+              ["kafka-service"]=9092
+              ["user-service"]=8060
+              ["credit-service"]=8058
+              ["subscription-service"]=8052
+              ["notification-service"]=8053
+              ["analytics-service"]=8064
+              ["admin-service"]=8063
+              ["llm-service"]=8062
+              ["image-service"]=8056
             )
 
-            for service in "${!service_ports[@]}"; do
-              port="${service_ports[$service]}"
-              wait_for_service "$service" "$port" "5" "10" || {
-                echo "Failed to start $service"
-                docker-compose logs "$service"
-                exit 1
-              }
-            done
-
-            echo "Tüm servisler başarıyla güncellendi ve başlatıldı!"
-
-            # Kullanılmayan container ve image'ları temizle
-            docker system prune -f --volumes
-
-            # Servisleri sırayla başlat ve health check yap
-            deploy_and_check_service() {
-              local service=$1
-              local port=$2
-              
-              echo "=== Deploying and checking $service ==="
-              deploy_service "$service"
-              sleep 30  # İlk başlatma için daha uzun bekle
-              
-              if ! wait_for_service "$service" "$port" 30 20; then
-                echo "Failed to start $service. Attempting recovery..."
-                
-                # Bağımlılıkları kontrol et
-                docker ps
-                echo "Network status:"
-                docker network inspect craftpilot-network
-                
-                # Servisi yeniden başlatmayı dene
-                docker restart $service
-                sleep 30
-                
-                if ! wait_for_service "$service" "$port" 15 20; then
-                  echo "Recovery failed for $service"
-                  exit 1
+            for service in "${!services[@]}"; do
+              port="${services[$service]}"
+              echo "Checking $service on port $port..."
+              for i in {1..10}; do
+                if curl -sf "http://localhost:${port}/actuator/health"; then
+                  echo "$service is healthy"
+                  break
                 fi
-              fi
-            }
-
-            # Core services için güncellenmiş deployment
-            echo "=== Starting Core Services ==="
-            deploy_and_check_service "eureka-server" "8761"
-            deploy_and_check_service "api-gateway" "8080"
-            deploy_and_check_service "redis-service" "8079"
-            deploy_and_check_service "kafka-service" "9092"
-
-            # Business services için güncellenmiş deployment
-            echo "=== Starting Business Services ==="
-            for service in "${business_services[@]}"; do
-              port="${service_ports[$service]}"
-              deploy_and_check_service "$service" "$port"
+                echo "Attempt $i: Waiting for $service..."
+                sleep 15
+              done
             done
-
-            # Final health check
-            echo "=== Final Health Check ==="
-            for service in "${!service_ports[@]}"; do
-              port="${service_ports[$service]}"
-              if ! curl -sf "http://localhost:${port}/actuator/health"; then
-                echo "Final check failed for $service"
-                docker logs $service
-                exit 1
-              fi
-              echo "$service is healthy"
-            done
-
-            echo "=== All services successfully deployed and verified ==="
