@@ -121,13 +121,8 @@ jobs:
           envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD
           script: |
             echo "Cleaning up existing core services..."
-            for service in eureka-server api-gateway; do
-              if docker ps -a | grep -q $service; then
-                echo "Stopping and removing $service..."
-                docker stop $service || true
-                docker rm $service || true
-              fi
-            done
+            docker stop eureka-server api-gateway >/dev/null 2>&1 || true
+            docker rm eureka-server api-gateway >/dev/null 2>&1 || true
 
             echo "Pulling core service images..."
             docker pull ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64 &
@@ -149,22 +144,26 @@ jobs:
               -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
               -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
               -e EUREKA_CLIENT_FETCH_REGISTRY=false \
+              -e SPRING_APPLICATION_NAME=eureka-server \
+              -e JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC" \
               ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
 
-            # Verify Eureka is running
-            echo "Waiting for Eureka to start..."
-            for i in {1..30}; do
-              if curl -sf http://localhost:8761/actuator/health >/dev/null 2>&1; then
-                echo "Eureka is healthy"
-                break
-              fi
-              if [ $i -eq 30 ]; then
-                echo "Eureka failed to start"
-                docker logs eureka-server
-                exit 1
-              fi
-              sleep 2
-            done
+            # Optimize Eureka startup check
+            echo "Waiting for Eureka..."
+            timeout 45 bash -c '
+              until curl -s http://localhost:8761/actuator/health | grep -q "UP"; do
+                if docker logs eureka-server 2>&1 | grep -q "Started Eureka"; then
+                  echo "Eureka started successfully"
+                  break
+                fi
+                echo -n "."
+                sleep 1
+              done
+            ' || {
+              echo "Eureka failed to start in time"
+              docker logs eureka-server
+              exit 1
+            }
 
             echo "Deploying API Gateway..."
             docker run -d \
@@ -179,24 +178,23 @@ jobs:
               -e SERVER_PORT=8080 \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
               -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
+              -e SPRING_APPLICATION_NAME=api-gateway \
+              -e JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC" \
               -e REDIS_HOST=redis \
               -e REDIS_PASSWORD=${REDIS_PASSWORD} \
               ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
 
-            # Verify API Gateway is running
-            echo "Waiting for API Gateway to start..."
-            for i in {1..30}; do
-              if curl -sf http://localhost:8080/actuator/health >/dev/null 2>&1; then
-                echo "API Gateway is healthy"
-                break
-              fi
-              if [ $i -eq 30 ]; then
-                echo "API Gateway failed to start"
-                docker logs api-gateway
-                exit 1
-              fi
-              sleep 2
-            done
+            # Quick Gateway check
+            timeout 30 bash -c '
+              until curl -s http://localhost:8080/actuator/health | grep -q "UP"; do
+                echo -n "."
+                sleep 1
+              done
+            ' || {
+              echo "API Gateway failed to start in time"
+              docker logs api-gateway
+              exit 1
+            }
 
   deploy-core-services:
     needs: deploy-core
