@@ -66,13 +66,17 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Remove existing network and recreate
+            # Properly remove and recreate network
+            echo "=== Setting up network ==="
+            # Stop all containers using the network
+            docker stop $(docker ps -q --filter network=craftpilot-network) || true
+            # Remove network
             docker network rm craftpilot-network || true
+            # Create new network with proper subnet
             docker network create \
               --driver bridge \
-              --subnet 172.18.0.0/16 \
-              --ip-range 172.18.0.0/24 \
-              --gateway 172.18.0.1 \
+              --subnet=172.18.0.0/16 \
+              --gateway=172.18.0.1 \
               craftpilot-network
 
             # Start Redis if not running
@@ -80,42 +84,57 @@ jobs:
               docker run -d \
                 --name redis \
                 --network craftpilot-network \
+                --ip 172.18.0.2 \
                 -p 6379:6379 \
                 -e REDIS_PASSWORD=13579ada \
                 redis:latest --requirepass 13579ada
             fi
 
-            # Deploy API Gateway
+            # Deploy API Gateway with retry mechanism
             echo "=== Deploying API Gateway ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
             docker stop api-gateway || true
             docker rm api-gateway || true
 
-            # Run with macvlan network
-            docker run -d \
-              --name api-gateway \
-              --hostname api-gateway \
-              --network craftpilot-network \
-              --ip 172.18.0.14 \
-              --restart unless-stopped \
-              -p 8080:8080 \
-              -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
-              -e SPRING_PROFILES_ACTIVE=prod \
-              -e SERVER_PORT=8080 \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
-              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
-              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
-              -e SPRING_CLOUD_CONFIG_ENABLED=false \
-              -e SPRING_SECURITY_BASIC_ENABLED=false \
-              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
-              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-              -e SPRING_APPLICATION_NAME=api-gateway \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
-              ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
+            MAX_RETRIES=3
+            RETRY_COUNT=0
+
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              if docker run -d \
+                --name api-gateway \
+                --hostname api-gateway \
+                --network craftpilot-network \
+                --ip 172.18.0.14 \
+                --restart unless-stopped \
+                -p 8080:8080 \
+                -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e SERVER_PORT=8080 \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
+                -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+                -e SPRING_CLOUD_CONFIG_ENABLED=false \
+                -e SPRING_SECURITY_BASIC_ENABLED=false \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e SPRING_APPLICATION_NAME=api-gateway \
+                -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
+                -e REDIS_HOST=redis \
+                -e REDIS_PORT=6379 \
+                -e REDIS_PASSWORD=13579ada \
+                ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64; then
+                  break
+              fi
+              
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              echo "Retry $RETRY_COUNT of $MAX_RETRIES"
+              sleep 5
+            done
+
+            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+              echo "Failed to start container after $MAX_RETRIES attempts"
+              exit 1
+            fi
 
             echo "=== Waiting for initial startup ==="
             sleep 20
