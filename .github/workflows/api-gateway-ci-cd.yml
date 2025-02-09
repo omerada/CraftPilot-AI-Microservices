@@ -111,65 +111,61 @@ jobs:
               ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
 
             echo "=== Waiting for initial startup ==="
-            sleep 15  # İlk başlangıç için biraz daha uzun bekleme süresi
+            sleep 20  # Initial wait for container startup
 
             echo "=== Performing health checks ==="
-            max_retries=30
+            max_attempts=10
             counter=0
+            success=false
 
-            until [ $counter -ge $max_retries ]
-            do
-              echo "Health check attempt $((counter + 1))/$max_retries"
+            while [ $counter -lt $max_attempts ]; do
+              echo "Health check attempt $((counter + 1))/$max_attempts"
               
-              # Konteyner çalışıyor mu?
+              # Konteyner durumu kontrolü
               if ! docker ps --format '{{.Status}}' -f name=api-gateway | grep -q "Up"; then
-                echo "Container is not running properly"
+                echo "Container is not running"
                 docker logs api-gateway --tail 50
-                sleep 10
+                sleep 5
                 counter=$((counter + 1))
                 continue
               fi
               
-              # Spring Boot başlangıç kontrolü
-              if ! docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
-                echo "Application not fully started yet..."
-                sleep 10
-                counter=$((counter + 1))
-                continue
-              fi
-              
-              # HTTP endpoint kontrolü
-              HEALTH_CHECK=$(curl -s -w "%{http_code}" http://localhost:8080/actuator/health -o /dev/null)
-              if [ "$HEALTH_CHECK" = "200" ]; then
-                echo "✓ Health endpoint is responding"
+              # Spring Boot başlangıç kontrolü - Started ApiGatewayApplication mesajını ara
+              if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
+                echo "✓ Application startup detected"
                 
-                # Detaylı sağlık kontrolü
-                HEALTH_STATUS=$(curl -s http://localhost:8080/actuator/health | grep -o '"status":"[^"]*' | cut -d'"' -f4)
-                if [ "$HEALTH_STATUS" = "UP" ]; then
-                  echo "✓ Application is healthy and running"
+                # Eureka kayıt kontrolü
+                if docker logs api-gateway 2>&1 | grep -q "DiscoveryClient.*registration status: 204"; then
+                  echo "✓ Successfully registered with Eureka"
                   
-                  # Eureka kayıt kontrolü
-                  if curl -s http://craftpilot:13579ada@localhost:8761/eureka/apps/API-GATEWAY | grep -q "API-GATEWAY"; then
-                    echo "✓ Successfully registered with Eureka"
-                    echo "=== Deployment completed successfully ==="
-                    exit 0
+                  # Son kontrol - Actuator health endpoint
+                  HEALTH_RESPONSE=$(curl -s http://localhost:8080/actuator/health)
+                  if echo "$HEALTH_RESPONSE" | grep -q '"status":"UP"'; then
+                    echo "✓ Application health check passed"
+                    success=true
+                    break
                   fi
                 fi
               fi
               
-              echo "Waiting for next health check..."
-              sleep 10
+              echo "Waiting for next check..."
+              sleep 5
               counter=$((counter + 1))
             done
 
-            echo "=== Health Check Failed - Debug Information ==="
-            echo "Docker Container Status:"
-            docker ps -a | grep api-gateway
-            echo "Container Logs:"
-            docker logs api-gateway --tail 100
-            echo "Eureka Registration Status:"
-            curl -s http://craftpilot:13579ada@localhost:8761/eureka/apps/API-GATEWAY || true
-            exit 1
+            if [ "$success" = true ]; then
+              echo "=== API Gateway deployment successful ==="
+              exit 0
+            else
+              echo "=== Deployment verification failed - Debug Information ==="
+              echo "Docker Status:"
+              docker ps -a | grep api-gateway
+              echo "Container Logs:"
+              docker logs api-gateway --tail 100
+              echo "Health Check Response:"
+              curl -s http://localhost:8080/actuator/health || true
+              exit 1
+            fi
 
       - name: Trigger Deploy Services Workflow
         if: success()
