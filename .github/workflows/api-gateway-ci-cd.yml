@@ -133,9 +133,6 @@ jobs:
               -e SPRING_APPLICATION_NAME=api-gateway \
               -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
               -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_LOWER_CASE_SERVICE_ID=true \
-              -e SPRING_DATA_REDIS_HOST=redis \
-              -e SPRING_DATA_REDIS_PORT=6379 \
-              -e SPRING_DATA_REDIS_PASSWORD=${REDIS_PASSWORD} \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
               -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=true \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \

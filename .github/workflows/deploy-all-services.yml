@@ -98,12 +98,11 @@ jobs:
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
-          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD
+          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD
           script: |
             if [ "${{ matrix.service.name }}" = "api-gateway" ]; then
               echo "=== Deploying API Gateway ==="
