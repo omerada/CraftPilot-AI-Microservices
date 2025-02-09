@@ -120,87 +120,102 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD
           script: |
-            echo "Fast deploying core services..."
-            docker stop eureka-server api-gateway >/dev/null 2>&1 & 
-            docker rm eureka-server api-gateway >/dev/null 2>&1 &
+            # Quick cleanup function
+            cleanup_container() {
+              local name=$1
+              if docker ps -a --format '{{.Names}}' | grep -q "^${name}$"; then
+                echo "Cleaning up ${name}..."
+                docker stop ${name} >/dev/null 2>&1
+                docker rm ${name} >/dev/null 2>&1
+              fi
+            }
+
+            # Agresif cleanup
+            cleanup_container "eureka-server"
+            cleanup_container "api-gateway"
+
+            # Hızlı image pull
+            echo "Pulling images silently..."
+            docker pull ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64 >/dev/null 2>&1 &
+            docker pull ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64 >/dev/null 2>&1 &
             wait
 
-            # Parallel image pulls with log suppression
-            docker pull ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64 >/dev/null & 
-            docker pull ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64 >/dev/null &
-            wait
-
-            echo "Quick-starting Eureka..."
+            # Eureka başlatma ve hızlı health check
+            echo "Starting Eureka Server..."
             docker run -d --name eureka-server \
-              --hostname eureka-server \
               --network craftpilot-network \
               --ip 172.20.0.13 \
               -p 8761:8761 \
-              -e SPRING_PROFILES_ACTIVE=prod \
+              -e JAVA_OPTS="-XX:+UseParallelGC -Xms256m -Xmx512m -Dspring.cloud.config.enabled=false -Dspring.output.ansi.enabled=NEVER" \
               -e SERVER_PORT=8761 \
-              -e EUREKA_USERNAME=craftpilot \
-              -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
-              -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
               -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
               -e EUREKA_CLIENT_FETCH_REGISTRY=false \
-              -e SPRING_CLOUD_CONFIG_ENABLED=false \
-              -e SPRING_CLOUD_CONFIG_IMPORT_CHECK_ENABLED=false \
-              -e JAVA_OPTS="-XX:+UseParallelGC -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom -Dspring.output.ansi.enabled=NEVER" \
+              -e EUREKA_USERNAME=craftpilot \
+              -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
               ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
 
-            # Ultra-fast health check
-            echo -n "Waiting for Eureka"
-            COUNTER=0
-            while [ $COUNTER -lt 30 ]; do
-              if curl -s "http://localhost:8761/actuator/health" | grep -q "UP"; then
-                echo "✓"
+            # Paralel health check
+            echo "Verifying Eureka..."
+            eureka_ready=false
+            for i in {1..20}; do
+              # Container durumunu kontrol et
+              if ! docker ps -q -f name=eureka-server >/dev/null 2>&1; then
+                echo "Eureka container failed!"
+                docker logs eureka-server
+                exit 1
+              fi
+              
+              # Logları kontrol et
+              if docker logs eureka-server 2>&1 | grep -q "Started EurekaServer"; then
+                echo "✓ Eureka is ready (detected from logs)"
+                eureka_ready=true
                 break
               fi
+              
+              # Health endpoint kontrol et
+              if curl -s -f "http://localhost:8761/actuator/health" >/dev/null 2>&1; then
+                echo "✓ Eureka is ready (health check passed)"
+                eureka_ready=true
+                break
+              fi
+              
               echo -n "."
               sleep 1
-              COUNTER=$((COUNTER+1))
-              # Early success detection from logs
-              if docker logs eureka-server 2>&1 | grep -q "Started EurekaServer"; then
-                echo "✓ (fast-track)"
-                break
-              fi
             done
 
-            # Parallel deployment of API Gateway
-            echo "Quick-starting Gateway..."
+            if [ "$eureka_ready" = false ]; then
+              echo "Eureka failed to start properly!"
+              docker logs eureka-server
+              exit 1
+            fi
+
+            # API Gateway deployment
+            echo "Deploying API Gateway..."
             docker run -d --name api-gateway \
-              --hostname api-gateway \
               --network craftpilot-network \
               --ip 172.20.0.14 \
               -p 8080:8080 \
-              -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
-              -e SPRING_PROFILES_ACTIVE=prod \
-              -e SERVER_PORT=8080 \
+              -e JAVA_OPTS="-XX:+UseParallelGC -Xms256m -Xmx512m -Dspring.cloud.config.enabled=false" \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
-              -e SPRING_CLOUD_CONFIG_ENABLED=false \
-              -e JAVA_OPTS="-XX:+UseParallelGC -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom" \
+              -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
+              -e REDIS_HOST=redis \
+              -e REDIS_PASSWORD=${REDIS_PASSWORD} \
               ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
 
-            # Quick Gateway check
-            echo -n "Waiting for Gateway"
-            COUNTER=0
-            while [ $COUNTER -lt 20 ]; do
-              if curl -s "http://localhost:8080/actuator/health" | grep -q "UP"; then
-                echo "✓"
+            # Gateway health check
+            echo "Verifying Gateway..."
+            for i in {1..10}; do
+              if curl -s -f "http://localhost:8080/actuator/health" >/dev/null 2>&1; then
+                echo "✓ Gateway is ready"
                 exit 0
               fi
               echo -n "."
-              sleep 1
-              COUNTER=$((COUNTER+1))
+              sleep 2
             done
 
-            # Only show logs if there's a problem
-            if [ $COUNTER -eq 20 ]; then
-              echo "\nService logs:"
-              docker logs eureka-server --tail 10
-              docker logs api-gateway --tail 10
-              exit 1
-            fi
+            echo "Gateway failed to start!"
+            docker logs api-gateway
+            exit 1
 
   deploy-core-services:
     needs: deploy-core
