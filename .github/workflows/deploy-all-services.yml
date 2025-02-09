@@ -52,10 +52,10 @@ jobs:
             docker run -d \
               --name kafka \
               --network craftpilot-network \
-              -p 29092:29092 \
+              -p 9092:9092 \
               -e KAFKA_BROKER_ID=1 \
               -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
-              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:29092 \
+              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092 \
               -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT \
               -e KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT \
               -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
@@ -63,64 +63,19 @@ jobs:
 
             sleep 20
 
-  deploy-core-services:
-    needs: deploy-infrastructure
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy Core Services
-        uses: appleboy/ssh-action@master
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD
-          script: |
-            # Deploy Eureka Server
-            docker pull ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
-            docker stop eureka-server || true
-            docker rm eureka-server || true
-
-            docker run -d \
-              --name eureka-server \
-              --network craftpilot-network \
-              -p 8761:8761 \
-              -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_USERNAME=craftpilot \
-              -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
-              ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
-
-            # Wait for Eureka
-            for i in {1..30}; do
-              if curl -sf http://localhost:8761/actuator/health; then
-                break
-              fi
-              sleep 10
-            done
-
-            # Deploy API Gateway
-            docker pull ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
-            docker stop api-gateway || true
-            docker rm api-gateway || true
-
-            docker run -d \
-              --name api-gateway \
-              --network craftpilot-network \
-              -p 8080:8080 \
-              -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
-              ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
-
-  deploy-business-services:
+  deploy-services:
     needs: deploy-core-services
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service:
-          [
-            { name: "user-service", port: 8060 },
+        service: [
+            # Core Services
+            { name: "eureka-server", port: 8761 },
+            { name: "api-gateway", port: 8080 },
+            { name: "redis-service", port: 8079 },
+            { name: "kafka-service", port: 9093 },
+
+            # Business Services
             { name: "credit-service", port: 8058 },
             { name: "subscription-service", port: 8052 },
             { name: "notification-service", port: 8053 },
@@ -128,6 +83,7 @@ jobs:
             { name: "admin-service", port: 8063 },
             { name: "llm-service", port: 8062 },
             { name: "image-service", port: 8056 },
+            { name: "user-service", port: 8060 },
           ]
     steps:
       - name: Deploy ${{ matrix.service.name }}
@@ -165,7 +121,7 @@ jobs:
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=${REDIS_PASSWORD} \
-              -e KAFKA_BOOTSTRAP_SERVERS=kafka:29092 \
+              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
               ${DOCKERHUB_USERNAME}/${{ matrix.service.name }}:latest-arm64
 
