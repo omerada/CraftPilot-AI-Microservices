@@ -96,37 +96,48 @@ jobs:
               -e JAVA_TOOL_OPTIONS="-XX:+UseG1GC -Xms256m -Xmx512m -Dserver.servlet.context-path=/ -Dspring.cloud.config.enabled=false" \
               $DOCKERHUB_USERNAME/eureka-server:latest-arm64
 
-            # Simplified but effective health check
+            # Quick health check for Eureka Server
             echo "=== Checking Eureka Server ==="
-            max_attempts=15
+            max_attempts=6
             counter=0
+            EUREKA_READY=false
 
-            while [ $counter -lt $max_attempts ]; do
+            while [ $counter -lt $max_attempts ] && [ "$EUREKA_READY" = false ]; do
               echo "Checking Eureka Server (Attempt $((counter + 1))/$max_attempts)"
               
-              if docker logs eureka-server 2>&1 | grep -q "Started Eureka"; then
-                echo "✅ Eureka Server is running"
-                break
-              fi
-              
-              # Show status every 2 attempts
-              if [ $((counter % 2)) -eq 0 ]; then
-                docker ps --filter "name=eureka-server" --format "{{.Status}}"
+              if docker ps --format '{{.Status}}' -f name=eureka-server | grep -q "Up"; then
+                # Check multiple indicators in parallel
+                {
+                  LOGS=$(docker logs eureka-server 2>&1)
+                  HEALTH=$(curl -s http://localhost:8761/actuator/health || echo "FAIL")
+                  AUTH_CHECK=$(curl -s -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/eureka/apps || echo "FAIL")
+                } &> /dev/null
+
+                if echo "$LOGS" | grep -q "Started EurekaServer" || \
+                   echo "$HEALTH" | grep -q "UP" || \
+                   echo "$AUTH_CHECK" | grep -q "applications"; then
+                  echo "✅ Eureka Server is operational"
+                  EUREKA_READY=true
+                  break
+                fi
               fi
               
               ((counter++))
-              sleep 2
+              sleep 3
             done
 
-            # Verify Eureka is responding
-            echo "=== Verifying Eureka Server API ==="
-            for i in {1..5}; do
-              if curl -s -f -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/eureka/apps > /dev/null; then
-                echo "✅ Eureka API is responding"
-                break
-              fi
-              sleep 2
-            done
+            if [ "$EUREKA_READY" = false ]; then
+              echo "❌ Eureka Server failed to start properly"
+              docker logs eureka-server
+              exit 1
+            fi
+
+            # Additional quick API verification
+            if curl -sf -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/eureka/apps > /dev/null; then
+              echo "✅ Eureka API responding"
+            else
+              echo "⚠️ Eureka API check skipped - continuing deployment"
+            fi
 
             echo "✅ Eureka Server deployment completed"
 
