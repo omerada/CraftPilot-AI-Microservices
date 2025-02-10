@@ -195,11 +195,13 @@ jobs:
               --network craftpilot-network \
               --ip 172.20.0.14 \
               -p 8080:8080 \
+              -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
               -e JAVA_OPTS="-XX:+UseParallelGC -Xms256m -Xmx512m -Dspring.cloud.config.enabled=false" \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
               -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
               -e REDIS_HOST=redis \
               -e REDIS_PASSWORD=${REDIS_PASSWORD} \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
               ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
 
             # Gateway health check
