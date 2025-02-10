@@ -185,21 +185,19 @@ jobs:
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8080 \
               -e SPRING_APPLICATION_NAME=api-gateway \
-              -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
-              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
               -e EUREKA_CLIENT_ENABLED=true \
               -e EUREKA_CLIENT_FETCH_REGISTRY=true \
               -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=true \
               -e EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE="http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/" \
-              -e EUREKA_CLIENT_SHOULD_ENFORCE_REGISTRATION_AT_INIT=true \
-              -e EUREKA_CLIENT_REGISTRY_FETCH_INTERVAL_SECONDS=5 \
-              -e EUREKA_INSTANCE_LEASE_RENEWAL_INTERVAL_IN_SECONDS=5 \
-              -e SPRING_CLOUD_DISCOVERY_ENABLED=true \
-              -e SPRING_CLOUD_SERVICE_REGISTRY_AUTO_REGISTRATION_ENABLED=true \
+              -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
+              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+              -e EUREKA_USERNAME=craftpilot \
+              -e EUREKA_PASSWORD="${EUREKA_PASSWORD}" \
+              -e SPRING_SECURITY_USER_NAME=craftpilot \
+              -e SPRING_SECURITY_USER_PASSWORD="${EUREKA_PASSWORD}" \
               -e SPRING_CLOUD_CONFIG_ENABLED=false \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info" \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-              -e SPRING_JACKSON_SERIALIZATION_INDENT_OUTPUT=true \
               -e SPRING_MAIN_ALLOW_BEAN_DEFINITION_OVERRIDING=true \
               -e SPRING_CLOUD_LOADBALANCER_RIBBON_ENABLED=false \
               -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
@@ -207,46 +205,53 @@ jobs:
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD="${REDIS_PASSWORD}" \
-              -e JAVA_OPTS="-XX:+UseParallelGC -Xms512m -Xmx1024m -Dspring.cloud.config.enabled=false -Dspring.cloud.discovery.enabled=true -Deureka.client.serviceUrl.defaultZone=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ -Deureka.instance.preferIpAddress=false" \
+              -e JAVA_TOOL_OPTIONS="-Xms512m -Xmx1024m -Dspring.cloud.config.enabled=false -Dspring.cloud.discovery.enabled=true -Deureka.client.serviceUrl.defaultZone=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/" \
               $DOCKERHUB_USERNAME/api-gateway:latest-arm64
 
-            # Enhanced health check with debug logs
-            echo "=== Waiting for API Gateway and verifying Eureka registration ==="
+            # Enhanced Gateway health check with debug logs
+            echo "=== Waiting for API Gateway ==="
             max_attempts=30
             counter=0
 
             while [ $counter -lt $max_attempts ]; do
               echo "Health check attempt $((counter + 1))/$max_attempts"
-
-              # Check if container is running
-              if ! docker ps | grep -q api-gateway; then
-                echo "Container is not running"
-                docker logs api-gateway
-                exit 1
-              fi
-
-              # Check application logs for startup
-              if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
-                echo "✓ Application started successfully"
+              
+              # Check application status
+              if docker ps -a --format '{{.Status}}' -f name=api-gateway | grep -q "Up"; then
+                echo "Container is running"
                 
-                # Check Eureka registration
-                if curl -s -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/eureka/apps/API-GATEWAY | grep -q "api-gateway"; then
-                  echo "✓ Successfully registered with Eureka"
-                  exit 0
+                # Check application logs
+                if docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication"; then
+                  echo "Application started successfully"
+
+                  # Try health check
+                  if curl -sf http://localhost:8080/actuator/health; then
+                    echo "Health check passed"
+                    
+                    # Verify Eureka registration
+                    if curl -sf -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/eureka/apps/api-gateway; then
+                      echo "✓ Successfully registered with Eureka"
+                      exit 0
+                    fi
+                  fi
                 fi
               fi
-
-              # Show recent logs every 5 attempts
+              
+              # Show logs periodically
               if [ $((counter % 5)) -eq 0 ]; then
-                echo "Recent container logs:"
-                docker logs --tail 50 api-gateway
+                echo "=== Container Logs ==="
+                docker logs --since=30s api-gateway
+                echo "=== End Logs ==="
               fi
-
+              
               ((counter++))
               sleep 10
             done
 
-            echo "Failed to verify API Gateway deployment. Final logs:"
+            echo "Failed to verify API Gateway deployment"
+            echo "=== Final Container Status ==="
+            docker ps -a | grep api-gateway
+            echo "=== Final Container Logs ==="
             docker logs api-gateway
             exit 1
 
