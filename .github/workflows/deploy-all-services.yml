@@ -104,6 +104,116 @@ jobs:
               exit 1
             fi
 
+            # Eureka başlatma
+            echo "Starting Eureka Server..."
+            docker run -d \
+              --name eureka-server \
+              --hostname eureka-server \
+              --network craftpilot-network \
+              --restart unless-stopped \
+              -p 8761:8761 \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e EUREKA_USERNAME=craftpilot \
+              -e EUREKA_PASSWORD=${EUREKA_PASSWORD} \
+              -e SERVER_PORT=8761 \
+              -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
+              -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
+              -e EUREKA_CLIENT_FETCH_REGISTRY=false \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
+
+            # Wait for Eureka to start
+            echo "Waiting for Eureka to start..."
+            sleep 20
+
+            # Health check
+            echo "Starting health checks..."
+            max_retries=5
+            count=0
+
+            while [ $count -lt $max_retries ]; do
+              count=$((count + 1))
+              echo "Health check attempt $count/$max_retries"
+              
+              if docker ps | grep -q "eureka-server"; then
+                if curl -s "http://localhost:8761" | grep -q "Eureka"; then
+                  echo "Eureka Server is running and responding"
+                  break
+                elif curl -s -u craftpilot:${EUREKA_PASSWORD} "http://localhost:8761/actuator/health" | grep -q "UP"; then
+                  echo "Eureka Server health check passed"
+                  break
+                elif docker logs eureka-server 2>&1 | grep -q "Started EurekaServerApplication"; then
+                  echo "Eureka Server logs indicate successful startup"
+                  break
+                fi
+              fi
+              
+              echo "Waiting 10 seconds before next attempt..."
+              sleep 10
+            done
+
+            # API Gateway deployment
+            echo "=== Deploying API Gateway ==="
+            docker pull ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
+            docker stop api-gateway || true
+            docker rm api-gateway || true
+
+            docker run -d \
+              --name api-gateway \
+              --hostname api-gateway \
+              --network craftpilot-network \
+              --restart unless-stopped \
+              -p 8080:8080 \
+              -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e SERVER_PORT=8080 \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/ \
+              -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
+              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+              -e SPRING_CLOUD_CONFIG_ENABLED=false \
+              -e SPRING_SECURITY_BASIC_ENABLED=false \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e SPRING_APPLICATION_NAME=api-gateway \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
+              -e REDIS_HOST=redis \
+              -e REDIS_PORT=6379 \
+              -e REDIS_PASSWORD=${REDIS_PASSWORD} \
+              ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
+
+            echo "=== Waiting for API Gateway ==="
+            sleep 20  # Initial wait for container startup
+
+            echo "=== Performing health checks ==="
+            max_attempts=6
+            counter=0
+
+            while [ $counter -lt $max_attempts ]; do
+              echo "Health check attempt $((counter + 1))/$max_attempts"
+              
+              if docker ps --format '{{.Status}}' -f name=api-gateway | grep -q "Up" && \
+                 docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication" && \
+                 docker logs api-gateway 2>&1 | grep -q "DiscoveryClient.*registration status: 204"; then
+                
+                echo "✓ Application is running and registered with Eureka"
+                echo "=== Deployment completed successfully ==="
+                exit 0
+              fi
+              
+              echo "Waiting for next check..."
+              sleep 10
+              counter=$((counter + 1))
+            done
+
+            echo "=== Health Check Failed - Debug Information ==="
+            echo "Docker Status:"
+            docker ps -a | grep api-gateway
+            echo "Container Logs:"
+            docker logs api-gateway --tail 100
+            exit 1
+
   deploy-core:
     needs: deploy-infrastructure
     runs-on: ubuntu-latest
