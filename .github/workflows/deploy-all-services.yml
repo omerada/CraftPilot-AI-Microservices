@@ -128,14 +128,17 @@ jobs:
               -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
               -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
               -e EUREKA_CLIENT_FETCH_REGISTRY=false \
+              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e JAVA_OPTS="-XX:+UseParallelGC -Xms256m -Xmx512m -Dspring.cloud.config.enabled=false" \
               $DOCKERHUB_USERNAME/eureka-server:latest-arm64
 
             # Enhanced Eureka health check
             echo "Waiting for Eureka to start..."
-            max_retries=10
+            max_retries=30
             counter=0
+
             while [ $counter -lt $max_retries ]; do
               counter=$((counter + 1))
               echo "Health check attempt $counter/$max_retries"
@@ -146,13 +149,27 @@ jobs:
                 exit 1
               fi
 
-              if curl -s -f http://localhost:8761/actuator/health | grep -q "UP"; then
+              if docker logs eureka-server 2>&1 | grep -q "Started EurekaServer" || \
+                 curl -s -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/actuator/health | grep -q "UP"; then
                 echo "✓ Eureka Server is healthy"
                 break
+              fi
+
+              if [ $((counter % 5)) -eq 0 ]; then
+                echo "Recent logs:"
+                docker logs --tail 20 eureka-server
               fi
               
               sleep 10
             done
+
+            if [ $counter -eq $max_retries ]; then
+              echo "Eureka Server failed to start properly after $max_retries attempts"
+              docker logs eureka-server
+              exit 1
+            fi
+
+            echo "✓ Eureka Server is running successfully"
 
             # API Gateway deployment
             echo "=== Deploying API Gateway ==="
