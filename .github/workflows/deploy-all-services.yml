@@ -24,18 +24,14 @@ jobs:
           script_stop: true
           script: |
             echo "=== Pre-deployment Cleanup ==="
-            # Quick cleanup function
-            cleanup_container() {
-              local name=$1
-              docker stop $name >/dev/null 2>&1 || true
-              docker rm $name >/dev/null 2>&1 || true
-            }
-
-            # Cleanup existing containers
+            # Remove duplicate container check and creation
             for container in redis zookeeper kafka eureka-server api-gateway; do
-              cleanup_container $container
+              echo "Stopping and removing $container..."
+              docker stop $container >/dev/null 2>&1 || true
+              docker rm $container >/dev/null 2>&1 || true
             done
 
+            # Network setup - prevent duplicate creation
             echo "=== Network Setup ==="
             docker network rm craftpilot-network >/dev/null 2>&1 || true
             docker network create \
@@ -87,7 +83,7 @@ jobs:
             # Wait for Kafka
             sleep 15
 
-            # Eureka Server deployment with improved initialization
+            # Enhanced Eureka Server deployment
             echo "=== Eureka Server Deployment ==="
             docker pull $DOCKERHUB_USERNAME/eureka-server:latest-arm64
 
@@ -105,32 +101,50 @@ jobs:
               -e EUREKA_CLIENT_FETCH_REGISTRY=false \
               -e EUREKA_SERVER_ENABLE_SELF_PRESERVATION=false \
               -e EUREKA_SERVER_RENEWAL_PERCENT_THRESHOLD=0.85 \
-              -e JAVA_TOOL_OPTIONS="-XX:+UseG1GC -Xms256m -Xmx512m -Dspring.cloud.config.enabled=false -Dmanagement.endpoint.health.probes.enabled=true -Dmanagement.health.livenessState.enabled=true -Dmanagement.health.readinessState.enabled=true" \
+              -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
+              -e JAVA_TOOL_OPTIONS="-Xms256m -Xmx512m -XX:+UseG1GC" \
               $DOCKERHUB_USERNAME/eureka-server:latest-arm64
 
-            # Improved Eureka health check with better error handling
+            # Improved Eureka health check
             echo "=== Waiting for Eureka Server ==="
-            max_attempts=30
+            max_attempts=45
             counter=0
 
             while [ $counter -lt $max_attempts ]; do
               echo "Health check attempt $((counter + 1))/$max_attempts"
               
-              # Check if container is running
+              # Container status check
               if ! docker ps --format '{{.Status}}' -f name=eureka-server | grep -q "Up"; then
                 echo "Container is not running!"
                 docker logs eureka-server
                 exit 1
               fi
+
+              # Multiple health checks
+              EUREKA_HEALTH=false
               
-              # Multiple health check methods
-              if curl -sf -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/actuator/health/liveness > /dev/null || \
-                 curl -sf http://localhost:8761/actuator/health > /dev/null || \
-                 docker logs eureka-server 2>&1 | grep -q "Started EurekaServerApplication"; then
-                  
+              # Method 1: Direct health check
+              if curl -sf http://localhost:8761/actuator/health > /dev/null 2>&1; then
+                echo "Health endpoint responding"
+                EUREKA_HEALTH=true
+              fi
+              
+              # Method 2: Authentication-based check
+              if curl -sf -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/eureka/apps > /dev/null 2>&1; then
+                echo "Eureka API responding"
+                EUREKA_HEALTH=true
+              fi
+              
+              # Method 3: Log-based check
+              if docker logs eureka-server 2>&1 | grep -q "Started EurekaServer"; then
+                echo "Application startup completed"
+                EUREKA_HEALTH=true
+              fi
+              
+              # If any health check passed
+              if [ "$EUREKA_HEALTH" = true ]; then
                 echo "✓ Eureka Server is healthy"
-                # Additional wait to ensure full initialization
-                sleep 15
+                sleep 10  # Extra wait for stability
                 break
               fi
               
@@ -142,7 +156,7 @@ jobs:
               fi
               
               ((counter++))
-              sleep 10
+              sleep 5
             done
 
             if [ $counter -eq $max_attempts ]; then
