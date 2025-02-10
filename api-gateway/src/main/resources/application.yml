@@ -124,6 +124,20 @@ spring:
         enabled: true
         caffeine:
           spec: maximumSize=500,expireAfterWrite=5s
+      ribbon:
+        enabled: false
+
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: false
+      accept-single-value-as-array: true
+    serialization:
+      fail-on-empty-beans: false
+      indent-output: true
+    mapper:
+      accept-case-insensitive-properties: true
+      accept-case-insensitive-enums: true
+    default-property-inclusion: non_null
 
 springdoc:
   api-docs:
@@ -154,16 +168,19 @@ eureka:
     hostname: ${HOSTNAME:api-gateway}
     instance-id: ${spring.application.name}:${random.uuid}
     lease-renewal-interval-in-seconds: 10
-    lease-expiration-duration-in-seconds: 30
+    lease-expiration-duration-in-seconds: 20
     metadata-map:
       zone: primary
       profile: ${spring.profiles.active:prod}
+      management.context-path: ${server.servlet.context-path:/}actuator
   client:
     service-url:
       defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:13579ada}@${EUREKA_SERVER_HOST:eureka-server}:${EUREKA_SERVER_PORT:8761}/eureka/
     fetch-registry: true
     register-with-eureka: true
     registry-fetch-interval-seconds: 5
+    should-enforce-registration-at-init: true
+    enabled: true
 
 management:
   endpoints:
@@ -181,6 +198,9 @@ management:
     livenessstate:
       enabled: true
     readinessstate:
+      enabled: true
+  info:
+    env:
       enabled: true
 
 logging:
