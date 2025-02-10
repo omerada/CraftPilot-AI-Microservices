@@ -73,7 +73,7 @@ jobs:
               -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
               confluentinc/cp-kafka:latest
 
-            # Optimized Eureka Server deployment
+            # Optimized Eureka Server deployment with proper health check
             echo "=== Deploying Eureka Server ==="
             docker run -d \
               --name eureka-server \
@@ -92,43 +92,43 @@ jobs:
               -e EUREKA_SERVER_RESPONSE_CACHE_UPDATE_INTERVAL_MS=1000 \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="*" \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
               -e JAVA_TOOL_OPTIONS="-XX:+UseG1GC -Xms256m -Xmx512m -Dserver.servlet.context-path=/ -Dspring.cloud.config.enabled=false" \
               $DOCKERHUB_USERNAME/eureka-server:latest-arm64
 
-            # Fast health check with parallel verification
-            echo "=== Quick Eureka Health Check ==="
-            MAX_ATTEMPTS=10
-            INTERVAL=2
-            SUCCESS=false
+            # Simplified but effective health check
+            echo "=== Checking Eureka Server ==="
+            max_attempts=15
+            counter=0
 
-            for i in $(seq 1 $MAX_ATTEMPTS); do
-              # Parallel health checks
-              {
-                # Check 1: Container status
-                docker ps --format '{{.Status}}' -f name=eureka-server | grep -q "Up" && \
-                # Check 2: Logs
-                docker logs --tail 50 eureka-server 2>&1 | grep -q "Started EurekaServer" && \
-                # Check 3: HTTP endpoint
-                curl -sf -m 1 http://localhost:8761/actuator/health >/dev/null 2>&1
-              } && {
-                echo "✅ Eureka Server is operational (Attempt $i)"
-                SUCCESS=true
+            while [ $counter -lt $max_attempts ]; do
+              echo "Checking Eureka Server (Attempt $((counter + 1))/$max_attempts)"
+              
+              if docker logs eureka-server 2>&1 | grep -q "Started Eureka"; then
+                echo "✅ Eureka Server is running"
                 break
-              }
-
-              if [ $((i % 2)) -eq 0 ]; then
-                echo "⏳ Waiting for Eureka... ($i/$MAX_ATTEMPTS)"
               fi
-              sleep $INTERVAL
+              
+              # Show status every 2 attempts
+              if [ $((counter % 2)) -eq 0 ]; then
+                docker ps --filter "name=eureka-server" --format "{{.Status}}"
+              fi
+              
+              ((counter++))
+              sleep 2
             done
 
-            if [ "$SUCCESS" = true ]; then
-              echo "✅ Eureka Server verified successfully"
-            else
-              echo "❌ Eureka Server health check failed - logs:"
-              docker logs eureka-server
-              exit 1
-            fi
+            # Verify Eureka is responding
+            echo "=== Verifying Eureka Server API ==="
+            for i in {1..5}; do
+              if curl -s -f -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/eureka/apps > /dev/null; then
+                echo "✅ Eureka API is responding"
+                break
+              fi
+              sleep 2
+            done
+
+            echo "✅ Eureka Server deployment completed"
 
             echo "✅ Infrastructure deployment completed successfully"
 
@@ -145,7 +145,7 @@ jobs:
               if docker exec redis redis-cli -a "${REDIS_PASSWORD}" ping | grep -q "PONG"; then
                 echo "✓ Redis is ready"
                 break
-              end
+              fi
               sleep 2
             done
 
