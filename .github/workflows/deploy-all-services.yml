@@ -22,8 +22,8 @@ jobs:
           envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD
           script: |
             echo "Cleaning up existing containers..."
-            # Önce tüm containerları durdur
-            for container in redis zookeeper kafka; do
+            # Önce tüm containerları durdur ve sil
+            for container in redis zookeeper kafka eureka-server api-gateway; do
               if docker ps -a | grep -q $container; then
                 echo "Stopping and removing $container..."
                 docker stop $container || true
@@ -111,8 +111,10 @@ jobs:
 
             # Eureka başlatma
             echo "Starting Eureka Server..."
+            echo "Pulling Eureka Server image..."
             docker pull $DOCKERHUB_USERNAME/eureka-server:latest-arm64
 
+            echo "Starting Eureka Server container..."
             docker run -d \
               --name eureka-server \
               --hostname eureka-server \
@@ -130,15 +132,26 @@ jobs:
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               $DOCKERHUB_USERNAME/eureka-server:latest-arm64
 
-            # Wait for Eureka to be fully ready
+            # Enhanced Eureka health check
             echo "Waiting for Eureka to start..."
-            for i in {1..30}; do
+            max_retries=10
+            counter=0
+            while [ $counter -lt $max_retries ]; do
+              counter=$((counter + 1))
+              echo "Health check attempt $counter/$max_retries"
+              
+              if ! docker ps | grep -q "eureka-server"; then
+                echo "Container failed to start"
+                docker logs eureka-server
+                exit 1
+              fi
+
               if curl -s -f http://localhost:8761/actuator/health | grep -q "UP"; then
-                echo "✓ Eureka is ready"
+                echo "✓ Eureka Server is healthy"
                 break
               fi
-              echo -n "."
-              sleep 2
+              
+              sleep 10
             done
 
             # API Gateway deployment
