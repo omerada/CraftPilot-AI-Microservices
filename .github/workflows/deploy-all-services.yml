@@ -39,6 +39,96 @@ jobs:
               --subnet=172.20.0.0/16 \
               craftpilot-network
 
+            echo "=== Quick Infrastructure Setup ==="
+            docker-compose down -v || true
+            docker network create craftpilot-network || true
+
+            # Infrastructure services with optimized startup
+            echo "=== Starting Redis ==="
+            docker run -d \
+              --name redis \
+              --network craftpilot-network \
+              --restart unless-stopped \
+              -p 6379:6379 \
+              redis:latest redis-server --requirepass "${REDIS_PASSWORD}"
+
+            echo "=== Starting ZooKeeper ==="
+            docker run -d \
+              --name zookeeper \
+              --network craftpilot-network \
+              --restart unless-stopped \
+              -e ZOOKEEPER_CLIENT_PORT=2181 \
+              -e ZOOKEEPER_TICK_TIME=2000 \
+              confluentinc/cp-zookeeper:latest
+
+            echo "=== Starting Kafka ==="
+            docker run -d \
+              --name kafka \
+              --network craftpilot-network \
+              --restart unless-stopped \
+              -p 9092:9092 \
+              -e KAFKA_BROKER_ID=1 \
+              -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
+              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
+              -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+              confluentinc/cp-kafka:latest
+
+            # Optimized Eureka Server Deployment
+            echo "=== Deploying Eureka Server ==="
+            docker run -d \
+              --name eureka-server \
+              --hostname eureka-server \
+              --network craftpilot-network \
+              --restart unless-stopped \
+              -p 8761:8761 \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e SERVER_PORT=8761 \
+              -e EUREKA_USERNAME=craftpilot \
+              -e EUREKA_PASSWORD="${EUREKA_PASSWORD}" \
+              -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
+              -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
+              -e EUREKA_CLIENT_FETCH_REGISTRY=false \
+              -e EUREKA_SERVER_ENABLE_SELF_PRESERVATION=false \
+              -e EUREKA_SERVER_RENEWAL_PERCENT_THRESHOLD=0.49 \
+              -e EUREKA_SERVER_RESPONSE_CACHE_UPDATE_INTERVAL_MS=1000 \
+              -e EUREKA_SERVER_RESPONSE_CACHE_AUTO_EXPIRATION_IN_SECONDS=10 \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="*" \
+              -e JAVA_TOOL_OPTIONS="-Xms256m -Xmx512m -XX:+UseG1GC -Dserver.servlet.context-path=/ -Dspring.cloud.config.enabled=false" \
+              $DOCKERHUB_USERNAME/eureka-server:latest-arm64
+
+            # Quick Availability Check
+            echo "=== Checking Eureka Server ==="
+            COUNTER=0
+            MAX_TRIES=10
+            DELAY=3
+
+            while [ $COUNTER -lt $MAX_TRIES ]; do
+              echo "Check attempt $((COUNTER + 1))/$MAX_TRIES"
+              
+              # Multi-point check
+              STATUS_CHECK=$(docker ps --filter "name=eureka-server" --format "{{.Status}}" 2>/dev/null)
+              HTTP_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8761 || echo "000")
+              
+              if [ -n "$STATUS_CHECK" ] && [ "$HTTP_CHECK" = "200" ]; then
+                echo "✅ Eureka Server is up and responding"
+                break
+              elif [ -n "$STATUS_CHECK" ] && docker logs eureka-server 2>&1 | grep -q "Started Eureka"; then
+                echo "✅ Eureka Server started successfully"
+                break
+              fi
+              
+              COUNTER=$((COUNTER + 1))
+              if [ $COUNTER -eq $MAX_TRIES ]; then
+                echo "❌ Eureka Server failed to start properly"
+                docker logs eureka-server
+                exit 1
+              fi
+              
+              sleep $DELAY
+            done
+
+            echo "✅ Infrastructure deployment completed successfully"
+
             echo "=== Redis Deployment ==="
             docker run -d \
               --name redis \
@@ -52,7 +142,7 @@ jobs:
               if docker exec redis redis-cli -a "${REDIS_PASSWORD}" ping | grep -q "PONG"; then
                 echo "✓ Redis is ready"
                 break
-              fi
+              end
               sleep 2
             done
 
@@ -102,70 +192,63 @@ jobs:
               -e EUREKA_SERVER_ENABLE_SELF_PRESERVATION=false \
               -e EUREKA_SERVER_RENEWAL_PERCENT_THRESHOLD=0.85 \
               -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
-              -e JAVA_TOOL_OPTIONS="-Xms256m -Xmx512m -XX:+UseG1GC" \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="*" \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e SPRING_OUTPUT_ANSI_ENABLED=NEVER \
+              -e JAVA_TOOL_OPTIONS="-Xms256m -Xmx512m -XX:+UseG1GC -Dspring.cloud.config.enabled=false -Dmanagement.endpoint.health.probes.enabled=true" \
               $DOCKERHUB_USERNAME/eureka-server:latest-arm64
 
-            # Improved Eureka health check
-            echo "=== Waiting for Eureka Server ==="
-            max_attempts=45
-            counter=0
+            # Quick availability check
+            echo "=== Initial health check ==="
+            sleep 5
 
-            while [ $counter -lt $max_attempts ]; do
+            echo "=== Starting enhanced health checks ==="
+            max_attempts=20
+            counter=0
+            success=false
+
+            while [ $counter -lt $max_attempts ] && [ "$success" = false ]; do
               echo "Health check attempt $((counter + 1))/$max_attempts"
               
               # Container status check
               if ! docker ps --format '{{.Status}}' -f name=eureka-server | grep -q "Up"; then
-                echo "Container is not running!"
+                echo "Container failed - checking logs:"
                 docker logs eureka-server
                 exit 1
               fi
 
-              # Multiple health checks
-              EUREKA_HEALTH=false
+              # Multi-point health check
+              HEALTH_CHECK1=$(curl -s http://localhost:8761/actuator/health || echo "FAIL")
+              HEALTH_CHECK2=$(curl -s -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/actuator/info || echo "FAIL")
+              LOGS_CHECK=$(docker logs eureka-server 2>&1 | grep -c "Started EurekaServer" || echo "0")
               
-              # Method 1: Direct health check
-              if curl -sf http://localhost:8761/actuator/health > /dev/null 2>&1; then
-                echo "Health endpoint responding"
-                EUREKA_HEALTH=true
-              fi
-              
-              # Method 2: Authentication-based check
-              if curl -sf -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/eureka/apps > /dev/null 2>&1; then
-                echo "Eureka API responding"
-                EUREKA_HEALTH=true
-              fi
-              
-              # Method 3: Log-based check
-              if docker logs eureka-server 2>&1 | grep -q "Started EurekaServer"; then
-                echo "Application startup completed"
-                EUREKA_HEALTH=true
-              fi
-              
-              # If any health check passed
-              if [ "$EUREKA_HEALTH" = true ]; then
-                echo "✓ Eureka Server is healthy"
-                sleep 10  # Extra wait for stability
+              if echo "$HEALTH_CHECK1" | grep -q "UP" || \
+                 echo "$HEALTH_CHECK2" | grep -q "{" || \
+                 [ "$LOGS_CHECK" -gt "0" ]; then
+                echo "✓ Eureka Server is operational"
+                success=true
                 break
               fi
-              
-              # Show logs every few attempts
-              if [ $((counter % 3)) -eq 0 ]; then
-                echo "=== Recent Logs ==="
-                docker logs --tail 20 eureka-server
-                echo "=== End Logs ==="
+
+              # Show progress info every other attempt
+              if [ $((counter % 2)) -eq 0 ]; then
+                echo "Container status: $(docker ps --format '{{.Status}}' -f name=eureka-server)"
+                echo "Recent logs:"
+                docker logs --tail 5 eureka-server
               fi
               
               ((counter++))
-              sleep 5
+              sleep 2
             done
 
-            if [ $counter -eq $max_attempts ]; then
-              echo "Eureka Server failed to start properly"
+            if [ "$success" = false ]; then
+              echo "Eureka Server failed to start properly. Logs:"
               docker logs eureka-server
               exit 1
             fi
 
-            echo "✓ Eureka Server initialization completed"
+            echo "✓ Eureka Server verified and ready"
+            sleep 5  # Brief pause before continuing
 
             echo "Starting Redis..."
             docker run -d \
