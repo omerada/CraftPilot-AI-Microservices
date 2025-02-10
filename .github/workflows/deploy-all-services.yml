@@ -73,7 +73,7 @@ jobs:
               -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
               confluentinc/cp-kafka:latest
 
-            # Optimized Eureka Server Deployment
+            # Optimized Eureka Server deployment
             echo "=== Deploying Eureka Server ==="
             docker run -d \
               --name eureka-server \
@@ -82,50 +82,53 @@ jobs:
               --restart unless-stopped \
               -p 8761:8761 \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e SERVER_PORT=8761 \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD="${EUREKA_PASSWORD}" \
-              -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
+              -e SERVER_PORT=8761 \
               -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
               -e EUREKA_CLIENT_FETCH_REGISTRY=false \
               -e EUREKA_SERVER_ENABLE_SELF_PRESERVATION=false \
-              -e EUREKA_SERVER_RENEWAL_PERCENT_THRESHOLD=0.49 \
+              -e EUREKA_SERVER_WAIT_TIME_IN_MS_WHEN_SYNC_EMPTY=0 \
               -e EUREKA_SERVER_RESPONSE_CACHE_UPDATE_INTERVAL_MS=1000 \
-              -e EUREKA_SERVER_RESPONSE_CACHE_AUTO_EXPIRATION_IN_SECONDS=10 \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="*" \
-              -e JAVA_TOOL_OPTIONS="-Xms256m -Xmx512m -XX:+UseG1GC -Dserver.servlet.context-path=/ -Dspring.cloud.config.enabled=false" \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e JAVA_TOOL_OPTIONS="-XX:+UseG1GC -Xms256m -Xmx512m -Dserver.servlet.context-path=/ -Dspring.cloud.config.enabled=false" \
               $DOCKERHUB_USERNAME/eureka-server:latest-arm64
 
-            # Quick Availability Check
-            echo "=== Checking Eureka Server ==="
-            COUNTER=0
-            MAX_TRIES=10
-            DELAY=3
+            # Fast health check with parallel verification
+            echo "=== Quick Eureka Health Check ==="
+            MAX_ATTEMPTS=10
+            INTERVAL=2
+            SUCCESS=false
 
-            while [ $COUNTER -lt $MAX_TRIES ]; do
-              echo "Check attempt $((COUNTER + 1))/$MAX_TRIES"
-              
-              # Multi-point check
-              STATUS_CHECK=$(docker ps --filter "name=eureka-server" --format "{{.Status}}" 2>/dev/null)
-              HTTP_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8761 || echo "000")
-              
-              if [ -n "$STATUS_CHECK" ] && [ "$HTTP_CHECK" = "200" ]; then
-                echo "✅ Eureka Server is up and responding"
+            for i in $(seq 1 $MAX_ATTEMPTS); do
+              # Parallel health checks
+              {
+                # Check 1: Container status
+                docker ps --format '{{.Status}}' -f name=eureka-server | grep -q "Up" && \
+                # Check 2: Logs
+                docker logs --tail 50 eureka-server 2>&1 | grep -q "Started EurekaServer" && \
+                # Check 3: HTTP endpoint
+                curl -sf -m 1 http://localhost:8761/actuator/health >/dev/null 2>&1
+              } && {
+                echo "✅ Eureka Server is operational (Attempt $i)"
+                SUCCESS=true
                 break
-              elif [ -n "$STATUS_CHECK" ] && docker logs eureka-server 2>&1 | grep -q "Started Eureka"; then
-                echo "✅ Eureka Server started successfully"
-                break
+              }
+
+              if [ $((i % 2)) -eq 0 ]; then
+                echo "⏳ Waiting for Eureka... ($i/$MAX_ATTEMPTS)"
               fi
-              
-              COUNTER=$((COUNTER + 1))
-              if [ $COUNTER -eq $MAX_TRIES ]; then
-                echo "❌ Eureka Server failed to start properly"
-                docker logs eureka-server
-                exit 1
-              fi
-              
-              sleep $DELAY
+              sleep $INTERVAL
             done
+
+            if [ "$SUCCESS" = true ]; then
+              echo "✅ Eureka Server verified successfully"
+            else
+              echo "❌ Eureka Server health check failed - logs:"
+              docker logs eureka-server
+              exit 1
+            fi
 
             echo "✅ Infrastructure deployment completed successfully"
 
