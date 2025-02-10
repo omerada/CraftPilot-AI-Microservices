@@ -171,7 +171,7 @@ jobs:
 
             echo "✓ Eureka Server is running successfully"
 
-            # API Gateway deployment
+            # API Gateway deployment with enhanced configuration
             echo "=== Deploying API Gateway ==="
             docker pull $DOCKERHUB_USERNAME/api-gateway:latest-arm64
 
@@ -187,34 +187,55 @@ jobs:
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE="http://craftpilot:${EUREKA_PASSWORD}@eureka-server:8761/eureka/" \
               -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
               -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
-              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+              -e EUREKA_INSTANCE_LEASE_RENEWAL_INTERVAL_IN_SECONDS=30 \
+              -e EUREKA_INSTANCE_LEASE_EXPIRATION_DURATION_IN_SECONDS=90 \
+              -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=true \
+              -e EUREKA_CLIENT_FETCH_REGISTRY=true \
+              -e EUREKA_CLIENT_REGISTRY_FETCH_INTERVAL_SECONDS=30 \
               -e SPRING_CLOUD_CONFIG_ENABLED=false \
-              -e SPRING_SECURITY_BASIC_ENABLED=false \
-              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info" \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e SPRING_APPLICATION_NAME=api-gateway \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
+              -e SPRING_MAIN_ALLOW_BEAN_DEFINITION_OVERRIDING=true \
+              -e SPRING_CLOUD_LOADBALANCER_RIBBON_ENABLED=false \
+              -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
+              -e SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_LOWER_CASE_SERVICE_ID=true \
+              -e SPRING_CODEC_MAX_IN_MEMORY_SIZE=20MB \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD="${REDIS_PASSWORD}" \
+              -e JAVA_OPTS="-XX:+UseParallelGC -Xms512m -Xmx1024m -Dspring.cloud.config.enabled=false -Dspring.cloud.discovery.enabled=true" \
               $DOCKERHUB_USERNAME/api-gateway:latest-arm64
 
-            # Enhanced Gateway health check
+            # Enhanced health check with more detailed logging
             echo "=== Waiting for API Gateway ==="
-            for i in {1..30}; do
-              if curl -s -f http://localhost:8080/actuator/health | grep -q "UP"; then
-                echo "✓ API Gateway is ready"
-                exit 0
+            max_attempts=15
+            counter=0
+
+            while [ $counter -lt $max_attempts ]; do
+              echo "Health check attempt $((counter + 1))/$max_attempts"
+              
+              if docker ps --format '{{.Status}}' -f name=api-gateway | grep -q "Up"; then
+                if curl -s -f http://localhost:8080/actuator/health | grep -q "UP"; then
+                  echo "✓ API Gateway is healthy"
+                  
+                  # Check Eureka registration
+                  if curl -s -f http://localhost:8761/eureka/apps/API-GATEWAY | grep -q "api-gateway"; then
+                    echo "✓ API Gateway is registered with Eureka"
+                    exit 0
+                  fi
+                fi
               fi
-              echo -n "."
-              sleep 2
+              
+              echo "Container logs:"
+              docker logs --tail 50 api-gateway
+              
+              ((counter++))
+              sleep 20
             done
 
-            echo "=== Health Check Failed - Debug Information ==="
-            echo "Docker Status:"
-            docker ps -a | grep api-gateway
-            echo "Container Logs:"
-            docker logs api-gateway --tail 100
+            echo "API Gateway failed to start properly. Final logs:"
+            docker logs api-gateway
             exit 1
 
   deploy-core:
