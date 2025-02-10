@@ -73,8 +73,17 @@ jobs:
               -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
               confluentinc/cp-kafka:latest
 
-            # Optimized Eureka Server deployment with proper health check
+            # Optimized Eureka Server Deployment
             echo "=== Deploying Eureka Server ==="
+
+            # 1. Prepare directories and remove old container
+            echo "Preparing environment..."
+            docker stop eureka-server >/dev/null 2>&1 || true
+            docker rm eureka-server >/dev/null 2>&1 || true
+            docker pull $DOCKERHUB_USERNAME/eureka-server:latest-arm64
+
+            # 2. Start Eureka with optimized settings
+            echo "Starting Eureka Server..."
             docker run -d \
               --name eureka-server \
               --hostname eureka-server \
@@ -88,58 +97,98 @@ jobs:
               -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
               -e EUREKA_CLIENT_FETCH_REGISTRY=false \
               -e EUREKA_SERVER_ENABLE_SELF_PRESERVATION=false \
-              -e EUREKA_SERVER_WAIT_TIME_IN_MS_WHEN_SYNC_EMPTY=0 \
+              -e EUREKA_SERVER_RENEWAL_PERCENT_THRESHOLD=0.49 \
               -e EUREKA_SERVER_RESPONSE_CACHE_UPDATE_INTERVAL_MS=1000 \
+              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+              -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="*" \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-              -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
-              -e JAVA_TOOL_OPTIONS="-XX:+UseG1GC -Xms256m -Xmx512m -Dserver.servlet.context-path=/ -Dspring.cloud.config.enabled=false" \
+              -e JAVA_TOOL_OPTIONS="-Xms256m -Xmx512m -XX:+UseG1GC -Dspring.cloud.config.enabled=false" \
               $DOCKERHUB_USERNAME/eureka-server:latest-arm64
 
-            # Quick health check for Eureka Server
-            echo "=== Checking Eureka Server ==="
-            max_attempts=6
-            counter=0
-            EUREKA_READY=false
+            # 3. Smart health check function
+            check_eureka_health() {
+              local check_type=$1
+              case $check_type in
+                "container")
+                  docker ps --format '{{.Status}}' -f name=eureka-server | grep -q "Up"
+                  return $?
+                  ;;
+                "logs")
+                  docker logs eureka-server 2>&1 | grep -q "Started EurekaServer"
+                  return $?
+                  ;;
+                "health")
+                  curl -sf http://localhost:8761/actuator/health > /dev/null
+                  return $?
+                  ;;
+                "api")
+                  curl -sf -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/eureka/apps > /dev/null
+                  return $?
+                  ;;
+              esac
+              return 1
+            }
 
-            while [ $counter -lt $max_attempts ] && [ "$EUREKA_READY" = false ]; do
-              echo "Checking Eureka Server (Attempt $((counter + 1))/$max_attempts)"
+            # 4. Progressive health check implementation
+            echo "=== Verifying Eureka Server ==="
+            TOTAL_WAIT=60  # Total seconds to wait
+            INTERVAL=2     # Check interval in seconds
+            attempts=$((TOTAL_WAIT / INTERVAL))
+            success=false
+
+            for ((i=1; i<=attempts; i++)); do
+              echo -n "Attempt $i/$attempts: "
               
-              if docker ps --format '{{.Status}}' -f name=eureka-server | grep -q "Up"; then
-                # Check multiple indicators in parallel
-                {
-                  LOGS=$(docker logs eureka-server 2>&1)
-                  HEALTH=$(curl -s http://localhost:8761/actuator/health || echo "FAIL")
-                  AUTH_CHECK=$(curl -s -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/eureka/apps || echo "FAIL")
-                } &> /dev/null
-
-                if echo "$LOGS" | grep -q "Started EurekaServer" || \
-                   echo "$HEALTH" | grep -q "UP" || \
-                   echo "$AUTH_CHECK" | grep -q "applications"; then
-                  echo "✅ Eureka Server is operational"
-                  EUREKA_READY=true
-                  break
+              # Progressive checks
+              if check_eureka_health "container"; then
+                echo -n "Container UP, "
+                
+                if check_eureka_health "logs"; then
+                  echo -n "Logs OK, "
+                  
+                  if check_eureka_health "health"; then
+                    echo -n "Health OK, "
+                    
+                    if check_eureka_health "api"; then
+                      echo "API OK ✅"
+                      success=true
+                      break
+                    fi
+                  fi
                 fi
               fi
               
-              ((counter++))
-              sleep 3
+              echo "waiting..."
+              sleep $INTERVAL
+              
+              # Show detailed status every 5 attempts
+              if [ $((i % 5)) -eq 0 ]; then
+                echo "=== Status Update ==="
+                echo "Container Status: $(docker ps -a -f name=eureka-server --format '{{.Status}}')"
+                echo "Recent Logs:"
+                docker logs --tail 5 eureka-server
+                echo "===================="
+              fi
             done
 
-            if [ "$EUREKA_READY" = false ]; then
+            if [ "$success" = true ]; then
+              echo "✅ Eureka Server is fully operational"
+              
+              # Verify registration capability
+              echo "Testing registration capability..."
+              curl -X POST -H "Content-Type: application/json" -d '{"instance": {"hostName": "test","app": "TEST","vipAddress": "test","secureVipAddress": "test","ipAddr": "127.0.0.1","status": "UP"}}' \
+                http://craftpilot:"${EUREKA_PASSWORD}"@localhost:8761/eureka/apps/test || echo "Registration test completed"
+              
+              sleep 5 # Brief pause before continuing
+            else
               echo "❌ Eureka Server failed to start properly"
+              echo "=== Final Diagnostics ==="
               docker logs eureka-server
+              docker stats eureka-server --no-stream
+              netstat -tulpn | grep 8761
               exit 1
             fi
-
-            # Additional quick API verification
-            if curl -sf -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/eureka/apps > /dev/null; then
-              echo "✅ Eureka API responding"
-            else
-              echo "⚠️ Eureka API check skipped - continuing deployment"
-            fi
-
-            echo "✅ Eureka Server deployment completed"
 
             echo "✅ Infrastructure deployment completed successfully"
 
