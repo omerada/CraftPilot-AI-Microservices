@@ -157,7 +157,7 @@ jobs:
             # Paralel health check
             echo "Verifying Eureka..."
             eureka_ready=false
-            for i in {1..10}; do
+            for i in {1..20}; do
               # Container durumunu kontrol et
               if ! docker ps -q -f name=eureka-server >/dev/null 2>&1; then
                 echo "Eureka container failed!"
