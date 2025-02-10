@@ -20,34 +20,109 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: DOCKERHUB_USERNAME,EUREKA_PASSWORD,REDIS_PASSWORD
+          command_timeout: "30m" # Increased timeout
+          script_stop: true
           script: |
-            echo "Cleaning up existing containers..."
-            # Önce tüm containerları durdur ve sil
+            echo "=== Pre-deployment Cleanup ==="
+            # Quick cleanup function
+            cleanup_container() {
+              local name=$1
+              docker stop $name >/dev/null 2>&1 || true
+              docker rm $name >/dev/null 2>&1 || true
+            }
+
+            # Cleanup existing containers
             for container in redis zookeeper kafka eureka-server api-gateway; do
-              if docker ps -a | grep -q $container; then
-                echo "Stopping and removing $container..."
-                docker stop $container || true
-                docker rm $container || true
-              fi
+              cleanup_container $container
             done
 
-            echo "Setting up network..."
-            # Ağı temizle ve yeniden oluştur
-            if docker network ls | grep -q craftpilot-network; then
-              echo "Removing existing network..."
-              # Önce bağlı containerları ayır
-              for container in $(docker network inspect craftpilot-network -f '{{range .Containers}}{{.Name}} {{end}}'); do
-                docker network disconnect -f craftpilot-network $container || true
-              done
-              docker network rm craftpilot-network
-            fi
-
+            echo "=== Network Setup ==="
+            docker network rm craftpilot-network >/dev/null 2>&1 || true
             docker network create \
               --driver bridge \
               --subnet=172.20.0.0/16 \
-              --ip-range=172.20.0.0/24 \
-              --gateway=172.20.0.1 \
               craftpilot-network
+
+            echo "=== Redis Deployment ==="
+            docker run -d \
+              --name redis \
+              --network craftpilot-network \
+              --restart unless-stopped \
+              -p 6379:6379 \
+              redis:latest redis-server --requirepass "${REDIS_PASSWORD}"
+
+            # Quick Redis check
+            for i in {1..5}; do
+              if docker exec redis redis-cli -a "${REDIS_PASSWORD}" ping | grep -q "PONG"; then
+                echo "✓ Redis is ready"
+                break
+              fi
+              sleep 2
+            done
+
+            echo "=== Zookeeper Deployment ==="
+            docker run -d \
+              --name zookeeper \
+              --network craftpilot-network \
+              --restart unless-stopped \
+              -e ZOOKEEPER_CLIENT_PORT=2181 \
+              -e ZOOKEEPER_TICK_TIME=2000 \
+              confluentinc/cp-zookeeper:latest
+
+            # Wait for Zookeeper
+            sleep 10
+
+            echo "=== Kafka Deployment ==="
+            docker run -d \
+              --name kafka \
+              --network craftpilot-network \
+              --restart unless-stopped \
+              -p 9092:9092 \
+              -e KAFKA_BROKER_ID=1 \
+              -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
+              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
+              -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+              confluentinc/cp-kafka:latest
+
+            # Wait for Kafka
+            sleep 15
+
+            echo "=== Eureka Server Deployment ==="
+            docker pull $DOCKERHUB_USERNAME/eureka-server:latest-arm64
+
+            docker run -d \
+              --name eureka-server \
+              --hostname eureka-server \
+              --network craftpilot-network \
+              --restart unless-stopped \
+              -p 8761:8761 \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e EUREKA_USERNAME=craftpilot \
+              -e EUREKA_PASSWORD="${EUREKA_PASSWORD}" \
+              -e SERVER_PORT=8761 \
+              -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
+              -e EUREKA_CLIENT_FETCH_REGISTRY=false \
+              -e EUREKA_SERVER_ENABLE_SELF_PRESERVATION=false \
+              -e EUREKA_SERVER_RENEWAL_PERCENT_THRESHOLD=0.85 \
+              -e JAVA_TOOL_OPTIONS="-Xms256m -Xmx512m -XX:+UseG1GC" \
+              $DOCKERHUB_USERNAME/eureka-server:latest-arm64
+
+            # Enhanced Eureka health check
+            echo "=== Waiting for Eureka Server ==="
+            for i in {1..45}; do
+              echo "Attempt $i/45: Checking Eureka health..."
+              if curl -sf -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/actuator/health | grep -q "UP"; then
+                echo "✓ Eureka Server is healthy"
+                sleep 5  # Extra wait for full initialization
+                break
+              fi
+              if [ $i -eq 45 ]; then
+                echo "Eureka Server failed to start"
+                docker logs eureka-server
+                exit 1
+              fi
+              sleep 5
+            done
 
             echo "Starting Redis..."
             docker run -d \
