@@ -124,20 +124,17 @@ spring:
         enabled: true
         caffeine:
           spec: maximumSize=500,expireAfterWrite=5s
-      ribbon:
-        enabled: false
-
   jackson:
     deserialization:
-      fail-on-unknown-properties: false
-      accept-single-value-as-array: true
+      UNWRAP_ROOT_VALUE: true
+      FAIL_ON_UNKNOWN_PROPERTIES: false
+      ACCEPT_SINGLE_VALUE_AS_ARRAY: true
     serialization:
-      fail-on-empty-beans: false
-      indent-output: true
+      WRAP_ROOT_VALUE: true
+      FAIL_ON_EMPTY_BEANS: false
     mapper:
-      accept-case-insensitive-properties: true
-      accept-case-insensitive-enums: true
-    default-property-inclusion: non_null
+      ACCEPT_CASE_INSENSITIVE_PROPERTIES: true
+      DEFAULT_VIEW_INCLUSION: true
 
 springdoc:
   api-docs:
@@ -168,19 +165,23 @@ eureka:
     hostname: ${HOSTNAME:api-gateway}
     instance-id: ${spring.application.name}:${random.uuid}
     lease-renewal-interval-in-seconds: 10
-    lease-expiration-duration-in-seconds: 20
+    lease-expiration-duration-in-seconds: 30
     metadata-map:
       zone: primary
       profile: ${spring.profiles.active:prod}
       management.context-path: ${server.servlet.context-path:/}actuator
   client:
     service-url:
-      defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:13579ada}@${EUREKA_SERVER_HOST:eureka-server}:${EUREKA_SERVER_PORT:8761}/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://craftpilot:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
     registry-fetch-interval-seconds: 5
     should-enforce-registration-at-init: true
     enabled: true
+    use-dns-for-fetching-service-urls: false
+    registry:
+      availability-zones:
+        default: defaultZone
 
 management:
   endpoints:
@@ -198,9 +199,6 @@ management:
     livenessstate:
       enabled: true
     readinessstate:
-      enabled: true
-  info:
-    env:
       enabled: true
 
 logging:

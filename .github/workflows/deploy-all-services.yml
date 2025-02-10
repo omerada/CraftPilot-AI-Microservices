@@ -111,15 +111,11 @@ jobs:
 
             # Eureka başlatma
             echo "Starting Eureka Server..."
-            echo "Pulling Eureka Server image..."
-            docker pull $DOCKERHUB_USERNAME/eureka-server:latest-arm64
-
-            echo "Starting Eureka Server container..."
             docker run -d \
               --name eureka-server \
               --hostname eureka-server \
               --network craftpilot-network \
-              --restart unless-stopped \
+              --ip 172.20.0.13 \
               -p 8761:8761 \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
@@ -128,11 +124,21 @@ jobs:
               -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
               -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
               -e EUREKA_CLIENT_FETCH_REGISTRY=false \
-              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
-              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
-              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-              -e JAVA_OPTS="-XX:+UseParallelGC -Xms256m -Xmx512m -Dspring.cloud.config.enabled=false" \
-              $DOCKERHUB_USERNAME/eureka-server:latest-arm64
+              -e EUREKA_SERVER_ENABLE_SELF_PRESERVATION=false \
+              -e EUREKA_SERVER_RENEWAL_PERCENT_THRESHOLD=0.85 \
+              ${DOCKERHUB_USERNAME}/eureka-server:latest-arm64
+
+            # Wait for Eureka to be fully ready
+            echo "Waiting for Eureka Server to be ready..."
+            for i in {1..30}; do
+              if curl -sf -u craftpilot:"${EUREKA_PASSWORD}" http://localhost:8761/actuator/health | grep -q "UP"; then
+                echo "✓ Eureka Server is healthy"
+                sleep 10  # Additional wait to ensure full initialization
+                break
+              fi
+              echo "Attempt $i/30: Waiting for Eureka Server..."
+              sleep 5
+            done
 
             # Enhanced Eureka health check
             echo "Waiting for Eureka to start..."
