@@ -63,12 +63,15 @@ management:
         enabled: true
       group:
         readiness:
-          include: ping,db,diskSpace
+          include: "*"
+          exclude: kafka
         liveness:
           include: ping
   health:
     kafka:
       enabled: false
+    defaults:
+      enabled: true
     circuitbreakers:
       enabled: true
     livenessstate:

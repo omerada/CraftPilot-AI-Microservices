@@ -21,24 +21,34 @@ spec:
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
+            - name: MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS
+              value: "always"
+            - name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED
+              value: "true"
             - name: MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP
               value: "false"
-            - name: MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE
-              value: "ping,diskSpace"
             - name: MANAGEMENT_HEALTH_KAFKA_ENABLED
               value: "false"
+            - name: MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE
+              value: "*"
+            - name: MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_EXCLUDE
+              value: "kafka"
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 9093
-            initialDelaySeconds: 60
+            initialDelaySeconds: 90
             periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 9093
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 3
           resources:
             limits:
               memory: "512Mi"
