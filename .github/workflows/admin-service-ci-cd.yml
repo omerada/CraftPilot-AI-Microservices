@@ -90,7 +90,7 @@ jobs:
               --name admin-service \
               --network craftpilot-network \
               --restart unless-stopped \
-              -p 8063:8063 \
+              -p 8081:8081 \
               -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
@@ -119,8 +119,8 @@ jobs:
 
             # Sağlık kontrolü
             echo "Servis başlatılıyor ve sağlık kontrolü yapılıyor..."
-            for i in {1..30}; do
-              if curl -s http://localhost:8063/actuator/health | grep -q "UP"; then
+            for i in {1..12}; do
+              if curl -sf http://localhost:8081/actuator/health; then
                 echo "Servis başarıyla başlatıldı!"
                 exit 0
               fi

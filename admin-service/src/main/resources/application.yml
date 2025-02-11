@@ -1,5 +1,5 @@
 server:
-  port: 8063
+  port: 8081
   compression:
     enabled: true
     mime-types: application/json,text/plain
@@ -30,7 +30,6 @@ spring:
       timeout: 5000
       lettuce:
         pool:
-
           max-active: 8
           max-idle: 8
           min-idle: 2

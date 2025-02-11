@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-service
+  namespace: craftpilot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-service
+  template:
+    metadata:
+      labels:
+        app: kafka-service
+    spec:
+      containers:
+        - name: kafka-service
+          image: craftpilot/kafka-service:latest-arm64
+          ports:
+            - containerPort: 9093
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            - name: MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP
+              value: "false"
+            - name: MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE
+              value: "ping,diskSpace"
+            - name: MANAGEMENT_HEALTH_KAFKA_ENABLED
+              value: "false"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 9093
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 9093
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "250m"

@@ -19,7 +19,7 @@ spec:
         - name: admin-service
           image: craftpilot/admin-service:latest
           ports:
-            - containerPort: 8097
+            - containerPort: 8081
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
@@ -47,15 +47,19 @@ spec:
           livenessProbe:
             httpGet:
               path: /actuator/health
-              port: 8097
-            initialDelaySeconds: 60
+              port: 8081
+            initialDelaySeconds: 90
             periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /actuator/health
-              port: 8097
-            initialDelaySeconds: 30
+              port: 8081
+            initialDelaySeconds: 60
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
       volumes:
         - name: firebase-credentials
           secret:

@@ -382,7 +382,7 @@ services:
     image: ${DOCKERHUB_USERNAME}/admin-service:latest-arm64
     container_name: admin-service
     ports:
-      - "8063:8063"
+      - "8081:8081"
     environment:
       <<: *common-variables
       SPRING_CLOUD_GCP_SA_KEY_LOCATION: file:/app/gcp-credentials.json
@@ -401,7 +401,7 @@ services:
         condition: service_healthy
     <<: *common-deploy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8063/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3

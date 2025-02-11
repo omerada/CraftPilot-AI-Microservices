@@ -34,8 +34,8 @@ RUN yum install -y curl
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 
 # Sağlık kontrolü için bekleme
-HEALTHCHECK --interval=30s --timeout=3s \
-  CMD curl -f http://localhost:8063/actuator/health || exit 1
+HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8081/actuator/health || exit 1
 
-EXPOSE 8063
+EXPOSE 8081
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
