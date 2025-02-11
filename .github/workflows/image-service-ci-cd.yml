@@ -80,6 +80,7 @@ jobs:
             fi
 
             # Deploy Image Service
+            echo "=== Deploying Image Service ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
             docker stop image-service || true
             docker rm image-service || true
@@ -105,35 +106,59 @@ jobs:
               -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
               ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
 
-            # Wait for infrastructure to be ready
-            echo "Waiting for infrastructure services..."
+            echo "=== Waiting for initial startup ==="
             sleep 30
 
-            # Health check with more detailed output
-            echo "Starting health checks..."
-            for i in {1..30}; do
-              echo "Attempt $i: Checking service health..."
-              
-              HEALTH_STATUS=$(curl -s http://localhost:8056/actuator/health || echo "Failed to connect")
-              echo "Health status: $HEALTH_STATUS"
-              
-              if echo "$HEALTH_STATUS" | grep -q "UP"; then
-                echo "Service is healthy!"
-                exit 0
+            # Enhanced health check with detailed validation
+            echo "=== Starting comprehensive health checks ==="
+            MAX_ATTEMPTS=10
+            ATTEMPT=1
+
+            check_service_health() {
+              # Check container is running
+              if ! docker ps --format '{{.Status}}' -f name=image-service | grep -q "Up"; then
+                echo "Container is not running"
+                return 1
               fi
-              
-              if [ $i -eq 15 ]; then
-                echo "Mid-point container logs:"
+
+              # Check application logs for successful startup
+              if ! docker logs image-service 2>&1 | grep -q "Started ImageServiceApplication"; then
+                echo "Application startup not detected"
+                return 1
+              fi
+
+              # Check Eureka registration
+              if ! docker logs image-service 2>&1 | grep -q "registration status: 204"; then
+                echo "Eureka registration not confirmed"
+                return 1
+              }
+
+              # Check actuator endpoint
+              if ! curl -s http://localhost:8056/actuator/health | grep -q '"status":"UP"'; then
+                echo "Health check endpoint not responding correctly"
+                return 1
+              fi
+
+              return 0
+            }
+
+            until check_service_health; do
+              if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+                echo "=== Health Check Failed - Debug Information ==="
+                echo "Docker Status:"
+                docker ps -a | grep image-service
+                echo "Container Logs:"
                 docker logs image-service
+                exit 1
               fi
               
-              sleep 10
+              echo "Attempt $ATTEMPT/$MAX_ATTEMPTS - Waiting for service to be fully healthy..."
+              sleep 15
+              ATTEMPT=$((ATTEMPT + 1))
             done
 
-            echo "Service failed to become healthy within timeout"
-            echo "Final container logs:"
-            docker logs image-service
-            exit 1
+            echo "✅ Service is healthy and ready!"
+            exit 0
 
       - name: Trigger Deploy Services Workflow
         if: success()
