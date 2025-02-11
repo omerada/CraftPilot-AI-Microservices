@@ -11,57 +11,53 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./image-service
     steps:
       - uses: actions/checkout@v3
 
-      # QEMU kurulumu
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Grant execute permission for mvnw
+        run: |
+          cd image-service
+          chmod +x mvnw
+
+      - name: Build
+        run: |
+          cd image-service
+          ./mvnw clean package -DskipTests
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
         with:
           platforms: arm64
 
-      # Docker Buildx kurulumu
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-        with:
-          platforms: linux/arm64
 
-      # Docker Hub'a giriş yap
       - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Sadece ARM64 için build ve push
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
           context: ./image-service
           platforms: linux/arm64
           push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
-            ${{ secrets.DOCKERHUB_USERNAME }}/image-service:${{ github.sha }}-arm64
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/image-service:buildcache-arm64
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/image-service:buildcache-arm64,mode=max
-          build-args: |
-            BUILDPLATFORM=linux/arm64
-            TARGETPLATFORM=linux/arm64
-
-      # Google Cloud kimlik doğrulaması
-      - id: "auth"
-        name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v1"
-        with:
-          credentials_json: "${{ secrets.GCP_SA_KEY }}"
-
-      # Google Cloud CLI kurulumu
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
@@ -69,120 +65,75 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true
-          debug: true
-          command_timeout: "20m"
           script: |
-            echo "=== Testing SSH Connection ==="
-            whoami
-            pwd
-
-            echo "=== System Architecture ==="
-            uname -m
-
-            echo "=== Testing Directory Access ==="
-            ls -la /opt/craftpilot || mkdir -p /opt/craftpilot
-
-            echo "=== Continuing with Deployment ==="
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
-
-            echo "=== Testing Docker ==="
-            docker version
-            docker info
-            docker ps
-
-            # Docker ağını oluştur (eğer yoksa)
+            # Infrastructure containers
             docker network create craftpilot-network || true
 
-            # Redis container'ını başlat (eğer çalışmıyorsa)
+            # Start Redis if not running
             if ! docker ps | grep -q redis; then
               docker run -d \
                 --name redis \
                 --network craftpilot-network \
                 -p 6379:6379 \
                 -e REDIS_PASSWORD=13579ada \
-                redis:latest \
-                redis-server --requirepass 13579ada
+                redis:latest --requirepass 13579ada
             fi
 
-            # Eureka server'ı başlat (eğer çalışmıyorsa)
-            if ! docker ps | grep -q eureka-server; then
-              docker run -d \
-                --name eureka-server \
-                --network craftpilot-network \
-                -p 8761:8761 \
-                -e SPRING_PROFILES_ACTIVE=prod \
-                -e EUREKA_USERNAME=craftpilot \
-                -e EUREKA_PASSWORD=13579ada \
-                ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
-            fi
-
-            echo "=== Pulling ARM64 Image ==="
+            # Deploy Image Service
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
-
-            echo "=== Stopping Old Container ==="
             docker stop image-service || true
             docker rm image-service || true
 
-            echo "=== Starting New Container ==="
             docker run -d \
               --name image-service \
               --network craftpilot-network \
+              --restart unless-stopped \
               -p 8056:8056 \
-              -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
+              -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_USERNAME=craftpilot \
-              -e EUREKA_PASSWORD=13579ada \
-              -e EUREKA_HOST=eureka-server \
-              -e EUREKA_PORT=8761 \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
-              -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
+              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
+              -e SPRING_SECURITY_USER_NAME=craftpilot \
+              -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+              -e SPRING_REDIS_HOST=redis \
+              -e SPRING_REDIS_PORT=6379 \
+              -e SPRING_REDIS_PASSWORD=13579ada \
+              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
-              -e GCP_CREDENTIALS_PATH=/app/gcp-credentials.json \
+              -e IMAGE_STORAGE_BUCKET_NAME=${{ secrets.GCP_STORAGE_BUCKET }} \
+              -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
               ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
 
-            # Verify container is running and healthy
-            sleep 10
-            if ! docker ps | grep -q image-service; then
-              echo "Container failed to start"
-              docker logs image-service
-              exit 1
-            fi
+            # Wait for infrastructure to be ready
+            echo "Waiting for infrastructure services..."
+            sleep 30
 
-            # Eureka Server'ın hazır olmasını bekle
-            echo "=== Waiting for Eureka Server ==="
+            # Health check with more detailed output
+            echo "Starting health checks..."
             for i in {1..30}; do
-              if curl -f http://localhost:8761/actuator/health; then
-                echo "Eureka Server is healthy"
-                break
+              echo "Attempt $i: Checking service health..."
+              
+              HEALTH_STATUS=$(curl -s http://localhost:8056/actuator/health || echo "Failed to connect")
+              echo "Health status: $HEALTH_STATUS"
+              
+              if echo "$HEALTH_STATUS" | grep -q "UP"; then
+                echo "Service is healthy!"
+                exit 0
               fi
-              if [ $i -eq 30]; then
-                echo "Eureka Server failed to start"
-                docker logs eureka-server
-                exit 1
-              fi
-              echo "Waiting for Eureka Server... (Attempt $i/30)"
-              sleep 10
-            done
-
-            # Image Service'in başlamasını bekle
-            echo "=== Waiting for Image Service ==="
-            for i in {1..30}; do
-              if curl -f http://localhost:8056/actuator/health; then
-                echo "Image Service is healthy"
-                break
-              fi
-              if [ $i -eq 30]; then
-                echo "Image Service failed to start"
+              
+              if [ $i -eq 15 ]; then
+                echo "Mid-point container logs:"
                 docker logs image-service
-                exit 1
               fi
-              echo "Waiting for Image Service... (Attempt $i/30)"
+              
               sleep 10
             done
+
+            echo "Service failed to become healthy within timeout"
+            echo "Final container logs:"
+            docker logs image-service
+            exit 1
 
       - name: Trigger Deploy Services Workflow
         if: success()
