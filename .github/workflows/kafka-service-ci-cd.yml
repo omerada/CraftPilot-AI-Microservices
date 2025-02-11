@@ -102,7 +102,7 @@ jobs:
 
             # Health check
             for i in {1..30}; do
-              if curl -s http://localhost:9093/actuator/health | grep -q "UP"; then
+              if curl -s http://localhost:9093/actuator/health/readiness | grep -q "UP"; then
                 echo "Service is healthy"
                 exit 0
               fi

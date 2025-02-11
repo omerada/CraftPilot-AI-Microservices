@@ -63,7 +63,7 @@ management:
         enabled: true
       group:
         readiness:
-          include: kafka,diskSpace
+          include: diskSpace,ping
         liveness:
           include: ping
   health:
@@ -75,7 +75,7 @@ management:
       enabled: true
     readinessstate:
       enabled: true
-    validate-group-membership: false
+    validate-group-membership: true
 
 logging:
   pattern:
