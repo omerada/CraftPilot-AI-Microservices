@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -16,20 +16,24 @@ import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import io.lettuce.core.ClientOptions;
+import io.lettuce.core.TimeoutOptions;
 import io.lettuce.core.protocol.ProtocolVersion;
 import java.time.Duration;
 
 @Configuration
 public class RedisConfig {
 
-    @Value("${spring.redis.host:localhost}")
+    @Value("${spring.data.redis.host:redis}")
     private String redisHost;
 
-    @Value("${spring.redis.port:6379}")
+    @Value("${spring.data.redis.port:6379}")
     private int redisPort;
 
-    @Value("${spring.redis.password:13579ada}")
+    @Value("${spring.data.redis.password:13579ada}")
     private String redisPassword;
+
+    @Value("${spring.data.redis.timeout:10000}")
+    private long timeout;
 
     @Bean
     @Primary
@@ -39,15 +43,22 @@ public class RedisConfig {
         redisConfig.setPort(redisPort);
         redisConfig.setPassword(redisPassword);
         
+        ClientOptions clientOptions = ClientOptions.builder()
+            .disconnectedBehavior(ClientOptions.DisconnectedBehavior.REJECT_COMMANDS)
+            .autoReconnect(true)
+            .timeoutOptions(TimeoutOptions.enabled(Duration.ofMillis(timeout)))
+            .protocolVersion(ProtocolVersion.RESP2)
+            .build();
+
         LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
-            .clientOptions(ClientOptions.builder()
-                .protocolVersion(ProtocolVersion.RESP2)
-                .build())
-            .commandTimeout(Duration.ofSeconds(5))
+            .clientOptions(clientOptions)
+            .commandTimeout(Duration.ofMillis(timeout))
             .shutdownTimeout(Duration.ofSeconds(2))
             .build();
 
-        return new LettuceConnectionFactory(redisConfig, clientConfig);
+        LettuceConnectionFactory factory = new LettuceConnectionFactory(redisConfig, clientConfig);
+        factory.afterPropertiesSet();
+        return factory;
     }
 
     @Bean

@@ -54,8 +54,8 @@ spring:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:13579ada}
-      timeout: 2000
-      connect-timeout: 2000
+      timeout: 10000
+      connect-timeout: 10000
       client-type: lettuce
       ssl:
         enabled: false
@@ -65,7 +65,7 @@ spring:
           max-idle: 8
           min-idle: 2
           max-wait: -1ms
-        shutdown-timeout: 100ms
+        shutdown-timeout: 200ms
         cluster:
           refresh:
             adaptive: true

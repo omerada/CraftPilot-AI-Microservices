@@ -108,6 +108,10 @@ jobs:
             chmod 644 /opt/craftpilot/config/notification-service/firebase-service-account.json
             chown 65532:65532 /opt/craftpilot/config/notification-service/firebase-service-account.json
 
+            echo "#!/bin/sh
+            curl -f http://localhost:8053/actuator/health || exit 1" > /opt/craftpilot/config/notification-service/healthcheck.sh
+            chmod +x /opt/craftpilot/config/notification-service/healthcheck.sh
+
             # Create function definition in a variable to avoid semicolon issues
             FUNCTION_DEF="notificationEventConsumer;notificationEventProducer"
 
@@ -134,6 +138,7 @@ jobs:
               -v "/opt/craftpilot/config/notification-service/gcp-credentials.json:/app/credentials/gcp-credentials.json:ro" \
               -v "/opt/craftpilot/config/notification-service/firebase-service-account.json:/app/credentials/firebase-credentials.json:ro" \
               -v "/opt/craftpilot/config/notification-service/grpc-netty.properties:/app/config/grpc-netty.properties:ro" \
+              -v "/opt/craftpilot/config/notification-service/healthcheck.sh:/app/healthcheck.sh:ro" \
               -e GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-credentials.json \
               -e FIREBASE_CONFIG=/app/credentials/firebase-credentials.json \
               -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/credentials/gcp-credentials.json \
@@ -156,11 +161,6 @@ jobs:
               -e SPRING_DATA_REDIS_PORT=6379 \
               -e SPRING_DATA_REDIS_PASSWORD=13579ada \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e "JAVA_OPTS=-Xmx768m -Xms384m -XX:+UseContainerSupport -XX:+UseG1GC -Dio.netty.tryReflectionSetAccessible=true -Dio.netty.noUnsafe=true --add-opens java.base/java.time=ALL-UNNAMED --add-opens java.base/java.time.chrono=ALL-UNNAMED -Dgrpc.netty.handler.ssl.useOpenSSL=true -Dio.grpc.netty.useCustomAllocator=false --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED -Dspring.cloud.gcp.firestore.emulator.enabled=false -Dspring.cloud.gcp.firestore.enabled=true" \
-              -e SENDGRID_API_KEY='${{ secrets.SENDGRID_API_KEY }}' \
-              -e SENDGRID_FROM_EMAIL='${{ secrets.SENDGRID_FROM_EMAIL }}' \
-              -e FIREBASE_SERVICE_ACCOUNT='${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' \
-              -e SPRING_MAIL_SENDGRID_API_KEY='${{ secrets.SENDGRID_API_KEY }}' \
               -e SPRING_MAIL_SENDGRID_FROM='${{ secrets.SENDGRID_FROM_EMAIL }}' \
               -e SPRING_MAIL_HOST=smtp.sendgrid.net \
               -e SPRING_MAIL_PORT=587 \
