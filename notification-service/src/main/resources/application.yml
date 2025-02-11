@@ -57,6 +57,8 @@ spring:
       timeout: 2000
       connect-timeout: 2000
       client-type: lettuce
+      ssl:
+        enabled: false
       lettuce:
         pool:
           max-active: 8
@@ -68,7 +70,6 @@ spring:
           refresh:
             adaptive: true
             period: 30s
-      ssl: false
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
@@ -83,22 +84,6 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-
-  redis:
-    host: ${REDIS_HOST:redis}
-    port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:13579ada}
-    timeout: 2000
-    connect-timeout: 2000
-    client-type: lettuce
-    lettuce:
-      pool:
-        max-active: 8
-        max-idle: 8
-        min-idle: 2
-        max-wait: -1ms
-      shutdown-timeout: 100ms
-    ssl: false
 
   sendgrid:
     api-key: ${SENDGRID_API_KEY}
