@@ -103,12 +103,12 @@ spec:
               value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Dio.netty.transport.noNative=true"
             - name: FIREBASE_CONFIG
               value: /app/credentials/firebase-credentials.json
-            - name: SPRING_MAIL_SENDGRID_API_KEY
+            - name: SPRING_SENDGRID_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: notification-service-secrets
                   key: sendgrid-api-key
-            - name: SPRING_MAIL_SENDGRID_FROM
+            - name: SPRING_SENDGRID_FROM_EMAIL
               valueFrom:
                 configMapKeyRef:
                   name: notification-service-config

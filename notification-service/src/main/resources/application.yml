@@ -86,9 +86,9 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
   sendgrid:
-    api-key: ${SENDGRID_API_KEY}
+    api-key: ${SPRING_SENDGRID_API_KEY}
     enabled: true
-    from: ${SENDGRID_FROM_EMAIL:support@craftpilot.com}
+    from: ${SPRING_SENDGRID_FROM_EMAIL:support@craftpilot.com}
 
 management:
   endpoints:
