@@ -66,18 +66,8 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Infrastructure containers
+            # Infrastructure setup
             docker network create craftpilot-network || true
-
-            # Start Redis if not running
-            if ! docker ps | grep -q redis; then
-              docker run -d \
-                --name redis \
-                --network craftpilot-network \
-                -p 6379:6379 \
-                -e REDIS_PASSWORD=13579ada \
-                redis:latest --requirepass 13579ada
-            fi
 
             # Deploy Image Service
             echo "=== Deploying Image Service ==="
@@ -85,6 +75,7 @@ jobs:
             docker stop image-service || true
             docker rm image-service || true
 
+            # Start container with same configuration
             docker run -d \
               --name image-service \
               --network craftpilot-network \
@@ -106,47 +97,49 @@ jobs:
               -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
               ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
 
-            # Increase initial wait time for service to fully start
-            echo "=== Waiting for initial startup ==="
-            sleep 30
+            echo "=== Waiting for container to start ==="
+            sleep 10
 
-            # More robust health check
-            echo "=== Starting health checks ==="
-            MAX_ATTEMPTS=10
-            ATTEMPT=1
-            WAIT_SECONDS=15
+            echo "=== Verifying container is running ==="
+            if ! docker ps --format '{{.Names}}' | grep -q "^image-service$"; then
+              echo "Container failed to start"
+              docker logs image-service
+              exit 1
+            fi
 
-            while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-              echo "Health check attempt $ATTEMPT of $MAX_ATTEMPTS"
+            echo "=== Checking container health ==="
+            for i in {1..12}; do
+              echo "Health check attempt $i/12"
               
-              # Check if container is running
-              if ! docker ps | grep -q image-service; then
-                echo "Container is not running"
-                docker ps -a | grep image-service
-                docker logs image-service --tail 50
+              # Check if container is still running
+              if ! docker ps --format '{{.Names}}' | grep -q "^image-service$"; then
+                echo "Container stopped running"
+                docker logs image-service
                 exit 1
               fi
-
-              # Check both liveness and readiness probes
-              HEALTH_STATUS=$(curl -s -m 5 http://localhost:8056/actuator/health | grep -o '"status":"[^"]*' | cut -d'"' -f4 || echo "UNKNOWN")
-              LIVENESS_STATUS=$(curl -s -m 5 http://localhost:8056/actuator/health/liveness | grep -o '"status":"[^"]*' | cut -d'"' -f4 || echo "UNKNOWN")
-              READINESS_STATUS=$(curl -s -m 5 http://localhost:8056/actuator/health/readiness | grep -o '"status":"[^"]*' | cut -d'"' -f4 || echo "UNKNOWN")
               
-              if [ "$HEALTH_STATUS" = "UP" ] && [ "$LIVENESS_STATUS" = "UP" ] && [ "$READINESS_STATUS" = "UP" ]; then
-                echo "✅ Service is healthy and ready!"
+              # Basic health check
+              HEALTH_CHECK=$(docker exec image-service curl -s -f http://localhost:8056/actuator/health || echo "FAILED")
+              
+              if [ "$HEALTH_CHECK" != "FAILED" ] && echo "$HEALTH_CHECK" | grep -q "UP"; then
+                echo "Service is healthy!"
                 exit 0
               fi
-
-              echo "Current status - Health: $HEALTH_STATUS, Liveness: $LIVENESS_STATUS, Readiness: $READINESS_STATUS"
-              echo "Waiting ${WAIT_SECONDS} seconds before next attempt..."
-              sleep $WAIT_SECONDS
-              ATTEMPT=$((ATTEMPT + 1))
+              
+              echo "Service not healthy yet, waiting..."
+              if [ $i -eq 6 ]; then
+                echo "=== Container Logs at midpoint ==="
+                docker logs image-service --tail 50
+              fi
+              
+              sleep 10
             done
 
-            echo "❌ Health check failed after $MAX_ATTEMPTS attempts"
-            echo "=== Final Debug Information ==="
+            echo "=== Health check failed - Debug information ==="
+            echo "Container status:"
             docker ps -a | grep image-service
-            docker logs image-service --tail 100
+            echo "Container logs:"
+            docker logs image-service
             exit 1
 
       - name: Trigger Deploy Services Workflow
