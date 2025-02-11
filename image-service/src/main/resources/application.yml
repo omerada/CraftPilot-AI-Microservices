@@ -131,17 +131,26 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+      cors:
+        allowed-origins: "*"
+        allowed-methods: GET,POST
   endpoint:
     health:
       show-details: always
       probes:
         enabled: true
+      group:
+        readiness:
+          include: "*"
+        liveness:
+          include: "*"
   health:
     livenessstate:
-      enabled: ${MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED:true}
+      enabled: true
     readinessstate:
-      enabled: ${MANAGEMENT_HEALTH_READINESSSTATE_ENABLED:true}
+      enabled: true
   metrics:
     tags:
       application: ${spring.application.name}
