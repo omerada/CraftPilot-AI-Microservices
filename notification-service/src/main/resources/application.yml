@@ -71,10 +71,12 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
   redis:
-    host: ${REDIS_HOST:localhost}
+    host: ${REDIS_HOST:redis}
     port: ${REDIS_PORT:6379}
     password: ${REDIS_PASSWORD:13579ada}
     timeout: 2000
+    connect-timeout: 2000
+    client-type: lettuce
     lettuce:
       pool:
         max-active: 8
@@ -82,13 +84,7 @@ spring:
         min-idle: 2
         max-wait: -1ms
       shutdown-timeout: 100ms
-    client-type: lettuce
-    connect-timeout: 2000
-    retry:
-      max-attempts: 3
-      initial-interval: 1000
-      multiplier: 2.0
-      max-interval: 5000
+    ssl: false
 
   sendgrid:
     api-key: ${SENDGRID_API_KEY}
@@ -109,6 +105,11 @@ management:
       enabled: true
     prometheus:
       enabled: true
+  health:
+    redis:
+      enabled: true
+    db:
+      enabled: false
 
 eureka:
   client:

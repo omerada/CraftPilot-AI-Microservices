@@ -9,30 +9,50 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import io.lettuce.core.ClientOptions;
+import io.lettuce.core.protocol.ProtocolVersion;
+import java.time.Duration;
 
 @Configuration
 public class RedisConfig {
 
-    @Value("${redis.host}")
+    @Value("${spring.redis.host:localhost}")
     private String redisHost;
 
-    @Value("${redis.port}")
+    @Value("${spring.redis.port:6379}")
     private int redisPort;
+
+    @Value("${spring.redis.password:13579ada}")
+    private String redisPassword;
 
     @Bean
     @Primary
-    public ReactiveRedisConnectionFactory reactiveRedisConnectionFactory() {
-        return new LettuceConnectionFactory(new RedisStandaloneConfiguration(redisHost, redisPort));
+    public LettuceConnectionFactory redisConnectionFactory() {
+        RedisStandaloneConfiguration redisConfig = new RedisStandaloneConfiguration();
+        redisConfig.setHostName(redisHost);
+        redisConfig.setPort(redisPort);
+        redisConfig.setPassword(redisPassword);
+        
+        LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
+            .clientOptions(ClientOptions.builder()
+                .protocolVersion(ProtocolVersion.RESP2) // Use RESP2 protocol
+                .build())
+            .commandTimeout(Duration.ofSeconds(5))
+            .shutdownTimeout(Duration.ofSeconds(2))
+            .build();
+
+        return new LettuceConnectionFactory(redisConfig, clientConfig);
     }
 
     @Bean
     public ReactiveRedisTemplate<String, Notification> notificationRedisTemplate(
-            ReactiveRedisConnectionFactory connectionFactory) {
+            LettuceConnectionFactory connectionFactory) {
         StringRedisSerializer keySerializer = new StringRedisSerializer();
         Jackson2JsonRedisSerializer<Notification> valueSerializer = 
                 new Jackson2JsonRedisSerializer<>(Notification.class);
@@ -48,12 +68,12 @@ public class RedisConfig {
 
     @Bean
     public ReactiveRedisTemplate<String, NotificationPreference> preferenceRedisTemplate(
-            ReactiveRedisConnectionFactory connectionFactory) {
+            LettuceConnectionFactory connectionFactory) {
         StringRedisSerializer keySerializer = new StringRedisSerializer();
         Jackson2JsonRedisSerializer<NotificationPreference> valueSerializer = 
                 new Jackson2JsonRedisSerializer<>(NotificationPreference.class);
 
-        RedisSerializationContext.RedisSerializationContextBuilder<String, NotificationPreference> builder =
+        RedisSerializationContext.RedisSerializationContext.RedisSerializationContextBuilder<String, NotificationPreference> builder =
                 RedisSerializationContext.newSerializationContext(keySerializer);
 
         RedisSerializationContext<String, NotificationPreference> context = 
@@ -64,7 +84,7 @@ public class RedisConfig {
 
     @Bean
     public ReactiveRedisTemplate<String, NotificationTemplate> templateRedisTemplate(
-            ReactiveRedisConnectionFactory connectionFactory) {
+            LettuceConnectionFactory connectionFactory) {
         StringRedisSerializer keySerializer = new StringRedisSerializer();
         Jackson2JsonRedisSerializer<NotificationTemplate> valueSerializer = 
                 new Jackson2JsonRedisSerializer<>(NotificationTemplate.class);
@@ -77,4 +97,4 @@ public class RedisConfig {
 
         return new ReactiveRedisTemplate<>(connectionFactory, context);
     }
-} 
+}
