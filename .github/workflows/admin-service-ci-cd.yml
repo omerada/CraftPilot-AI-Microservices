@@ -90,9 +90,13 @@ jobs:
               --name admin-service \
               --network craftpilot-network \
               --restart unless-stopped \
-              -p 8081:8081 \
+              -p 8063:8063 \
               -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
+              -e SERVER_PORT=8063 \
+              -e EUREKA_INSTANCE_NONSECUREPORT=8063 \
+              -e EUREKA_INSTANCE_STATUSPAGETIMEOUT=5000 \
+              -e EUREKA_INSTANCE_HEALTHCHECKTIMEOUT=5000 \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e EUREKA_INSTANCE_PREFERIPADDRESS=true \
               -e EUREKA_CLIENT_FETCHREGISTRY=true \
@@ -120,7 +124,8 @@ jobs:
             # Sağlık kontrolü
             echo "Servis başlatılıyor ve sağlık kontrolü yapılıyor..."
             for i in {1..12}; do
-              if curl -sf http://localhost:8081/actuator/health; then
+              if curl -sf http://localhost:8063/actuator/health \ 
+                || docker exec admin-service curl -sf http://localhost:8063/actuator/health; then
                 echo "Servis başarıyla başlatıldı!"
                 exit 0
               fi

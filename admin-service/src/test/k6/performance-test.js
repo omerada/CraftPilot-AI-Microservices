@@ -14,7 +14,7 @@ export const options = {
 };
 
 export default function () {
-  const BASE_URL = __ENV.BASE_URL || "http://admin-service:8081";
+  const BASE_URL = __ENV.BASE_URL || "http://admin-service:8063";
 
   const responses = http.batch([
     ["GET", `${BASE_URL}/actuator/health`],

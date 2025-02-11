@@ -56,7 +56,7 @@ mvn spring-boot:run
 
 ```bash
 docker build -t craftpilot/admin-service .
-docker run -p 8081:8081 craftpilot/admin-service
+docker run -p 8063:8063 craftpilot/admin-service
 ```
 
 ### Kubernetes ile Deployment
@@ -67,12 +67,12 @@ kubectl apply -f k8s/
 
 ## API Dokümantasyonu
 
-Swagger UI: `http://localhost:8081/swagger-ui.html`
+Swagger UI: `http://localhost:8063/swagger-ui.html`
 
 ## Metrikler ve İzleme
 
-- Prometheus metrikleri: `http://localhost:8081/actuator/prometheus`
-- Health check: `http://localhost:8081/actuator/health`
+- Prometheus metrikleri: `http://localhost:8063/actuator/prometheus`
+- Health check: `http://localhost:8063/actuator/health`
 
 ## Güvenlik
 
