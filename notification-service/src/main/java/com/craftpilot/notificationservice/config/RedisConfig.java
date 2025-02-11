@@ -41,7 +41,7 @@ public class RedisConfig {
         
         LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
             .clientOptions(ClientOptions.builder()
-                .protocolVersion(ProtocolVersion.RESP2) // Use RESP2 protocol
+                .protocolVersion(ProtocolVersion.RESP2)
                 .build())
             .commandTimeout(Duration.ofSeconds(5))
             .shutdownTimeout(Duration.ofSeconds(2))
@@ -57,11 +57,10 @@ public class RedisConfig {
         Jackson2JsonRedisSerializer<Notification> valueSerializer = 
                 new Jackson2JsonRedisSerializer<>(Notification.class);
 
-        RedisSerializationContext.RedisSerializationContextBuilder<String, Notification> builder =
-                RedisSerializationContext.newSerializationContext(keySerializer);
-
-        RedisSerializationContext<String, Notification> context = 
-                builder.value(valueSerializer).build();
+        RedisSerializationContext<String, Notification> context = RedisSerializationContext
+                .<String, Notification>newSerializationContext(keySerializer)
+                .value(valueSerializer)
+                .build();
 
         return new ReactiveRedisTemplate<>(connectionFactory, context);
     }
@@ -73,11 +72,10 @@ public class RedisConfig {
         Jackson2JsonRedisSerializer<NotificationPreference> valueSerializer = 
                 new Jackson2JsonRedisSerializer<>(NotificationPreference.class);
 
-        RedisSerializationContext.RedisSerializationContext.RedisSerializationContextBuilder<String, NotificationPreference> builder =
-                RedisSerializationContext.newSerializationContext(keySerializer);
-
-        RedisSerializationContext<String, NotificationPreference> context = 
-                builder.value(valueSerializer).build();
+        RedisSerializationContext<String, NotificationPreference> context = RedisSerializationContext
+                .<String, NotificationPreference>newSerializationContext(keySerializer)
+                .value(valueSerializer)
+                .build();
 
         return new ReactiveRedisTemplate<>(connectionFactory, context);
     }
@@ -89,11 +87,10 @@ public class RedisConfig {
         Jackson2JsonRedisSerializer<NotificationTemplate> valueSerializer = 
                 new Jackson2JsonRedisSerializer<>(NotificationTemplate.class);
 
-        RedisSerializationContext.RedisSerializationContextBuilder<String, NotificationTemplate> builder =
-                RedisSerializationContext.newSerializationContext(keySerializer);
-
-        RedisSerializationContext<String, NotificationTemplate> context = 
-                builder.value(valueSerializer).build();
+        RedisSerializationContext<String, NotificationTemplate> context = RedisSerializationContext
+                .<String, NotificationTemplate>newSerializationContext(keySerializer)
+                .value(valueSerializer)
+                .build();
 
         return new ReactiveRedisTemplate<>(connectionFactory, context);
     }
