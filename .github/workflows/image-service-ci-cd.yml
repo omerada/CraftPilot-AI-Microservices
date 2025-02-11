@@ -115,50 +115,58 @@ jobs:
             ATTEMPT=1
 
             check_service_health() {
+              container_status=$(docker ps --format '{{.Status}}' -f name=image-service)
+              startup_log=$(docker logs image-service 2>&1 | grep "Started ImageServiceApplication" || true)
+              eureka_reg=$(docker logs image-service 2>&1 | grep "registration status: 204" || true)
+              health_check=$(curl -s http://localhost:8056/actuator/health || true)
+
               # Check container is running
-              if ! docker ps --format '{{.Status}}' -f name=image-service | grep -q "Up"; then
+              if [[ ! $container_status =~ "Up" ]]; then
                 echo "Container is not running"
                 return 1
               fi
 
               # Check application logs for successful startup
-              if ! docker logs image-service 2>&1 | grep -q "Started ImageServiceApplication"; then
+              if [ -z "$startup_log" ]; then
                 echo "Application startup not detected"
                 return 1
               fi
 
               # Check Eureka registration
-              if ! docker logs image-service 2>&1 | grep -q "registration status: 204"; then
+              if [ -z "$eureka_reg" ]; then
                 echo "Eureka registration not confirmed"
                 return 1
-              }
+              fi
 
               # Check actuator endpoint
-              if ! curl -s http://localhost:8056/actuator/health | grep -q '"status":"UP"'; then
+              if [[ ! $health_check =~ '"status":"UP"' ]]; then
                 echo "Health check endpoint not responding correctly"
                 return 1
               fi
 
+              echo "All health checks passed"
               return 0
             }
 
-            until check_service_health; do
-              if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
-                echo "=== Health Check Failed - Debug Information ==="
-                echo "Docker Status:"
-                docker ps -a | grep image-service
-                echo "Container Logs:"
-                docker logs image-service
-                exit 1
+            while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+              echo "Health check attempt $ATTEMPT of $MAX_ATTEMPTS"
+              
+              if check_service_health; then
+                echo "✅ Service is healthy and ready!"
+                exit 0
               fi
               
-              echo "Attempt $ATTEMPT/$MAX_ATTEMPTS - Waiting for service to be fully healthy..."
+              echo "Waiting before next attempt..."
               sleep 15
               ATTEMPT=$((ATTEMPT + 1))
             done
 
-            echo "✅ Service is healthy and ready!"
-            exit 0
+            echo "=== Health Check Failed - Debug Information ==="
+            echo "Docker Status:"
+            docker ps -a | grep image-service
+            echo "Container Logs:"
+            docker logs image-service
+            exit 1
 
       - name: Trigger Deploy Services Workflow
         if: success()
