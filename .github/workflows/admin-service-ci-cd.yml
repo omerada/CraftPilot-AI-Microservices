@@ -124,8 +124,8 @@ jobs:
             # Sağlık kontrolü
             echo "Servis başlatılıyor ve sağlık kontrolü yapılıyor..."
             for i in {1..12}; do
-              if curl -sf http://localhost:8063/actuator/health \ 
-                || docker exec admin-service curl -sf http://localhost:8063/actuator/health; then
+              if curl -sf http://localhost:8063/actuator/health || \
+                 docker exec admin-service curl -sf http://localhost:8063/actuator/health; then
                 echo "Servis başarıyla başlatıldı!"
                 exit 0
               fi
