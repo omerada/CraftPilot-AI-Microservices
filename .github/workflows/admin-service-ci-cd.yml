@@ -94,6 +94,11 @@ jobs:
               -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+              -e EUREKA_INSTANCE_PREFERIPADDRESS=true \
+              -e EUREKA_CLIENT_FETCHREGISTRY=true \
+              -e EUREKA_CLIENT_REGISTERWITHEUREKA=true \
+              -e EUREKA_INSTANCE_LEASERENEWALINTERVALINSECONDS=10 \
+              -e EUREKA_INSTANCE_LEASEEXPIRATIONDURATIONINSECONDS=30 \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \

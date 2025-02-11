@@ -14,8 +14,8 @@ spring:
           spec: maximumSize=500,expireAfterWrite=5s
   security:
     user:
-      name: ${EUREKA_USERNAME:craftpilot}
-      password: ${EUREKA_PASSWORD:13579ada}
+      name: craftpilot
+      password: 13579ada
 
 server:
   port: ${SERVER_PORT:8761}
@@ -53,8 +53,11 @@ eureka:
     rateLimiterBurstSize: 10
     rateLimiterRegistrationsPerSecond: 5
   security:
-    username: eureka
-    password: ${EUREKA_PASSWORD:secret}
+    basic:
+      enabled: true
+    user:
+      name: ${spring.security.user.name}
+      password: ${spring.security.user.password}
 
 management:
   endpoints:
