@@ -138,7 +138,7 @@ public class NotificationRepository {
                     .toList();
 
             } catch (ExecutionException e) {
-                if (e.getCause() instanceof com.google.firebase.firestore.FirestoreException 
+                if (e.getCause() instanceof FirestoreException 
                     && e.getCause().getMessage().contains("FAILED_PRECONDITION")) {
                     log.error("Missing Firestore index. Please create the index using the following URL: {}", 
                         extractIndexUrl(e.getMessage()));
