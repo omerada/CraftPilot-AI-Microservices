@@ -22,6 +22,7 @@ RUN mkdir -p /gcp-credentials
 # JVM ayarları
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 RUN echo "Running on ARM64 architecture"
+ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
 
 EXPOSE 8056
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]
