@@ -64,12 +64,9 @@ management:
       group:
         readiness:
           include: "*"
-          exclude: kafka
         liveness:
           include: ping
   health:
-    kafka:
-      enabled: false
     defaults:
       enabled: true
     circuitbreakers:
@@ -78,7 +75,9 @@ management:
       enabled: true
     readinessstate:
       enabled: true
-    validate-group-membership: false
+    kafka:
+      enabled: true
+    validate-group-membership: true
 
 logging:
   pattern:
