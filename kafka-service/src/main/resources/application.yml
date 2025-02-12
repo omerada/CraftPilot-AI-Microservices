@@ -55,28 +55,25 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: "*"
   endpoint:
     health:
       show-details: always
+      show-components: always
       probes:
         enabled: true
       group:
         readiness:
-          include: diskSpace,ping,"*"
+          include: ping,diskSpace
         liveness:
-          include: ping,"*"
+          include: ping
   health:
-    defaults:
-      enabled: true
-    circuitbreakers:
-      enabled: true
     livenessstate:
       enabled: true
     readinessstate:
       enabled: true
     kafka:
-      enabled: true
+      enabled: false
 
 logging:
   pattern:

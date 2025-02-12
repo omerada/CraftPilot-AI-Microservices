@@ -22,30 +22,38 @@ spec:
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
             - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
-              value: "health,info,metrics"
+              value: "*"
             - name: MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS
               value: "always"
             - name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED
               value: "true"
-            - name: MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP
+            - name: SPRING_HEALTH_KAFKA_ENABLED
               value: "false"
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: "kafka:9092"
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 9093
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 9093
-            initialDelaySeconds: 90
-            periodSeconds: 15
-            timeoutSeconds: 10
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 9093
-            initialDelaySeconds: 60
-            periodSeconds: 10
-            timeoutSeconds: 10
+            initialDelaySeconds: 45
+            periodSeconds: 15
+            timeoutSeconds: 5
             failureThreshold: 3
           resources:
             limits:
