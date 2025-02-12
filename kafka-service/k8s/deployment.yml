@@ -21,18 +21,16 @@ spec:
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
+            - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+              value: "health,info,metrics"
             - name: MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS
               value: "always"
             - name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED
               value: "true"
             - name: MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP
-              value: "true"
-            - name: MANAGEMENT_HEALTH_KAFKA_ENABLED
-              value: "true"
-            - name: MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE
-              value: "*"
-            - name: MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_EXCLUDE
-              value: "kafka"
+              value: "false"
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:9092"
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness

@@ -63,9 +63,9 @@ management:
         enabled: true
       group:
         readiness:
-          include: diskSpace,ping
+          include: diskSpace,ping,"*"
         liveness:
-          include: ping
+          include: ping,"*"
   health:
     defaults:
       enabled: true
