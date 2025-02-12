@@ -19,6 +19,6 @@ public class UserPreference implements Serializable {
     private String userId;
     private String theme;
     private String language;
-    private boolean notifications;  // Changed from emailNotifications
-    private boolean pushEnabled;    // Changed from pushNotifications
+    private Boolean emailNotifications;
+    private Boolean pushNotifications;
 }
