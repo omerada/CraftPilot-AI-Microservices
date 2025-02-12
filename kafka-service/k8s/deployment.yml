@@ -26,9 +26,9 @@ spec:
             - name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED
               value: "true"
             - name: MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP
-              value: "false"
+              value: "true"
             - name: MANAGEMENT_HEALTH_KAFKA_ENABLED
-              value: "false"
+              value: "true"
             - name: MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE
               value: "*"
             - name: MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_EXCLUDE
