@@ -1,75 +1,28 @@
 # Build stage
-FROM public.ecr.aws/amazoncorretto/amazoncorretto:21-al2023 AS build
-
-# Install required packages for build
-RUN yum update -y && \
-    yum install -y tar gzip
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 
 WORKDIR /build
+COPY pom.xml .
+COPY src ./src
 
-# Copy Maven wrapper files first
-COPY .mvn/ .mvn/
-COPY mvnw mvnw.cmd pom.xml ./
-
-# Fix permissions for mvnw
-RUN chmod +x mvnw
-
-# Download dependencies first (this layer will be cached)
-RUN ./mvnw dependency:go-offline -B
-
-# Copy source code
-COPY src ./src/
-
-# Build the application
-RUN ./mvnw clean package -DskipTests
+# Maven build
+RUN mvn clean package -DskipTests
 
 # Run stage
-FROM public.ecr.aws/amazoncorretto/amazoncorretto:21-al2023
-
-# Install required runtime packages first
-RUN yum update -y && \
-    yum install -y glibc-devel openssl-devel apr-devel && \
-    yum clean all && \
-    rm -rf /var/cache/yum
+FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
+COPY --from=build /build/target/*.jar app.jar
 
-# Create necessary directories with proper permissions
-RUN mkdir -p /app/logs /etc/gcp/credentials && \
-    chmod 755 /app/logs /etc/gcp && \
-    chmod 777 /etc/gcp/credentials
+# JVM ayarları
+ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseStringDeduplication -Xmx1G -Xms512m"
+ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
 
-# Copy and set permissions for the application jar
-COPY --from=build --chown=1000:1000 /build/target/*.jar app.jar
-RUN chmod 644 app.jar
+# Health check için curl ekle
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user
-RUN useradd -u 1000 -r -g 0 appuser && \
-    chown -R appuser:0 /app /etc/gcp && \
-    chmod -R g+rwX /app /etc/gcp
+HEALTHCHECK --interval=10s --timeout=3s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:8062/actuator/health/liveness || exit 1
 
-USER 1000
-
-# Configure JVM for container and ARM64
-ENV JAVA_OPTS="\
-    -XX:+UseContainerSupport \
-    -XX:MaxRAMPercentage=75.0 \
-    -XX:InitialRAMPercentage=50.0 \
-    -XX:+UseG1GC \
-    -XX:MaxGCPauseMillis=200 \
-    -XX:+UseStringDeduplication \
-    -XX:+HeapDumpOnOutOfMemoryError \
-    -XX:HeapDumpPath=/var/log/craftpilot/heap-dump.hprof \
-    -Djava.security.egd=file:/dev/./urandom \
-    -Dspring.output.ansi.enabled=ALWAYS \
-    -Dio.netty.tryReflectionSetAccessible=true \
-    -Dio.netty.transport.noNative=true"
-
-ENV SERVER_PORT=8060
-
-EXPOSE ${SERVER_PORT}
-
-HEALTHCHECK --interval=30s --timeout=3s \
-  CMD curl -f http://localhost:${SERVER_PORT}/actuator/health || exit 1
-
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${SERVER_PORT} -Dspring.profiles.active=prod -jar app.jar"]
+EXPOSE 8060
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]
