@@ -1,19 +1,25 @@
 package com.craftpilot.userservice.mapper;
 
-import com.craftpilot.userservice.dto.UserPreferenceResponse;
 import com.craftpilot.userservice.model.UserPreference;
-import org.springframework.stereotype.Component;
+import com.craftpilot.userservice.model.dto.UserPreferenceDto;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingConstants;
 
-@Component
-public class UserPreferenceMapper {
+@Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
+public interface UserPreferenceMapper {
     
-    public UserPreferenceResponse toResponse(UserPreference preference) {
-        return UserPreferenceResponse.builder()
-                .userId(preference.getUserId())
-                .theme(preference.getTheme())
-                .language(preference.getLanguage())
-                .notifications(preference.isNotifications())
-                .pushEnabled(preference.isPushEnabled())
-                .build();
-    }
+    @Mapping(target = "userId", source = "userId")
+    @Mapping(target = "theme", source = "theme")
+    @Mapping(target = "language", source = "language")
+    @Mapping(target = "notifications", source = "notifications")
+    @Mapping(target = "pushEnabled", source = "pushEnabled")
+    UserPreferenceDto toDto(UserPreference preference);
+
+    @Mapping(target = "userId", source = "userId")
+    @Mapping(target = "theme", source = "theme")
+    @Mapping(target = "language", source = "language")
+    @Mapping(target = "notifications", source = "notifications")
+    @Mapping(target = "pushEnabled", source = "pushEnabled")
+    UserPreference toEntity(UserPreferenceDto dto);
 }
