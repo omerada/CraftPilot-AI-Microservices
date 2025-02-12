@@ -60,6 +60,13 @@ spring:
       initial-interval: 1000
       multiplier: 2.0
       max-interval: 5000
+  data:
+    redis:
+      repositories:
+        enabled: true
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
 eureka:
   instance:
