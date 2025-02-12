@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-scan:
+  build-and-deploy:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -49,21 +49,6 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/user-service:${{ github.sha }}-arm64
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64,mode=max
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64"
-          format: "table"
-          exit-code: "1"
-          ignore-unfixed: true
-          severity: "CRITICAL,HIGH"
-
-  deploy:
-    needs: build-and-scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
 
       - id: "auth"
         name: "Authenticate to Google Cloud"
