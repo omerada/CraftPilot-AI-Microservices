@@ -100,11 +100,11 @@ jobs:
               --name image-service \
               --network craftpilot-network \
               --restart unless-stopped \
-              --health-cmd='wget -q --spider --proxy off localhost:8056/actuator/health || exit 1' \
-              --health-interval=10s \
-              --health-retries=5 \
-              --health-timeout=5s \
-              --health-start-period=30s \
+              --health-cmd="curl -f http://localhost:8056/actuator/health || exit 1" \
+              --health-interval=30s \
+              --health-retries=3 \
+              --health-timeout=10s \
+              --health-start-period=60s \
               -p 8056:8056 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -122,56 +122,60 @@ jobs:
               -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
               ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
 
-            echo "=== Waiting for container to start ==="
-            sleep 30
+            # Install curl in the container for health checks
+            docker exec image-service apt-get update && docker exec image-service apt-get install -y curl
 
-            echo "=== Checking container health ==="
-            RETRY_COUNT=0
-            MAX_RETRIES=15
-            HEALTHY=false
+            echo "=== Waiting for initial startup ==="
+            sleep 60
 
-            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-              echo "Health check attempt $((RETRY_COUNT + 1))/$MAX_RETRIES"
+            echo "=== Checking service health ==="
+            MAX_ATTEMPTS=10
+            ATTEMPT=1
+
+            while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+              echo "Health check attempt $ATTEMPT/$MAX_ATTEMPTS"
               
-              # Check container health status
-              HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' image-service)
-              
-              if [ "$HEALTH_STATUS" = "healthy" ]; then
-                echo "Container is healthy!"
-                
-                # Verify Eureka registration
-                if docker logs image-service 2>&1 | grep -q "registration status: 204"; then
-                  echo "Service is registered with Eureka!"
-                  HEALTHY=true
-                  break
-                fi
-              elif [ "$HEALTH_STATUS" = "unhealthy" ]; then
-                echo "Container is unhealthy"
-                docker logs image-service --tail 50
+              # Check container status
+              CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' image-service)
+              if [ "$CONTAINER_STATUS" != "running" ]; then
+                echo "Container is not running. Current status: $CONTAINER_STATUS"
+                docker logs image-service
                 exit 1
               fi
+
+              # Check application health
+              HEALTH_CHECK=$(docker exec image-service curl -s -w "\n%{http_code}" http://localhost:8056/actuator/health)
+              HTTP_CODE=$(echo "$HEALTH_CHECK" | tail -n1)
+              HEALTH_STATUS=$(echo "$HEALTH_CHECK" | head -n1)
               
-              # Show detailed status at midpoint
-              if [ $RETRY_COUNT -eq 7 ]; then
-                echo "=== Mid-point Status ==="
-                docker ps -a | grep image-service
-                docker inspect image-service | grep -A 10 "Health"
-                docker logs image-service --tail 50
+              if [ "$HTTP_CODE" = "200" ] && echo "$HEALTH_STATUS" | grep -q '"status":"UP"'; then
+                echo "Service is healthy!"
+                # Verify Eureka registration
+                if docker logs image-service | grep -q "registration status: 204"; then
+                  echo "Successfully registered with Eureka"
+                  exit 0
+                fi
               fi
               
-              RETRY_COUNT=$((RETRY_COUNT + 1))
-              sleep 20
+              if [ $ATTEMPT -eq 5 ]; then
+                echo "=== Mid-point debug information ==="
+                echo "Container Status:"
+                docker ps | grep image-service
+                echo "Recent Logs:"
+                docker logs image-service --tail 100
+              fi
+              
+              echo "Waiting before next attempt..."
+              sleep 30
+              ATTEMPT=$((ATTEMPT + 1))
             done
 
-            if [ "$HEALTHY" = false ]; then
-              echo "=== Health check failed - Final Debug Information ==="
-              echo "Container Status:"
-              docker ps -a | grep image-service
-              echo "Health Check Status:"
-              docker inspect image-service | grep -A 10 "Health"
-              echo "Container Logs:"
-              docker logs image-service
-              exit 1
+            echo "=== Health check failed - Debug information ==="
+            echo "Final Container Status:"
+            docker inspect image-service | grep -A 10 "Health"
+            echo "Container Logs:"
+            docker logs image-service
+            exit 1
 
       - name: Trigger Deploy Services Workflow
         if: success()
