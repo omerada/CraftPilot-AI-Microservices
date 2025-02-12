@@ -20,25 +20,29 @@ public class RedisConfig {
     
     @Bean
     public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
-            ReactiveRedisConnectionFactory connectionFactory) {
+            ReactiveRedisConnectionFactory factory, ObjectMapper objectMapper) {
+        
+        Jackson2JsonRedisSerializer<Object> serializer = new Jackson2JsonRedisSerializer<>(Object.class);
+        serializer.setObjectMapper(objectMapper);
         
         StringRedisSerializer keySerializer = new StringRedisSerializer();
-        Jackson2JsonRedisSerializer<Object> valueSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
         
         RedisSerializationContext.RedisSerializationContextBuilder<String, Object> builder =
                 RedisSerializationContext.newSerializationContext(keySerializer);
         
         RedisSerializationContext<String, Object> context = builder
-                .value(valueSerializer)
+                .value(serializer)
                 .hashKey(keySerializer)
-                .hashValue(valueSerializer)
+                .hashValue(serializer)
                 .build();
         
-        return new ReactiveRedisTemplate<>(connectionFactory, context);
+        return new ReactiveRedisTemplate<>(factory, context);
     }
 
     @Bean
     public ObjectMapper objectMapper() {
-        return new ObjectMapper();
+        ObjectMapper mapper = new ObjectMapper();
+        // Additional ObjectMapper configuration if needed
+        return mapper;
     }
 }
