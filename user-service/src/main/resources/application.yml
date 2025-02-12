@@ -65,7 +65,7 @@ spring:
   data:
     redis:
       repositories:
-        enabled: true
+        enabled: false # Disable Redis repositories since we're using custom implementation
 
 eureka:
   instance:
