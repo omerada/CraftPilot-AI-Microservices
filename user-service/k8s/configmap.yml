@@ -26,9 +26,16 @@ data:
       endpoints:
         web:
           exposure:
-            include: health,info,metrics,prometheus,loggers
+            include: health,info,metrics,prometheus,loggers,env
       endpoint:
         health:
+          probes:
+            enabled: true
+          group:
+            readiness:
+              include: db,redis,kafka
+            liveness:
+              include: ping
           show-details: always
         metrics:
           enabled: true
@@ -37,6 +44,7 @@ data:
       metrics:
         tags:
           application: ${spring.application.name}
+          environment: prod
         distribution:
           percentiles-histogram:
             http.server.requests: true
@@ -50,11 +58,13 @@ data:
         name: /app/logs/user-service.log
       pattern:
         file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
-        console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+        console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{traceId}/%X{spanId}] [%thread] %-5level %logger{36} - %msg%n"
       level:
+        root: WARN
         com.craftpilot.userservice: INFO
         org.springframework.data: INFO
         org.springframework.security: INFO
+        org.springframework.web: INFO
 
     resilience4j:
       circuitbreaker:

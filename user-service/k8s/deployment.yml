@@ -60,19 +60,29 @@ spec:
               memory: "512Mi"
               cpu: "250m"
             limits:
-              memory: "1Gi"
-              cpu: "500m"
+              memory: "1.5Gi" # Increased for better performance
+              cpu: "750m" # Increased for better performance
           livenessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/liveness
               port: 8060
-            initialDelaySeconds: 60
-            periodSeconds: 15
+            initialDelaySeconds: 90
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
           readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8060
+            initialDelaySeconds: 45
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
             httpGet:
               path: /actuator/health
               port: 8060
-            initialDelaySeconds: 30
+            failureThreshold: 30
             periodSeconds: 10
           securityContext:
             allowPrivilegeEscalation: false
