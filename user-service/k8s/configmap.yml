@@ -54,8 +54,7 @@ data:
 
     logging:
       file:
-        path: /app/logs
-        name: /app/logs/user-service.log
+        name: ${LOG_FILE:/app/logs/user-service.log}
       pattern:
         file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
         console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{traceId}/%X{spanId}] [%thread] %-5level %logger{36} - %msg%n"
