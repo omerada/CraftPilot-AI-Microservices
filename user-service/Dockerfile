@@ -34,14 +34,21 @@ RUN yum update -y && \
 
 WORKDIR /app
 
-# Create necessary directories
+# Create necessary directories with proper permissions
 RUN mkdir -p /app/logs /etc/gcp/credentials && \
-    chown -R 1000:1000 /app/logs /etc/gcp && \
-    chmod 755 /app/logs /etc/gcp
+    chmod 755 /app/logs /etc/gcp && \
+    chmod 777 /etc/gcp/credentials
+
+# Copy and set permissions for the application jar
+COPY --from=build --chown=1000:1000 /build/target/*.jar app.jar
+RUN chmod 644 app.jar
+
+# Create a non-root user
+RUN useradd -u 1000 -r -g 0 appuser && \
+    chown -R appuser:0 /app /etc/gcp && \
+    chmod -R g+rwX /app /etc/gcp
 
 USER 1000
-
-COPY --from=build --chown=1000:1000 /build/target/*.jar app.jar
 
 # Configure JVM for container and ARM64
 ENV JAVA_OPTS="\

@@ -49,6 +49,8 @@ spec:
                   key: eureka-url
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: "/etc/gcp/credentials/gcp-credentials.json"
+            - name: FIREBASE_CONFIG_PATH
+              value: "/etc/gcp/credentials/gcp-credentials.json"
           volumeMounts:
             - name: gcp-credentials
               mountPath: "/etc/gcp/credentials"
@@ -87,6 +89,8 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false
+            runAsUser: 1000
+            runAsGroup: 1000
             capabilities:
               drop:
                 - ALL
@@ -94,6 +98,7 @@ spec:
         - name: gcp-credentials
           secret:
             secretName: gcp-credentials
+            defaultMode: 0400
             items:
               - key: credentials.json
                 path: gcp-credentials.json

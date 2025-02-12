@@ -117,6 +117,12 @@ jobs:
                 ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
             fi
 
+            echo "=== Setting up GCP Credentials ==="
+            sudo mkdir -p /opt/craftpilot/gcp
+            echo '${{ secrets.GCP_SA_KEY }}' | sudo tee /opt/craftpilot/gcp/credentials.json > /dev/null
+            sudo chmod 644 /opt/craftpilot/gcp/credentials.json
+            sudo chown 1000:1000 /opt/craftpilot/gcp/credentials.json
+
             echo "=== Deploying User Service ==="
             # Force pull latest image
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
@@ -130,14 +136,16 @@ jobs:
               --network craftpilot-network \
               --restart unless-stopped \
               -p 8060:8060 \
-              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+              -v /opt/craftpilot/gcp/credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
+              -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
+              --user 1000:1000 \
               ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
 
             echo "=== Waiting for Service to Start ==="
