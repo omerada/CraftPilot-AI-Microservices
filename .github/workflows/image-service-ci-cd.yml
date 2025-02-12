@@ -117,43 +117,55 @@ jobs:
               -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
               ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
 
-            echo "=== Waiting for container to start ==="
-            sleep 20
+            echo "=== Waiting for Spring Boot to start ==="
+            sleep 30  # Increased initial wait time
 
-            echo "=== Checking container health ==="
-            for i in {1..12}; do
-              echo "Health check attempt $i/12"
+            echo "=== Checking service health ==="
+            MAX_RETRIES=15
+            RETRY_COUNT=0
+
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              echo "Health check attempt $((RETRY_COUNT + 1))/$MAX_RETRIES"
               
-              # Check if container is still running
-              if ! docker ps | grep -q "^image-service"; then
+              # Check if container is running
+              if ! docker ps --format '{{.Names}}' | grep -q "^image-service$"; then
                 echo "Container stopped running"
                 docker logs image-service
                 exit 1
               fi
+
+              # Try curl directly to the container's health endpoint
+              HEALTH_STATUS=$(curl -s -m 5 http://localhost:8056/actuator/health || echo "FAILED")
               
-              # Check Redis connection first
-              if docker exec image-service curl -s http://localhost:8056/actuator/health | grep -q '"redis":{"status":"UP"}'; then
-                echo "Redis connection is healthy"
-                if docker exec image-service curl -s http://localhost:8056/actuator/health | grep -q '"status":"UP"'; then
-                  echo "Service is fully healthy!"
-                  exit 0
+              if [ "$HEALTH_STATUS" != "FAILED" ]; then
+                if echo "$HEALTH_STATUS" | grep -q '"status":"UP"'; then
+                  # Additional verification for Eureka registration
+                  if docker logs image-service 2>&1 | grep -q "registration status: 204"; then
+                    echo "Service is healthy and registered with Eureka!"
+                    exit 0
+                  fi
                 fi
               fi
               
-              if [ $i -eq 6 ]; then
-                echo "=== Mid-point container logs ==="
+              # Show logs at specific intervals
+              if [ $RETRY_COUNT -eq 7 ]; then
+                echo "=== Mid-point Status ==="
+                echo "Container Status:"
+                docker ps | grep image-service
+                echo "Recent Logs:"
                 docker logs image-service --tail 50
               fi
               
-              sleep 10
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              sleep 20  # Increased wait between attempts
             done
 
             echo "=== Health check failed - Debug information ==="
-            echo "Docker network info:"
+            echo "Final Container Status:"
+            docker ps -a | grep image-service
+            echo "Network Status:"
             docker network inspect craftpilot-network
-            echo "Redis container status:"
-            docker logs redis --tail 20
-            echo "Image service logs:"
+            echo "Full Container Logs:"
             docker logs image-service
             exit 1
 
