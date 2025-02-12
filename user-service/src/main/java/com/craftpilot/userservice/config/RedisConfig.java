@@ -1,6 +1,7 @@
 package com.craftpilot.userservice.config;
 
 import com.craftpilot.userservice.model.UserPreference;
+import com.craftpilot.userservice.model.user.entity.UserEntity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,6 +34,26 @@ public class RedisConfig {
                 .build();
 
         return new ReactiveRedisTemplate<>(factory, context);
+    }
+
+    @Bean
+    public ReactiveRedisTemplate<String, UserEntity> reactiveRedisTemplate(
+            ReactiveRedisConnectionFactory connectionFactory) {
+        
+        StringRedisSerializer keySerializer = new StringRedisSerializer();
+        Jackson2JsonRedisSerializer<UserEntity> valueSerializer = 
+            new Jackson2JsonRedisSerializer<>(UserEntity.class);
+
+        RedisSerializationContext.RedisSerializationContextBuilder<String, UserEntity> builder =
+            RedisSerializationContext.newSerializationContext(keySerializer);
+
+        RedisSerializationContext<String, UserEntity> context = builder
+            .value(valueSerializer)
+            .hashKey(keySerializer)
+            .hashValue(valueSerializer)
+            .build();
+
+        return new ReactiveRedisTemplate<>(connectionFactory, context);
     }
 
     @Bean
