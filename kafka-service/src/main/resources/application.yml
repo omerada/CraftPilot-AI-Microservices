@@ -102,13 +102,13 @@ management:
         enabled: true
       group:
         readiness:
-          include: kafkaHealthIndicator
+          show-details: always
+          include: livenessState,readinessState
   health:
-    kafka:
+    livenessState:
       enabled: true
-    defaults:
+    readinessState:
       enabled: true
-    validate-group-membership: false
 
 logging:
   level:
