@@ -64,7 +64,7 @@ management:
         enabled: true
       group:
         readiness:
-          include: ping,diskSpace
+          include: ping,diskSpace # Removed kafka from readiness group
         liveness:
           include: ping
   health:
@@ -73,7 +73,7 @@ management:
     readinessstate:
       enabled: true
     kafka:
-      enabled: false
+      enabled: true # Changed to true to enable Kafka health checks
 
 logging:
   pattern:
