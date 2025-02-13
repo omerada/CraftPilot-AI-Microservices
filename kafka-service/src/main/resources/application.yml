@@ -67,13 +67,9 @@ management:
         enabled: true
       group:
         readiness:
-          include: ping,diskSpace,livenessState
+          include: customKafka,diskSpace,ping # Change to use our custom health indicator
         liveness:
           include: ping
-  endpoints:
-    web:
-      exposure:
-        include: "*"
   health:
     livenessstate:
       enabled: true
