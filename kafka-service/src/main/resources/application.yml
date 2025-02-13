@@ -59,6 +59,10 @@ eureka:
     health-check-url-path: /actuator/health
 
 management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
   endpoint:
     health:
       show-details: always
@@ -67,17 +71,18 @@ management:
         enabled: true
       group:
         readiness:
-          include: diskSpace,ping # Remove kafka from readiness check
+          show-details: always
+          include: diskSpace,ping,kafkaHealth
         liveness:
           include: ping
-      validate-group-membership: false # Disable group membership validation
+      validate-group-membership: false
   health:
     livenessstate:
       enabled: true
     readinessstate:
       enabled: true
-    defaults:
-      enabled: true
+    kafka:
+      enabled: false
 
 logging:
   pattern:
