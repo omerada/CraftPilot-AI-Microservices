@@ -103,12 +103,13 @@ management:
       group:
         readiness:
           show-details: always
-          include: kafka
-          additional-path: readiness
+          include: "*"
   health:
     kafka:
       enabled: true
     defaults:
+      enabled: true
+    binders:
       enabled: true
 
 logging:

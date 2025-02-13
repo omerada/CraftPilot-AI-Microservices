@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.concurrent.TimeUnit;
 
-@Component("kafka")
+@Component
 public class KafkaHealthIndicator implements HealthIndicator {
 
     private final KafkaAdmin kafkaAdmin;
