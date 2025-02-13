@@ -59,10 +59,6 @@ eureka:
     health-check-url-path: /actuator/health
 
 management:
-  endpoints:
-    web:
-      exposure:
-        include: "*"
   endpoint:
     health:
       show-details: always
@@ -74,13 +70,17 @@ management:
           include: ping,diskSpace,livenessState
         liveness:
           include: ping
+  endpoints:
+    web:
+      exposure:
+        include: "*"
   health:
     livenessstate:
       enabled: true
     readinessstate:
       enabled: true
     kafka:
-      enabled: true
+      enabled: false # Disable default Kafka health check
     defaults:
       enabled: true
 
