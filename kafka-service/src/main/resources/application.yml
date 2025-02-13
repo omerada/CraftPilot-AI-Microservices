@@ -103,11 +103,12 @@ management:
       group:
         readiness:
           show-details: always
-          include: livenessState,readinessState
+          include: kafka
+          additional-path: readiness
   health:
-    livenessState:
+    kafka:
       enabled: true
-    readinessState:
+    defaults:
       enabled: true
 
 logging:
