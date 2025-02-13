@@ -1,8 +1,9 @@
 package com.craftpilot.kafkaservice.config;
 
+import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.TopicBuilder;
@@ -12,63 +13,70 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
+@RequiredArgsConstructor
 public class KafkaConfig {
 
-    @Value("${spring.kafka.bootstrap-servers}")
-    private String bootstrapServers;
+    private final KafkaTopicsProperties topicsProperties;
 
     @Bean
     public KafkaAdmin kafkaAdmin() {
         Map<String, Object> configs = new HashMap<>();
-        configs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        configs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, 
+                   topicsProperties.getBootstrapServers());
+        configs.put(AdminClientConfig.RETRIES_CONFIG, 5);
+        configs.put(AdminClientConfig.RETRY_BACKOFF_MS_CONFIG, 1000);
+        configs.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 30000);
         return new KafkaAdmin(configs);
     }
 
     @Bean
-    public NewTopic questionEventsTopic() {
-        return TopicBuilder.name("question-events")
-                .partitions(3)
-                .replicas(1)
-                .build();
+    public NewTopic userEventsTopic() {
+        return createTopic(topicsProperties.getTopics().get("user-events"));
     }
 
     @Bean
-    public NewTopic metricsEventsTopic() {
-        return TopicBuilder.name("metrics-events")
-                .partitions(3)
-                .replicas(1)
-                .build();
+    public NewTopic subscriptionEventsTopic() {
+        return createTopic(topicsProperties.getTopics().get("subscription-events"));
     }
 
     @Bean
     public NewTopic notificationEventsTopic() {
-        return TopicBuilder.name("notification-events")
-                .partitions(3)
-                .replicas(1)
-                .build();
+        return createTopic(topicsProperties.getTopics().get("notification-events"));
     }
 
     @Bean
-    public NewTopic contentEventsTopic() {
-        return TopicBuilder.name("content-events")
-                .partitions(3)
-                .replicas(1)
-                .build();
-    }
-
-    @Bean
-    public NewTopic modelEventsTopic() {
-        return TopicBuilder.name("model-events")
-                .partitions(3)
-                .replicas(1)
-                .build();
+    public NewTopic creditEventsTopic() {
+        return createTopic(topicsProperties.getTopics().get("credit-events"));
     }
 
     @Bean
     public NewTopic imageEventsTopic() {
-        return TopicBuilder.name("image-events")
-                .partitions(3)
-                .replicas(1)
+        return createTopic(topicsProperties.getTopics().get("image-events"));
+    }
+
+    @Bean
+    public NewTopic analyticsEventsTopic() {
+        return createTopic(topicsProperties.getTopics().get("analytics-events"));
+    }
+
+    @Bean
+    public NewTopic llmEventsTopic() {
+        return createTopic(topicsProperties.getTopics().get("llm-events"));
+    }
+
+    @Bean
+    public NewTopic paymentEventsTopic() {
+        return createTopic(topicsProperties.getTopics().get("payment-events"));
+    }
+
+    private NewTopic createTopic(TopicProperties properties) {
+        return TopicBuilder.name(properties.getName())
+                .partitions(properties.getPartitions())
+                .replicas(properties.getReplicas())
+                .config("min.insync.replicas", "2")
+                .config("cleanup.policy", "delete")
+                .config("retention.ms", "604800000") // 7 days
+                .config("max.message.bytes", "1048576") // 1MB
                 .build();
     }
 }

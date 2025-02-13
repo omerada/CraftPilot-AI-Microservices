@@ -3,49 +3,83 @@ server:
   compression:
     enabled: true
     mime-types: application/json,text/plain
-    min-response-size: 1024
   shutdown: graceful
 
 spring:
   application:
     name: kafka-service
   kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    admin:
+      properties:
+        bootstrap.servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+        delete.topic.enable: true
+        auto.create.topics.enable: false
+        default.replication.factor: 3
+        min.insync.replicas: 2
+    properties:
+      security.protocol: PLAINTEXT
+      sasl.mechanism: PLAIN
+      ssl.endpoint.identification.algorithm: ""
+      reconnect.backoff.ms: 1000
+      reconnect.backoff.max.ms: 10000
+      retry.backoff.ms: 1000
+      request.timeout.ms: 30000
+      delivery.timeout.ms: 120000
+      max.block.ms: 60000
+      metadata.max.age.ms: 300000
+      metadata.max.idle.ms: 300000
+      connections.max.idle.ms: 600000
     producer:
-      bootstrap-servers: ${SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS:kafka:9092}
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
       properties:
-        spring.json.add.type.headers: false
-        retries: 5
-        delivery.timeout.ms: 180000
-        request.timeout.ms: 45000
-        retry.backoff.ms: 2000
-        max.block.ms: 90000
+        retries: 3
         acks: all
+        retry.backoff.ms: 1000
+        request.timeout.ms: 30000
     consumer:
-      bootstrap-servers: ${SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS:kafka:9092}
       group-id: ${spring.application.name}-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      properties:
-        spring.json.trusted.packages: "com.craftpilot.*"
-        isolation.level: read_committed
-        max.poll.interval.ms: 600000
-        session.timeout.ms: 60000
-        heartbeat.interval.ms: 15000
-        fetch.min.bytes: 1
-        fetch.max.wait.ms: 500
-    admin:
-      bootstrap-servers: ${SPRING_KAFKA_ADMIN_BOOTSTRAP_SERVERS:kafka:9092}
-      properties:
-        request.timeout.ms: 20000
-        retry.backoff.ms: 500
     listener:
       missing-topics-fatal: false
-    properties:
-      security.protocol: PLAINTEXT
+
+kafka:
+  topics:
+    user-events:
+      name: user-events
+      partitions: 3
+      replicas: 3
+    subscription-events:
+      name: subscription-events
+      partitions: 3
+      replicas: 3
+    notification-events:
+      name: notification-events
+      partitions: 3
+      replicas: 3
+    credit-events:
+      name: credit-events
+      partitions: 3
+      replicas: 3
+    image-events:
+      name: image-events
+      partitions: 3
+      replicas: 3
+    analytics-events:
+      name: analytics-events
+      partitions: 3
+      replicas: 3
+    llm-events:
+      name: llm-events
+      partitions: 3
+      replicas: 3
+    payment-events:
+      name: payment-events
+      partitions: 3
+      replicas: 3
 
 eureka:
   client:
@@ -55,37 +89,22 @@ eureka:
     fetch-registry: true
   instance:
     prefer-ip-address: true
-    lease-renewal-interval-in-seconds: 10
-    health-check-url-path: /actuator/health
 
 management:
   endpoints:
     web:
       exposure:
-        include: "*"
+        include: "health,info"
   endpoint:
     health:
       show-details: always
-      show-components: always
       probes:
         enabled: true
       group:
         readiness:
-          include: "diskSpace,ping" # Kafka'yı readiness grubundan çıkar
-          show-details: always
-        liveness:
-          include: "ping"
-      validate-group-membership: false
-  health:
-    kafka:
-      enabled: false # Default Kafka health check'i devre dışı bırak
+          include: kafkaHealthIndicator
 
 logging:
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
   level:
     root: INFO
     com.craftpilot: DEBUG
-    org.springframework.web: INFO
-    org.springframework.kafka: INFO
-    org.apache.kafka: WARN
