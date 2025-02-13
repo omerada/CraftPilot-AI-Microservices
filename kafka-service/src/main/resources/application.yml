@@ -67,16 +67,15 @@ management:
         enabled: true
       group:
         readiness:
-          include: customKafka,diskSpace,ping # Change to use our custom health indicator
+          include: diskSpace,ping # Remove kafka from readiness check
         liveness:
           include: ping
+      validate-group-membership: false # Disable group membership validation
   health:
     livenessstate:
       enabled: true
     readinessstate:
       enabled: true
-    kafka:
-      enabled: false # Disable default Kafka health check
     defaults:
       enabled: true
 

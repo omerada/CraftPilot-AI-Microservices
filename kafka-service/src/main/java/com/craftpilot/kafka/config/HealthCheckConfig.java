@@ -4,28 +4,31 @@ import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.core.KafkaTemplate;
 
 @Configuration
 public class HealthCheckConfig {
     
-    @Bean(name = "customKafka")  // Explicitly name the bean
-    public HealthIndicator customKafkaHealthIndicator(
-            KafkaTemplate<String, String> kafkaTemplate,
-            KafkaListenerEndpointRegistry registry) {
+    @Bean
+    @Primary
+    public HealthIndicator kafkaHealthIndicator(KafkaTemplate<String, String> kafkaTemplate) {
         return () -> {
             try {
-                // Basic connection check
-                kafkaTemplate.getDefaultTopic();
+                // Check if KafkaTemplate is properly initialized
+                if (kafkaTemplate == null || kafkaTemplate.getProducerFactory() == null) {
+                    return Health.down()
+                        .withDetail("error", "Kafka configuration is missing")
+                        .build();
+                }
+                
                 return Health.up()
-                    .withDetail("message", "Kafka connection is available")
-                    .build();
+                        .withDetail("status", "Kafka is operational")
+                        .build();
             } catch (Exception e) {
                 return Health.down()
-                    .withDetail("message", "Kafka connection is unavailable")
-                    .withDetail("error", e.getMessage())
-                    .build();
+                        .withDetail("error", e.getMessage())
+                        .build();
             }
         };
     }
