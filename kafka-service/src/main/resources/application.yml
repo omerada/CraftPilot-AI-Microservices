@@ -94,7 +94,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: "*"
   endpoint:
     health:
       show-details: always
@@ -102,10 +102,13 @@ management:
         enabled: true
       group:
         readiness:
-          include: kafka,diskSpace,ping
+          include: kafkaHealthIndicator
   health:
     kafka:
       enabled: true
+    defaults:
+      enabled: true
+    validate-group-membership: false
 
 logging:
   level:
