@@ -17,11 +17,12 @@ spring:
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
       properties:
         spring.json.add.type.headers: false
-        retries: 3
-        delivery.timeout.ms: 120000
-        request.timeout.ms: 30000
-        retry.backoff.ms: 1000
-        max.block.ms: 60000
+        retries: 5
+        delivery.timeout.ms: 180000
+        request.timeout.ms: 45000
+        retry.backoff.ms: 2000
+        max.block.ms: 90000
+        acks: all
     consumer:
       bootstrap-servers: ${SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS:kafka:9092}
       group-id: ${spring.application.name}-group
@@ -31,9 +32,11 @@ spring:
       properties:
         spring.json.trusted.packages: "com.craftpilot.*"
         isolation.level: read_committed
-        max.poll.interval.ms: 300000
-        session.timeout.ms: 45000
-        heartbeat.interval.ms: 10000
+        max.poll.interval.ms: 600000
+        session.timeout.ms: 60000
+        heartbeat.interval.ms: 15000
+        fetch.min.bytes: 1
+        fetch.max.wait.ms: 500
     admin:
       bootstrap-servers: ${SPRING_KAFKA_ADMIN_BOOTSTRAP_SERVERS:kafka:9092}
       properties:

@@ -90,15 +90,17 @@ jobs:
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
-              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka-service:9092 \
-              -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT \
+              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,INTERNAL://localhost:29092 \
+              -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT \
               -e KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT \
               -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+              -e KAFKA_AUTO_CREATE_TOPICS_ENABLE=true \
+              -e KAFKA_NUM_PARTITIONS=3 \
               ${{ secrets.DOCKERHUB_USERNAME }}/kafka-service:latest-arm64
 
-            # Wait for service to be ready
+            # Increase initial wait time
             echo "Waiting for service to start..."
-            sleep 30
+            sleep 60
 
             # Health check
             for i in {1..30}; do
