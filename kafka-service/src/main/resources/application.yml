@@ -71,18 +71,14 @@ management:
         enabled: true
       group:
         readiness:
+          include: "diskSpace,ping" # Kafka'yı readiness grubundan çıkar
           show-details: always
-          include: diskSpace,ping,kafkaHealth
         liveness:
-          include: ping
+          include: "ping"
       validate-group-membership: false
   health:
-    livenessstate:
-      enabled: true
-    readinessstate:
-      enabled: true
     kafka:
-      enabled: false
+      enabled: false # Default Kafka health check'i devre dışı bırak
 
 logging:
   pattern:
