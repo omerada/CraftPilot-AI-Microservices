@@ -94,7 +94,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: "health,info"
+        include: health,info
   endpoint:
     health:
       show-details: always
@@ -103,6 +103,9 @@ management:
       group:
         readiness:
           include: kafkabroker
+  health:
+    kafka:
+      enabled: true
 
 logging:
   level:
