@@ -42,6 +42,10 @@ spring:
       properties:
         request.timeout.ms: 20000
         retry.backoff.ms: 500
+    listener:
+      missing-topics-fatal: false
+    properties:
+      security.protocol: PLAINTEXT
 
 eureka:
   client:
@@ -67,7 +71,7 @@ management:
         enabled: true
       group:
         readiness:
-          include: ping,diskSpace # Removed kafka from readiness group
+          include: ping,diskSpace,livenessState
         liveness:
           include: ping
   health:
@@ -76,7 +80,9 @@ management:
     readinessstate:
       enabled: true
     kafka:
-      enabled: true # Changed to true to enable Kafka health checks
+      enabled: true
+    defaults:
+      enabled: true
 
 logging:
   pattern:
