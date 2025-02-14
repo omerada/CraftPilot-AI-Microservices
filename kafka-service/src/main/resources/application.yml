@@ -112,21 +112,11 @@ management:
         enabled: true
       group:
         readiness:
-          show-details: always
-          include: readinessState,db,diskSpace
+          include: diskSpace,kafkaHealthIndicator
         liveness:
           include: livenessState
-      validate-group-membership: false
   health:
-    kafka:
-      enabled: true
     defaults:
-      enabled: true
-    binders:
-      enabled: true
-    livenessState:
-      enabled: true
-    readinessState:
       enabled: true
 
 logging:
