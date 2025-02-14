@@ -11,20 +11,18 @@ spring:
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     admin:
+      auto-create: false
+      fail-fast: true
       properties:
-        bootstrap.servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-        delete.topic.enable: true
-        auto.create.topics.enable: false
-        default.replication.factor: 3
-        min.insync.replicas: 2
+        bootstrap.servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     properties:
       security.protocol: PLAINTEXT
+      reconnect.backoff.ms: 1000
+      request.timeout.ms: 30000
       sasl.mechanism: PLAIN
       ssl.endpoint.identification.algorithm: ""
-      reconnect.backoff.ms: 1000
       reconnect.backoff.max.ms: 10000
       retry.backoff.ms: 1000
-      request.timeout.ms: 30000
       delivery.timeout.ms: 120000
       max.block.ms: 60000
       metadata.max.age.ms: 300000
@@ -111,20 +109,18 @@ management:
       probes:
         enabled: true
       group:
-        readiness:
-          show-details: always
-          include: "*"
         liveness:
-          include: ping
-      validate-group-membership: false
+          include: livenessState,diskSpace
+        readiness:
+          include: readinessState
   health:
-    kafka:
-      enabled: true
-    defaults:
-      enabled: true
     livenessstate:
       enabled: true
     readinessstate:
+      enabled: true
+    kafka:
+      enabled: true
+    binders:
       enabled: true
 
 logging:
