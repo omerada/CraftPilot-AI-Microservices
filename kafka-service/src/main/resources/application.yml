@@ -99,22 +99,20 @@ eureka:
     prefer-ip-address: true
 
 management:
-  endpoint:
-    health:
-      show-details: always
-      validate-group-membership: false
-      probes:
-        enabled: true
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+      show-components: always
   health:
-    defaults:
+    livenessstate:
       enabled: true
-    diskspace:
-      enabled: true
-    ping:
+    readinessstate:
       enabled: true
 
 logging:
