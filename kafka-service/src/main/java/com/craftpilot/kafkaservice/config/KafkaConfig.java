@@ -3,9 +3,13 @@ package com.craftpilot.kafkaservice.config;
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.springframework.boot.actuate.autoconfigure.health.ConditionalOnEnabledHealthIndicator;
+import org.springframework.boot.actuate.autoconfigure.health.HealthContributorAutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.KafkaAdmin;
 
@@ -13,6 +17,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
+@EnableKafka
+@Import(HealthContributorAutoConfiguration.class)
+@ConditionalOnEnabledHealthIndicator("health")
 @RequiredArgsConstructor
 public class KafkaConfig {
 

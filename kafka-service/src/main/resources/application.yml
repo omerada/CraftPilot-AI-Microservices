@@ -112,11 +112,16 @@ management:
         enabled: true
       group:
         readiness:
-          include: ping,kafkaHealthIndicator
+          show-details: always
+          include: ping
         liveness:
           include: ping
   health:
-    defaults:
+    defaults:e
+      enabled: true
+    livenessstate:
+      enabled: true
+    readinessstate:
       enabled: true
 
 logging:
