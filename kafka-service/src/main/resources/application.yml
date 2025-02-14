@@ -9,7 +9,7 @@ spring:
   application:
     name: kafka-service
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     admin:
       properties:
         bootstrap.servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
@@ -29,7 +29,11 @@ spring:
       max.block.ms: 60000
       metadata.max.age.ms: 300000
       metadata.max.idle.ms: 300000
-      connections.max.idle.ms: 600000
+      connections.max.idle.ms: 180000
+      max.poll.interval.ms: 300000
+      session.timeout.ms: 45000
+      heartbeat.interval.ms: 15000
+      max.poll.records: 500
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -38,11 +42,17 @@ spring:
         acks: all
         retry.backoff.ms: 1000
         request.timeout.ms: 30000
+        batch-size: 16384
+        buffer-memory: 33554432
+        compression-type: snappy
     consumer:
       group-id: ${spring.application.name}-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+      max-poll-records: 500
+      isolation-level: read_committed
     listener:
       missing-topics-fatal: false
 
@@ -94,7 +104,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: "*"
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
@@ -104,12 +114,19 @@ management:
         readiness:
           show-details: always
           include: "*"
+          include: readinessState,kafka
+        liveness:
+          include: livenessState
   health:
     kafka:
       enabled: true
     defaults:
       enabled: true
     binders:
+      enabled: true
+    livenessState:
+      enabled: true
+    readinessState:
       enabled: true
 
 logging:
