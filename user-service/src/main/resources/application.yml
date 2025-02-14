@@ -1,50 +1,10 @@
 spring:
   application:
     name: user-service
-  cloud:
-    gcp:
-      project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
-      credentials:
-        location: ${GOOGLE_APPLICATION_CREDENTIALS:/app/config/firebase-service-account.json}
-      firestore:
-        enabled: true
-        project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
-        database-id: ${GCP_FIRESTORE_DATABASE_ID:default}
-  kafka:
-    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
-    producer:
-      acks: 1
-      retries: 3
-      batch-size: 16384
-      buffer-memory: 33554432
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      compression-type: snappy
-      properties:
-        spring.json.add.type.headers: false
-        linger.ms: 5
-    consumer:
-      group-id: userservice-group
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
-  cache:
-    type: redis
-    redis:
-      time-to-live: 3600000
-      cache-null-values: false
-      use-key-prefix: true
-      key-prefix: craftpilot
-      repositories:
-        enabled: false
-  autoconfigure:
-    exclude: org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
   redis:
     host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:13579ada}
+    password: ${REDIS_PASSWORD:}
     timeout: 2000
     lettuce:
       pool:
@@ -53,138 +13,38 @@ spring:
         min-idle: 2
         max-wait: -1ms
       shutdown-timeout: 100ms
-    client-type: lettuce
-    connect-timeout: 2000
-    retry:
-      max-attempts: 3
-      initial-interval: 1000
-      multiplier: 2.0
-      max-interval: 5000
-    repositories:
-      enabled: true
-  data:
-    redis:
-      repositories:
-        enabled: false # Disable Redis repositories since we're using custom implementation
 
 eureka:
   instance:
     prefer-ip-address: true
-    lease-renewal-interval-in-seconds: 30
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_SERVER_URL:http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:13579ada}@localhost:8761/eureka/}
-    registry-fetch-interval-seconds: 5
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
     register-with-eureka: true
     fetch-registry: true
 
 server:
-  port: ${SERVER_PORT:8060}
-  shutdown: graceful
-  http2:
-    enabled: true
+  port: ${SERVER_PORT:8080}
 
-  compression:
-    enabled: true
-    mime-types: application/json,application/xml,text/plain
-    min-response-size: 1024
-
-logging:
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-  level:
-    com.craftpilot.userservice: DEBUG
-    org.springframework.web: INFO
-    org.springframework.security: INFO
-    org.springframework.cache: DEBUG
-    org.springframework.data.redis: INFO
-    org.springframework.kafka: INFO
-    com.google.cloud: DEBUG
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus,info
+  endpoint:
+    health:
+      show-details: always
 
 springdoc:
   api-docs:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
-    operationsSorter: method
-    tagsSorter: alpha
-  show-actuator: true
-
-firebase:
-  credential:
-    path: ${FIREBASE_CREDENTIAL_PATH:/app/config/firebase-service-account.json}
-  project:
-    id: ${GCP_PROJECT_ID:craft-pilot-ai}
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,metrics,prometheus,info,env
-  endpoint:
-    health:
-      show-details: always
-      probes:
-        enabled: true
-      group:
-        readiness:
-          include: kafka
-        liveness:
-          include: ping
-  metrics:
-    tags:
-      application: ${spring.application.name}
-    distribution:
-      percentiles-histogram:
-        http.server.requests: true
-    enable:
-      jvm: true
-      process: true
-      system: true
-    export:
-      prometheus:
-        enabled: true
-        step: 1m
 
 resilience4j:
   circuitbreaker:
     instances:
-      userService:
-        slidingWindowSize: 100
-        failureRateThreshold: 50
-        waitDurationInOpenState: 10s
-        permittedNumberOfCallsInHalfOpenState: 10
-        automaticTransitionFromOpenToHalfOpenEnabled: true
-    configs:
-      default:
+      userPreferences:
         slidingWindowSize: 10
         failureRateThreshold: 50
-        permittedNumberOfCallsInHalfOpenState: 3
-  bulkhead:
-    instances:
-      userService:
-        maxConcurrentCalls: 100
-  timelimiter:
-    instances:
-      userService:
-        timeoutDuration: 5s
-        cancelRunningFuture: true
-  ratelimiter:
-    configs:
-      default:
-        limitForPeriod: 100
-        limitRefreshPeriod: 1s
-        timeoutDuration: 0s
-
-cloud:
-  loadbalancer:
-    cache:
-      enabled: true
-      caffeine:
-        spec: maximumSize=500,expireAfterWrite=5s
-
-health:
-  redis:
-    enabled: true
-  diskspace:
-    enabled: true
+        waitDurationInOpenState: 10s
