@@ -113,10 +113,10 @@ management:
       group:
         readiness:
           show-details: always
-          include: "*"
-          include: readinessState,kafka
+          include: readinessState,db,diskSpace
         liveness:
           include: livenessState
+      validate-group-membership: false
   health:
     kafka:
       enabled: true
