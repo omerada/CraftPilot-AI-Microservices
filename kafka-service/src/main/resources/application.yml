@@ -99,17 +99,23 @@ eureka:
     prefer-ip-address: true
 
 management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
   endpoint:
     health:
       show-details: always
       probes:
         enabled: true
-      show-components: always
+      group:
+        liveness:
+          include: livenessState,customKafkaHealthIndicator
+        readiness:
+          include: readinessState,customKafkaHealthIndicator
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
   health:
+    kafka:
+      enabled: false
     livenessstate:
       enabled: true
     readinessstate:
