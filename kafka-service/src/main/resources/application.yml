@@ -113,11 +113,14 @@ management:
       group:
         readiness:
           show-details: always
-          include: ping
+          include: "*"
         liveness:
           include: ping
+      validate-group-membership: false
   health:
-    defaults:e
+    kafka:
+      enabled: true
+    defaults:
       enabled: true
     livenessstate:
       enabled: true
