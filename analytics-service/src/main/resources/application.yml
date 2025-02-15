@@ -8,9 +8,7 @@ server:
 
 spring:
   application:
-    name: analytics-service
-  config:
-    import: classpath:application-kafka.yml
+    name: analytics-service 
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
     include: kafka-base

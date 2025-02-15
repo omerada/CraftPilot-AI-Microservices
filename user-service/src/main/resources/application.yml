@@ -1,6 +1,4 @@
 spring:
-  config:
-    import: classpath:application-kafka.yml
   application:
     name: user-service
   profiles:
