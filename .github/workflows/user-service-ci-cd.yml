@@ -89,13 +89,7 @@ jobs:
               echo "Docker is not running. Starting Docker..."
               sudo systemctl start docker
             fi
-
-            echo "=== Setting up GCP Credentials ==="
-            sudo mkdir -p /opt/craftpilot/gcp
-            echo '${{ secrets.GCP_SA_KEY }}' | sudo tee /opt/craftpilot/gcp/credentials.json > /dev/null
-            sudo chmod 644 /opt/craftpilot/gcp/credentials.json
-            sudo chown 1000:1000 /opt/craftpilot/gcp/credentials.json
-
+            
             echo "=== Deploying User Service ==="
             # Force pull latest image
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
