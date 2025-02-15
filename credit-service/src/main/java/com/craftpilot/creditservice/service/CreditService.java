@@ -63,10 +63,13 @@ public class CreditService {
                 .doOnSuccess(transaction -> {
                     meterRegistry.counter("credit.transactions", "type", transaction.getType().toString()).increment();
                     kafkaTemplate.send(creditEventsTopic, userId, new CreditEvent(transaction))
-                        .addCallback(
-                            result -> log.debug("Credit event sent successfully for user: {}", userId),
-                            ex -> log.error("Failed to send credit event for user: {}", userId, ex)
-                        );
+                        .whenComplete((result, ex) -> {
+                            if (ex != null) {
+                                log.error("Failed to send credit event for user: {}", userId, ex);
+                            } else {
+                                log.debug("Credit event sent successfully for user: {}", userId);
+                            }
+                        });
                 })
                 .doOnError(error -> log.error("Error processing credit transaction", error));
     }
