@@ -8,6 +8,7 @@
         <groupId>com.craftpilot</groupId>
         <artifactId>craft-pilot-parent</artifactId>
         <version>1.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <groupId>com.craftpilot</groupId>
@@ -306,4 +307,4 @@
             </plugin>
         </plugins>
     </build>
-</project> 
+</project>

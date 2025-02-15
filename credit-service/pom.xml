@@ -8,9 +8,9 @@
         <groupId>com.craftpilot</groupId>
         <artifactId>craft-pilot-parent</artifactId>
         <version>1.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <groupId>com.craftpilot</groupId>
     <artifactId>credit-service</artifactId>
     <version>1.0.0</version>
     <name>credit-service</name>
@@ -64,7 +64,7 @@
             </exclusions>
         </dependency>
         
-        <!-- Shared Config -->
+        <!-- Shared Config - Bu bağımlılığın versiyonu parent POM ile aynı olmalı -->
         <dependency>
             <groupId>com.craftpilot</groupId>
             <artifactId>shared-config</artifactId>
@@ -211,4 +211,4 @@
         </profile>
     </profiles>
 
-</project> 
+</project>

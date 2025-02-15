@@ -1,5 +1,5 @@
 # Build stage
-FROM public.ecr.aws/amazoncorretto/amazoncorretto:21 AS build
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
 
 WORKDIR /build
 
@@ -8,7 +8,7 @@ RUN yum install -y tar gzip
 
 # Maven wrapper ve bağımlılıkları kopyala
 COPY .mvn/ .mvn/
-COPY mvnw pom.xml ./
+COPY mvnw pom.xml ./ 
 RUN chmod +x mvnw
 RUN ./mvnw dependency:go-offline
 
@@ -16,26 +16,16 @@ RUN ./mvnw dependency:go-offline
 COPY src ./src/
 RUN ./mvnw clean package -DskipTests
 
-# Run stage
-FROM public.ecr.aws/amazoncorretto/amazoncorretto:21
+# Copy the local Maven repository from the build context
+COPY target/*.jar app.jar
+
+# Final stage
+FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-# Uygulama dizinini oluştur
-RUN mkdir -p /app/config
+# Copy the built artifact from builder stage
+COPY --from=builder app.jar app.jar
 
-# JAR dosyasını kopyala
-COPY --from=build /build/target/*.jar app.jar
-
-# curl yükle (health check için)
-RUN yum install -y curl
-
-# JVM ayarları
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
-
-# Sağlık kontrolü için bekleme
-HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8063/actuator/health || exit 1
-
-EXPOSE 8063
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+# Set the entrypoint
+ENTRYPOINT ["java", "-jar", "app.jar"]

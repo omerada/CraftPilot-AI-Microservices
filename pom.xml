@@ -3,39 +3,34 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.2</version>
+        <relativePath/>
+    </parent>
+
     <groupId>com.craftpilot</groupId>
-    <artifactId>craftpilot-main</artifactId>
+    <artifactId>craft-pilot-parent</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <modules>
-        <!-- 1. Service Discovery -->
-        <module>eureka-server</module> 
-		
-        <module>kafka-service</module>
+        <!-- Core dependencies first -->
+        <module>shared-config</module>
         
-        <!-- 3. Infrastructure Services -->
-        <module>redis-service</module>
-        
-        <!-- 4. Core Services -->
+        <!-- Then other modules -->
+        <module>eureka-server</module>
+        <module>api-gateway</module>
         <module>user-service</module>
-        <module>subscription-service</module>
         <module>credit-service</module>
-        
-        <!-- 5. AI and Processing Services --> 
+        <module>subscription-service</module>
+        <module>notification-service</module>
+        <module>analytics-service</module>
+        <module>admin-service</module>
+        <module>redis-service</module>
         <module>llm-service</module>
         <module>image-service</module>
-        
-        <!-- 6. Content and Analytics Services -->
-        <module>analytics-service</module>
-        
-        <!-- 7. Support Services -->
-        <module>notification-service</module>
-        <module>admin-service</module>
-        
-        <!-- 2. API Gateway -->
-        <module>api-gateway</module>
-        <module>shared-config</module>
     </modules>
 
     <properties>
