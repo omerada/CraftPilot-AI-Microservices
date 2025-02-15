@@ -113,7 +113,8 @@ jobs:
               -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
               -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_URI=http://eureka-server:8761/eureka \
+              -e EUREKA_HOST=eureka-server \
+              -e EUREKA_PORT=8761 \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
