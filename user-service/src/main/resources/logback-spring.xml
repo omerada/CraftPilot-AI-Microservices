@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
-    
-    <springProperty scope="context" name="applicationName" source="spring.application.name"/>
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
     
     <appender name="Console" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -10,34 +8,7 @@
         </encoder>
     </appender>
 
-    <appender name="File" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>logs/${applicationName}.log</file>
-        <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>logs/${applicationName}.%d{yyyy-MM-dd}.log</fileNamePattern>
-            <maxHistory>30</maxHistory>
-        </rollingPolicy>
-    </appender>
-
-    <appender name="Logstash" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>logs/${applicationName}-json.log</file>
-        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-            <includeMdcKeyName>correlationId</includeMdcKeyName>
-            <customFields>{"app_name":"${applicationName}"}</customFields>
-        </encoder>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>logs/${applicationName}-json.%d{yyyy-MM-dd}.log</fileNamePattern>
-            <maxHistory>7</maxHistory>
-        </rollingPolicy>
-    </appender>
-
     <root level="INFO">
         <appender-ref ref="Console"/>
-        <appender-ref ref="File"/>
-        <appender-ref ref="Logstash"/>
     </root>
-    
-    <logger name="com.craftpilot" level="DEBUG"/>
 </configuration>
