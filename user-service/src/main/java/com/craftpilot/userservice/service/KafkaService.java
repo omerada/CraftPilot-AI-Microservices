@@ -1,46 +1,42 @@
 package com.craftpilot.userservice.service;
 
-import com.craftpilot.userservice.event.UserEvent;
 import com.craftpilot.userservice.model.user.entity.UserEntity;
+import com.craftpilot.userservice.model.user.event.UserEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.stereotype.Service; 
+import org.springframework.stereotype.Service;
 
-@Slf4j
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class KafkaService {
     private final KafkaTemplate<String, UserEvent> kafkaTemplate;
-    private static final String USER_TOPIC = "user-events";
+    
+    @Value("${kafka.topics.user-events}")
+    private String userEventsTopic;
 
     public void sendUserCreatedEvent(UserEntity user) {
-        sendUserEvent("USER_CREATED", user);
+        sendUserEvent(UserEvent.fromEntity(user, "USER_CREATED"));
     }
 
     public void sendUserUpdatedEvent(UserEntity user) {
-        sendUserEvent("USER_UPDATED", user);
+        sendUserEvent(UserEvent.fromEntity(user, "USER_UPDATED"));
     }
 
     public void sendUserDeletedEvent(UserEntity user) {
-        sendUserEvent("USER_DELETED", user);
+        sendUserEvent(UserEvent.fromEntity(user, "USER_DELETED"));
     }
 
-    private void sendUserEvent(String eventType, UserEntity user) {
-        UserEvent event = UserEvent.builder()
-                .userId(user.getId())
-                .eventType(eventType)
-                .timestamp(System.currentTimeMillis())
-                .build();
-
-        kafkaTemplate.send(USER_TOPIC, user.getId(), event)
-                .whenComplete((result, ex) -> {
-                    if (ex == null) {
-                        log.info("Sent event {} for user {}", eventType, user.getId());
-                    } else {
-                        log.error("Failed to send event {} for user {}: {}", 
-                                eventType, user.getId(), ex.getMessage());
-                    }
-                });
+    private void sendUserEvent(UserEvent event) {
+        kafkaTemplate.send(userEventsTopic, event.getUserId(), event)
+            .whenComplete((result, ex) -> {
+                if (ex != null) {
+                    log.error("Failed to send user event for ID: {}", event.getUserId(), ex);
+                } else {
+                    log.debug("User event sent successfully for ID: {}", event.getUserId());
+                }
+            });
     }
 }

@@ -73,8 +73,14 @@ public class UserService {
     public Mono<UserEntity> getUserById(String id) {
         Timer.Sample sample = Timer.start(meterRegistry);
         return cacheService.getCachedUser(id)
-                .switchIfEmpty(userRepository.findById(id)
-                        .flatMap(cacheService::cacheUser))
+                .switchIfEmpty(
+                    userRepository.findById(id)
+                        .doOnSuccess(user -> {
+                            if (user != null) {
+                                cacheService.cacheUser(user).subscribe();
+                            }
+                        })
+                )
                 .switchIfEmpty(Mono.error(new UserNotFoundException(id)))
                 .doFinally(signalType -> sample.stop(userRetrievalTimer));
     }
@@ -200,11 +206,15 @@ public class UserService {
     }
 
     private void sendUserEvent(UserEntity user, String eventType) {
-        UserEvent event = UserEvent.fromUser(eventType, user);
+        UserEvent event = UserEvent.fromEntity(user, eventType);
+        
         kafkaTemplate.send(userEventsTopic, user.getId(), event)
-                .addCallback(
-                    result -> log.debug("User event sent successfully: {}", event.getEventType()),
-                    ex -> log.error("Failed to send user event: {}", ex.getMessage())
-                );
+            .whenComplete((result, ex) -> {
+                if (ex != null) {
+                    log.error("Failed to send user event: {}", ex.getMessage());
+                } else {
+                    log.debug("User event sent successfully: {}", eventType);
+                }
+            });
     }
 }

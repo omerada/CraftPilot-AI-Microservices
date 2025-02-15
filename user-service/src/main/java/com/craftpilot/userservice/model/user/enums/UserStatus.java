@@ -5,5 +5,8 @@ package com.craftpilot.userservice.model.user.enums;
  * This enum defines the different states a user can have in the system.
  */
 public enum UserStatus {
-    ACTIVE, INACTIVE, SUSPENDED, DELETED
+    ACTIVE,
+    INACTIVE,
+    SUSPENDED,
+    DELETED
 }
