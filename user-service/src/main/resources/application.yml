@@ -4,18 +4,13 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
     include: kafka-base
-  redis:
-    host: ${REDIS_HOST:localhost}
-    port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:}
-    timeout: 2000
-    lettuce:
-      pool:
-        max-active: 8
-        max-idle: 8
-        min-idle: 2
-        max-wait: -1ms
-      shutdown-timeout: 100ms
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: 2000
+      timeout: 1000
 
 eureka:
   instance:
