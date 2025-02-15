@@ -9,6 +9,10 @@ on:
       - ".github/workflows/admin-service-ci-cd.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-and-deploy:
     runs-on: self-hosted
@@ -16,11 +20,22 @@ jobs:
     steps:
       - name: Clean workspace
         run: |
-          sudo rm -rf ${{ github.workspace }}/*
-          sudo mkdir -p ${{ github.workspace }}
-          sudo chown -R ${{ runner.user }}:${{ runner.user }} ${{ github.workspace }}
+          rm -rf ./* || true
+          rm -rf ./.* || true
 
       - uses: actions/checkout@v3
+        with:
+          clean: true
+          fetch-depth: 0
+
+      # Create fresh Maven local repository
+      - name: Prepare Maven environment
+        run: |
+          docker volume rm maven-repo || true
+          docker volume create maven-repo
+          docker run --rm \
+            -v maven-repo:/maven-repo \
+            alpine sh -c "chmod -R 777 /maven-repo"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v3
@@ -28,12 +43,6 @@ jobs:
           java-version: "21"
           distribution: "temurin"
           cache: maven
-
-      # Create Maven local repository volume with correct permissions
-      - name: Prepare Maven volume
-        run: |
-          docker volume create maven-repo
-          docker run --rm -v maven-repo:/maven-repo alpine chown -R 1000:1000 /maven-repo
 
       # Build shared-config using Maven container
       - name: Build shared-config
