@@ -18,35 +18,13 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      # Initial cleanup with docker to avoid permission issues
-      - name: Clean workspace with Docker
+      - name: Cleanup workspace
         run: |
-          docker run --rm \
-            -v "${GITHUB_WORKSPACE}:/workspace" \
-            alpine:latest \
-            sh -c "rm -rf /workspace/* /workspace/.*"
+          rm -rf ./* ./.* || true
 
       - uses: actions/checkout@v3
         with:
-          clean: false # Disable built-in cleaning
           fetch-depth: 0
-
-      # Ensure workspace permissions after checkout
-      - name: Fix workspace permissions
-        run: |
-          docker run --rm \
-            -v "${GITHUB_WORKSPACE}:/workspace" \
-            alpine:latest \
-            sh -c "chown -R $(id -u):$(id -g) /workspace"
-
-      # Create fresh Maven local repository
-      - name: Prepare Maven environment
-        run: |
-          docker volume rm maven-repo || true
-          docker volume create maven-repo
-          docker run --rm \
-            -v maven-repo:/maven-repo \
-            alpine sh -c "chmod -R 777 /maven-repo"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v3
@@ -55,37 +33,33 @@ jobs:
           distribution: "temurin"
           cache: maven
 
-      # Build shared-config using Maven container
-      - name: Build shared-config
+      # Create Maven volume once
+      - name: Setup Maven volume
         run: |
+          docker volume create maven-repo || true
           docker run --rm \
-            -v "${{ github.workspace }}:/workspace:rw" \
-            -v maven-repo:/root/.m2:rw \
-            -w /workspace/shared-config \
-            --user $(id -u):$(id -g) \
-            maven:3.9.6-eclipse-temurin-21-alpine \
-            mvn clean install -DskipTests
+            -v maven-repo:/maven-repo \
+            alpine:latest \
+            chmod -R 777 /maven-repo
 
-      # Build admin-service using Maven container
-      - name: Build admin-service
+      # Build both projects in one container
+      - name: Build projects
         run: |
+          echo "Building shared-config and admin-service..."
           docker run --rm \
-            -v "${{ github.workspace }}:/workspace:rw" \
-            -v maven-repo:/root/.m2:rw \
-            -w /workspace/admin-service \
-            --user $(id -u):$(id -g) \
+            -v "${PWD}:/workspace" \
+            -v maven-repo:/root/.m2 \
+            -w /workspace \
             maven:3.9.6-eclipse-temurin-21-alpine \
-            mvn clean package -DskipTests
+            /bin/sh -c '
+              cd shared-config && mvn clean install -DskipTests && \
+              cd ../admin-service && mvn clean package -DskipTests
+            '
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-        with:
-          platforms: arm64
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-        with:
-          platforms: linux/arm64
+      - name: Set up Docker Build
+        run: |
+          docker buildx create --use --platform linux/arm64
+          docker buildx inspect --bootstrap
 
       - name: Login to DockerHub
         uses: docker/login-action@v2
