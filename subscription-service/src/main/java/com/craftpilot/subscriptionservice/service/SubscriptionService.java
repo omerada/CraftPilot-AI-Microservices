@@ -8,7 +8,9 @@ import com.craftpilot.subscriptionservice.repository.SubscriptionPlanRepository;
 import com.craftpilot.subscriptionservice.repository.SubscriptionRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -22,6 +24,7 @@ import java.time.temporal.ChronoUnit;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class SubscriptionService {
 
     private final SubscriptionRepository subscriptionRepository;
@@ -32,6 +35,9 @@ public class SubscriptionService {
     private final Counter subscriptionCreationCounter;
     private final Counter subscriptionCancellationCounter;
     private final Counter subscriptionRenewalCounter;
+
+    @Value("${kafka.topics.subscription-events}")
+    private String subscriptionEventsTopic;
 
     public SubscriptionService(
             SubscriptionRepository subscriptionRepository,
@@ -182,7 +188,7 @@ public class SubscriptionService {
                                         .subscription(savedSubscription)
                                         .build();
 
-                                kafkaTemplate.send("subscription-events", event);
+                                kafkaTemplate.send(subscriptionEventsTopic, event);
                             });
                 })
                 .subscribe();
@@ -193,11 +199,11 @@ public class SubscriptionService {
                 .eventType(eventType)
                 .subscriptionId(subscription.getId())
                 .userId(subscription.getUserId())
-                .timestamp(LocalDateTime.now().toEpochSecond(java.time.ZoneOffset.UTC))
+                .timestamp(System.currentTimeMillis())
                 .subscription(subscription)
                 .build();
 
-        kafkaTemplate.send("subscription-events", subscription.getId(), event)
+        kafkaTemplate.send(subscriptionEventsTopic, subscription.getId(), event)
                 .whenComplete((result, ex) -> {
                     if (ex != null) {
                         log.error("Failed to send subscription event: {}", event, ex);
@@ -206,4 +212,4 @@ public class SubscriptionService {
                     }
                 });
     }
-} 
+}

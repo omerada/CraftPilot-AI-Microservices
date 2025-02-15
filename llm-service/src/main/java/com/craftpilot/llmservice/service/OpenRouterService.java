@@ -3,11 +3,14 @@ package com.craftpilot.llmservice.service;
 import com.craftpilot.llmservice.config.OpenRouterConfig;
 import com.craftpilot.llmservice.model.AIRequest;
 import com.craftpilot.llmservice.model.AIResponse;
+import com.craftpilot.llmservice.event.AIEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.client.circuitbreaker.ReactiveCircuitBreaker;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
@@ -20,6 +23,10 @@ public class OpenRouterService {
     private final WebClient webClient;
     private final OpenRouterConfig config;
     private final ReactiveCircuitBreaker circuitBreaker;
+    private final KafkaTemplate<String, AIEvent> kafkaTemplate;
+
+    @Value("${kafka.topics.ai-events}")
+    private String aiEventsTopic;
 
     public Mono<AIResponse> processRequest(AIRequest request) {
         if (request.getRequestId() == null) {
@@ -41,6 +48,7 @@ public class OpenRouterService {
                 .bodyToMono(AIResponse.class)
                 .map(response -> {
                     response.setRequestId(request.getRequestId());
+                    sendAIEvent(request, response, "AI_COMPLETION");
                     return response;
                 });
     }
@@ -48,11 +56,27 @@ public class OpenRouterService {
     private Mono<AIResponse> handleError(Throwable throwable, AIRequest request) {
         log.error("Error calling OpenRouter API for request {}: {}", 
                 request.getRequestId(), throwable.getMessage());
-        return Mono.just(AIResponse.builder()
+        
+        AIResponse errorResponse = AIResponse.builder()
                 .error("Service temporarily unavailable")
                 .model(request.getModel() != null ? request.getModel() : config.getDefaultModel())
                 .requestId(request.getRequestId())
-                .build());
+                .build();
+
+        sendAIEvent(request, null, throwable.getMessage());
+        return Mono.just(errorResponse);
+    }
+
+    private void sendAIEvent(AIRequest request, AIResponse response, String error) {
+        AIEvent event = error != null ? 
+            AIEvent.error(request, error) :
+            AIEvent.fromRequest(request, response, "AI_COMPLETION");
+
+        kafkaTemplate.send(aiEventsTopic, request.getRequestId(), event)
+            .addCallback(
+                result -> log.debug("AI event sent successfully for request: {}", request.getRequestId()),
+                ex -> log.error("Failed to send AI event for request: {}", request.getRequestId(), ex)
+            );
     }
 
     private Map<String, Object> createRequestBody(AIRequest request) {
@@ -63,4 +87,4 @@ public class OpenRouterService {
             "temperature", request.getTemperature() != null ? request.getTemperature() : config.getTemperature()
         );
     }
-} 
+}

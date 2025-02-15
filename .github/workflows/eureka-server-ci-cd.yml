@@ -66,10 +66,78 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Infrastructure setup
+            echo "=== Infrastructure Setup Started ==="
+
+            # Create network if not exists
             docker network create craftpilot-network || true
 
+            # Check and start Redis if not running
+            if ! docker ps | grep -q redis; then
+              echo "Starting Redis..."
+              docker run -d \
+                --name redis \
+                --network craftpilot-network \
+                -p 6379:6379 \
+                -e REDIS_PASSWORD=13579ada \
+                redis:latest redis-server --requirepass 13579ada
+                
+              # Wait for Redis to be ready
+              echo "Waiting for Redis to be ready..."
+              for i in {1..30}; do
+                if docker exec redis redis-cli -a 13579ada ping | grep -q "PONG"; then
+                  echo "Redis is ready"
+                  break
+                fi
+                echo "Waiting for Redis... attempt $i/30"
+                sleep 2
+              done
+            else
+              echo "Redis is already running"
+            fi
+
+            # Check and start Zookeeper if not running
+            if ! docker ps | grep -q zookeeper; then
+              echo "Starting Zookeeper..."
+              docker run -d \
+                --name zookeeper \
+                --network craftpilot-network \
+                -e ZOOKEEPER_CLIENT_PORT=2181 \
+                -e ZOOKEEPER_TICK_TIME=2000 \
+                confluentinc/cp-zookeeper:latest
+
+              # Wait for Zookeeper
+              echo "Waiting for Zookeeper to be ready..."
+              sleep 10
+            else
+              echo "Zookeeper is already running"
+            fi
+
+            # Check and start Kafka if not running
+            if ! docker ps | grep -q kafka; then
+              echo "Starting Kafka..."
+              docker run -d \
+                --name kafka \
+                --network craftpilot-network \
+                -p 9092:9092 \
+                -e KAFKA_BROKER_ID=1 \
+                -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
+                -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
+                -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+                -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
+                -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 \
+                confluentinc/cp-kafka:latest
+
+              # Wait for Kafka
+              echo "Waiting for Kafka to be ready..."
+              sleep 20
+            else
+              echo "Kafka is already running"
+            fi
+
+            echo "=== Infrastructure Setup Completed ==="
+
             # Deploy Eureka Server
+            echo "=== Deploying Eureka Server ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
             docker stop eureka-server || true
             docker rm eureka-server || true
@@ -91,43 +159,26 @@ jobs:
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
 
-            # Wait for container to start
-            echo "Waiting for container to start..."
-            sleep 20
-
-            # Health check
-            echo "Starting health checks..."
-            max_retries=5
-            count=0
-
-            while [ $count -lt $max_retries ]; do
-              count=$((count + 1))
-              echo "Health check attempt $count/$max_retries"
+            # Enhanced health check for Eureka Server
+            echo "=== Performing Health Checks ==="
+            for i in {1..30}; do
+              echo "Health check attempt $i/30"
               
-              if docker ps | grep -q "eureka-server"; then
-                if curl -s "http://localhost:8761" | grep -q "Eureka"; then
-                  echo "Eureka Server is running and responding"
-                  exit 0
-                elif curl -s -u craftpilot:13579ada "http://localhost:8761/actuator/health" | grep -q "UP"; then
-                  echo "Eureka Server health check passed"
-                  exit 0
-                elif docker logs eureka-server 2>&1 | grep -q "Started EurekaServerApplication"; then
-                  echo "Eureka Server logs indicate successful startup"
-                  exit 0
-                fi
+              if curl -sf http://localhost:8761/actuator/health | grep -q "UP"; then
+                echo "✓ Eureka Server is healthy"
+                echo "=== Deployment Completed Successfully ==="
+                exit 0
               fi
               
-              echo "Waiting 10 seconds before next attempt..."
+              if [ $i -eq 15 ]; then
+                echo "Mid-point container logs:"
+                docker logs eureka-server --tail 50
+              fi
+              
+              echo "Waiting for next check..."
               sleep 10
             done
 
-            echo "Eureka Server failed to start properly"
+            echo "=== Deployment Failed - Debug Information ==="
             docker logs eureka-server
             exit 1
-
-      - name: Trigger Deploy Services Workflow
-        if: success()
-        uses: peter-evans/repository-dispatch@v2
-        with:
-          token: ${{ secrets.GH_TOKEN }}
-          event-type: trigger-deploy-services

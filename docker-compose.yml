@@ -173,32 +173,6 @@ services:
       timeout: 10s
       retries: 3
 
-  # KAFKA Service
-  kafka-service:
-    container_name: kafka-service
-    image: ${DOCKERHUB_USERNAME}/kafka-service:latest-arm64
-    ports:
-      - "9093:9093"
-    environment:
-      <<: *common-variables
-      SERVER_PORT: 9093
-    networks:
-      craftpilot-network:
-        ipv4_address: 172.18.0.16
-    depends_on:
-      zookeeper:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      eureka-server:
-        condition: service_healthy
-    <<: *common-deploy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9093/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   # LLM Service
   llm-service:
     build:
@@ -307,6 +281,8 @@ services:
       - ./user-service/src/main/resources/firebase-service-account.json:/app/config/firebase-service-account.json
     depends_on:
       eureka-server:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     networks:
       craftpilot-network:

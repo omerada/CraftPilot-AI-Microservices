@@ -1,0 +1,43 @@
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      retries: 3
+      acks: all
+      batch-size: 16384
+      buffer-memory: 33554432
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 1
+        spring.json.type.mappings: >
+          userEvent:com.craftpilot.userservice.event.UserEvent,
+          creditEvent:com.craftpilot.creditservice.event.CreditEvent,
+          notificationEvent:com.craftpilot.notificationservice.event.NotificationEvent,
+          subscriptionEvent:com.craftpilot.subscriptionservice.event.SubscriptionEvent,
+          aiEvent:com.craftpilot.llmservice.event.AIEvent,
+          analyticsEvent:com.craftpilot.analyticsservice.event.AnalyticsEvent
+    consumer:
+      group-id: ${spring.application.name}-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.craftpilot.*"
+        isolation.level: read_committed
+        max.poll.records: 500
+        heartbeat.interval.ms: 3000
+        session.timeout.ms: 45000
+    admin:
+      auto-create: true
+      fail-fast: false
+
+kafka:
+  topics:
+    user-events: user-events
+    credit-events: credit-events
+    notification-events: notification-events
+    subscription-events: subscription-events
+    ai-events: ai-events
+    analytics-events: analytics-events

@@ -35,6 +35,8 @@ spring:
           min-idle: 2
           max-wait: 1000ms
         shutdown-timeout: 200ms
+  config:
+    import: classpath:application-kafka.yml
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     producer:
@@ -44,9 +46,15 @@ spring:
       acks: 1
       properties:
         spring.json.type.mapping: aiEvent:com.craftpilot.llmservice.event.AIEvent
+        spring.json.type.mappings: aiEvent:com.craftpilot.llmservice.event.AIEvent
     consumer:
       group-id: llm-service-group
       auto-offset-reset: earliest
+
+kafka:
+  topics:
+    ai-events: ai-events
+    llm-completions: llm-completions
 
 eureka:
   client:

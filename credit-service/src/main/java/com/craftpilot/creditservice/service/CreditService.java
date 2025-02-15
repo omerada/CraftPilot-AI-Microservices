@@ -13,6 +13,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -25,6 +26,9 @@ public class CreditService {
     private final CreditTransactionRepository transactionRepository;
     private final KafkaTemplate<String, CreditEvent> kafkaTemplate;
     private final MeterRegistry meterRegistry;
+
+    @Value("${kafka.topics.credit-events}")
+    private String creditEventsTopic;
 
     public Mono<Credit> getUserCredits(String userId) {
         return creditRepository.findByUserId(userId)
@@ -58,7 +62,11 @@ public class CreditService {
                 })
                 .doOnSuccess(transaction -> {
                     meterRegistry.counter("credit.transactions", "type", transaction.getType().toString()).increment();
-                    kafkaTemplate.send("credit-events", new CreditEvent(transaction));
+                    kafkaTemplate.send(creditEventsTopic, userId, new CreditEvent(transaction))
+                        .addCallback(
+                            result -> log.debug("Credit event sent successfully for user: {}", userId),
+                            ex -> log.error("Failed to send credit event for user: {}", userId, ex)
+                        );
                 })
                 .doOnError(error -> log.error("Error processing credit transaction", error));
     }
@@ -95,4 +103,4 @@ public class CreditService {
 
         return creditRepository.save(credit);
     }
-} 
+}

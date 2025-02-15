@@ -66,20 +66,7 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Infrastructure setup
-            echo "=== Setting up infrastructure ==="
-            docker network create craftpilot-network || true
-
-            # Start Redis if not running
-            if ! docker ps | grep -q redis; then
-              docker run -d \
-                --name redis \
-                --network craftpilot-network \
-                -p 6379:6379 \
-                -e REDIS_PASSWORD=13579ada \
-                redis:latest --requirepass 13579ada
-            fi
-
+          
             # Deploy API Gateway
             echo "=== Deploying API Gateway ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
@@ -141,10 +128,3 @@ jobs:
             echo "Container Logs:"
             docker logs api-gateway --tail 100
             exit 1
-
-      - name: Trigger Deploy Services Workflow
-        if: success()
-        uses: peter-evans/repository-dispatch@v2
-        with:
-          token: ${{ secrets.GH_TOKEN }}
-          event-type: trigger-deploy-services

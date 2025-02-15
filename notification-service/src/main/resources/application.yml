@@ -13,6 +13,13 @@ spring:
     name: notification-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+    include: kafka
+  config:
+    import: classpath:application-kafka.yml
+  sendgrid:
+    api-key: ${SPRING_SENDGRID_API_KEY}
+    enabled: true
+    from: ${SPRING_SENDGRID_FROM_EMAIL:support@craftpilot.com}
   mail:
     sendgrid:
       api-key: ${SENDGRID_API_KEY}
@@ -32,21 +39,10 @@ spring:
     discovery:
       enabled: true
     stream:
-      kafka:
-        binder:
-          brokers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
-          autoAddPartitions: true
-          configuration:
-            security.protocol: PLAINTEXT
       bindings:
         notificationEventConsumer-in-0:
           destination: notifications
           group: notification-service-group
-          consumer:
-            maxAttempts: 3
-            backOffInitialInterval: 1000
-            backOffMaxInterval: 10000
-            backOffMultiplier: 2.0
         notificationEventProducer-out-0:
           destination: notifications
   data:
@@ -70,25 +66,6 @@ spring:
           refresh:
             adaptive: true
             period: 30s
-
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    consumer:
-      group-id: ${spring.application.name}-group
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
-        spring.json.value.default.type: java.util.Map
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-
-  sendgrid:
-    api-key: ${SPRING_SENDGRID_API_KEY}
-    enabled: true
-    from: ${SPRING_SENDGRID_FROM_EMAIL:support@craftpilot.com}
 
 management:
   endpoints:
@@ -162,3 +139,8 @@ springdoc:
   paths-to-match: /**
   default-produces-media-type: application/json
   default-consumes-media-type: application/json
+
+kafka:
+  topics:
+    notification-events: notification-events
+    notification-delivery: notification-delivery

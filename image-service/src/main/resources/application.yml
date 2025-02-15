@@ -9,6 +9,8 @@ server:
 spring:
   application:
     name: image-service
+  config:
+    import: classpath:application-kafka.yml
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -225,3 +227,8 @@ springdoc:
     enabled: true
   packages-to-scan: com.craftpilot.imageservice.controller
   paths-to-match: /**
+
+kafka:
+  topics:
+    image-events: image-events
+    image-generation-events: image-generation-events

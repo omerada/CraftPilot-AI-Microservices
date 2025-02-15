@@ -1,4 +1,4 @@
-package com.craftpilot.creditservice.config;
+package com.craftpilot.imageservice.config;
 
 import com.craftpilot.shared.kafka.KafkaBaseConfig;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -10,12 +10,12 @@ import org.springframework.kafka.config.TopicBuilder;
 public class KafkaConfig extends KafkaBaseConfig {
 
     @Bean
-    public NewTopic creditEventsTopic() {
-        return createTopic("credit-events");
+    public NewTopic imageEventsTopic() {
+        return createTopic("image-events");
     }
 
     @Bean
-    public NewTopic paymentEventsTopic() {
-        return createTopic("payment-events");
+    public NewTopic imageGenerationEventsTopic() {
+        return createTopic("image-generation-events");
     }
 }

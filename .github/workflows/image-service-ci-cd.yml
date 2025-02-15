@@ -66,29 +66,6 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Infrastructure setup
-            docker network create craftpilot-network || true
-
-            # Start Redis first
-            echo "=== Starting Redis ==="
-            if ! docker ps | grep -q redis; then
-              docker run -d \
-                --name redis \
-                --network craftpilot-network \
-                -p 6379:6379 \
-                redis:latest redis-server --requirepass 13579ada
-            fi
-
-            # Wait for Redis
-            echo "=== Waiting for Redis ==="
-            for i in {1..30}; do
-              if docker exec redis redis-cli -a 13579ada ping | grep -q "PONG"; then
-                echo "Redis is ready"
-                break
-              fi
-              echo "Waiting for Redis... attempt $i/30"
-              sleep 2
-            done
 
             # Deploy Image Service
             echo "=== Deploying Image Service ==="
@@ -176,10 +153,3 @@ jobs:
             echo "Container Logs:"
             docker logs image-service
             exit 1
-
-      - name: Trigger Deploy Services Workflow
-        if: success()
-        uses: peter-evans/repository-dispatch@v2
-        with:
-          token: ${{ secrets.GH_TOKEN }}
-          event-type: trigger-deploy-services

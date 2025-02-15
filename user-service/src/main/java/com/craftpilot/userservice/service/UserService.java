@@ -24,6 +24,9 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
+import com.craftpilot.userservice.model.user.event.UserEvent;
 
 /**
  * Kullanıcı işlemleri için servis arayüzü.
@@ -39,6 +42,11 @@ public class UserService {
     private final MeterRegistry meterRegistry;
     private final RedisCacheService cacheService;
     private final KafkaService kafkaService;
+    private final KafkaTemplate<String, UserEvent> kafkaTemplate;
+
+    @Value("${kafka.topics.user-events}")
+    private String userEventsTopic;
+
     private Counter userCreationCounter;
     private Counter userUpdateCounter;
     private Counter userDeletionCounter;
@@ -55,7 +63,10 @@ public class UserService {
     @Transactional
     public Mono<UserEntity> createUser(UserEntity user) {
         return userRepository.save(user)
-                .doOnSuccess(savedUser -> kafkaService.sendUserCreatedEvent(savedUser))
+                .doOnSuccess(savedUser -> {
+                    kafkaService.sendUserCreatedEvent(savedUser);
+                    sendUserEvent(savedUser, "USER_CREATED");
+                })
                 .doOnError(error -> log.error("Error creating user: {}", error.getMessage()));
     }
 
@@ -87,14 +98,20 @@ public class UserService {
                     existingUser.setUpdatedAt(System.currentTimeMillis());
                     return userRepository.save(existingUser);
                 })
-                .doOnSuccess(updatedUser -> kafkaService.sendUserUpdatedEvent(updatedUser))
+                .doOnSuccess(updatedUser -> {
+                    kafkaService.sendUserUpdatedEvent(updatedUser);
+                    sendUserEvent(updatedUser, "USER_UPDATED");
+                })
                 .doOnError(error -> log.error("Error updating user: {}", error.getMessage()));
     }
 
     public Mono<Void> deleteUser(String userId) {
         return userRepository.findById(userId)
                 .flatMap(user -> userRepository.deleteById(userId)
-                        .then(Mono.fromRunnable(() -> kafkaService.sendUserDeletedEvent(user))))
+                        .then(Mono.fromRunnable(() -> {
+                            kafkaService.sendUserDeletedEvent(user);
+                            sendUserEvent(user, "USER_DELETED");
+                        })))
                 .then();
     }
 
@@ -180,5 +197,14 @@ public class UserService {
                         .updatedAt(System.currentTimeMillis())
                         .build())
                 .flatMap(this::createUser);
+    }
+
+    private void sendUserEvent(UserEntity user, String eventType) {
+        UserEvent event = UserEvent.fromUser(eventType, user);
+        kafkaTemplate.send(userEventsTopic, user.getId(), event)
+                .addCallback(
+                    result -> log.debug("User event sent successfully: {}", event.getEventType()),
+                    ex -> log.error("Failed to send user event: {}", ex.getMessage())
+                );
     }
 }

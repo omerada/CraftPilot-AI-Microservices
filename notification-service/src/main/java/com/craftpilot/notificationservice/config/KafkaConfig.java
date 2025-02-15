@@ -1,10 +1,13 @@
 package com.craftpilot.notificationservice.config;
 
 import com.craftpilot.notificationservice.event.NotificationEvent;
+import com.craftpilot.shared.kafka.KafkaBaseConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.annotation.EnableKafka;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 import org.springframework.messaging.Message;
@@ -15,8 +18,9 @@ import java.util.function.Supplier;
 
 @Slf4j
 @Configuration
+@EnableKafka
 @RequiredArgsConstructor
-public class KafkaConfig {
+public class KafkaConfig extends KafkaBaseConfig {
     
     @Value("${spring.cloud.stream.kafka.binder.brokers}")
     private String bootstrapServers;
@@ -42,5 +46,15 @@ public class KafkaConfig {
                 message.getPayload().getEventType(),
                 message.getPayload().getNotificationId(),
                 bootstrapServers);
+    }
+
+    @Bean
+    public NewTopic notificationEventsTopic() {
+        return createTopic("notification-events");
+    }
+
+    @Bean
+    public NewTopic notificationDeliveryTopic() {
+        return createTopic("notification-delivery");
     }
 }

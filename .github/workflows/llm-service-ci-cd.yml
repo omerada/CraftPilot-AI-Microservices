@@ -66,43 +66,6 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Infrastructure containers
-            docker network create craftpilot-network || true
-
-            # Start Zookeeper if not running
-            if ! docker ps | grep -q zookeeper; then
-              docker run -d \
-                --name zookeeper \
-                --network craftpilot-network \
-                -e ZOOKEEPER_CLIENT_PORT=2181 \
-                -e ZOOKEEPER_TICK_TIME=2000 \
-                confluentinc/cp-zookeeper:latest
-            fi
-
-            # Start Kafka if not running
-            if ! docker ps | grep -q kafka; then
-              docker run -d \
-                --name kafka \
-                --network craftpilot-network \
-                -p 9092:9092 \
-                -e KAFKA_BROKER_ID=1 \
-                -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
-                -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
-                -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
-                -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
-                -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 \
-                confluentinc/cp-kafka:latest
-            fi
-
-            # Start Redis if not running
-            if ! docker ps | grep -q redis; then
-              docker run -d \
-                --name redis \
-                --network craftpilot-network \
-                -p 6379:6379 \
-                -e REDIS_PASSWORD=13579ada \
-                redis:latest --requirepass 13579ada
-            fi
 
             # Deploy LLM Service
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
@@ -159,10 +122,3 @@ jobs:
             echo "Final container logs:"
             docker logs llm-service
             exit 1
-
-      - name: Trigger Deploy Services Workflow
-        if: success()
-        uses: peter-evans/repository-dispatch@v2
-        with:
-          token: ${{ secrets.GH_TOKEN }}
-          event-type: trigger-deploy-services

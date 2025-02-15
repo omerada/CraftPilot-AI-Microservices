@@ -1,67 +1,22 @@
 package com.craftpilot.llmservice.config;
- 
-import lombok.RequiredArgsConstructor;
-import org.apache.kafka.clients.admin.AdminClientConfig;
+
+import com.craftpilot.shared.kafka.KafkaBaseConfig;
 import org.apache.kafka.clients.admin.NewTopic;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.common.serialization.StringSerializer;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.kafka.core.DefaultKafkaProducerFactory;
-import org.springframework.kafka.core.KafkaAdmin;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.core.ProducerFactory;
-import org.springframework.kafka.support.serializer.JsonSerializer;
-import org.springframework.kafka.config.TopicBuilder;
-
-import java.util.HashMap;
-import java.util.Map;
+import org.springframework.kafka.annotation.EnableKafka;
 
 @Configuration
-@RequiredArgsConstructor
-public class KafkaConfig {
-
-    @Value("${spring.kafka.bootstrap-servers}")
-    private String bootstrapServers; 
+@EnableKafka
+public class KafkaConfig extends KafkaBaseConfig {
 
     @Bean
-    public KafkaAdmin kafkaAdmin() {
-        Map<String, Object> configs = new HashMap<>();
-        configs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        configs.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "30000");
-        configs.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "30000");
-        configs.put(AdminClientConfig.RETRIES_CONFIG, "5");
-        configs.put("reconnect.backoff.ms", "1000");
-        configs.put("reconnect.backoff.max.ms", "10000");
-        return new KafkaAdmin(configs);
+    public NewTopic aiEventsTopic() {
+        return createTopic("ai-events");
     }
 
     @Bean
-    public ProducerFactory<String, Object> producerFactory() {
-        Map<String, Object> configProps = new HashMap<>();
-        configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
-        configProps.put(ProducerConfig.RETRIES_CONFIG, 3);
-        configProps.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 1000);
-        configProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 30000);
-        configProps.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 30000);
-        configProps.put(JsonSerializer.TYPE_MAPPINGS, "aiEvent:com.craftpilot.llmservice.event.AIEvent");
-        
-        return new DefaultKafkaProducerFactory<>(configProps);
+    public NewTopic llmCompletionsTopic() {
+        return createTopic("llm-completions");
     }
-
-    @Bean
-    public KafkaTemplate<String, Object> kafkaTemplate() {
-        return new KafkaTemplate<>(producerFactory());
-    }
-
-    @Bean
-    public NewTopic aiEventTopic() {
-        return TopicBuilder.name("ai-events")
-                .partitions(3)
-                .replicas(1)
-                .build();
-    }
-} 
+}

@@ -66,18 +66,6 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Infrastructure containers
-            docker network create craftpilot-network || true
-
-            # Start Redis if not running
-            if ! docker ps | grep -q redis; then
-              docker run -d \
-                --name redis \
-                --network craftpilot-network \
-                -p 6379:6379 \
-                -e REDIS_PASSWORD=13579ada \
-                redis:latest --requirepass 13579ada
-            fi
 
             # Deploy Credit Service
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/credit-service:latest-arm64

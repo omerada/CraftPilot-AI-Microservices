@@ -1,6 +1,11 @@
 spring:
+  config:
+    import: classpath:application-kafka.yml
   application:
     name: user-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+    include: kafka
   redis:
     host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}
@@ -48,3 +53,8 @@ resilience4j:
         slidingWindowSize: 10
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
+
+kafka:
+  topics:
+    user-events: user-events
+    user-activity: user-activity

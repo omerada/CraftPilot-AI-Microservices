@@ -90,33 +90,6 @@ jobs:
               sudo systemctl start docker
             fi
 
-            docker network create craftpilot-network || true
-
-            echo "=== Ensuring Redis is Running ==="
-            if ! docker ps --filter "name=redis" --format '{{.Names}}' | grep -q "^redis$"; then
-              echo "Starting Redis container..."
-              docker run -d \
-                --name redis \
-                --network craftpilot-network \
-                --restart unless-stopped \
-                -p 6379:6379 \
-                redis:latest
-            fi
-
-            echo "=== Ensuring Eureka Server is Running ==="
-            if ! docker ps --filter "name=eureka-server" --format '{{.Names}}' | grep -q "^eureka-server$"; then
-              echo "Starting Eureka Server container..."
-              docker run -d \
-                --name eureka-server \
-                --network craftpilot-network \
-                --restart unless-stopped \
-                -p 8761:8761 \
-                -e SPRING_PROFILES_ACTIVE=prod \
-                -e EUREKA_USERNAME=craftpilot \
-                -e EUREKA_PASSWORD=13579ada \
-                ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
-            fi
-
             echo "=== Setting up GCP Credentials ==="
             sudo mkdir -p /opt/craftpilot/gcp
             echo '${{ secrets.GCP_SA_KEY }}' | sudo tee /opt/craftpilot/gcp/credentials.json > /dev/null
@@ -165,10 +138,3 @@ jobs:
             echo "=== Service Failed to Start - Showing Logs ==="
             docker logs user-service
             exit 1
-
-      - name: Trigger Deploy Services Workflow
-        if: success()
-        uses: peter-evans/repository-dispatch@v2
-        with:
-          token: ${{ secrets.GH_TOKEN }}
-          event-type: trigger-deploy-services

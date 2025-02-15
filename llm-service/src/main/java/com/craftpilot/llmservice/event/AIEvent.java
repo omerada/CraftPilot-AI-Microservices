@@ -15,44 +15,41 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class AIEvent {
     private String eventId;
-    private AIEventType eventType;
+    private String userId;
+    private String eventType;
+    private String requestId;
     private String model;
-    private String requestType;
-    private Long processingTime;
-    private Integer tokenCount;
+    private String prompt;
     private LocalDateTime timestamp;
+    private AIRequest request;
+    private AIResponse response;
     private String error;
 
-    public static AIEvent success(AIRequest request, AIResponse response) {
+    public static AIEvent fromRequest(AIRequest request, AIResponse response, String eventType) {
         return AIEvent.builder()
                 .eventId(java.util.UUID.randomUUID().toString())
-                .eventType(AIEventType.COMPLETED)
+                .userId(request.getUserId())
+                .eventType(eventType)
+                .requestId(request.getRequestId())
                 .model(request.getModel())
-                .requestType(request.getRequestType())
-                .processingTime(response.getProcessingTime())
-                .tokenCount(response.getTokenCount())
+                .prompt(request.getPrompt())
                 .timestamp(LocalDateTime.now())
+                .request(request)
+                .response(response)
                 .build();
     }
 
-    public static AIEvent failure(AIRequest request, String errorMessage) {
+    public static AIEvent error(AIRequest request, String error) {
         return AIEvent.builder()
                 .eventId(java.util.UUID.randomUUID().toString())
-                .eventType(AIEventType.FAILED)
+                .userId(request.getUserId())
+                .eventType("AI_ERROR")
+                .requestId(request.getRequestId())
                 .model(request.getModel())
-                .requestType(request.getRequestType())
-                .error(errorMessage)
+                .prompt(request.getPrompt())
                 .timestamp(LocalDateTime.now())
+                .request(request)
+                .error(error)
                 .build();
     }
-
-    public static AIEvent started(AIRequest request) {
-        return AIEvent.builder()
-                .eventId(java.util.UUID.randomUUID().toString())
-                .eventType(AIEventType.STARTED)
-                .model(request.getModel())
-                .requestType(request.getRequestType())
-                .timestamp(LocalDateTime.now())
-                .build();
-    }
-} 
+}

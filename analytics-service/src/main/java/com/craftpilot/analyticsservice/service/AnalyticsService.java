@@ -9,20 +9,26 @@ import com.craftpilot.analyticsservice.repository.UsageMetricsRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
- 
+
 import java.util.Map;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class AnalyticsService {
+    private final KafkaTemplate<String, Object> kafkaTemplate;
     private final UsageMetricsRepository usageMetricsRepository;
     private final PerformanceMetricsRepository performanceMetricsRepository;
     private final AnalyticsReportRepository analyticsReportRepository;
     private final MeterRegistry meterRegistry;
+
+    @Value("${kafka.topics.analytics-events}")
+    private String analyticsEventsTopic;
 
     // Usage Metrics
     public Mono<UsageMetrics> recordUsageMetrics(UsageMetrics metrics) {
@@ -159,4 +165,12 @@ public class AnalyticsService {
                     meterRegistry.counter("analytics.report.retrieved").increment();
                 });
     }
-} 
+
+    private void publishAnalyticsEvent(String key, Object event) {
+        kafkaTemplate.send(analyticsEventsTopic, key, event)
+            .addCallback(
+                result -> log.debug("Analytics event published successfully"),
+                ex -> log.error("Failed to publish analytics event", ex)
+            );
+    }
+}
