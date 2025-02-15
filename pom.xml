@@ -35,6 +35,7 @@
         
         <!-- 2. API Gateway -->
         <module>api-gateway</module>
+        <module>shared-config</module>
     </modules>
 
     <properties>

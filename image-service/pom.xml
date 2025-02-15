@@ -5,10 +5,9 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.2</version>
-        <relativePath/>
+        <groupId>com.craftpilot</groupId>
+        <artifactId>craft-pilot-parent</artifactId>
+        <version>1.0-SNAPSHOT</version>
     </parent>
 
     <groupId>com.craftpilot</groupId>
@@ -188,7 +187,7 @@
             <artifactId>shared-config</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
-        
+
         <!-- OpenAI -->
         <dependency>
             <groupId>com.theokanning.openai-gpt3-java</groupId>

@@ -5,15 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.3</version>
-        <relativePath/>
+        <groupId>com.craftpilot</groupId>
+        <artifactId>craft-pilot-parent</artifactId>
+        <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <groupId>com.craftpilot</groupId>
     <artifactId>analytics-service</artifactId>
-    <version>1.0.0</version>
     <name>analytics-service</name>
     <description>Analytics Service for Craft Pilot AI</description>
 
