@@ -29,6 +29,7 @@ jobs:
           docker run --rm \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace/shared-config \
+            -v maven-repo:/root/.m2 \
             maven:3.9.6-eclipse-temurin-21-alpine \
             mvn clean install -DskipTests
 
@@ -38,6 +39,7 @@ jobs:
           docker run --rm \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace/admin-service \
+            -v maven-repo:/root/.m2 \
             maven:3.9.6-eclipse-temurin-21-alpine \
             mvn clean package -DskipTests
 
