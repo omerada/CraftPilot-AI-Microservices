@@ -32,10 +32,27 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,metrics,prometheus,info
+        include: health,metrics,prometheus,info,loggers
+      base-path: /actuator
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: redis,diskSpace
+          show-details: always
+        liveness:
+          include: ping
+          show-details: always
+  health:
+    redis:
+      enabled: true
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
 
 springdoc:
   api-docs:
@@ -55,3 +72,10 @@ kafka:
   topics:
     user-events: user-events
     user-activity: user-activity
+
+logging:
+  level:
+    root: INFO
+    com.craftpilot.userservice: DEBUG
+    org.springframework.data.redis: DEBUG
+    org.springframework.boot.actuate: DEBUG

@@ -26,7 +26,7 @@ ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
 # Health check tools
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-HEALTHCHECK --interval=10s --timeout=3s --start-period=40s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8060/actuator/health/liveness || exit 1
 
 # Set non-root user

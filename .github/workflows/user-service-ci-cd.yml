@@ -122,13 +122,17 @@ jobs:
               ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
 
             echo "=== Waiting for Service to Start ==="
-            for i in {1..30}; do
+            for i in {1..60}; do
               if docker ps --filter "name=user-service" --format '{{.Status}}' | grep -q "Up"; then
-                echo "User service is running"
-                # Check application health
-                if curl -f http://localhost:8060/actuator/health; then
-                  echo "User service is healthy"
-                  exit 0
+                echo "User service container is running"
+                # First check liveness
+                if curl -f http://localhost:8060/actuator/health/liveness; then
+                  echo "Liveness check passed"
+                  # Then check readiness
+                  if curl -f http://localhost:8060/actuator/health/readiness; then
+                    echo "Readiness check passed"
+                    exit 0
+                  fi
                 fi
               fi
               echo "Waiting for service to start... Attempt $i"
@@ -136,5 +140,10 @@ jobs:
             done
 
             echo "=== Service Failed to Start - Showing Logs ==="
+            echo "Docker Container Status:"
+            docker ps -a | grep user-service
+            echo "Container Logs:"
             docker logs user-service
+            echo "Health Check Response:"
+            curl -v http://localhost:8060/actuator/health || true
             exit 1
