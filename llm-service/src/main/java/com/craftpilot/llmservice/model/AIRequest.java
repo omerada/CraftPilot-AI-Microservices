@@ -14,9 +14,11 @@ import java.util.Map;
 @AllArgsConstructor
 public class AIRequest {
     private String requestId;
+    private String userId;  // Added
     private String model;
     private List<Map<String, String>> messages;
     private Integer maxTokens;
     private Double temperature;
     private String requestType;
-} 
+    private String prompt;  // Added
+}

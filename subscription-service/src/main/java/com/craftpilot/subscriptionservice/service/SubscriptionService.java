@@ -8,7 +8,6 @@ import com.craftpilot.subscriptionservice.repository.SubscriptionPlanRepository;
 import com.craftpilot.subscriptionservice.repository.SubscriptionRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
@@ -24,17 +23,13 @@ import java.time.temporal.ChronoUnit;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class SubscriptionService {
 
     private final SubscriptionRepository subscriptionRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final PaymentService paymentService;
     private final KafkaTemplate<String, SubscriptionEvent> kafkaTemplate;
-
-    private final Counter subscriptionCreationCounter;
-    private final Counter subscriptionCancellationCounter;
-    private final Counter subscriptionRenewalCounter;
+    private final MeterRegistry meterRegistry;
 
     @Value("${kafka.topics.subscription-events}")
     private String subscriptionEventsTopic;
@@ -49,16 +44,7 @@ public class SubscriptionService {
         this.subscriptionPlanRepository = subscriptionPlanRepository;
         this.paymentService = paymentService;
         this.kafkaTemplate = kafkaTemplate;
-        
-        this.subscriptionCreationCounter = Counter.builder("subscription.creation")
-                .description("Number of subscriptions created")
-                .register(meterRegistry);
-        this.subscriptionCancellationCounter = Counter.builder("subscription.cancellation")
-                .description("Number of subscriptions cancelled")
-                .register(meterRegistry);
-        this.subscriptionRenewalCounter = Counter.builder("subscription.renewal")
-                .description("Number of subscriptions renewed")
-                .register(meterRegistry);
+        this.meterRegistry = meterRegistry;
     }
 
     public Mono<Subscription> createSubscription(CreateSubscriptionRequest request) {

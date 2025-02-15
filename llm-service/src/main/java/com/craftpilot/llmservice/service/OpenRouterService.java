@@ -73,10 +73,13 @@ public class OpenRouterService {
             AIEvent.fromRequest(request, response, "AI_COMPLETION");
 
         kafkaTemplate.send(aiEventsTopic, request.getRequestId(), event)
-            .addCallback(
-                result -> log.debug("AI event sent successfully for request: {}", request.getRequestId()),
-                ex -> log.error("Failed to send AI event for request: {}", request.getRequestId(), ex)
-            );
+            .whenComplete((result, ex) -> {
+                if (ex != null) {
+                    log.error("Failed to send AI event for request: {}", request.getRequestId(), ex);
+                } else {
+                    log.debug("AI event sent successfully for request: {}", request.getRequestId());
+                }
+            });
     }
 
     private Map<String, Object> createRequestBody(AIRequest request) {
