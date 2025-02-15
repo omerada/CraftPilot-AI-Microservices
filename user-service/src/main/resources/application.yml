@@ -6,23 +6,25 @@ spring:
     include: kafka-base
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST:redis-server}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
-      connect-timeout: 5000
-      timeout: 3000
+      password: ${REDIS_PASSWORD:13579ada}
+      connect-timeout: 10000
+      timeout: 10000
+      client-type: lettuce
+      ssl:
+        enabled: false
       lettuce:
         pool:
           max-active: 8
           max-idle: 8
           min-idle: 2
-          max-wait: 1000
-        shutdown-timeout: 100ms
-      retry:
-        max-attempts: 3
-        initial-interval: 1000
-        max-interval: 3000
-        multiplier: 1.5
+          max-wait: -1ms
+        shutdown-timeout: 200ms
+        cluster:
+          refresh:
+            adaptive: true
+            period: 30s
 
   firebase:
     config:
