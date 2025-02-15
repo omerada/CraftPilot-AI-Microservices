@@ -9,8 +9,20 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
-      connect-timeout: 2000
-      timeout: 1000
+      connect-timeout: 5000
+      timeout: 3000
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2
+          max-wait: 1000
+        shutdown-timeout: 100ms
+      retry:
+        max-attempts: 3
+        initial-interval: 1000
+        max-interval: 3000
+        multiplier: 1.5
 
   firebase:
     config:
