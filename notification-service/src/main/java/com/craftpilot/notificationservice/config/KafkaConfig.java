@@ -1,7 +1,7 @@
 package com.craftpilot.notificationservice.config;
 
 import com.craftpilot.notificationservice.event.NotificationEvent;
-import com.craftpilot.shared.kafka.KafkaBaseConfig;
+import com.craftpilot.notificationservice.config.KafkaBaseConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.NewTopic;

@@ -1,6 +1,6 @@
 package com.craftpilot.userservice.config;
 
-import com.craftpilot.shared.kafka.KafkaBaseConfig;
+import com.craftpilot.userservice.config.KafkaBaseConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

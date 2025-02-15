@@ -9,28 +9,9 @@ server:
 spring:
   application:
     name: image-service
-  config:
-    import: classpath:application-kafka.yml
-  kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    producer:
-      acks: 1
-      retries: 3
-      batch-size: 16384
-      buffer-memory: 33554432
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      compression-type: snappy
-      properties:
-        spring.json.add.type.headers: false
-        linger.ms: 5
-    consumer:
-      group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID:image-service-group}
-      auto-offset-reset: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "com.craftpilot.imageservice.model"
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+    include: kafka
   cache:
     type: redis
     redis:
@@ -227,8 +208,3 @@ springdoc:
     enabled: true
   packages-to-scan: com.craftpilot.imageservice.controller
   paths-to-match: /**
-
-kafka:
-  topics:
-    image-events: image-events
-    image-generation-events: image-generation-events

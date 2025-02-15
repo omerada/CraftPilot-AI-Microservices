@@ -13,6 +13,7 @@ spring:
     import: classpath:application-kafka.yml
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+    include: kafka
   cloud:
     discovery:
       enabled: true

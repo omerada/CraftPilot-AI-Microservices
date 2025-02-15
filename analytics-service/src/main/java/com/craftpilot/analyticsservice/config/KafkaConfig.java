@@ -1,6 +1,6 @@
 package com.craftpilot.analyticsservice.config;
 
-import com.craftpilot.shared.kafka.KafkaBaseConfig;
+import com.craftpilot.analyticsservice.config.KafkaBaseConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

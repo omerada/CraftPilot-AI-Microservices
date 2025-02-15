@@ -14,8 +14,6 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
     include: kafka
-  config:
-    import: classpath:application-kafka.yml
   sendgrid:
     api-key: ${SPRING_SENDGRID_API_KEY}
     enabled: true

@@ -7,10 +7,11 @@ server:
   shutdown: graceful
 
 spring:
-  config:
-    import: classpath:application-kafka.yml
   application:
     name: admin-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+    include: kafka  
   cloud:
     gcp:
       credentials:
@@ -92,11 +93,3 @@ logging:
     org.springframework.web: INFO
     org.springframework.data.redis: INFO
     org.springframework.cloud: INFO
-
-kafka:
-  topics:
-    admin-events: admin-events
-    system-metrics: system-metrics
-    system-alerts: system-alerts
-    audit-logs: audit-logs
-    user-activity: user-activity
