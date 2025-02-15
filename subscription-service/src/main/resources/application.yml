@@ -7,7 +7,7 @@ spring:
     name: subscription-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:local}
-    include: kafka
+    include: kafka-base
   config:
     import: classpath:application-kafka.yml
   redis:

@@ -5,7 +5,7 @@ spring:
     name: user-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
-    include: kafka
+    include: kafka-base
   redis:
     host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}

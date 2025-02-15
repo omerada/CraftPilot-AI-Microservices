@@ -11,7 +11,7 @@ spring:
     name: credit-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
-    include: kafka
+    include: kafka-base
   security:
     user:
       name: ${SPRING_SECURITY_USER_NAME:craftpilot}
