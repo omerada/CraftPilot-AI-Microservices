@@ -2,13 +2,16 @@ package com.craftpilot.imageservice.service;
 
 import com.craftpilot.imageservice.model.Image;
 import com.craftpilot.imageservice.repository.ImageRepository;
+import com.craftpilot.imageservice.event.ImageEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ImageService {
@@ -29,10 +32,13 @@ public class ImageService {
                 .doOnSuccess(savedImage -> {
                     ImageEvent event = ImageEvent.fromImage(savedImage, "IMAGE_GENERATED");
                     kafkaTemplate.send(imageEventsTopic, savedImage.getId(), event)
-                            .addCallback(
-                                result -> log.info("Image generation event sent successfully for image: {}", savedImage.getId()),
-                                ex -> log.error("Failed to send image generation event", ex)
-                            );
+                            .whenComplete((result, ex) -> {
+                                if (ex != null) {
+                                    log.error("Failed to send image generation event", ex);
+                                } else {
+                                    log.info("Image generation event sent successfully for image: {}", savedImage.getId());
+                                }
+                            });
                 });
     }
 
@@ -51,10 +57,13 @@ public class ImageService {
                     return imageRepository.deleteById(id)
                             .then(Mono.fromRunnable(() -> 
                                 kafkaTemplate.send(imageEventsTopic, id, event)
-                                    .addCallback(
-                                        result -> log.info("Image deletion event sent successfully for image: {}", id),
-                                        ex -> log.error("Failed to send image deletion event", ex)
-                                    )
+                                    .whenComplete((result, ex) -> {
+                                        if (ex != null) {
+                                            log.error("Failed to send image deletion event", ex);
+                                        } else {
+                                            log.info("Image deletion event sent successfully for image: {}", id);
+                                        }
+                                    })
                             ));
                 });
     }
