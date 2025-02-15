@@ -4,6 +4,8 @@ import com.craftpilot.userservice.model.UserPreference;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
@@ -28,6 +30,7 @@ public class RedisConfig {
     private String redisPassword;
 
     @Bean
+    @Primary
     public ReactiveRedisConnectionFactory reactiveRedisConnectionFactory() {
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
         config.setHostName(redisHost);
@@ -46,7 +49,7 @@ public class RedisConfig {
 
     @Bean
     public ReactiveRedisTemplate<String, UserPreference> preferenceRedisTemplate(
-            ReactiveRedisConnectionFactory factory) {
+            @Qualifier("reactiveRedisConnectionFactory") ReactiveRedisConnectionFactory factory) {
         
         StringRedisSerializer keySerializer = new StringRedisSerializer();
         Jackson2JsonRedisSerializer<UserPreference> valueSerializer =
