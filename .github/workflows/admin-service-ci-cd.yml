@@ -14,6 +14,12 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      - name: Clean workspace
+        run: |
+          sudo rm -rf ${{ github.workspace }}/*
+          sudo mkdir -p ${{ github.workspace }}
+          sudo chown -R ${{ runner.user }}:${{ runner.user }} ${{ github.workspace }}
+
       - uses: actions/checkout@v3
 
       - name: Set up JDK 21
@@ -23,13 +29,20 @@ jobs:
           distribution: "temurin"
           cache: maven
 
+      # Create Maven local repository volume with correct permissions
+      - name: Prepare Maven volume
+        run: |
+          docker volume create maven-repo
+          docker run --rm -v maven-repo:/maven-repo alpine chown -R 1000:1000 /maven-repo
+
       # Build shared-config using Maven container
       - name: Build shared-config
         run: |
           docker run --rm \
-            -v "${{ github.workspace }}:/workspace" \
+            -v "${{ github.workspace }}:/workspace:rw" \
+            -v maven-repo:/root/.m2:rw \
             -w /workspace/shared-config \
-            -v maven-repo:/root/.m2 \
+            --user $(id -u):$(id -g) \
             maven:3.9.6-eclipse-temurin-21-alpine \
             mvn clean install -DskipTests
 
@@ -37,9 +50,10 @@ jobs:
       - name: Build admin-service
         run: |
           docker run --rm \
-            -v "${{ github.workspace }}:/workspace" \
+            -v "${{ github.workspace }}:/workspace:rw" \
+            -v maven-repo:/root/.m2:rw \
             -w /workspace/admin-service \
-            -v maven-repo:/root/.m2 \
+            --user $(id -u):$(id -g) \
             maven:3.9.6-eclipse-temurin-21-alpine \
             mvn clean package -DskipTests
 
