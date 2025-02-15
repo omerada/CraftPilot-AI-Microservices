@@ -12,6 +12,10 @@ spring:
       connect-timeout: 2000
       timeout: 1000
 
+  firebase:
+    config:
+      path: ${FIREBASE_CONFIG_PATH:/etc/gcp/credentials/gcp-credentials.json}
+
 eureka:
   instance:
     prefer-ip-address: true
