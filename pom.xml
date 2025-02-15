@@ -16,9 +16,6 @@
     <packaging>pom</packaging>
 
     <modules>
-        <!-- Core dependencies first -->
-        <module>shared-config</module>
-        
         <!-- Then other modules -->
         <module>eureka-server</module>
         <module>api-gateway</module>
