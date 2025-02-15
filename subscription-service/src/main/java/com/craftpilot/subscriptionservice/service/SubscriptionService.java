@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import javax.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
@@ -30,6 +31,10 @@ public class SubscriptionService {
     private final PaymentService paymentService;
     private final KafkaTemplate<String, SubscriptionEvent> kafkaTemplate;
     private final MeterRegistry meterRegistry;
+
+    private Counter subscriptionCreationCounter;
+    private Counter subscriptionRenewalCounter;
+    private Counter subscriptionCancellationCounter;
 
     @Value("${kafka.topics.subscription-events}")
     private String subscriptionEventsTopic;
@@ -45,6 +50,21 @@ public class SubscriptionService {
         this.paymentService = paymentService;
         this.kafkaTemplate = kafkaTemplate;
         this.meterRegistry = meterRegistry;
+    }
+
+    @PostConstruct
+    private void initMetrics() {
+        subscriptionCreationCounter = Counter.builder("subscription.creation")
+                .description("Number of subscriptions created")
+                .register(meterRegistry);
+        
+        subscriptionRenewalCounter = Counter.builder("subscription.renewal")
+                .description("Number of subscriptions renewed")
+                .register(meterRegistry);
+        
+        subscriptionCancellationCounter = Counter.builder("subscription.cancellation")
+                .description("Number of subscriptions cancelled")
+                .register(meterRegistry);
     }
 
     public Mono<Subscription> createSubscription(CreateSubscriptionRequest request) {

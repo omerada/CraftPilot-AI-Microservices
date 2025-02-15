@@ -7,10 +7,9 @@ import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-
+@Slf4j
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class PhoneVerificationCleanupScheduler {
 
     private final ReactiveRedisTemplate<String, String> redisTemplate;
@@ -35,4 +34,4 @@ public class PhoneVerificationCleanupScheduler {
                 })
                 .subscribe();
     }
-} 
+}

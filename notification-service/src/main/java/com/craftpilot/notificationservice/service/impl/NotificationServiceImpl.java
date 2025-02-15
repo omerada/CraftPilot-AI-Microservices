@@ -2,6 +2,7 @@ package com.craftpilot.notificationservice.service.impl;
 
 import com.craftpilot.notificationservice.dto.NotificationRequest;
 import com.craftpilot.notificationservice.dto.NotificationResponse;
+import com.craftpilot.notificationservice.event.NotificationEvent;
 import com.craftpilot.notificationservice.model.EmailRequest;
 import com.craftpilot.notificationservice.model.Notification;
 import com.craftpilot.notificationservice.model.NotificationTemplate;
@@ -16,6 +17,8 @@ import io.github.resilience4j.retry.annotation.Retry;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -33,6 +36,10 @@ public class NotificationServiceImpl implements NotificationService {
     private final MeterRegistry meterRegistry;
     private final SendGridService sendGridService;
     private final EmailService emailService;
+    private final KafkaTemplate<String, NotificationEvent> kafkaTemplate;
+    
+    @Value("${kafka.topics.notification-events}")
+    private String notificationEventsTopic;
 
     @Override
     @CircuitBreaker(name = "createNotification")
@@ -43,7 +50,8 @@ public class NotificationServiceImpl implements NotificationService {
                 .flatMap(notification -> {
                     if (notification.getScheduledAt() != null && 
                             notification.getScheduledAt().isAfter(LocalDateTime.now())) {
-                        return saveNotification(notification).map(NotificationResponse::fromEntity);
+                        return saveNotification(notification)
+                                .map(NotificationResponse::fromEntity);
                     }
                     return sendNotification(notification)
                             .then(saveNotification(notification))
@@ -187,5 +195,18 @@ public class NotificationServiceImpl implements NotificationService {
         } catch (Exception e) {
             log.error("Failed to send email notification: {}", e.getMessage());
         }
+    }
+
+    private void sendNotificationEvent(Notification notification, String eventType) {
+        NotificationEvent event = NotificationEvent.fromNotification(eventType, notification);
+        
+        kafkaTemplate.send(notificationEventsTopic, notification.getId(), event)
+            .whenComplete((result, ex) -> {
+                if (ex != null) {
+                    log.error("Failed to send notification event for ID: {}", notification.getId(), ex);
+                } else {
+                    log.debug("Notification event sent successfully for ID: {}", notification.getId());
+                }
+            });
     }
 }

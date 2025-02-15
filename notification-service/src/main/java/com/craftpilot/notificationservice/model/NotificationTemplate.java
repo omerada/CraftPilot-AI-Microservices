@@ -26,4 +26,4 @@ public class NotificationTemplate {
     private boolean deleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-} 
+}
