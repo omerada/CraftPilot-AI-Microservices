@@ -64,6 +64,13 @@
                 </exclusion>
             </exclusions>
         </dependency>
+        
+        <!-- Shared Config -->
+        <dependency>
+            <groupId>com.craftpilot</groupId>
+            <artifactId>shared-config</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
 
         <!-- Eureka Client -->
         <dependency>

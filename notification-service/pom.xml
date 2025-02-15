@@ -249,6 +249,14 @@
             <scope>test</scope>
         </dependency>
 
+        
+        <!-- Shared Config -->
+        <dependency>
+            <groupId>com.craftpilot</groupId>
+            <artifactId>shared-config</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+
         <!-- Gmail API -->
         <dependency>
             <groupId>com.google.api-client</groupId>

@@ -35,6 +35,13 @@
         <lombok.version>1.18.30</lombok.version>
         <springdoc-openapi.version>2.3.0</springdoc-openapi.version>
         <caffeine.version>3.1.8</caffeine.version>
+ 
+        <!-- Shared Config -->
+        <dependency>
+            <groupId>com.craftpilot</groupId>
+            <artifactId>shared-config</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
 
         <!-- Testing -->
         <testcontainers.version>1.19.3</testcontainers.version>
