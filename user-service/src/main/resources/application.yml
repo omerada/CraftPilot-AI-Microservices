@@ -16,14 +16,40 @@ spring:
     config:
       path: ${FIREBASE_CONFIG_PATH:/etc/gcp/credentials/gcp-credentials.json}
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    properties:
+      security.protocol: PLAINTEXT
+      retry.backoff.ms: 1000
+      request.timeout.ms: 30000
+      max.block.ms: 30000
+    producer:
+      acks: 1
+      retries: 3
+    consumer:
+      auto-offset-reset: latest
+      group-id: ${spring.application.name}
+    admin:
+      fail-fast: false
+
 eureka:
   instance:
     prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
   client:
     serviceUrl:
       defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
-    register-with-eureka: true
-    fetch-registry: true
+    register-with-eureka: ${EUREKA_REGISTER:true}
+    fetch-registry: ${EUREKA_FETCH:true}
+    enabled: ${EUREKA_ENABLED:true}
+    healthcheck:
+      enabled: true
+    refresh:
+      enable: true
+    shouldDisableDelta: true
+    registry-fetch-interval-seconds: 30
 
 server:
   port: ${SERVER_PORT:8080}
@@ -53,6 +79,12 @@ management:
       enabled: true
     readinessState:
       enabled: true
+    diskspace:
+      enabled: true
+    circuitbreakers:
+      enabled: true
+    kafka:
+      enabled: false # Disable Kafka health check temporarily
 
 springdoc:
   api-docs:

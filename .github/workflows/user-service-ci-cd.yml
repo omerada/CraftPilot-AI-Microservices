@@ -113,11 +113,16 @@ jobs:
               -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
               -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
+              -e EUREKA_URI=http://eureka-server:8761/eureka \
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \
+              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
+              -e EUREKA_ENABLED=true \
+              -e EUREKA_REGISTER=true \
+              -e EUREKA_FETCH=true \
               --user 1000:1000 \
               ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
 
