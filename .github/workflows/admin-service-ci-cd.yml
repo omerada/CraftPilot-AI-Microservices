@@ -23,15 +23,23 @@ jobs:
           distribution: "temurin"
           cache: maven
 
-      # Install shared-config first
+      # Build shared-config using Maven container
       - name: Build shared-config
-        working-directory: ./shared-config
-        run: mvn clean install -DskipTests
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace/shared-config \
+            maven:3.9.6-eclipse-temurin-21-alpine \
+            mvn clean install -DskipTests
 
-      # Then build admin-service
+      # Build admin-service using Maven container
       - name: Build admin-service
-        working-directory: ./admin-service
-        run: mvn clean package -DskipTests
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace/admin-service \
+            maven:3.9.6-eclipse-temurin-21-alpine \
+            mvn clean package -DskipTests
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
