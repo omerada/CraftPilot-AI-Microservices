@@ -168,9 +168,12 @@ public class AnalyticsService {
 
     private void publishAnalyticsEvent(String key, Object event) {
         kafkaTemplate.send(analyticsEventsTopic, key, event)
-            .addCallback(
-                result -> log.debug("Analytics event published successfully"),
-                ex -> log.error("Failed to publish analytics event", ex)
-            );
+            .whenComplete((result, ex) -> {
+                if (ex != null) {
+                    log.error("Failed to publish analytics event", ex);
+                } else {
+                    log.debug("Analytics event published successfully");
+                }
+            });
     }
 }
