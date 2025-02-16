@@ -84,8 +84,10 @@ management:
       group:
         readiness:
           include: "*"
+          show-details: always
         liveness:
-          include: "ping"
+          include: ping
+          show-details: always
   health:
     redis:
       enabled: true
@@ -99,6 +101,8 @@ management:
       enabled: true
     diskspace:
       enabled: true
+    kafka:
+      enabled: false # Temporarily disable Kafka health check
 
 openrouter:
   api-key: ${OPENROUTER_API_KEY}

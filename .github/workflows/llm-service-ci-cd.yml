@@ -71,16 +71,10 @@ jobs:
             docker stop llm-service || true
             docker rm llm-service || true
 
-            # Add health check to Docker container
             docker run -d \
               --name llm-service \
               --network craftpilot-network \
               --restart unless-stopped \
-              --health-cmd="wget -q --spider http://localhost:8062/actuator/health || exit 1" \
-              --health-interval=30s \
-              --health-timeout=10s \
-              --health-retries=5 \
-              --health-start-period=120s \
               -p 8062:8062 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -92,45 +86,65 @@ jobs:
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
+              -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="*" \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
               -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
               -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
-              -e SERVER_SHUTDOWN=graceful \
+              -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
               -e SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL=PLAINTEXT \
+              -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
+              -e JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0" \
+              --health-cmd="curl -f http://localhost:8062/actuator/health/liveness || exit 1" \
+              --health-interval=30s \
+              --health-timeout=10s \
+              --health-retries=3 \
+              --health-start-period=120s \
               ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
 
-            echo "Installing curl in container..."
-            docker exec llm-service apt-get update && \
-            docker exec llm-service apt-get install -y curl
+            echo "=== Waiting for service startup ==="
+            max_attempts=20
+            counter=0
 
-            echo "Waiting for service startup..."
-            sleep 30
-
-            echo "Starting health checks..."
-            for i in {1..20}; do
-              echo "Health check attempt $i/20..."
+            while [ $counter -lt $max_attempts ]; do
+              echo "Health check attempt $((counter + 1))/$max_attempts"
               
-              if docker exec llm-service curl -sf http://localhost:8062/actuator/health; then
-                echo "Service is healthy!"
-                exit 0
+              # Container durumu kontrolü
+              if ! docker ps --filter "name=llm-service" --format '{{.Status}}' | grep -q "Up"; then
+                echo "Container is not running anymore. Checking logs..."
+                docker logs llm-service
+                exit 1
               fi
               
-              if [ $((i % 5)) -eq 0 ]; then
-                echo "Container logs at attempt $i:"
-                docker logs llm-service --tail 50
-                docker inspect llm-service | grep -A 10 "Health"
+              # Application log kontrolü
+              if docker logs llm-service 2>&1 | grep -q "Started LlmServiceApplication"; then
+                echo "Application startup completed"
+                
+                # Eureka registration kontrolü
+                if docker logs llm-service 2>&1 | grep -q "DiscoveryClient.*registration status: 204"; then
+                  echo "Successfully registered with Eureka"
+                  
+                  # Final health check
+                  HEALTH_CHECK=$(curl -s http://localhost:8062/actuator/health)
+                  if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
+                    echo "✓ Service is healthy"
+                    echo "=== Deployment completed successfully ==="
+                    exit 0
+                  fi
+                fi
               fi
               
+              echo "Waiting for service to start... ($((counter + 1))/$max_attempts)"
               sleep 15
+              counter=$((counter + 1))
             done
 
-            echo "Service failed to become healthy - Final diagnostics"
-            echo "Docker container status:"
+            echo "=== Health check failed - Debug Information ==="
+            echo "Docker Status:"
             docker ps -a | grep llm-service
-            echo "Container logs:"
-            docker logs llm-service
-            echo "Health check status:"
-            docker inspect llm-service | grep -A 10 "Health"
+            echo "Container Logs:"
+            docker logs llm-service --tail 100
+            echo "Health Check Response:"
+            curl -v http://localhost:8062/actuator/health || true
             exit 1
