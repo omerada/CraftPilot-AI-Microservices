@@ -7,12 +7,12 @@ RUN chmod +x ./mvnw
 RUN mvn clean package -DskipTests
 
 # Run stage
-FROM eclipse-temurin:21-jre-jammy
+FROM openjdk:21-slim
 
 WORKDIR /app
 COPY --from=builder /build/target/*.jar app.jar
 
-# Create directory for credentials
+# Create config directory
 RUN mkdir -p /app/config
 
 # JVM options
@@ -24,8 +24,8 @@ ENV SERVER_PORT=8080 \
     SPRING_APPLICATION_NAME=api-gateway \
     SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true \
     SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_LOWER_CASE_SERVICE_ID=true \
-    GCP_CREDENTIALS_PATH=file:/app/config/gcp-credentials.json
+    FIREBASE_CREDENTIALS_PATH=/app/config/firebase-credentials.json
 
 EXPOSE 8080
 
-ENTRYPOINT java ${JAVA_OPTS} -jar app.jar
+ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -140,6 +140,10 @@ spring:
       ACCEPT_CASE_INSENSITIVE_PROPERTIES: true
       DEFAULT_VIEW_INCLUSION: true
 
+  firebase:
+    credentials:
+      path: ${FIREBASE_CREDENTIALS_PATH:firebase-credentials.json}
+
 eureka:
   instance:
     prefer-ip-address: false

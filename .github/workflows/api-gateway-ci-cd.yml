@@ -66,7 +66,6 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-          
             # Deploy API Gateway
             echo "=== Deploying API Gateway ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
@@ -79,9 +78,10 @@ jobs:
               --network craftpilot-network \
               --restart unless-stopped \
               -p 8080:8080 \
-              -v /opt/craftpilot/gcp-credentials.json:/app/config/gcp-credentials.json:ro \
+              -v ${{ secrets.GCP_SA_KEY_PATH }}:/app/config/firebase-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8080 \
+              -e FIREBASE_CREDENTIALS_PATH=/app/config/firebase-credentials.json \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
               -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \

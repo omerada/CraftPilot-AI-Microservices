@@ -134,10 +134,11 @@ services:
     environment:
       <<: *common-variables
       SERVER_PORT: 8080
+      FIREBASE_CREDENTIALS_PATH: /app/config/firebase-credentials.json
     ports:
       - "8080:8080"
     volumes:
-      - ${GCP_SA_KEY_PATH}:/app/gcp-credentials.json:ro
+      - ${GCP_SA_KEY_PATH}:/app/config/firebase-credentials.json:ro
     networks:
       craftpilot-network:
         ipv4_address: 172.18.0.14
