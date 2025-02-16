@@ -123,6 +123,7 @@ spring:
         - AddResponseHeader=Access-Control-Allow-Methods, GET,POST,PUT,DELETE,OPTIONS,HEAD
         - AddResponseHeader=Access-Control-Allow-Headers, Origin,Content-Type,Accept,Authorization,X-Request-With
         - AddResponseHeader=Access-Control-Max-Age, 3600
+        - RemoveRequestHeader=Authorization # Authorization header'ı kaldır
       httpclient:
         connect-timeout: 5000
         response-timeout: 5000
@@ -175,8 +176,8 @@ management:
   endpoint:
     health:
       show-details: always
-      probes:
-        enabled: true
+  security:
+    enabled: false # Management endpoint'leri için security'i kapat
   health:
     circuitbreakers:
       enabled: true
