@@ -2,46 +2,30 @@ package com.craftpilot.apigateway.config;
 
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
-import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.servers.Server;
-import org.springdoc.core.models.GroupedOpenApi;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.List;
 
 @Configuration
 public class OpenApiConfig {
 
+    @Value("${spring.application.name}")
+    private String applicationName;
+
     @Bean
-    public OpenAPI apiGatewayOpenAPI() {
+    public OpenAPI customOpenAPI() {
         return new OpenAPI()
+                .servers(List.of(
+                    new Server().url("/"),
+                    new Server().url("http://api.craftpilot.io"),
+                    new Server().url("https://api.craftpilot.io")
+                ))
                 .info(new Info()
-                        .title("CraftPilot API Gateway")
-                        .description("CraftPilot Microservices API Documentation")
-                        .version("1.0"));
-    }
-
-    @Bean
-    public GroupedOpenApi publicApi() {
-        return GroupedOpenApi.builder()
-                .group("public-apis")
-                .pathsToMatch("/api/**")
-                .pathsToExclude("/api/admin/**")
-                .build();
-    }
-
-    @Bean
-    public GroupedOpenApi adminApi() {
-        return GroupedOpenApi.builder()
-                .group("admin-apis")
-                .pathsToMatch("/api/admin/**")
-                .build();
-    }
-
-    @Bean
-    public GroupedOpenApi actuatorApi() {
-        return GroupedOpenApi.builder()
-                .group("actuator")
-                .pathsToMatch("/actuator/**")
-                .build();
+                    .title(applicationName.toUpperCase() + " API Documentation")
+                    .version("1.0")
+                    .description("API Gateway Documentation for CraftPilot AI Platform"));
     }
 }

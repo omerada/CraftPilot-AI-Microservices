@@ -21,15 +21,26 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers("/swagger-ui.html", 
-                            "/swagger-ui/**", 
-                            "/v3/api-docs/**", 
-                            "/webjars/**",
-                            "/swagger-resources/**",
-                            "/actuator/**",
-                            "/health/**").permitAll()
+                .pathMatchers(
+                    "/",
+                    "/swagger-ui.html",
+                    "/swagger-ui/**",
+                    "/v3/api-docs/**",
+                    "/v3/api-docs.yaml",
+                    "/webjars/**",
+                    "/swagger-resources/**",
+                    "/swagger-resources",
+                    "/actuator/**",
+                    "/actuator",
+                    "/health/**",
+                    "/health",
+                    "/info"
+                ).permitAll()
                 .anyExchange().permitAll()
-            );
+            )
+            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+            .formLogin(ServerHttpSecurity.FormLoginSpec::disable);
+        
         return http.build();
     }
 
@@ -39,7 +50,9 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(Arrays.asList("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setExposedHeaders(Arrays.asList("Content-Disposition"));
         configuration.setMaxAge(3600L);
+        configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

@@ -173,6 +173,8 @@ springdoc:
   packages-to-scan: com.craftpilot.apigateway
   webjars:
     prefix: /webjars
+  default-produces-media-type: application/json
+  default-consumes-media-type: application/json
 
 eureka:
   instance:
