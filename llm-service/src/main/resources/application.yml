@@ -58,26 +58,25 @@ eureka:
 management:
   endpoints:
     web:
+      base-path: /actuator
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+      cors:
+        allowed-origins: "*"
+        allowed-methods: GET
   endpoint:
     health:
       show-details: always
       probes:
         enabled: true
-      group:
-        readiness:
-          include: redis,diskSpace
-        liveness:
-          include: ping
   health:
     redis:
       enabled: true
     circuitbreakers:
       enabled: true
-    livenessstate:
+    livenessState:
       enabled: true
-    readinessstate:
+    readinessState:
       enabled: true
 
 openrouter:
