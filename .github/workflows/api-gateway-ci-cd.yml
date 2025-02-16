@@ -66,11 +66,20 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Ensure config directory exists
+            mkdir -p /app/config
+
             # Deploy API Gateway
             echo "=== Deploying API Gateway ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
             docker stop api-gateway || true
             docker rm api-gateway || true
+
+            # Verify GCP credentials file exists
+            if [ ! -f "${{ secrets.GCP_SA_KEY_PATH }}" ]; then
+              echo "Error: GCP credentials file not found at ${{ secrets.GCP_SA_KEY_PATH }}"
+              exit 1
+            fi
 
             docker run -d \
               --name api-gateway \
@@ -81,7 +90,7 @@ jobs:
               -v ${{ secrets.GCP_SA_KEY_PATH }}:/app/config/firebase-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8080 \
-              -e FIREBASE_CREDENTIALS_PATH=/app/config/firebase-credentials.json \
+              -e SPRING_FIREBASE_CREDENTIALS_PATH=/app/config/firebase-credentials.json \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
               -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \

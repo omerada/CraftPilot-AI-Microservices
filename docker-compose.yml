@@ -134,7 +134,7 @@ services:
     environment:
       <<: *common-variables
       SERVER_PORT: 8080
-      FIREBASE_CREDENTIALS_PATH: /app/config/firebase-credentials.json
+      SPRING_FIREBASE_CREDENTIALS_PATH: /app/config/firebase-credentials.json
     ports:
       - "8080:8080"
     volumes:
