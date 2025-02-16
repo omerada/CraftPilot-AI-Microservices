@@ -67,4 +67,4 @@ public class SubscriptionController {
     public Flux<Subscription> getExpiringSubscriptions() {
         return subscriptionService.getExpiringSubscriptions();
     }
-} 
+}

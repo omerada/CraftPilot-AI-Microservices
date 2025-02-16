@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/user-activities")
+@RequestMapping("/user-activities")  // /api/admin prefix'i kaldırıldı
 @RequiredArgsConstructor
 @Tag(name = "User Activities", description = "User activity management APIs")
 public class UserActivityController {
@@ -118,4 +118,4 @@ public class UserActivityController {
         return userActivityService.getActivityCount(userId)
                 .map(ResponseEntity::ok);
     }
-} 
+}

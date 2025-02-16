@@ -92,4 +92,4 @@ public class SubscriptionPlanController {
             throw new SecurityException("Only admin users can perform this operation");
         }
     }
-} 
+}

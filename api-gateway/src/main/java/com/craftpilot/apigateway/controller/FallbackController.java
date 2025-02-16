@@ -14,107 +14,73 @@ import java.util.Map;
 @RequestMapping("/fallback")
 public class FallbackController {
 
+    private Mono<ResponseEntity<Map<String, String>>> createFallbackResponse(String serviceName) {
+        Map<String, String> response = new HashMap<>();
+        response.put("status", "error");
+        response.put("message", serviceName + " service is currently unavailable");
+        response.put("timestamp", String.valueOf(System.currentTimeMillis()));
+        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response));
+    }
+
+    // Core Services
     @GetMapping("/user")
     public Mono<ResponseEntity<Map<String, String>>> userServiceFallback() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "error");
-        response.put("message", "User service is currently unavailable");
-        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response));
+        return createFallbackResponse("User");
     }
 
+    @GetMapping("/auth")
+    public Mono<ResponseEntity<Map<String, String>>> authServiceFallback() {
+        return createFallbackResponse("Authentication");
+    }
+
+    // Business Services
     @GetMapping("/admin")
     public Mono<ResponseEntity<Map<String, String>>> adminServiceFallback() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "error");
-        response.put("message", "Admin service is currently unavailable");
-        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response));
-    }
-
-    @GetMapping("/question")
-    public Mono<ResponseEntity<Map<String, String>>> questionServiceFallback() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "error");
-        response.put("message", "Question service is currently unavailable");
-        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response));
-    }
-
-    @GetMapping("/chat")
-    public Mono<ResponseEntity<Map<String, String>>> chatServiceFallback() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "error");
-        response.put("message", "Chat service is currently unavailable");
-        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response));
-    }
-
-    @GetMapping("/image")
-    public Mono<ResponseEntity<Map<String, String>>> imageServiceFallback() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "error");
-        response.put("message", "Image service is currently unavailable");
-        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response));
-    }
-
-    @GetMapping("/code")
-    public Mono<ResponseEntity<Map<String, String>>> codeServiceFallback() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "error");
-        response.put("message", "Code service is currently unavailable");
-        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response));
-    }
-
-    @GetMapping("/translation")
-    public Mono<ResponseEntity<Map<String, String>>> translationServiceFallback() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "error");
-        response.put("message", "Translation service is currently unavailable");
-        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response));
-    }
-
-    @GetMapping("/content")
-    public Mono<ResponseEntity<Map<String, String>>> contentServiceFallback() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "error");
-        response.put("message", "Content service is currently unavailable");
-        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response));
-    }
-
-    @GetMapping("/model")
-    public Mono<ResponseEntity<Map<String, String>>> modelServiceFallback() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "error");
-        response.put("message", "Model service is currently unavailable");
-        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response));
+        return createFallbackResponse("Admin");
     }
 
     @GetMapping("/analytics")
     public Mono<ResponseEntity<Map<String, String>>> analyticsServiceFallback() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "error");
-        response.put("message", "Analytics service is currently unavailable");
-        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response));
+        return createFallbackResponse("Analytics");
     }
 
-    @GetMapping("/notification")
-    public Mono<ResponseEntity<Map<String, String>>> notificationServiceFallback() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "error");
-        response.put("message", "Notification service is currently unavailable");
-        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response));
+    @GetMapping("/ai")
+    public Mono<ResponseEntity<Map<String, String>>> llmServiceFallback() {
+        return createFallbackResponse("AI/LLM");
     }
 
-    @GetMapping("/credit")
+    @GetMapping("/images")
+    public Mono<ResponseEntity<Map<String, String>>> imageServiceFallback() {
+        return createFallbackResponse("Image");
+    }
+
+    @GetMapping("/credits")
     public Mono<ResponseEntity<Map<String, String>>> creditServiceFallback() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "error");
-        response.put("message", "Credit service is currently unavailable");
-        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response));
+        return createFallbackResponse("Credit");
     }
 
-    @GetMapping("/subscription")
+    @GetMapping("/subscriptions")
     public Mono<ResponseEntity<Map<String, String>>> subscriptionServiceFallback() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "error");
-        response.put("message", "Subscription service is currently unavailable");
-        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response));
+        return createFallbackResponse("Subscription");
     }
-} 
+
+    @GetMapping("/notifications")
+    public Mono<ResponseEntity<Map<String, String>>> notificationServiceFallback() {
+        return createFallbackResponse("Notification");
+    }
+
+    @GetMapping("/cache")
+    public Mono<ResponseEntity<Map<String, String>>> redisServiceFallback() {
+        return createFallbackResponse("Cache/Redis");
+    }
+ 
+    @GetMapping("/subscription-plans")
+    public Mono<ResponseEntity<Map<String, String>>> subscriptionPlansServiceFallback() {
+        return createFallbackResponse("Subscription Plans");
+    }
+
+    @GetMapping("/payments")
+    public Mono<ResponseEntity<Map<String, String>>> paymentsServiceFallback() {
+        return createFallbackResponse("Payment");
+    }
+}

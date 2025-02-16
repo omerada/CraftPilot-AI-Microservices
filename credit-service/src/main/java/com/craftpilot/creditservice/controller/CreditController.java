@@ -49,4 +49,4 @@ public class CreditController {
         return creditService.getUserTransactions(userId)
                 .map(CreditTransactionDto::fromEntity);
     }
-} 
+}

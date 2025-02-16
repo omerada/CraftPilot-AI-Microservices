@@ -48,4 +48,4 @@ public class LLMController {
         request.setRequestType("content");
         return openRouterService.processRequest(request);
     }
-} 
+}

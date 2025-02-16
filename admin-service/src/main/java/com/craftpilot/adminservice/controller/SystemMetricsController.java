@@ -14,7 +14,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 
 @RestController
-@RequestMapping("/system-metrics")
+@RequestMapping("/system-metrics")  // /api/admin prefix'i kaldırıldı
 @RequiredArgsConstructor
 @Tag(name = "System Metrics", description = "System metrics management APIs")
 public class SystemMetricsController {
@@ -96,4 +96,4 @@ public class SystemMetricsController {
         return systemMetricsService.getServicesRequiringMaintenance()
                 .map(ResponseEntity::ok);
     }
-} 
+}

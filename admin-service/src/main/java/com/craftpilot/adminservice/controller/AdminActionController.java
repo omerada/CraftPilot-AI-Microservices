@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/admin-actions")
+@RequestMapping("/admin-actions")  // /api/admin prefix'i kaldırıldı
 @RequiredArgsConstructor
 @Tag(name = "Admin Actions", description = "Admin action management APIs")
 public class AdminActionController {
@@ -134,4 +134,4 @@ public class AdminActionController {
         return adminActionService.hasPermission(adminId, actionType)
                 .map(ResponseEntity::ok);
     }
-} 
+}

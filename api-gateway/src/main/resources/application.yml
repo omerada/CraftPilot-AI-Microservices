@@ -31,28 +31,26 @@ spring:
         - id: user-service
           uri: lb://user-service
           predicates:
-            - Path=/api/users/**,/api/auth/**
+            - Path=/users/**,/auth/**
           filters:
             - name: CircuitBreaker
               args:
                 name: userServiceCircuitBreaker
-                fallbackUri: forward:/fallback/user
 
         # Business Services
         - id: admin-service
           uri: lb://admin-service
           predicates:
-            - Path=/api/admin/**,/api/management/**
+            - Path=/admin/**
           filters:
-            - name: CircuitBreaker
-              args:
-                name: adminServiceCircuitBreaker
+            - StripPrefix=1
 
         - id: analytics-service
           uri: lb://analytics-service
           predicates:
-            - Path=/api/analytics/**,/api/reports/**,/api/metrics/**
+            - Path=/analytics/**
           filters:
+            - StripPrefix=1
             - name: CircuitBreaker
               args:
                 name: analyticsServiceCircuitBreaker
@@ -60,8 +58,9 @@ spring:
         - id: llm-service
           uri: lb://llm-service
           predicates:
-            - Path=/api/questions/**,/api/chat/**,/api/completions/**
+            - Path=/ai/**
           filters:
+            - StripPrefix=1
             - name: CircuitBreaker
               args:
                 name: llmServiceCircuitBreaker
@@ -69,8 +68,9 @@ spring:
         - id: image-service
           uri: lb://image-service
           predicates:
-            - Path=/api/images/**,/api/media/**
+            - Path=/images/**
           filters:
+            - StripPrefix=1
             - name: CircuitBreaker
               args:
                 name: imageServiceCircuitBreaker
@@ -78,7 +78,7 @@ spring:
         - id: credit-service
           uri: lb://credit-service
           predicates:
-            - Path=/api/credits/**,/api/payments/**,/api/billing/**
+            - Path=/credits/**
           filters:
             - name: CircuitBreaker
               args:
@@ -87,8 +87,9 @@ spring:
         - id: subscription-service
           uri: lb://subscription-service
           predicates:
-            - Path=/api/subscriptions/**,/api/plans/**
+            - Path=/subscriptions/**,/subscription-plans/**,/payments/**
           filters:
+            - StripPrefix=1
             - name: CircuitBreaker
               args:
                 name: subscriptionServiceCircuitBreaker
@@ -96,20 +97,23 @@ spring:
         - id: notification-service
           uri: lb://notification-service
           predicates:
-            - Path=/api/notifications/**,/api/messages/**
+            - Path=/notifications/**
           filters:
+            - StripPrefix=1
             - name: CircuitBreaker
               args:
                 name: notificationServiceCircuitBreaker
 
-        # Swagger UI Routes
-        - id: swagger-ui
-          uri: ${spring.cloud.gateway.uri:http://localhost:8080}
+        - id: redis-service
+          uri: lb://redis-service
           predicates:
-            - Path=/swagger-ui/**,/swagger-ui.html,/v3/api-docs/**
+            - Path=/cache/**
           filters:
-            - StripPrefix=0
-            - AddResponseHeader=Access-Control-Allow-Origin, *
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: redisServiceCircuitBreaker
+
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin
         - AddResponseHeader=Access-Control-Allow-Origin, *
@@ -135,29 +139,6 @@ spring:
     mapper:
       ACCEPT_CASE_INSENSITIVE_PROPERTIES: true
       DEFAULT_VIEW_INCLUSION: true
-
-springdoc:
-  api-docs:
-    enabled: true
-    path: /v3/api-docs
-  swagger-ui:
-    enabled: true
-    path: /swagger-ui.html
-    config-url: /v3/api-docs/swagger-config
-    urls:
-      - url: /v3/api-docs
-        name: API Gateway
-    operationsSorter: method
-    disable-swagger-default-url: true
-    csrf:
-      enabled: false
-    security:
-      enabled: false
-  cache:
-    disabled: true
-  show-actuator: true
-  use-management-port: false
-  packages-to-scan: com.craftpilot.apigateway
 
 eureka:
   instance:

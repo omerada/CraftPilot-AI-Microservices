@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/audit-logs")
+@RequestMapping("/audit-logs")  // /api/admin prefix'i kaldırıldı
 @RequiredArgsConstructor
 @Tag(name = "Audit Logs", description = "Audit log management APIs")
 public class AuditLogController {
@@ -155,4 +155,4 @@ public class AuditLogController {
         return auditLogService.getLogCount(userId)
                 .map(ResponseEntity::ok);
     }
-} 
+}

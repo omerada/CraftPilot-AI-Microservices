@@ -6,7 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/redis")
+@RequestMapping("/cache")
 @RequiredArgsConstructor
 public class RedisController {
 
@@ -65,4 +65,4 @@ public class RedisController {
         redisService.releaseLock(key);
         return ResponseEntity.ok().build();
     }
-} 
+}

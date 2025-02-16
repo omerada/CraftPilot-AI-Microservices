@@ -150,4 +150,4 @@ public class SystemAlertController {
         return systemAlertService.isServiceInCriticalState(serviceId)
                 .map(ResponseEntity::ok);
     }
-} 
+}
