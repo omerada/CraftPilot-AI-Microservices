@@ -4,13 +4,16 @@ import com.craftpilot.userservice.model.UserPreference;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import java.time.Duration;
 
 @Configuration
 public class RedisConfig {
@@ -25,35 +28,24 @@ public class RedisConfig {
     private String password;
 
     @Bean
+    @Primary
     public ReactiveRedisConnectionFactory reactiveRedisConnectionFactory() {
-        RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration();
-        configuration.setHostName(redisHost);
-        configuration.setPort(redisPort);
-        configuration.setPassword(password);
-        return new LettuceConnectionFactory(configuration);
-    }
-
-    @Bean
-    public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
-            ReactiveRedisConnectionFactory connectionFactory) {
-        StringRedisSerializer keySerializer = new StringRedisSerializer();
-        Jackson2JsonRedisSerializer<Object> valueSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
-
-        RedisSerializationContext.RedisSerializationContextBuilder<String, Object> builder =
-                RedisSerializationContext.newSerializationContext(keySerializer);
-
-        RedisSerializationContext<String, Object> context = builder
-                .value(valueSerializer)
-                .hashKey(keySerializer)
-                .hashValue(valueSerializer)
-                .build();
-
-        return new ReactiveRedisTemplate<>(connectionFactory, context);
+        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
+        config.setHostName(redisHost);
+        config.setPort(redisPort);
+        config.setPassword(password);
+        
+        LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
+            .commandTimeout(Duration.ofSeconds(5))
+            .shutdownTimeout(Duration.ofSeconds(2))
+            .build();
+        
+        return new LettuceConnectionFactory(config, clientConfig);
     }
 
     @Bean
     public ReactiveRedisTemplate<String, UserPreference> userPreferenceReactiveRedisTemplate(
-            ReactiveRedisConnectionFactory connectionFactory) {
+            ReactiveRedisConnectionFactory reactiveRedisConnectionFactory) {
         StringRedisSerializer keySerializer = new StringRedisSerializer();
         Jackson2JsonRedisSerializer<UserPreference> valueSerializer = 
             new Jackson2JsonRedisSerializer<>(UserPreference.class);
@@ -67,6 +59,6 @@ public class RedisConfig {
                 .hashValue(valueSerializer)
                 .build();
 
-        return new ReactiveRedisTemplate<>(connectionFactory, context);
+        return new ReactiveRedisTemplate<>(reactiveRedisConnectionFactory, context);
     }
 }
