@@ -35,16 +35,88 @@ spring:
             allowedMethods: "*"
             allowedHeaders: "*"
       routes:
-        - id: all_services
-          uri: lb://
+        # Core Services
+        - id: user-service
+          uri: lb://user-service
           predicates:
-            - Path=/**
+            - Path=/api/users/**,/api/auth/**
           filters:
-            - StripPrefix=0
             - name: CircuitBreaker
               args:
-                name: defaultCircuitBreaker
+                name: userServiceCircuitBreaker
+                fallbackUri: forward:/fallback/user
+
+        # Business Services
+        - id: admin-service
+          uri: lb://admin-service
+          predicates:
+            - Path=/api/admin/**,/api/management/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: adminServiceCircuitBreaker
                 fallbackUri: forward:/fallback
+
+        - id: analytics-service
+          uri: lb://analytics-service
+          predicates:
+            - Path=/api/analytics/**,/api/reports/**,/api/metrics/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: analyticsServiceCircuitBreaker
+                fallbackUri: forward:/fallback
+
+        - id: llm-service
+          uri: lb://llm-service
+          predicates:
+            - Path=/api/questions/**,/api/chat/**,/api/completions/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: llmServiceCircuitBreaker
+                fallbackUri: forward:/fallback
+
+        - id: image-service
+          uri: lb://image-service
+          predicates:
+            - Path=/api/images/**,/api/media/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: imageServiceCircuitBreaker
+                fallbackUri: forward:/fallback
+
+        - id: credit-service
+          uri: lb://credit-service
+          predicates:
+            - Path=/api/credits/**,/api/payments/**,/api/billing/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: creditServiceCircuitBreaker
+                fallbackUri: forward:/fallback
+
+        - id: subscription-service
+          uri: lb://subscription-service
+          predicates:
+            - Path=/api/subscriptions/**,/api/plans/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: subscriptionServiceCircuitBreaker
+                fallbackUri: forward:/fallback
+
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/notifications/**,/api/messages/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: notificationServiceCircuitBreaker
+                fallbackUri: forward:/fallback
+
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin
         - AddResponseHeader=Access-Control-Allow-Origin, *
