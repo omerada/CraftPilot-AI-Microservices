@@ -38,6 +38,18 @@ spring:
           min-idle: 2
           max-wait: 1000ms
         shutdown-timeout: 200ms
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    properties:
+      security.protocol: PLAINTEXT
+      reconnect.backoff.ms: 1000
+      reconnect.backoff.max.ms: 5000
+    consumer:
+      auto-offset-reset: earliest
+      group-id: llm-service-group
+    producer:
+      retries: 3
+      acks: all
 
 kafka:
   topics:
@@ -60,7 +72,7 @@ management:
     web:
       base-path: /actuator
       exposure:
-        include: health,info,metrics,prometheus
+        include: "*"
       cors:
         allowed-origins: "*"
         allowed-methods: GET
@@ -69,6 +81,11 @@ management:
       show-details: always
       probes:
         enabled: true
+      group:
+        readiness:
+          include: "*"
+        liveness:
+          include: "ping"
   health:
     redis:
       enabled: true
@@ -77,6 +94,10 @@ management:
     livenessState:
       enabled: true
     readinessState:
+      enabled: true
+    defaults:
+      enabled: true
+    diskspace:
       enabled: true
 
 openrouter:

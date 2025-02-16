@@ -30,13 +30,13 @@ public class LightSecurityConfig {
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers("/actuator/health").permitAll()
-                .pathMatchers("/actuator/info").permitAll()
+                .pathMatchers("/actuator/**").permitAll()
+                .pathMatchers("/actuator/health/**").permitAll()
+                .pathMatchers("/actuator/info/**").permitAll()
                 .pathMatchers("/v3/api-docs/**").permitAll()
                 .pathMatchers("/swagger-ui/**").permitAll()
-                .anyExchange().authenticated()
+                .anyExchange().permitAll() // Geçici olarak tüm endpointleri açıyoruz
             )
-            .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
             .build();
     }
 

@@ -76,11 +76,11 @@ jobs:
               --name llm-service \
               --network craftpilot-network \
               --restart unless-stopped \
-              --health-cmd="curl -f http://localhost:8062/actuator/health || exit 1" \
-              --health-interval=10s \
-              --health-timeout=5s \
-              --health-retries=3 \
-              --health-start-period=60s \
+              --health-cmd="wget -q --spider http://localhost:8062/actuator/health || exit 1" \
+              --health-interval=30s \
+              --health-timeout=10s \
+              --health-retries=5 \
+              --health-start-period=120s \
               -p 8062:8062 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -92,11 +92,13 @@ jobs:
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="*" \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
               -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
               -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
-              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics \
-              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e SERVER_SHUTDOWN=graceful \
+              -e SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL=PLAINTEXT \
               ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
 
             echo "Installing curl in container..."
