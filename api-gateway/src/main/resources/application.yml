@@ -32,14 +32,8 @@ spring:
         corsConfigurations:
           "[/**]":
             allowedOrigins: "*"
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - DELETE
-              - OPTIONS
+            allowedMethods: "*"
             allowedHeaders: "*"
-            maxAge: 3600
       routes:
         # Core Services
         - id: user-service
@@ -126,7 +120,7 @@ spring:
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin
         - AddResponseHeader=Access-Control-Allow-Origin, *
-        - AddResponseHeader=Access-Control-Allow-Methods, GET,POST,PUT,DELETE,OPTIONS
+        - AddResponseHeader=Access-Control-Allow-Methods, GET,POST,PUT,DELETE,OPTIONS,HEAD
         - AddResponseHeader=Access-Control-Allow-Headers, Origin,Content-Type,Accept,Authorization,X-Request-With
         - AddResponseHeader=Access-Control-Max-Age, 3600
       httpclient:
@@ -148,36 +142,6 @@ spring:
     mapper:
       ACCEPT_CASE_INSENSITIVE_PROPERTIES: true
       DEFAULT_VIEW_INCLUSION: true
-
-springdoc:
-  api-docs:
-    enabled: true
-    path: /v3/api-docs
-    resolve-schema-properties: true
-  swagger-ui:
-    enabled: true
-    path: /swagger-ui.html
-    urls:
-      - url: /v3/api-docs
-        name: API Gateway
-    operationsSorter: method
-    disable-swagger-default-url: true
-    csrf:
-      enabled: false
-    security:
-      enabled: false
-    use-root-path: true
-  cache:
-    disabled: true
-  show-actuator: true
-  use-management-port: false
-  packages-to-scan: com.craftpilot.apigateway
-  webjars:
-    prefix: /webjars
-  default-produces-media-type: application/json
-  default-consumes-media-type: application/json
-  paths-to-match:
-    - /**
 
 eureka:
   instance:
