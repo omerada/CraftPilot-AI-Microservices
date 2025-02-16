@@ -19,18 +19,6 @@ import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
-    public static final String[] PUBLIC_PATHS = {
-        "/",
-        "/swagger-ui.html",
-        "/swagger-ui/**",
-        "/v3/api-docs/**",
-        "/webjars/**",
-        "/actuator/health",
-        "/actuator/info",
-        "/api/auth/**",
-        "/public/**"
-    };
-
     private final FirebaseAuthenticationFilter firebaseAuthenticationFilter;
 
     public SecurityConfig(FirebaseAuthenticationFilter firebaseAuthenticationFilter) {
@@ -38,22 +26,14 @@ public class SecurityConfig {
     }
 
     @Bean
-    @Order(1)
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers("/public/**").permitAll()
-                .pathMatchers("/admin/**").hasRole("ADMIN")
-                .pathMatchers("/users/**").authenticated()
+                .pathMatchers("/public/**", "/actuator/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
                 .anyExchange().authenticated()
             )
-            .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(jwt -> jwt
-                    .jwtAuthenticationConverter(grantedAuthoritiesExtractor())
-                )
-            )
-            .addFilterBefore(new CustomAuthFilter(), SecurityWebFiltersOrder.AUTHORIZATION)
+            .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
             .build();
     }
 
@@ -61,17 +41,5 @@ public class SecurityConfig {
     public ServerSecurityContextRepository securityContextRepository() {
         return new WebSessionServerSecurityContextRepository();
     }
-
-    @Bean
-    public CorsWebFilter corsFilter() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.addAllowedOrigin("*");
-        config.addAllowedHeader("*");
-        config.addAllowedMethod("*");
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-
-        return new CorsWebFilter(source);
-    }
+ 
 }

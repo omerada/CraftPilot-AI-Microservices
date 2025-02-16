@@ -4,6 +4,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +26,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
 public class FirebaseAuthenticationFilter implements WebFilter {
     private static final Logger log = LoggerFactory.getLogger(FirebaseAuthenticationFilter.class);
@@ -61,9 +63,32 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             return chain.filter(exchange);
         }
 
-        return extractAndValidateToken(exchange)
-            .flatMap(token -> authenticateAndChain(token, exchange, chain))
-            .onErrorResume(this::handleError);
+        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+            return exchange.getResponse().setComplete();
+        }
+
+        String token = authHeader.substring(7);
+
+        return validateFirebaseToken(token)
+            .flatMap(firebaseToken -> {
+                // Firebase token'dan custom headers oluştur
+                ServerWebExchange modifiedExchange = exchange.mutate()
+                    .request(exchange.getRequest().mutate()
+                        .header("X-User-Id", firebaseToken.getUid())
+                        .header("X-User-Role", extractUserRole(firebaseToken))
+                        .header("X-User-Email", firebaseToken.getEmail())
+                        .build())
+                    .build();
+                
+                return chain.filter(modifiedExchange);
+            })
+            .onErrorResume(e -> {
+                log.error("Firebase authentication error", e);
+                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                return exchange.getResponse().setComplete();
+            });
     }
 
     private boolean isPublicPath(String path) {
@@ -71,85 +96,13 @@ public class FirebaseAuthenticationFilter implements WebFilter {
                path.matches(".+\\.(png|jpg|ico|css|js|html)$");
     }
 
-    private Mono<FirebaseToken> extractAndValidateToken(ServerWebExchange exchange) {
-        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-
-        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-            return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing or invalid Authorization header"));
-        }
-
-        String token = authHeader.substring(BEARER_PREFIX.length());
-        
-        // Check cache first
-        FirebaseToken cachedToken = tokenCache.getIfPresent(token);
-        if (cachedToken != null) {
-            return Mono.just(cachedToken);
-        }
-
-        // Verify token if not in cache
-        return Mono.fromCallable(() -> {
-            FirebaseToken verifiedToken = firebaseAuth.verifyIdToken(token);
-            tokenCache.put(token, verifiedToken);
-            return verifiedToken;
-        }).subscribeOn(Schedulers.boundedElastic());
+    private Mono<FirebaseToken> validateFirebaseToken(String token) {
+        return Mono.fromCallable(() -> FirebaseAuth.getInstance().verifyIdToken(token));
     }
 
-    private Mono<Void> authenticateAndChain(FirebaseToken decodedToken, 
-                                          ServerWebExchange exchange, 
-                                          WebFilterChain chain) {
-        // Extract user roles and claims
-        List<SimpleGrantedAuthority> authorities = extractAuthorities(decodedToken);
-        
-        // Create user details
-        FirebaseUserDetails userDetails = new FirebaseUserDetails(decodedToken);
-        
-        // Create authentication token
-        UsernamePasswordAuthenticationToken authentication = 
-            new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
-
-        // Add custom headers
-        ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
-            .header("X-User-Id", decodedToken.getUid())
-            .header("X-User-Email", decodedToken.getEmail())
-            .header("X-User-Role", String.join(",", 
-                authorities.stream()
-                    .map(SimpleGrantedAuthority::getAuthority)
-                    .collect(Collectors.toList())))
-            .build();
-
-        // Create new exchange with mutated request
-        ServerWebExchange mutatedExchange = exchange.mutate()
-            .request(mutatedRequest)
-            .build();
-
-        return chain.filter(mutatedExchange)
-            .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication));
-    }
-
-    private List<SimpleGrantedAuthority> extractAuthorities(FirebaseToken token) {
-        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
-        
-        // Add default role
-        authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
-        
-        // Add custom roles from claims
-        if (token.getClaims().containsKey("roles")) {
-            @SuppressWarnings("unchecked")
-            List<String> roles = (List<String>) token.getClaims().get("roles");
-            roles.stream()
-                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
-                .forEach(authorities::add);
-        }
-        
-        return authorities;
-    }
-
-    private Mono<Void> handleError(Throwable error) {
-        if (error instanceof ResponseStatusException) {
-            throw (ResponseStatusException) error;
-        }
-        
-        log.error("Authentication error", error);
-        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication failed");
+    private String extractUserRole(FirebaseToken token) {
+        // Firebase custom claims'den rolleri al
+        Object claims = token.getClaims().get("role");
+        return claims != null ? claims.toString() : "USER";
     }
 }

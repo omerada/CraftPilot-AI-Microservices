@@ -43,39 +43,27 @@ public class LightSecurityConfig {
     @Bean
     public WebFilter headerValidationFilter() {
         return (exchange, chain) -> {
-            String userId = exchange.getRequest().getHeaders().getFirst(USER_ID_HEADER);
-            String userRole = exchange.getRequest().getHeaders().getFirst(USER_ROLE_HEADER);
-            String correlationId = exchange.getRequest().getHeaders().getFirst(CORRELATION_ID_HEADER);
-            String apiKey = exchange.getRequest().getHeaders().getFirst(API_KEY_HEADER);
+            String userId = exchange.getRequest().getHeaders().getFirst("X-User-Id");
+            String userRole = exchange.getRequest().getHeaders().getFirst("X-User-Role");
+            String userEmail = exchange.getRequest().getHeaders().getFirst("X-User-Email");
 
-            // Actuator endpoints için header kontrolünü bypass et
+            // Public endpoints bypass
             String path = exchange.getRequest().getPath().value();
             if (path.startsWith("/actuator/") || path.startsWith("/v3/api-docs") || path.startsWith("/swagger-ui")) {
                 return chain.filter(exchange);
             }
 
-            // Header validasyonları
-            if (userId == null || userRole == null || correlationId == null || apiKey == null) {
-                log.warn("Missing required headers. Path: {}, CorrelationId: {}", path, correlationId);
+            // Firebase user bilgilerini kontrol et
+            if (userId == null || userRole == null) {
                 exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
                 return exchange.getResponse().setComplete();
             }
 
-            // API Key kontrolü (Gerçek uygulamada bu değer config'den veya vault'dan gelmeli)
-            if (!"valid-api-key".equals(apiKey)) {
-                log.warn("Invalid API Key. Path: {}, CorrelationId: {}", path, correlationId);
-                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+            // Admin endpoint'leri için rol kontrolü
+            if (path.startsWith("/admin") && !userRole.contains("ADMIN")) {
+                exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
                 return exchange.getResponse().setComplete();
             }
-
-            // Log security info
-            log.debug("Security headers validated. UserId: {}, Role: {}, CorrelationId: {}, Path: {}", 
-                     userId, userRole, correlationId, path);
-
-            // Request'e custom attributes ekle
-            exchange.getAttributes().put("userId", userId);
-            exchange.getAttributes().put("userRole", userRole);
-            exchange.getAttributes().put("correlationId", correlationId);
 
             return chain.filter(exchange);
         };
