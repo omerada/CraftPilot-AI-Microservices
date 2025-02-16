@@ -1,5 +1,7 @@
 server:
-  port: ${SERVER_PORT:8080}
+  port: 8080
+  ssl:
+    enabled: false
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/xml,text/plain
@@ -26,90 +28,23 @@ spring:
         locator:
           enabled: true
           lower-case-service-id: true
+      globalcors:
+        corsConfigurations:
+          "[/**]":
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
       routes:
-        # Core Services
-        - id: user-service
-          uri: lb://user-service
+        - id: all_services
+          uri: lb://
           predicates:
-            - Path=/api/users/**,/api/auth/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: userServiceCircuitBreaker
-                fallbackUri: forward:/fallback/user
-
-        # Business Services
-        - id: admin-service
-          uri: lb://admin-service
-          predicates:
-            - Path=/api/admin/**,/api/management/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: adminServiceCircuitBreaker
-
-        - id: analytics-service
-          uri: lb://analytics-service
-          predicates:
-            - Path=/api/analytics/**,/api/reports/**,/api/metrics/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: analyticsServiceCircuitBreaker
-
-        - id: llm-service
-          uri: lb://llm-service
-          predicates:
-            - Path=/api/questions/**,/api/chat/**,/api/completions/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: llmServiceCircuitBreaker
-
-        - id: image-service
-          uri: lb://image-service
-          predicates:
-            - Path=/api/images/**,/api/media/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: imageServiceCircuitBreaker
-
-        - id: credit-service
-          uri: lb://credit-service
-          predicates:
-            - Path=/api/credits/**,/api/payments/**,/api/billing/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: creditServiceCircuitBreaker
-
-        - id: subscription-service
-          uri: lb://subscription-service
-          predicates:
-            - Path=/api/subscriptions/**,/api/plans/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: subscriptionServiceCircuitBreaker
-
-        - id: notification-service
-          uri: lb://notification-service
-          predicates:
-            - Path=/api/notifications/**,/api/messages/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: notificationServiceCircuitBreaker
-
-        # Swagger UI Routes
-        - id: swagger-ui
-          uri: ${spring.cloud.gateway.uri:http://localhost:8080}
-          predicates:
-            - Path=/swagger-ui/**,/swagger-ui.html,/v3/api-docs/**
+            - Path=/**
           filters:
             - StripPrefix=0
-            - AddResponseHeader=Access-Control-Allow-Origin, *
+            - name: CircuitBreaker
+              args:
+                name: defaultCircuitBreaker
+                fallbackUri: forward:/fallback
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin
         - AddResponseHeader=Access-Control-Allow-Origin, *
@@ -162,7 +97,7 @@ springdoc:
 eureka:
   instance:
     prefer-ip-address: false
-    hostname: ${HOSTNAME:api-gateway}
+    hostname: api-gateway
     instance-id: ${spring.application.name}:${random.uuid}
     lease-renewal-interval-in-seconds: 10
     lease-expiration-duration-in-seconds: 30
@@ -172,7 +107,7 @@ eureka:
       management.context-path: ${server.servlet.context-path:/}actuator
   client:
     service-url:
-      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://craftpilot:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka/}
+      defaultZone: http://craftpilot:13579ada@eureka-server:8761/eureka/
     fetch-registry: true
     register-with-eureka: true
     registry-fetch-interval-seconds: 5
@@ -187,7 +122,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info
   endpoint:
     health:
       show-details: always
