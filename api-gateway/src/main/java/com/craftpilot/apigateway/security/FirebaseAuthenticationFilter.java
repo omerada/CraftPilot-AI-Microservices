@@ -29,6 +29,17 @@ import java.util.stream.Collectors;
 public class FirebaseAuthenticationFilter implements WebFilter {
     private static final Logger log = LoggerFactory.getLogger(FirebaseAuthenticationFilter.class);
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final Set<String> PUBLIC_PATHS = Set.of(
+        "/",
+        "/swagger-ui.html",
+        "/swagger-ui/**",
+        "/v3/api-docs/**",
+        "/webjars/**",
+        "/actuator/health",
+        "/actuator/info",
+        "/api/auth/**",
+        "/public/**"
+    );
     
     private final FirebaseAuth firebaseAuth;
     private final Cache<String, FirebaseToken> tokenCache;
@@ -56,7 +67,7 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     }
 
     private boolean isPublicPath(String path) {
-        return Arrays.stream(SecurityConfig.PUBLIC_PATHS).anyMatch(path::startsWith) || 
+        return PUBLIC_PATHS.stream().anyMatch(path::startsWith) || 
                path.matches(".+\\.(png|jpg|ico|css|js|html)$");
     }
 

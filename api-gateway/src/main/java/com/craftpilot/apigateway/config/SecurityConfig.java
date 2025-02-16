@@ -10,6 +10,7 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.context.ServerSecurityContextRepository;
 import org.springframework.security.web.server.context.WebSessionServerSecurityContextRepository;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.web.server.authentication.AuthenticationWebFilter;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -47,7 +48,7 @@ public class SecurityConfig {
             .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .securityContextRepository(securityContextRepository())
-            .addFilterAt(firebaseAuthenticationFilter, SecurityWebFilters.AUTHENTICATION)
+            .addFilterAt(firebaseAuthenticationFilter, AuthenticationWebFilter.class)
             .build();
     }
 
