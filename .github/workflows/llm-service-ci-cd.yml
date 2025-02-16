@@ -87,7 +87,9 @@ jobs:
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
-              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+              -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+              -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+              -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
               -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e SPRING_KAFKA_CONSUMER_GROUP_ID=llm-service-group \
               -e SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET=earliest \
@@ -102,7 +104,7 @@ jobs:
             for i in {1..30}; do
               echo "Attempt $i: Checking service health..."
               
-              HEALTH_STATUS=$(curl -s http://localhost:8062/actuator/health || echo "Failed to connect")
+              HEALTH_STATUS=$(curl -s http://localhost:8062/actuator/health/liveness || echo "Failed to connect")
               echo "Health status: $HEALTH_STATUS"
               
               if echo "$HEALTH_STATUS" | grep -q "UP"; then
@@ -110,9 +112,9 @@ jobs:
                 exit 0
               fi
               
-              if [ $i -eq 15 ]; then
-                echo "Mid-point container logs:"
-                docker logs llm-service
+              if [ $((i % 5)) -eq 0 ]; then
+                echo "Container logs at attempt $i:"
+                docker logs llm-service --tail 50
               fi
               
               sleep 10

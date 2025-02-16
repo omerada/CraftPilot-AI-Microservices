@@ -21,7 +21,8 @@ ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
 # Health check için curl ekle
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-HEALTHCHECK --interval=10s --timeout=3s --start-period=40s --retries=3 \
+# Health check için daha uzun bir başlangıç süresi ve daha geniş aralıklar tanımlayalım
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8062/actuator/health/liveness || exit 1
 
 EXPOSE 8062
