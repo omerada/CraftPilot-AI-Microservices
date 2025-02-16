@@ -1,6 +1,7 @@
 package com.craftpilot.userservice.config;
 
 import com.craftpilot.userservice.model.UserPreference;
+import com.craftpilot.userservice.model.user.entity.UserEntity;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -54,6 +55,25 @@ public class RedisConfig {
                 RedisSerializationContext.newSerializationContext(keySerializer);
 
         RedisSerializationContext<String, UserPreference> context = builder
+                .value(valueSerializer)
+                .hashKey(keySerializer)
+                .hashValue(valueSerializer)
+                .build();
+
+        return new ReactiveRedisTemplate<>(reactiveRedisConnectionFactory, context);
+    }
+
+    @Bean
+    public ReactiveRedisTemplate<String, UserEntity> userEntityReactiveRedisTemplate(
+            ReactiveRedisConnectionFactory reactiveRedisConnectionFactory) {
+        StringRedisSerializer keySerializer = new StringRedisSerializer();
+        Jackson2JsonRedisSerializer<UserEntity> valueSerializer = 
+            new Jackson2JsonRedisSerializer<>(UserEntity.class);
+
+        RedisSerializationContext.RedisSerializationContextBuilder<String, UserEntity> builder =
+                RedisSerializationContext.newSerializationContext(keySerializer);
+
+        RedisSerializationContext<String, UserEntity> context = builder
                 .value(valueSerializer)
                 .hashKey(keySerializer)
                 .hashValue(valueSerializer)

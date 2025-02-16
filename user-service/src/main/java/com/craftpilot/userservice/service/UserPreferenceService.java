@@ -18,23 +18,19 @@ public class UserPreferenceService {
 
     @CircuitBreaker(name = "userPreferences", fallbackMethod = "getDefaultPreferences")
     public Mono<UserPreference> getUserPreferences(String userId) {
-        return redisCacheService.getUserPreferences(userId)
-                .switchIfEmpty(getDefaultPreferences(userId));
+        return redisCacheService.getUserPreferences(userId);
     }
 
-    public Mono<UserPreference> saveUserPreferences(String userId, UserPreferenceRequest request) {
-        UserPreference preference = mapper.toEntity(request);
-        preference.setUserId(userId);
-        preference.setCreatedAt(System.currentTimeMillis());
-        preference.setUpdatedAt(System.currentTimeMillis());
-        return redisCacheService.saveUserPreferences(preference);
+    public Mono<UserPreference> saveUserPreferences(UserPreference preferences) {
+        return redisCacheService.saveUserPreferences(preferences)
+                .thenReturn(preferences);
     }
 
-    public Mono<Void> deleteUserPreferences(String userId) {
+    public Mono<Boolean> deleteUserPreferences(String userId) {
         return redisCacheService.deleteUserPreferences(userId);
     }
 
-    private Mono<UserPreference> getDefaultPreferences(String userId) {
+    private Mono<UserPreference> getDefaultPreferences(String userId, Throwable t) {
         return Mono.just(UserPreference.builder()
                 .userId(userId)
                 .theme("light")

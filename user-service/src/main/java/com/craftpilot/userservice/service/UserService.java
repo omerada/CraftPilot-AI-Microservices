@@ -72,15 +72,7 @@ public class UserService {
 
     public Mono<UserEntity> getUserById(String id) {
         Timer.Sample sample = Timer.start(meterRegistry);
-        return cacheService.getCachedUser(id)
-                .switchIfEmpty(
-                    userRepository.findById(id)
-                        .doOnSuccess(user -> {
-                            if (user != null) {
-                                cacheService.cacheUser(user).subscribe();
-                            }
-                        })
-                )
+        return findById(id)
                 .switchIfEmpty(Mono.error(new UserNotFoundException(id)))
                 .doFinally(signalType -> sample.stop(userRetrievalTimer));
     }
@@ -216,5 +208,12 @@ public class UserService {
                     log.debug("User event sent successfully: {}", eventType);
                 }
             });
+    }
+
+    public Mono<UserEntity> findById(String id) {
+        return cacheService.get(id)
+                .switchIfEmpty(userRepository.findById(id)
+                        .flatMap(user -> cacheService.set(user.getId(), user)
+                                .thenReturn(user)));
     }
 }

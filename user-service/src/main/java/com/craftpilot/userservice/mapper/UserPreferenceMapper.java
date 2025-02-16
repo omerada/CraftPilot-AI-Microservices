@@ -10,9 +10,9 @@ import org.mapstruct.MappingConstants;
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface UserPreferenceMapper {
     
+    @Mapping(target = "createdAt", expression = "java(System.currentTimeMillis())")
+    @Mapping(target = "updatedAt", expression = "java(System.currentTimeMillis())")
     @Mapping(target = "userId", ignore = true)
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "updatedAt", ignore = true)
     UserPreference toEntity(UserPreferenceRequest request);
 
     UserPreferenceResponse toResponse(UserPreference preference);
