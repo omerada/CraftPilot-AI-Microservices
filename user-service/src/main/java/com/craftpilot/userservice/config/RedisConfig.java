@@ -21,62 +21,31 @@ import java.time.Duration;
 @Configuration
 public class RedisConfig {
 
-    @Value("${spring.redis.host:localhost}")
+    @Value("${spring.data.redis.host:localhost}")
     private String redisHost;
 
-    @Value("${spring.redis.port:6379}")
-    private String redisPort;
-
-    @Value("${spring.redis.password:}")
-    private String redisPassword;
+    @Value("${spring.data.redis.port:6379}")
+    private int redisPort;
 
     @Bean
-    @Primary
-    public ReactiveRedisConnectionFactory reactiveRedisConnectionFactory() {
-        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
-        config.setHostName(redisHost);
-        config.setPort(Integer.parseInt(redisPort));
-        if (redisPassword != null && !redisPassword.isEmpty()) {
-            config.setPassword(redisPassword);
-        }
-
-        LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
-            .commandTimeout(Duration.ofSeconds(5))
-            .shutdownTimeout(Duration.ofSeconds(2))
-            .build();
-
-        return new LettuceConnectionFactory(config, clientConfig);
+    public RedisConnectionFactory connectionFactory() {
+        RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration();
+        configuration.setHostName(redisHost);
+        configuration.setPort(redisPort);
+        return new LettuceConnectionFactory(configuration);
     }
 
     @Bean
-    public ReactiveRedisTemplate<String, UserPreference> preferenceRedisTemplate(
-            @Qualifier("reactiveRedisConnectionFactory") ReactiveRedisConnectionFactory factory) {
-        
-        StringRedisSerializer keySerializer = new StringRedisSerializer();
-        Jackson2JsonRedisSerializer<UserPreference> valueSerializer =
-                new Jackson2JsonRedisSerializer<>(UserPreference.class);
-        
-        RedisSerializationContext.RedisSerializationContextBuilder<String, UserPreference> builder =
-                RedisSerializationContext.newSerializationContext(keySerializer);
-        
-        RedisSerializationContext<String, UserPreference> context =
-                builder.value(valueSerializer).build();
-        
-        return new ReactiveRedisTemplate<>(factory, context);
-    }
-
-    @Bean
-    public ReactiveRedisTemplate<String, UserEntity> reactiveRedisTemplate(
+    public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
             ReactiveRedisConnectionFactory connectionFactory) {
         
         StringRedisSerializer keySerializer = new StringRedisSerializer();
-        Jackson2JsonRedisSerializer<UserEntity> valueSerializer =
-                new Jackson2JsonRedisSerializer<>(UserEntity.class);
+        Jackson2JsonRedisSerializer<Object> valueSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
 
-        RedisSerializationContext.RedisSerializationContextBuilder<String, UserEntity> builder =
+        RedisSerializationContext.RedisSerializationContextBuilder<String, Object> builder =
                 RedisSerializationContext.newSerializationContext(keySerializer);
 
-        RedisSerializationContext<String, UserEntity> context = builder
+        RedisSerializationContext<String, Object> context = builder
                 .value(valueSerializer)
                 .hashKey(keySerializer)
                 .hashValue(valueSerializer)
