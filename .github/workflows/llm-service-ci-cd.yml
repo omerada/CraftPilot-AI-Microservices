@@ -66,16 +66,21 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-
             # Deploy LLM Service
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
             docker stop llm-service || true
             docker rm llm-service || true
 
+            # Add health check to Docker container
             docker run -d \
               --name llm-service \
               --network craftpilot-network \
               --restart unless-stopped \
+              --health-cmd="curl -f http://localhost:8062/actuator/health || exit 1" \
+              --health-interval=10s \
+              --health-timeout=5s \
+              --health-retries=3 \
+              --health-start-period=60s \
               -p 8062:8062 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -90,24 +95,22 @@ jobs:
               -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
               -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
               -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
-              -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-              -e SPRING_KAFKA_CONSUMER_GROUP_ID=llm-service-group \
-              -e SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET=earliest \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
 
-            # Wait for infrastructure to be ready
-            echo "Waiting for infrastructure services..."
+            echo "Installing curl in container..."
+            docker exec llm-service apt-get update && \
+            docker exec llm-service apt-get install -y curl
+
+            echo "Waiting for service startup..."
             sleep 30
 
-            # Health check with more detailed output
             echo "Starting health checks..."
-            for i in {1..30}; do
-              echo "Attempt $i: Checking service health..."
+            for i in {1..20}; do
+              echo "Health check attempt $i/20..."
               
-              HEALTH_STATUS=$(curl -s http://localhost:8062/actuator/health/liveness || echo "Failed to connect")
-              echo "Health status: $HEALTH_STATUS"
-              
-              if echo "$HEALTH_STATUS" | grep -q "UP"; then
+              if docker exec llm-service curl -sf http://localhost:8062/actuator/health; then
                 echo "Service is healthy!"
                 exit 0
               fi
@@ -115,12 +118,17 @@ jobs:
               if [ $((i % 5)) -eq 0 ]; then
                 echo "Container logs at attempt $i:"
                 docker logs llm-service --tail 50
+                docker inspect llm-service | grep -A 10 "Health"
               fi
               
-              sleep 10
+              sleep 15
             done
 
-            echo "Service failed to become healthy within timeout"
-            echo "Final container logs:"
+            echo "Service failed to become healthy - Final diagnostics"
+            echo "Docker container status:"
+            docker ps -a | grep llm-service
+            echo "Container logs:"
             docker logs llm-service
+            echo "Health check status:"
+            docker inspect llm-service | grep -A 10 "Health"
             exit 1
