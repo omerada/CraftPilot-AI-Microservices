@@ -6,10 +6,13 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import com.craftpilot.imageservice.config.LightSecurityConfig;
+import org.springframework.context.annotation.Import;
 
 @SpringBootApplication
 @EnableDiscoveryClient
-@EnableScheduling
+@EnableScheduling 
+@Import(LightSecurityConfig.class)
 @OpenAPIDefinition(
     info = @Info(
         title = "Image Service API",

@@ -7,7 +7,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.reactive.config.EnableWebFlux;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.info.Info;
+import com.craftpilot.llmservice.config.LightSecurityConfig;
+import org.springframework.context.annotation.Import;
 
+@Import(LightSecurityConfig.class) 
 @SpringBootApplication
 @EnableDiscoveryClient
 @EnableWebFlux

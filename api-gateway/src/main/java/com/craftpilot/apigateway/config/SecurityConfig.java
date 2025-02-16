@@ -43,23 +43,17 @@ public class SecurityConfig {
         return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers("/admin/**").permitAll()
-                .pathMatchers("/users/**").permitAll()
-                .pathMatchers("/auth/**").permitAll()
-                .pathMatchers("/analytics/**").permitAll()
-                .pathMatchers("/ai/**").permitAll()
-                .pathMatchers("/images/**").permitAll()
-                .pathMatchers("/credits/**").permitAll()
-                .pathMatchers("/subscriptions/**").permitAll()
-                .pathMatchers("/notifications/**").permitAll()
-                .pathMatchers("/cache/**").permitAll()
-                .pathMatchers("/fallback/**").permitAll()
-                .anyExchange().permitAll()
+                .pathMatchers("/public/**").permitAll()
+                .pathMatchers("/admin/**").hasRole("ADMIN")
+                .pathMatchers("/users/**").authenticated()
+                .anyExchange().authenticated()
             )
-            .httpBasic().disable()
-            .formLogin().disable()
-            .securityContextRepository(securityContextRepository())
-            .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+            .oauth2ResourceServer(oauth2 -> oauth2
+                .jwt(jwt -> jwt
+                    .jwtAuthenticationConverter(grantedAuthoritiesExtractor())
+                )
+            )
+            .addFilterBefore(new CustomAuthFilter(), SecurityWebFiltersOrder.AUTHORIZATION)
             .build();
     }
 
