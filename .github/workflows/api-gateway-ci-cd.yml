@@ -66,20 +66,20 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Ensure config directory exists
-            mkdir -p /app/config
+            set -e  # Exit on any error
 
-            # Deploy API Gateway
+            echo "=== Setting up directories ==="
+            sudo mkdir -p /opt/craftpilot/config
+            sudo chown -R $USER:$USER /opt/craftpilot
+
+            echo "=== Setting up GCP credentials ==="
+            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/firebase-credentials.json
+            chmod 600 /opt/craftpilot/config/firebase-credentials.json
+
             echo "=== Deploying API Gateway ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
             docker stop api-gateway || true
             docker rm api-gateway || true
-
-            # Verify GCP credentials file exists
-            if [ ! -f "${{ secrets.GCP_SA_KEY_PATH }}" ]; then
-              echo "Error: GCP credentials file not found at ${{ secrets.GCP_SA_KEY_PATH }}"
-              exit 1
-            fi
 
             docker run -d \
               --name api-gateway \
@@ -87,46 +87,38 @@ jobs:
               --network craftpilot-network \
               --restart unless-stopped \
               -p 8080:8080 \
-              -v ${{ secrets.GCP_SA_KEY_PATH }}:/app/config/firebase-credentials.json:ro \
+              -v /opt/craftpilot/config/firebase-credentials.json:/app/config/firebase-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8080 \
               -e SPRING_FIREBASE_CREDENTIALS_PATH=/app/config/firebase-credentials.json \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e EUREKA_INSTANCE_HOSTNAME=api-gateway \
               -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
-              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
-              -e SPRING_CLOUD_CONFIG_ENABLED=false \
-              -e SPRING_SECURITY_BASIC_ENABLED=false \
-              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e SPRING_APPLICATION_NAME=api-gateway \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-credentials.json \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
               ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
 
-            echo "=== Waiting for initial startup ==="
-            sleep 20  # Initial wait for container startup
-
-            echo "=== Performing health checks ==="
-            max_attempts=6
+            echo "=== Waiting for Service Startup ==="
+            max_attempts=12
             counter=0
 
             while [ $counter -lt $max_attempts ]; do
               echo "Health check attempt $((counter + 1))/$max_attempts"
               
-              # Container ve uygulama durumu kontrolü
-              if docker ps --format '{{.Status}}' -f name=api-gateway | grep -q "Up" && \
-                 docker logs api-gateway 2>&1 | grep -q "Started ApiGatewayApplication" && \
-                 docker logs api-gateway 2>&1 | grep -q "DiscoveryClient.*registration status: 204"; then
-                
-                echo "✓ Application is running and registered with Eureka"
-                echo "=== Deployment completed successfully ==="
-                exit 0
+              if docker ps --filter "name=api-gateway" --format '{{.Status}}' | grep -q "Up"; then
+                if curl -sf http://localhost:8080/actuator/health > /dev/null; then
+                  echo "✓ API Gateway is healthy"
+                  echo "=== Deployment completed successfully ==="
+                  exit 0
+                fi
               fi
               
-              echo "Waiting for next check..."
+              echo "Waiting for service to be healthy..."
               sleep 10
               counter=$((counter + 1))
             done
@@ -136,4 +128,6 @@ jobs:
             docker ps -a | grep api-gateway
             echo "Container Logs:"
             docker logs api-gateway --tail 100
+            echo "Directory Permissions:"
+            ls -la /opt/craftpilot/config/
             exit 1

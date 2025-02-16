@@ -30,12 +30,17 @@ public class FirebaseConfig {
     }
 
     @PostConstruct
-    public void initialize() throws IOException {
+    public void initialize() {
         try {
             if (FirebaseApp.getApps().isEmpty()) {
                 logger.info("Initializing Firebase with credentials from: {}", credentialsPath);
                 
                 Resource resource = resourceLoader.getResource("file:" + credentialsPath);
+                if (!resource.exists()) {
+                    logger.error("Firebase credentials file not found at: {}", credentialsPath);
+                    throw new IOException("Firebase credentials file not found");
+                }
+
                 try (InputStream serviceAccount = resource.getInputStream()) {
                     FirebaseOptions options = FirebaseOptions.builder()
                             .setCredentials(GoogleCredentials.fromStream(serviceAccount))
@@ -45,8 +50,8 @@ public class FirebaseConfig {
                 }
             }
         } catch (IOException e) {
-            logger.error("Failed to initialize Firebase. Credential path: {}. Error: {}", credentialsPath, e.getMessage(), e);
-            throw new RuntimeException("Failed to initialize Firebase: " + e.getMessage(), e);
+            logger.error("Failed to initialize Firebase. Path: {}. Error: {}", credentialsPath, e.getMessage(), e);
+            throw new RuntimeException("Firebase initialization failed: " + e.getMessage(), e);
         }
     }
 
