@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "craftpilot-prod": "craft-pilot-ai",
+    "default": "craft-pilot-ai"
+  },
+  "targets": {},
+  "etags": {}
+}
