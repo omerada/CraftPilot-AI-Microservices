@@ -18,8 +18,10 @@ metadata:
     nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
     nginx.ingress.kubernetes.io/proxy-next-upstream: "error timeout http_502"
     nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "3"
-    # Auth popup'ı engellemek için bu annotation'ı ekliyoruz
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      auth_basic off;
     nginx.ingress.kubernetes.io/auth-type: ""
+    nginx.ingress.kubernetes.io/auth-realm: ""
 spec:
   rules:
     - host: api.craftpilot.io
