@@ -113,7 +113,7 @@ jobs:
               -e EUREKA_USERNAME=craftpilot \
               -e EUREKA_PASSWORD=13579ada \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-              -e REDIS_HOST=redis-server \
+              -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
               -e EUREKA_ENABLED=true \

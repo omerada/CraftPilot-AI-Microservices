@@ -35,22 +35,6 @@ spring:
     config:
       path: ${FIREBASE_CONFIG_PATH:/etc/gcp/credentials/gcp-credentials.json}
 
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    properties:
-      security.protocol: PLAINTEXT
-      retry.backoff.ms: 1000
-      request.timeout.ms: 30000
-      max.block.ms: 30000
-    producer:
-      acks: 1
-      retries: 3
-    consumer:
-      auto-offset-reset: latest
-      group-id: ${spring.application.name}
-    admin:
-      fail-fast: false
-
 eureka:
   instance:
     prefer-ip-address: true
