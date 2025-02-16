@@ -16,19 +16,14 @@ import java.io.InputStream;
 @Configuration
 public class FirebaseConfig {
 
-    @Value("${firebase.credentials.path:firebase-credentials.json}")
-    private String firebaseCredentialsPath;
-
     @PostConstruct
     public void initialize() throws IOException {
         if (FirebaseApp.getApps().isEmpty()) {
-            try (InputStream serviceAccount = new ClassPathResource(firebaseCredentialsPath).getInputStream()) {
-                FirebaseOptions options = FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+            FirebaseOptions options = FirebaseOptions.builder()
+                    .setCredentials(GoogleCredentials.fromStream(
+                            getClass().getResourceAsStream("/app/config/firebase-credentials.json")))
                     .build();
-
-                FirebaseApp.initializeApp(options);
-            }
+            FirebaseApp.initializeApp(options);
         }
     }
 
