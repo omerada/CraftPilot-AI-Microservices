@@ -153,10 +153,10 @@ springdoc:
   api-docs:
     enabled: true
     path: /v3/api-docs
+    resolve-schema-properties: true
   swagger-ui:
     enabled: true
     path: /swagger-ui.html
-    config-url: /v3/api-docs/swagger-config
     urls:
       - url: /v3/api-docs
         name: API Gateway
@@ -166,6 +166,7 @@ springdoc:
       enabled: false
     security:
       enabled: false
+    use-root-path: true
   cache:
     disabled: true
   show-actuator: true
@@ -175,6 +176,8 @@ springdoc:
     prefix: /webjars
   default-produces-media-type: application/json
   default-consumes-media-type: application/json
+  paths-to-match:
+    - /**
 
 eureka:
   instance:
