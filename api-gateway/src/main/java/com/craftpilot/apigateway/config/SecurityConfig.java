@@ -21,6 +21,13 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeExchange(exchanges -> exchanges
+                .pathMatchers("/swagger-ui.html", 
+                            "/swagger-ui/**", 
+                            "/v3/api-docs/**", 
+                            "/webjars/**",
+                            "/swagger-resources/**",
+                            "/actuator/**",
+                            "/health/**").permitAll()
                 .anyExchange().permitAll()
             );
         return http.build();

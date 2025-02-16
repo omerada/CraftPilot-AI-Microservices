@@ -171,6 +171,8 @@ springdoc:
   show-actuator: true
   use-management-port: false
   packages-to-scan: com.craftpilot.apigateway
+  webjars:
+    prefix: /webjars
 
 eureka:
   instance:
