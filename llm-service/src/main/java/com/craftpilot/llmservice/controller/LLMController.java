@@ -12,7 +12,7 @@ import reactor.core.publisher.Mono;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/ai")
+@RequestMapping("/ai")
 @RequiredArgsConstructor
 @Tag(name = "LLM API", description = "AI dil modeli işlemleri için endpoints")
 public class LLMController {

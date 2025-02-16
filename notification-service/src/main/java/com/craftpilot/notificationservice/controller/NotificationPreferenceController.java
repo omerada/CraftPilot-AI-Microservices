@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 @RestController
-@RequestMapping("/api/v1/preferences")
+@RequestMapping("/preferences")
 @RequiredArgsConstructor
 @Tag(name = "Notification Preference Controller", description = "Notification preference management endpoints")
 public class NotificationPreferenceController {

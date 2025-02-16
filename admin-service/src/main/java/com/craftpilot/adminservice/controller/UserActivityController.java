@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/user-activities")
+@RequestMapping("/user-activities")
 @RequiredArgsConstructor
 @Tag(name = "User Activities", description = "User activity management APIs")
 public class UserActivityController {

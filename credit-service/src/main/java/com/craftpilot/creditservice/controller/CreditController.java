@@ -15,7 +15,7 @@ import reactor.core.publisher.Mono;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/api/v1/credits")
+@RequestMapping("/credits")
 @RequiredArgsConstructor
 @Tag(name = "Credits", description = "Credit management endpoints")
 public class CreditController {

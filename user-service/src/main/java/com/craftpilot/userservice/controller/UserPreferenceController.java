@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 @RestController
-@RequestMapping("/api/users/{userId}/preferences")
+@RequestMapping("/users/{userId}/preferences")
 @RequiredArgsConstructor
 public class UserPreferenceController {
     private final UserPreferenceService userPreferenceService;

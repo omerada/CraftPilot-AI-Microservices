@@ -16,7 +16,7 @@ import reactor.core.publisher.Mono;
  */
 @Slf4j
 @RestController
-@RequestMapping("/v1/users")
+@RequestMapping("/users")
 @RequiredArgsConstructor
 @Tag(name = "User Operations", description = "Kullanıcı yönetimi için endpoints")
 public class UserController {

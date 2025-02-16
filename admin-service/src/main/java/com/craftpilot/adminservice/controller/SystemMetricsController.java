@@ -14,7 +14,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/system-metrics")
+@RequestMapping("/system-metrics")
 @RequiredArgsConstructor
 @Tag(name = "System Metrics", description = "System metrics management APIs")
 public class SystemMetricsController {

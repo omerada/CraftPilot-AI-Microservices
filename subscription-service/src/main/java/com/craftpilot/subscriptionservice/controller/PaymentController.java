@@ -16,7 +16,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @RestController
-@RequestMapping("/api/v1/payments")
+@RequestMapping("/payments")
 @RequiredArgsConstructor
 @Tag(name = "Payments", description = "Payment management APIs")
 @SecurityRequirement(name = "bearerAuth")

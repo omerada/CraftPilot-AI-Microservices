@@ -13,7 +13,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @RestController
-@RequestMapping("/api/v1/analytics")
+@RequestMapping("/analytics")
 @RequiredArgsConstructor
 @Tag(name = "Analytics", description = "Analytics management APIs")
 public class AnalyticsController {

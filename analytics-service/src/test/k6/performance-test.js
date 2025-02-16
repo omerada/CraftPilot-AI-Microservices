@@ -18,8 +18,8 @@ export default function () {
 
   const responses = http.batch([
     ["GET", `${BASE_URL}/actuator/health`],
-    ["GET", `${BASE_URL}/api/v1/analytics/metrics`],
-    ["GET", `${BASE_URL}/api/v1/analytics/reports/daily`],
+    ["GET", `${BASE_URL}/analytics/metrics`],
+    ["GET", `${BASE_URL}/analytics/reports/daily`],
   ]);
 
   check(responses[0], {

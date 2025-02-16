@@ -13,7 +13,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @RestController
-@RequestMapping("/api/v1/subscriptions")
+@RequestMapping("/subscriptions")
 @RequiredArgsConstructor
 @Tag(name = "Subscription", description = "Subscription management endpoints")
 @SecurityRequirement(name = "bearerAuth")

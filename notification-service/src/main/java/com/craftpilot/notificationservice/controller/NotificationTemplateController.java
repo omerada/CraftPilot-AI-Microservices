@@ -13,7 +13,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @RestController
-@RequestMapping("/api/v1/templates")
+@RequestMapping("/templates")
 @RequiredArgsConstructor
 @Tag(name = "Notification Template Controller", description = "Notification template management endpoints")
 public class NotificationTemplateController {

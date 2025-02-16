@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/admin-actions")
+@RequestMapping("/admin-actions")
 @RequiredArgsConstructor
 @Tag(name = "Admin Actions", description = "Admin action management APIs")
 public class AdminActionController {
