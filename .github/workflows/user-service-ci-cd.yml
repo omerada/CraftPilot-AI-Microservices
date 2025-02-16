@@ -89,7 +89,7 @@ jobs:
               echo "Docker is not running. Starting Docker..."
               sudo systemctl start docker
             fi
-            
+
             echo "=== Deploying User Service ==="
             # Force pull latest image
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
@@ -108,43 +108,71 @@ jobs:
               -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8060 \
-              -e EUREKA_HOST=eureka-server \
-              -e EUREKA_PORT=8761 \
-              -e EUREKA_USERNAME=craftpilot \
-              -e EUREKA_PASSWORD=13579ada \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+              -e EUREKA_INSTANCE_HOSTNAME=user-service \
+              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
-              -e EUREKA_ENABLED=true \
-              -e EUREKA_REGISTER=true \
-              -e EUREKA_FETCH=true \
-              --user 1000:1000 \
+              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+              -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+              -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+              -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics" \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e SPRING_APPLICATION_NAME=user-service \
+              --health-cmd="curl -f http://localhost:8060/actuator/health || exit 1" \
+              --health-interval=10s \
+              --health-retries=10 \
+              --health-timeout=5s \
+              --health-start-period=40s \
               ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
 
             echo "=== Waiting for Service to Start ==="
-            for i in {1..60}; do
-              if docker ps --filter "name=user-service" --format '{{.Status}}' | grep -q "Up"; then
-                echo "User service container is running"
-                # First check liveness
-                if curl -f http://localhost:8060/actuator/health/liveness; then
-                  echo "Liveness check passed"
-                  # Then check readiness
-                  if curl -f http://localhost:8060/actuator/health/readiness; then
-                    echo "Readiness check passed"
+            max_attempts=30
+            counter=0
+
+            while [ $counter -lt $max_attempts ]; do
+              echo "Health check attempt $((counter + 1))/$max_attempts"
+              
+              # Container durumu kontrolü
+              if ! docker ps --filter "name=user-service" --format '{{.Status}}' | grep -q "Up"; then
+                echo "Container is not running anymore. Checking logs..."
+                docker logs user-service
+                exit 1
+              fi
+              
+              # Application log kontrolü
+              if docker logs user-service 2>&1 | grep -q "Started UserserviceApplication"; then
+                echo "Application startup completed"
+                
+                # Eureka registration kontrolü
+                if docker logs user-service 2>&1 | grep -q "DiscoveryClient.*registration status: 204"; then
+                  echo "Successfully registered with Eureka"
+                  
+                  # Final health check
+                  response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8060/actuator/health)
+                  if [ "$response" = "200" ]; then
+                    echo "✓ Health check passed"
+                    echo "=== Deployment completed successfully ==="
                     exit 0
                   fi
                 fi
               fi
-              echo "Waiting for service to start... Attempt $i"
+              
+              echo "Waiting for service to start... ($((counter + 1))/$max_attempts)"
               sleep 10
+              counter=$((counter + 1))
             done
 
-            echo "=== Service Failed to Start - Showing Logs ==="
+            echo "=== Service Failed to Start - Debug Information ==="
             echo "Docker Container Status:"
             docker ps -a | grep user-service
             echo "Container Logs:"
-            docker logs user-service
+            docker logs user-service --tail 200
+            echo "Network Information:"
+            docker network inspect craftpilot-network
             echo "Health Check Response:"
             curl -v http://localhost:8060/actuator/health || true
             exit 1
