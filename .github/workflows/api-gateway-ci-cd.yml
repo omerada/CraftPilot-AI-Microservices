@@ -98,19 +98,30 @@ jobs:
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e SPRING_APPLICATION_NAME=api-gateway \
               -e GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-credentials.json \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
+              -e SPRING_REDIS_HOST=redis \
+              -e SPRING_REDIS_PORT=6379 \
+              -e SPRING_REDIS_PASSWORD=13579ada \
+              -e SPRING_REDIS_TIMEOUT=5000 \
+              -e SPRING_REDIS_LETTUCE_POOL_MAX-ACTIVE=8 \
+              -e SPRING_REDIS_LETTUCE_POOL_MAX-IDLE=8 \
+              -e SPRING_REDIS_LETTUCE_POOL_MIN-IDLE=2 \
+              -e SPRING_REDIS_LETTUCE_SHUTDOWN-TIMEOUT=100ms \
               ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest-arm64
 
             echo "=== Waiting for Service Startup ==="
-            max_attempts=12
+            max_attempts=20
             counter=0
 
             while [ $counter -lt $max_attempts ]; do
               echo "Health check attempt $((counter + 1))/$max_attempts"
               
               if docker ps --filter "name=api-gateway" --format '{{.Status}}' | grep -q "Up"; then
+                # Wait for Redis connection to be established
+                if docker logs api-gateway 2>&1 | grep -q "RedisConnectionFactory.getConnection"; then
+                  sleep 5  # Give extra time for Redis connection
+                fi
+                
+                # Check application health
                 if curl -sf http://localhost:8080/actuator/health > /dev/null; then
                   echo "✓ API Gateway is healthy"
                   echo "=== Deployment completed successfully ==="
@@ -127,7 +138,9 @@ jobs:
             echo "Docker Status:"
             docker ps -a | grep api-gateway
             echo "Container Logs:"
-            docker logs api-gateway --tail 100
-            echo "Directory Permissions:"
-            ls -la /opt/craftpilot/config/
+            docker logs api-gateway --tail 200
+            echo "Redis Connection Test:"
+            docker exec api-gateway nc -zv redis 6379 || true
+            echo "Network Information:"
+            docker network inspect craftpilot-network
             exit 1
