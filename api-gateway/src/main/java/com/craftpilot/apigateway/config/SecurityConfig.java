@@ -16,7 +16,7 @@ public class SecurityConfig {
 
     private final FirebaseAuthenticationFilter firebaseAuthenticationFilter;
 
-    public SecurityConfig(FirebaseAuthenticationFilter firebaseAuthenticationFilter) {
+    public SecurityConfig(FirebaseAuthenticationFilter(FirebaseAuthenticationFilter firebaseAuthenticationFilter) {
         this.firebaseAuthenticationFilter = firebaseAuthenticationFilter;
     }
 
@@ -24,22 +24,27 @@ public class SecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable) // HTTP Basic'i devre dışı bırak
-            .formLogin(ServerHttpSecurity.FormLoginSpec::disable) // Form login'i devre dışı bırak
+            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .authorizeExchange(exchanges -> exchanges
+                // Actuator endpoints
                 .pathMatchers("/actuator/**").permitAll()
-                .pathMatchers("/**/actuator/**").permitAll()
-                .pathMatchers("/*/actuator/**").permitAll()
+                .pathMatchers("/actuator/health/**").permitAll()
+                .pathMatchers("/actuator/info/**").permitAll()
+                // Service health endpoints
                 .pathMatchers("/*/health").permitAll()
+                .pathMatchers("/*/actuator/health").permitAll()
+                // Documentation endpoints
                 .pathMatchers("/v3/api-docs/**").permitAll()
                 .pathMatchers("/swagger-ui/**").permitAll()
                 .pathMatchers("/webjars/**").permitAll()
-                .pathMatchers("/*/v3/api-docs/**").permitAll()
-                .pathMatchers("/*/swagger-ui/**").permitAll()
-                .pathMatchers("/*/webjars/**").permitAll()
-                .pathMatchers("/auth/**").permitAll() // Auth endpointlerini public yap
-                .pathMatchers("/users/register").permitAll() // Kayıt endpointini public yap
-                .pathMatchers("/users/login").permitAll() // Login endpointini public yap
+                .pathMatchers("/*/v3/api-docs").permitAll()
+                .pathMatchers("/*/swagger-ui.html").permitAll()
+                // Auth endpoints
+                .pathMatchers("/auth/**").permitAll()
+                .pathMatchers("/users/register").permitAll()
+                .pathMatchers("/users/login").permitAll()
+                // All other requests need authentication
                 .anyExchange().authenticated()
             )
             .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
