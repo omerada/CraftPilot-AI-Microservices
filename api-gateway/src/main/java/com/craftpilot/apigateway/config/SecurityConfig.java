@@ -11,6 +11,9 @@ import org.springframework.security.web.server.context.ServerSecurityContextRepo
 import org.springframework.security.web.server.context.WebSessionServerSecurityContextRepository;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.http.HttpMethod;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsWebFilter;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -39,14 +42,22 @@ public class SecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .cors(ServerHttpSecurity.CorsSpec::disable)
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers(HttpMethod.OPTIONS).permitAll()
-                .pathMatchers(PUBLIC_PATHS).permitAll()
-                .anyExchange().authenticated()
+                .pathMatchers("/admin/**").permitAll()
+                .pathMatchers("/users/**").permitAll()
+                .pathMatchers("/auth/**").permitAll()
+                .pathMatchers("/analytics/**").permitAll()
+                .pathMatchers("/ai/**").permitAll()
+                .pathMatchers("/images/**").permitAll()
+                .pathMatchers("/credits/**").permitAll()
+                .pathMatchers("/subscriptions/**").permitAll()
+                .pathMatchers("/notifications/**").permitAll()
+                .pathMatchers("/cache/**").permitAll()
+                .pathMatchers("/fallback/**").permitAll()
+                .anyExchange().permitAll()
             )
-            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
-            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+            .httpBasic().disable()
+            .formLogin().disable()
             .securityContextRepository(securityContextRepository())
             .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
             .build();
@@ -55,5 +66,18 @@ public class SecurityConfig {
     @Bean
     public ServerSecurityContextRepository securityContextRepository() {
         return new WebSessionServerSecurityContextRepository();
+    }
+
+    @Bean
+    public CorsWebFilter corsFilter() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.addAllowedOrigin("*");
+        config.addAllowedHeader("*");
+        config.addAllowedMethod("*");
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+
+        return new CorsWebFilter(source);
     }
 }
