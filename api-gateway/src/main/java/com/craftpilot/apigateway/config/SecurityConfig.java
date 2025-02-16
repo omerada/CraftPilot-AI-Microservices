@@ -3,17 +3,12 @@ package com.craftpilot.apigateway.config;
 import com.craftpilot.apigateway.security.FirebaseAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.context.ServerSecurityContextRepository;
 import org.springframework.security.web.server.context.WebSessionServerSecurityContextRepository;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
-import org.springframework.http.HttpMethod;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.reactive.CorsWebFilter;
-import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -29,8 +24,17 @@ public class SecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
+            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers("/public/**", "/actuator/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                .pathMatchers("/actuator/health").permitAll()
+                .pathMatchers("/actuator/info").permitAll()
+                .pathMatchers("/v3/api-docs/**").permitAll()
+                .pathMatchers("/swagger-ui/**").permitAll()
+                .pathMatchers("/webjars/**").permitAll()
+                .pathMatchers("/*/v3/api-docs/**").permitAll()
+                .pathMatchers("/*/swagger-ui/**").permitAll()
+                .pathMatchers("/*/webjars/**").permitAll()
                 .anyExchange().authenticated()
             )
             .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
@@ -41,5 +45,4 @@ public class SecurityConfig {
     public ServerSecurityContextRepository securityContextRepository() {
         return new WebSessionServerSecurityContextRepository();
     }
- 
 }

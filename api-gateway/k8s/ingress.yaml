@@ -12,12 +12,14 @@ metadata:
     nginx.ingress.kubernetes.io/enable-cors: "true"
     nginx.ingress.kubernetes.io/cors-allow-methods: "GET, PUT, POST, DELETE, PATCH, OPTIONS"
     nginx.ingress.kubernetes.io/cors-allow-origin: "*"
-    nginx.ingress.kubernetes.io/ssl-redirect: "false" # SSL yönlendirmesini kapatıyoruz
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
     nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
     nginx.ingress.kubernetes.io/proxy-next-upstream: "error timeout http_502"
     nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "3"
+    # Auth popup'ı engellemek için bu annotation'ı ekliyoruz
+    nginx.ingress.kubernetes.io/auth-type: ""
 spec:
   rules:
     - host: api.craftpilot.io
