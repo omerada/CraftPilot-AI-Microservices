@@ -1,7 +1,5 @@
 server:
-  port: 8080
-  ssl:
-    enabled: false
+  port: ${SERVER_PORT:8080}
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/xml,text/plain
@@ -28,12 +26,6 @@ spring:
         locator:
           enabled: true
           lower-case-service-id: true
-      globalcors:
-        corsConfigurations:
-          "[/**]":
-            allowedOrigins: "*"
-            allowedMethods: "*"
-            allowedHeaders: "*"
       routes:
         # Core Services
         - id: user-service
@@ -55,7 +47,6 @@ spring:
             - name: CircuitBreaker
               args:
                 name: adminServiceCircuitBreaker
-                fallbackUri: forward:/fallback
 
         - id: analytics-service
           uri: lb://analytics-service
@@ -65,7 +56,6 @@ spring:
             - name: CircuitBreaker
               args:
                 name: analyticsServiceCircuitBreaker
-                fallbackUri: forward:/fallback
 
         - id: llm-service
           uri: lb://llm-service
@@ -75,7 +65,6 @@ spring:
             - name: CircuitBreaker
               args:
                 name: llmServiceCircuitBreaker
-                fallbackUri: forward:/fallback
 
         - id: image-service
           uri: lb://image-service
@@ -85,7 +74,6 @@ spring:
             - name: CircuitBreaker
               args:
                 name: imageServiceCircuitBreaker
-                fallbackUri: forward:/fallback
 
         - id: credit-service
           uri: lb://credit-service
@@ -95,7 +83,6 @@ spring:
             - name: CircuitBreaker
               args:
                 name: creditServiceCircuitBreaker
-                fallbackUri: forward:/fallback
 
         - id: subscription-service
           uri: lb://subscription-service
@@ -105,7 +92,6 @@ spring:
             - name: CircuitBreaker
               args:
                 name: subscriptionServiceCircuitBreaker
-                fallbackUri: forward:/fallback
 
         - id: notification-service
           uri: lb://notification-service
@@ -115,15 +101,21 @@ spring:
             - name: CircuitBreaker
               args:
                 name: notificationServiceCircuitBreaker
-                fallbackUri: forward:/fallback
 
+        # Swagger UI Routes
+        - id: swagger-ui
+          uri: ${spring.cloud.gateway.uri:http://localhost:8080}
+          predicates:
+            - Path=/swagger-ui/**,/swagger-ui.html,/v3/api-docs/**
+          filters:
+            - StripPrefix=0
+            - AddResponseHeader=Access-Control-Allow-Origin, *
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin
         - AddResponseHeader=Access-Control-Allow-Origin, *
         - AddResponseHeader=Access-Control-Allow-Methods, GET,POST,PUT,DELETE,OPTIONS,HEAD
         - AddResponseHeader=Access-Control-Allow-Headers, Origin,Content-Type,Accept,Authorization,X-Request-With
         - AddResponseHeader=Access-Control-Max-Age, 3600
-        - RemoveRequestHeader=Authorization # Authorization header'ı kaldır
       httpclient:
         connect-timeout: 5000
         response-timeout: 5000
@@ -144,10 +136,33 @@ spring:
       ACCEPT_CASE_INSENSITIVE_PROPERTIES: true
       DEFAULT_VIEW_INCLUSION: true
 
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    config-url: /v3/api-docs/swagger-config
+    urls:
+      - url: /v3/api-docs
+        name: API Gateway
+    operationsSorter: method
+    disable-swagger-default-url: true
+    csrf:
+      enabled: false
+    security:
+      enabled: false
+  cache:
+    disabled: true
+  show-actuator: true
+  use-management-port: false
+  packages-to-scan: com.craftpilot.apigateway
+
 eureka:
   instance:
     prefer-ip-address: false
-    hostname: api-gateway
+    hostname: ${HOSTNAME:api-gateway}
     instance-id: ${spring.application.name}:${random.uuid}
     lease-renewal-interval-in-seconds: 10
     lease-expiration-duration-in-seconds: 30
@@ -157,7 +172,7 @@ eureka:
       management.context-path: ${server.servlet.context-path:/}actuator
   client:
     service-url:
-      defaultZone: http://craftpilot:13579ada@eureka-server:8761/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://craftpilot:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
     registry-fetch-interval-seconds: 5
@@ -172,12 +187,12 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
-  security:
-    enabled: false # Management endpoint'leri için security'i kapat
+      probes:
+        enabled: true
   health:
     circuitbreakers:
       enabled: true

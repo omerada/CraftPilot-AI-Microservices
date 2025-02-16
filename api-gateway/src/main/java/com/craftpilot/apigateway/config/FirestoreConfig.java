@@ -5,6 +5,7 @@ import com.google.cloud.firestore.Firestore;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.cloud.FirestoreClient;
+import com.google.firebase.auth.FirebaseAuth;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,40 +25,59 @@ public class FirestoreConfig {
     private String credentialsPath;
 
     private final ResourceLoader resourceLoader;
+    private FirebaseApp firebaseApp;
 
     public FirestoreConfig(ResourceLoader resourceLoader) {
         this.resourceLoader = resourceLoader;
     }
 
-    @Bean
-    public Firestore firestore() throws IOException {
+    private FirebaseApp initializeFirebaseApp() throws IOException {
+        if (firebaseApp != null) {
+            return firebaseApp;
+        }
+
         try {
             Resource resource = resourceLoader.getResource(credentialsPath);
             InputStream serviceAccount = resource.getInputStream();
-            
             GoogleCredentials credentials = GoogleCredentials.fromStream(serviceAccount);
+            
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(credentials)
                     .build();
 
             if (FirebaseApp.getApps().isEmpty()) {
-                FirebaseApp.initializeApp(options);
+                firebaseApp = FirebaseApp.initializeApp(options);
+            } else {
+                firebaseApp = FirebaseApp.getInstance();
             }
-
-            return FirestoreClient.getFirestore();
-        } catch (Exception e) {
-            logger.warn("Failed to initialize Firestore with credentials. Using default credentials: {}", e.getMessage());
             
-            // Try to use default credentials (for local development or if running on GCP)
+            return firebaseApp;
+        } catch (Exception e) {
+            logger.warn("Failed to initialize Firebase with credentials. Using default credentials: {}", e.getMessage());
+            
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.getApplicationDefault())
                     .build();
 
             if (FirebaseApp.getApps().isEmpty()) {
-                FirebaseApp.initializeApp(options);
+                firebaseApp = FirebaseApp.initializeApp(options);
+            } else {
+                firebaseApp = FirebaseApp.getInstance();
             }
-
-            return FirestoreClient.getFirestore();
+            
+            return firebaseApp;
         }
+    }
+
+    @Bean
+    public Firestore firestore() throws IOException {
+        initializeFirebaseApp();
+        return FirestoreClient.getFirestore();
+    }
+
+    @Bean
+    public FirebaseAuth firebaseAuth() throws IOException {
+        initializeFirebaseApp();
+        return FirebaseAuth.getInstance();
     }
 }
