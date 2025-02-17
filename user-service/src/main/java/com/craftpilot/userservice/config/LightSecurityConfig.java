@@ -34,6 +34,8 @@ public class LightSecurityConfig {
                 .pathMatchers("/actuator/info").permitAll()
                 .pathMatchers("/v3/api-docs/**").permitAll()
                 .pathMatchers("/swagger-ui/**").permitAll()
+                .pathMatchers("/webjars/**").permitAll()  // Swagger UI için gerekli
+                .pathMatchers("/swagger-ui.html").permitAll() // Ana Swagger sayfası için
                 .anyExchange().authenticated()
             )
             .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
@@ -49,7 +51,10 @@ public class LightSecurityConfig {
 
             // Public endpoints bypass
             String path = exchange.getRequest().getPath().value();
-            if (path.startsWith("/actuator/") || path.startsWith("/v3/api-docs") || path.startsWith("/swagger-ui")) {
+            if (path.startsWith("/actuator/") || 
+                path.startsWith("/v3/api-docs") || 
+                path.startsWith("/swagger-ui") ||
+                path.startsWith("/webjars/")) {  // webjars path'i bypass
                 return chain.filter(exchange);
             }
 
