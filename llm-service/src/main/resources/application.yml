@@ -72,6 +72,20 @@ spring:
         maxConnections: 500
         maxIdleTime: 20s
         maxLifeTime: 60s
+  webflux:
+    base-path: /
+  codec:
+    max-in-memory-size: 16MB
+  reactor:
+    netty:
+      client:
+        protocols: http11
+      pool:
+        type: elastic
+        max-connections: 500
+      resources:
+        loop-resources:
+          preferred-native-transport: false
 
 kafka:
   topics:
@@ -145,4 +159,5 @@ logging:
     org.springframework.kafka: INFO
     org.springframework.cloud: INFO
     io.netty: INFO
-    reactor.netty: INFO
+    reactor.netty: DEBUG
+    io.netty: DEBUG
