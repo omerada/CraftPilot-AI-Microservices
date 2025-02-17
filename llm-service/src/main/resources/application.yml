@@ -61,17 +61,6 @@ spring:
     producer:
       retries: 3
       acks: all
-  reactor:
-    netty:
-      client:
-        maxConnections: 500
-        maxIdleTime: 20s
-        maxLifeTime: 60s
-      pool:
-        leasingStrategy: fifo
-        maxConnections: 500
-        maxIdleTime: 20s
-        maxLifeTime: 60s
   webflux:
     base-path: /
   codec:
@@ -80,9 +69,14 @@ spring:
     netty:
       client:
         protocols: http11
+        maxConnections: 500
+        maxIdleTime: 20s
+        maxLifeTime: 60s
       pool:
         type: elastic
         max-connections: 500
+        maxIdleTime: 20s
+        maxLifeTime: 60s
       resources:
         loop-resources:
           preferred-native-transport: false
