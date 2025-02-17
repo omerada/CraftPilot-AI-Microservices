@@ -16,4 +16,26 @@ public class AIResponse {
     private Integer tokensUsed;
     private Long processingTime;
     private String status;
+    private String error; 
+    private Boolean success; 
+
+    public static AIResponse error(String errorMessage) {
+        return AIResponse.builder()
+            .status("ERROR")
+            .error(errorMessage)
+            .success(false)
+            .build();
+    }
+
+    public static AIResponse success(String response, String model, Integer tokensUsed, String requestId) {
+        return AIResponse.builder()
+            .status("SUCCESS")
+            .response(response)
+            .model(model)
+            .tokensUsed(tokensUsed)
+            .requestId(requestId)
+            .success(true)
+            .processingTime(System.currentTimeMillis())
+            .build();
+    }
 }

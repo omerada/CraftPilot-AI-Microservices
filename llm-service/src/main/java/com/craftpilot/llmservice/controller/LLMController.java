@@ -14,21 +14,65 @@ import reactor.core.publisher.Mono;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/llm")
+@RequestMapping("/ai")
 @RequiredArgsConstructor
 @Tag(name = "LLM API", description = "AI dil modeli işlemleri için endpoints")
 public class LLMController {
     private final LLMService llmService;
 
+    @PostMapping(value = "/completions", 
+                produces = MediaType.APPLICATION_JSON_VALUE,
+                consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Text completion", description = "Verilen prompt için text completion yapar")
+    public Mono<ResponseEntity<AIResponse>> textCompletion(@RequestBody AIRequest request) {
+        request.setRequestType("TEXT");
+        return llmService.processTextCompletion(request)
+            .map(response -> ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(response))
+            .doOnError(error -> log.error("Text completion error: ", error))
+            .doOnSuccess(response -> log.debug("Text completion success: {}", response));
+    }
+
     @PostMapping(value = "/chat/completions", 
                 produces = MediaType.APPLICATION_JSON_VALUE,
                 consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Chat completion", description = "Sohbet formatında AI yanıtı üretir")
     public Mono<ResponseEntity<AIResponse>> chatCompletion(@RequestBody AIRequest request) {
+        request.setRequestType("CHAT");
         return llmService.processChatCompletion(request)
             .map(response -> ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(response))
             .doOnError(error -> log.error("Chat completion error: ", error))
             .doOnSuccess(response -> log.debug("Chat completion success: {}", response));
+    }
+
+    @PostMapping(value = "/images/generate", 
+                produces = MediaType.APPLICATION_JSON_VALUE,
+                consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Image generation", description = "Verilen prompt'a göre resim üretir")
+    public Mono<ResponseEntity<AIResponse>> generateImage(@RequestBody AIRequest request) {
+        request.setRequestType("IMAGE");
+        return llmService.processImageGeneration(request)
+            .map(response -> ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(response))
+            .doOnError(error -> log.error("Image generation error: ", error))
+            .doOnSuccess(response -> log.debug("Image generation success: {}", response));
+    }
+
+    @PostMapping(value = "/code/completion", 
+                produces = MediaType.APPLICATION_JSON_VALUE,
+                consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Code completion", description = "Kod tamamlama ve geliştirme yapar")
+    public Mono<ResponseEntity<AIResponse>> codeCompletion(@RequestBody AIRequest request) {
+        request.setRequestType("CODE");
+        return llmService.processCodeCompletion(request)
+            .map(response -> ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(response))
+            .doOnError(error -> log.error("Code completion error: ", error))
+            .doOnSuccess(response -> log.debug("Code completion success: {}", response));
     }
 }

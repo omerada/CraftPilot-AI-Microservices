@@ -105,13 +105,9 @@ management:
       enabled: false # Temporarily disable Kafka health check
 
 openrouter:
-  api-key: ${OPENROUTER_API_KEY}
-  base-url: https://openrouter.ai/api/v1
-  default-model: openai/gpt-3.5-turbo
-  max-tokens: 2000
-  temperature: 0.7
-  retry-attempts: 3
-  retry-delay: 1000
+  api:
+    key: ${OPENROUTER_API_KEY}
+    url: https://api.openrouter.ai/api
 
 logging:
   pattern:
