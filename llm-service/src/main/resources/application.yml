@@ -5,6 +5,17 @@ server:
     mime-types: application/json,text/plain
     min-response-size: 1024
   shutdown: graceful
+  netty:
+    connection-timeout: 5000
+    idle-timeout: 15000
+    max-keep-alive-requests: 1000
+    threads:
+      worker: 4
+      boss: 1
+  tomcat:
+    max-threads: 200
+    min-spare-threads: 10
+    accept-count: 100
 
 spring:
   application:
@@ -50,6 +61,17 @@ spring:
     producer:
       retries: 3
       acks: all
+  reactor:
+    netty:
+      client:
+        maxConnections: 500
+        maxIdleTime: 20s
+        maxLifeTime: 60s
+      pool:
+        leasingStrategy: fifo
+        maxConnections: 500
+        maxIdleTime: 20s
+        maxLifeTime: 60s
 
 kafka:
   topics:
@@ -122,3 +144,5 @@ logging:
     org.springframework.web: INFO
     org.springframework.kafka: INFO
     org.springframework.cloud: INFO
+    io.netty: INFO
+    reactor.netty: INFO
