@@ -12,55 +12,12 @@ server:
     threads:
       worker: 4
       boss: 1
-  tomcat:
-    max-threads: 200
-    min-spare-threads: 10
-    accept-count: 100
 
 spring:
   application:
     name: llm-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
-    include: kafka-base
-  cloud:
-    gcp:
-      project-id: ${SPRING_CLOUD_GCP_PROJECT_ID}
-      credentials:
-        location: file:${GOOGLE_APPLICATION_CREDENTIALS}
-      firestore:
-        project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
-        enabled: true
-    discovery:
-      enabled: true
-    loadbalancer:
-      ribbon:
-        enabled: false
-  data:
-    redis:
-      host: ${REDIS_HOST:redis}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:13579ada}
-      timeout: 5000
-      lettuce:
-        pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 2
-          max-wait: 1000ms
-        shutdown-timeout: 200ms
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
-    properties:
-      security.protocol: PLAINTEXT
-      reconnect.backoff.ms: 1000
-      reconnect.backoff.max.ms: 5000
-    consumer:
-      auto-offset-reset: earliest
-      group-id: llm-service-group
-    producer:
-      retries: 3
-      acks: all
   webflux:
     base-path: /
   codec:
@@ -77,14 +34,25 @@ spring:
         max-connections: 500
         maxIdleTime: 20s
         maxLifeTime: 60s
+        leasingStrategy: fifo
       resources:
         loop-resources:
           preferred-native-transport: false
-
-kafka:
-  topics:
-    ai-events: ai-events
-    llm-completions: llm-completions
+  cloud:
+    discovery:
+      enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:13579ada}
+      timeout: 5000
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2
+          max-wait: 1000ms
 
 eureka:
   client:
@@ -103,45 +71,26 @@ management:
       base-path: /actuator
       exposure:
         include: "*"
-      cors:
-        allowed-origins: "*"
-        allowed-methods: GET
   endpoint:
     health:
       show-details: always
       probes:
         enabled: true
-      group:
-        readiness:
-          include: "*"
-          show-details: always
-        liveness:
-          include: ping
-          show-details: always
   health:
-    redis:
-      enabled: true
-    circuitbreakers:
-      enabled: true
     livenessState:
       enabled: true
     readinessState:
       enabled: true
-    defaults:
-      enabled: true
-    diskspace:
-      enabled: true
-    kafka:
-      enabled: false # Temporarily disable Kafka health check
 
 openrouter:
-  api-key: ${OPENROUTER_API_KEY}
-  base-url: https://openrouter.ai/api/v1
-  default-model: openai/gpt-3.5-turbo
-  max-tokens: 2000
-  temperature: 0.7
-  retry-attempts: 3
-  retry-delay: 1000
+  api:
+    key: ${OPENROUTER_API_KEY}
+    url: https://api.openrouter.ai/api
+    defaultModel: google/gemini-2.0-flash-lite-preview-02-05:free
+    maxTokens: 2000
+    temperature: 0.7
+    retryAttempts: 3
+    retryDelay: 1000
 
 logging:
   pattern:
@@ -150,8 +99,6 @@ logging:
     root: INFO
     com.craftpilot: DEBUG
     org.springframework.web: INFO
-    org.springframework.kafka: INFO
     org.springframework.cloud: INFO
-    io.netty: INFO
     reactor.netty: DEBUG
     io.netty: DEBUG
