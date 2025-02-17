@@ -197,6 +197,52 @@ public class UserService {
                 .flatMap(this::createUser);
     }
 
+    public Mono<UserEntity> verifyAndCreateOrUpdateUser(String firebaseToken) {
+        return verifyFirebaseToken(firebaseToken)
+            .flatMap(decodedToken -> userRepository.findById(decodedToken.getUid())
+                .flatMap(existingUser -> {
+                    // Update existing user if needed
+                    boolean needsUpdate = false;
+                    if (!existingUser.getEmail().equals(decodedToken.getEmail())) {
+                        existingUser.setEmail(decodedToken.getEmail());
+                        needsUpdate = true;
+                    }
+                    if (!existingUser.getDisplayName().equals(decodedToken.getName())) {
+                        existingUser.setDisplayName(decodedToken.getName());
+                        needsUpdate = true;
+                    }
+                    if (needsUpdate) {
+                        existingUser.setUpdatedAt(System.currentTimeMillis());
+                        return userRepository.save(existingUser);
+                    }
+                    return Mono.just(existingUser);
+                })
+                .switchIfEmpty(Mono.defer(() -> {
+                    // Create new user if not exists
+                    UserEntity newUser = buildUserFromToken(decodedToken);
+                    return createUser(newUser);
+                })));
+    }
+
+    public Mono<UserEntity> handleFirebaseUpdate(String userId, UserEntity updates) {
+        return userRepository.findById(userId)
+            .flatMap(existingUser -> {
+                updateUserFields(existingUser, updates);
+                return userRepository.save(existingUser)
+                    .doOnSuccess(savedUser -> {
+                        // Firebase ile senkronize et
+                        try {
+                            UserRecord.UpdateRequest request = new UserRecord.UpdateRequest(userId)
+                                .setDisplayName(updates.getDisplayName())
+                                .setPhotoUrl(updates.getPhotoUrl());
+                            firebaseAuth.updateUser(request);
+                        } catch (FirebaseAuthException e) {
+                            log.error("Firebase update failed", e);
+                        }
+                    });
+            });
+    }
+
     private void sendUserEvent(UserEntity user, String eventType) {
         UserEvent event = UserEvent.fromEntity(user, eventType);
         

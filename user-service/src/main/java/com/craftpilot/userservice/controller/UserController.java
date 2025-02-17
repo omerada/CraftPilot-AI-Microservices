@@ -69,4 +69,20 @@ public class UserController {
             @RequestParam(required = false) String username) {
         return userService.searchUsers(email, username);
     }
+
+    @PostMapping("/sync")
+    @Operation(summary = "Firebase kullanıcısını senkronize et", 
+              description = "Firebase Authentication'dan gelen kullanıcıyı sistemle senkronize eder")
+    public Mono<UserEntity> syncFirebaseUser(@RequestHeader("Firebase-Token") String firebaseToken) {
+        return userService.verifyAndCreateOrUpdateUser(firebaseToken);
+    }
+
+    @PutMapping("/{id}/firebase-sync")
+    @Operation(summary = "Firebase güncellemelerini senkronize et", 
+              description = "Firebase'de yapılan güncellemeleri sistemle senkronize eder")
+    public Mono<UserEntity> syncFirebaseUpdates(
+            @PathVariable String id,
+            @RequestBody UserEntity updates) {
+        return userService.handleFirebaseUpdate(id, updates);
+    }
 }
