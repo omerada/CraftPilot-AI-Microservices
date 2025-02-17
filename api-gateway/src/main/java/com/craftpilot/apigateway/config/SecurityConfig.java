@@ -10,6 +10,7 @@ import org.springframework.security.web.server.context.ServerSecurityContextRepo
 import org.springframework.security.web.server.context.WebSessionServerSecurityContextRepository;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -28,6 +29,15 @@ public class SecurityConfig {
             .httpBasic().disable()
             .formLogin().disable()
             .logout().disable()
+            .headers(headers -> headers
+                .frameOptions().disable()
+                .cache().disable())
+            .exceptionHandling(handling -> handling
+                .authenticationEntryPoint((exchange, ex) -> {
+                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                    // WWW-Authenticate header'ını eklemiyoruz
+                    return exchange.getResponse().setComplete();
+                }))
             .authorizeExchange(exchanges -> exchanges
                 // Root path
                 .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll() // CORS için OPTIONS isteklerine izin ver

@@ -28,6 +28,14 @@ public class LightSecurityConfig {
             .csrf().disable()
             .formLogin().disable()
             .httpBasic().disable()
+            .headers(headers -> headers
+                .frameOptions().disable()
+                .cache().disable())
+            .exceptionHandling(handling -> handling
+                .authenticationEntryPoint((exchange, ex) -> {
+                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                    return exchange.getResponse().setComplete();
+                }))
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers("/actuator/health", 
                              "/actuator/info",
