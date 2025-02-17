@@ -118,8 +118,10 @@ spring:
         - DedupeResponseHeader=Access-Control-Allow-Origin
         - AddResponseHeader=Access-Control-Allow-Origin, *
         - AddResponseHeader=Access-Control-Allow-Methods, GET,POST,PUT,DELETE,OPTIONS,HEAD
-        - AddResponseHeader=Access-Control-Allow-Headers, Origin,Content-Type,Accept,Authorization,X-Request-With
+        - AddResponseHeader=Access-Control-Allow-Headers, Origin,Content-Type,Accept,Authorization,X-Request-With,X-User-Id,X-User-Role,X-User-Email
         - AddResponseHeader=Access-Control-Max-Age, 3600
+        - AddResponseHeader=Access-Control-Allow-Credentials, true
+        - AddResponseHeader=WWW-Authenticate, Bearer realm="craftpilot"
       httpclient:
         connect-timeout: 5000
         response-timeout: 5000
