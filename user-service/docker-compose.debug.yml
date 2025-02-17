@@ -1,0 +1,17 @@
+version: "3.8"
+services:
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.debug
+    ports:
+      - "8080:8080" # Normal service port
+      - "5005:5005" # Debug port
+    environment:
+      - SPRING_PROFILES_ACTIVE=remote
+    networks:
+      - craft-pilot-network
+
+networks:
+  craft-pilot-network:
+    driver: bridge

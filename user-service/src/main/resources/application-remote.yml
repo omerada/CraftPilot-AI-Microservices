@@ -1,0 +1,10 @@
+spring:
+  profiles: remote
+
+server:
+  port: 8080
+
+# Remote debugging configuration
+java:
+  debug: true
+  debug-port: 5005

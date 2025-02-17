@@ -24,27 +24,18 @@ public class LightSecurityConfig {
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
-            .csrf().disable()
-            .formLogin().disable()
-            .httpBasic().disable()
-            .headers(headers -> headers
-                .frameOptions().disable()
-                .cache().disable())
-            .exceptionHandling(handling -> handling
-                .authenticationEntryPoint((exchange, ex) -> {
-                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                    return exchange.getResponse().setComplete();
-                }))
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers("/actuator/health", 
-                             "/actuator/info",
-                             "/v3/api-docs/**",
-                             "/swagger-ui/**",
-                             "/webjars/**",
-                             "/swagger-ui.html").permitAll()
+                .pathMatchers("/actuator/**").permitAll()
+                .pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .anyExchange().authenticated()
             )
-            .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
+            // Yeni güvenlik yapılandırması
+            .csrf(ServerHttpSecurity.CsrfSpec::disable)
+            .cors(cors -> cors.disable())
+            .headers(headers -> headers
+                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'"))
+                .xssProtection(xss -> xss.disable())
+            )
             .build();
     }
 
