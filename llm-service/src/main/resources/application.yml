@@ -18,6 +18,8 @@ spring:
     name: llm-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+  main:
+    web-application-type: reactive
   webflux:
     base-path: /
   codec:
@@ -85,7 +87,7 @@ management:
 openrouter:
   api:
     key: ${OPENROUTER_API_KEY}
-    url: https://api.openrouter.ai/api
+    url: https://openrouter.ai/api/v1
     defaultModel: google/gemini-2.0-flash-lite-preview-02-05:free
     maxTokens: 2000
     temperature: 0.7

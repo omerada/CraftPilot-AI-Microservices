@@ -180,18 +180,6 @@
             <artifactId>reactor-netty-http</artifactId>
         </dependency>
 
-        <!-- Remove commons-logging -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>commons-logging</groupId>
-                    <artifactId>commons-logging</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        
         <!-- Use jcl-over-slf4j instead -->
         <dependency>
             <groupId>org.slf4j</groupId>
