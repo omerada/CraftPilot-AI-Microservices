@@ -90,4 +90,19 @@ public class OpenRouterService {
             "temperature", request.getTemperature() != null ? request.getTemperature() : config.getTemperature()
         );
     }
+
+    private void publishEvent(String event) {
+        try {
+            kafkaTemplate.send(aiEventsTopic, event)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("Failed to publish event to kafka: {}", ex.getMessage());
+                    } else {
+                        log.debug("Event published successfully: {}", event);
+                    }
+                });
+        } catch (Exception e) {
+            log.error("Error publishing event: {}", e.getMessage());
+        }
+    }
 }

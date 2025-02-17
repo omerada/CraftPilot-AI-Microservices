@@ -40,6 +40,17 @@ spring:
       resources:
         loop-resources:
           preferred-native-transport: false
+  kafka:
+    properties:
+      security.protocol: PLAINTEXT
+      reconnect.backoff.ms: 1000
+      reconnect.backoff.max.ms: 5000
+    consumer:
+      auto-offset-reset: earliest
+      group-id: llm-service-group
+    producer:
+      retries: 3
+      acks: all
   cloud:
     discovery:
       enabled: true
@@ -93,6 +104,21 @@ openrouter:
     temperature: 0.7
     retryAttempts: 3
     retryDelay: 1000
+
+kafka:
+  topics:
+    ai-events: ai-events
+    llm-completions: llm-completions
+  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+  consumer:
+    group-id: llm-service-group
+    auto-offset-reset: earliest
+  producer:
+    retries: 3
+    acks: all
+    properties:
+      max.block.ms: 5000
+      request.timeout.ms: 2000
 
 logging:
   pattern:
