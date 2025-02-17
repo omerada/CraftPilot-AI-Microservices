@@ -11,6 +11,8 @@ on:
 jobs:
   build-and-deploy:
     runs-on: self-hosted
+    env:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }} # API key'i env olarak ekle
     steps:
       - uses: actions/checkout@v3
 
@@ -78,6 +80,7 @@ jobs:
               -p 8062:8062 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
+              -e OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }} \ # API key'i container'a aktar
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \

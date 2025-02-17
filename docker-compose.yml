@@ -176,33 +176,22 @@ services:
 
   # LLM Service
   llm-service:
-    build:
-      context: ./llm-service
-      dockerfile: Dockerfile
-      platforms:
-        - linux/arm64
-    image: ${DOCKERHUB_USERNAME}/llm-service:latest-arm64
-    container_name: llm-service
+    image: ghcr.io/${GITHUB_REPOSITORY}/llm-service:main
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/
     ports:
       - "8062:8062"
-    environment:
-      <<: *common-variables
-      MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
-      MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED: "true"
-      MANAGEMENT_HEALTH_READINESSSTATE_ENABLED: "true"
-      SPRING_APPLICATION_NAME: llm-service
-    volumes:
-      - ${GCP_SA_KEY_PATH:-./llm-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
     networks:
-      craftpilot-network:
-        ipv4_address: 172.18.0.17
+      - craftpilot-network
     depends_on:
-      eureka-server:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
+      - redis
+      - kafka
+      - eureka-server
     <<: *common-deploy
     healthcheck:
       test:

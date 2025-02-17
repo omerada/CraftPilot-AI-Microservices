@@ -9,9 +9,13 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # Run stage
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
+
+ARG OPENROUTER_API_KEY
+ENV OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+
 COPY --from=build /build/target/*.jar app.jar
 
 # JVM ayarları
@@ -26,4 +30,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8062/actuator/health || exit 1
 
 EXPOSE 8062
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]
+
+ENTRYPOINT ["java", \
+            "-Dspring.profiles.active=prod", \
+            "-Djava.security.egd=file:/dev/./urandom", \
+            "-jar", \
+            "app.jar"]
