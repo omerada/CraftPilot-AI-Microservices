@@ -10,10 +10,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AIResponse {
-    private String response;
-    private String error;
-    private String model;
-    private Integer tokenCount;
-    private Long processingTime;
     private String requestId;
-} 
+    private String response;
+    private String model;
+    private Integer tokensUsed;
+    private Long processingTime;
+    private String status;
+}
