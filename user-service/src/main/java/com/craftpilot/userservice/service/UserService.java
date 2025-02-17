@@ -27,6 +27,8 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import com.craftpilot.userservice.model.user.event.UserEvent;
+import com.google.firebase.auth.UserRecord;
+import com.google.firebase.auth.UserRecord.UpdateRequest;
 
 /**
  * Kullanıcı işlemleri için servis arayüzü.
@@ -232,7 +234,7 @@ public class UserService {
                     .doOnSuccess(savedUser -> {
                         // Firebase ile senkronize et
                         try {
-                            UserRecord.UpdateRequest request = new UserRecord.UpdateRequest(userId)
+                            UpdateRequest request = new UpdateRequest(userId)
                                 .setDisplayName(updates.getDisplayName())
                                 .setPhotoUrl(updates.getPhotoUrl());
                             firebaseAuth.updateUser(request);
