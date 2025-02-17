@@ -4,35 +4,53 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
-import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.web.server.WebFilter;
-import reactor.core.publisher.Mono;
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ServerWebExchange;
-import org.springframework.web.server.WebFilterChain;
+import org.springframework.web.server.WebFilter;
+import reactor.core.publisher.Mono;
+import java.util.List;
+import java.util.Arrays;
 
 @Slf4j
 @Configuration
 @EnableWebFluxSecurity
 public class LightSecurityConfig {
 
-    private static final String USER_ID_HEADER = "X-User-Id";
-    private static final String USER_ROLE_HEADER = "X-User-Role";
-    private static final String USER_EMAIL_HEADER = "X-User-Email";
+    private static final List<String> PUBLIC_PATHS = Arrays.asList(
+        "/actuator/",
+        "/v3/api-docs",
+        "/swagger-ui",
+        "/webjars/"
+    );
+
+    private static final List<RequiredHeader> REQUIRED_HEADERS = Arrays.asList(
+        new RequiredHeader("X-User-Id", "User ID is required"),
+        new RequiredHeader("X-User-Role", "User role is required"),
+        new RequiredHeader("X-User-Email", "User email is required")
+    );
 
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
-            .authorizeExchange(exchanges -> exchanges
-                .pathMatchers("/actuator/**").permitAll()
-                .pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                .anyExchange().authenticated()
-            )
-            // Yeni güvenlik yapılandırması
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .cors(cors -> cors.disable())
+            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+            .authorizeExchange(exchanges -> exchanges
+                .pathMatchers(getPublicPaths()).permitAll()
+                .pathMatchers("/admin/**").hasRole("ADMIN")
+                .anyExchange().authenticated()
+            )
+            .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
+            .exceptionHandling(handling -> handling
+                .authenticationEntryPoint((exchange, ex) -> {
+                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                    return exchange.getResponse().setComplete();
+                })
+            )
             .headers(headers -> headers
                 .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'"))
                 .xssProtection(xss -> xss.disable())
@@ -43,23 +61,15 @@ public class LightSecurityConfig {
     @Bean
     public WebFilter headerValidationFilter() {
         return (exchange, chain) -> {
-            String path = exchange.getRequest().getPath().value();
-            
-            // Public endpoints bypass
-            if (isPublicPath(path)) {
+            if (isPublicPath(exchange.getRequest().getPath().value())) {
                 return chain.filter(exchange);
             }
 
-            // Header kontrolü
-            if (!hasValidHeaders(exchange)) {
-                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                return exchange.getResponse().setComplete();
-            }
-
-            // Admin yetki kontrolü
-            if (isAdminPath(path) && !isAdminUser(exchange)) {
-                exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
-                return exchange.getResponse().setComplete();
+            for (RequiredHeader header : REQUIRED_HEADERS) {
+                String headerValue = exchange.getRequest().getHeaders().getFirst(header.name);
+                if (headerValue == null || headerValue.trim().isEmpty()) {
+                    return handleMissingHeader(exchange, header.message);
+                }
             }
 
             return chain.filter(exchange);
@@ -67,24 +77,28 @@ public class LightSecurityConfig {
     }
 
     private boolean isPublicPath(String path) {
-        return path.startsWith("/actuator/") || 
-               path.startsWith("/v3/api-docs") || 
-               path.startsWith("/swagger-ui") ||
-               path.startsWith("/webjars/");
+        return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
     }
 
-    private boolean hasValidHeaders(ServerWebExchange exchange) {
-        String userId = exchange.getRequest().getHeaders().getFirst(USER_ID_HEADER);
-        String userRole = exchange.getRequest().getHeaders().getFirst(USER_ROLE_HEADER);
-        return userId != null && userRole != null;
+    private String[] getPublicPaths() {
+        return PUBLIC_PATHS.stream()
+            .map(path -> path + "**")
+            .toArray(String[]::new);
     }
 
-    private boolean isAdminPath(String path) {
-        return path.startsWith("/admin");
+    private Mono<Void> handleMissingHeader(ServerWebExchange exchange, String message) {
+        exchange.getResponse().setStatusCode(HttpStatus.BAD_REQUEST);
+        exchange.getResponse().getHeaders().add("X-Error-Message", message);
+        return exchange.getResponse().setComplete();
     }
 
-    private boolean isAdminUser(ServerWebExchange exchange) {
-        String userRole = exchange.getRequest().getHeaders().getFirst(USER_ROLE_HEADER);
-        return userRole != null && userRole.contains("ADMIN");
+    private static class RequiredHeader {
+        final String name;
+        final String message;
+
+        RequiredHeader(String name, String message) {
+            this.name = name;
+            this.message = message;
+        }
     }
 }

@@ -1,68 +1,65 @@
 package com.craftpilot.apigateway.config;
 
 import com.craftpilot.apigateway.security.FirebaseAuthenticationFilter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.web.server.context.ServerSecurityContextRepository;
-import org.springframework.security.web.server.context.WebSessionServerSecurityContextRepository;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
+import java.util.List;
+import java.util.Arrays;
 
 @Configuration
 @EnableWebFluxSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final FirebaseAuthenticationFilter firebaseAuthenticationFilter;
 
-    public SecurityConfig(FirebaseAuthenticationFilter firebaseAuthenticationFilter) { 
-        this.firebaseAuthenticationFilter = firebaseAuthenticationFilter;
-    }
+    private static final List<String> PUBLIC_PATHS = Arrays.asList(
+        "/",
+        "/actuator/**",
+        "/swagger-ui.html",
+        "/swagger-ui/**",
+        "/v3/api-docs/**",
+        "/webjars/**",
+        "/*/v3/api-docs",
+        "/*/swagger-ui.html",
+        "/*/health",
+        "/*/actuator/**",
+        "/auth/**",
+        "/users/register",
+        "/users/login",
+        "/public/**"
+    );
 
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
-            .csrf().disable()
-            .httpBasic().disable()
-            .formLogin().disable()
-            .logout().disable()
-            .headers(headers -> headers
-                .frameOptions().disable()
-                .cache().disable())
-            .exceptionHandling(handling -> handling
-                .authenticationEntryPoint((exchange, ex) -> {
-                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                    // WWW-Authenticate header'ını eklemiyoruz
-                    return exchange.getResponse().setComplete();
-                }))
+            .csrf(ServerHttpSecurity.CsrfSpec::disable)
+            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+            .logout(ServerHttpSecurity.LogoutSpec::disable)
             .authorizeExchange(exchanges -> exchanges
-                // Root path
-                .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll() // CORS için OPTIONS isteklerine izin ver
-                .pathMatchers("/").permitAll()
-                // Actuator endpoints
-                .pathMatchers("/actuator/**").permitAll()
-                // Documentation endpoints
-                .pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**").permitAll()
-                .pathMatchers("/*/v3/api-docs", "/*/swagger-ui.html").permitAll()
-                // Service health endpoints
-                .pathMatchers("/*/health", "/*/actuator/**").permitAll()
-                // Auth endpoints
-                .pathMatchers("/auth/**", "/users/register", "/users/login").permitAll()
-                // Public paths
-                .pathMatchers("/public/**").permitAll()
-                // All other requests need authentication
+                .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .pathMatchers(PUBLIC_PATHS.toArray(new String[0])).permitAll()
                 .anyExchange().authenticated()
             )
             .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
-            .securityContextRepository(securityContextRepository())
+            .headers(headers -> headers
+                .frameOptions(frame -> frame.disable())
+                .contentSecurityPolicy(csp -> csp
+                    .policyDirectives("default-src 'self'; frame-ancestors 'none';"))
+            )
+            .exceptionHandling(handling -> handling
+                .authenticationEntryPoint((exchange, ex) -> {
+                    exchange.getResponse().getHeaders().add("WWW-Authenticate", "Bearer");
+                    return exchange.getResponse().setComplete();
+                })
+            )
             .build();
-    }
-
-    @Bean
-    public ServerSecurityContextRepository securityContextRepository() {
-        return new WebSessionServerSecurityContextRepository();
     }
 }
