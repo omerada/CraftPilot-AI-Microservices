@@ -38,6 +38,7 @@ build/
 
 ### db folder
 /db
+/postman
 
 # Firebase credentials
 **/firebase-service-account.json
