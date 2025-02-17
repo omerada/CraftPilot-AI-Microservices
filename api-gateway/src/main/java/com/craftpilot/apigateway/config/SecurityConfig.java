@@ -16,7 +16,7 @@ public class SecurityConfig {
 
     private final FirebaseAuthenticationFilter firebaseAuthenticationFilter;
 
-    public SecurityConfig(FirebaseAuthenticationFilter firebaseAuthenticationFilter) { 
+    public SecurityConfig(FirebaseAuthenticationFilter(firebaseAuthenticationFilter) { 
         this.firebaseAuthenticationFilter = firebaseAuthenticationFilter;
     }
 
@@ -27,23 +27,26 @@ public class SecurityConfig {
             .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .authorizeExchange(exchanges -> exchanges
+                // Root path
+                .pathMatchers("/").permitAll()
                 // Actuator endpoints
                 .pathMatchers("/actuator/**").permitAll()
-                .pathMatchers("/actuator/health/**").permitAll()
-                .pathMatchers("/actuator/info/**").permitAll()
-                // Service health endpoints
-                .pathMatchers("/*/health").permitAll()
-                .pathMatchers("/*/actuator/health").permitAll()
                 // Documentation endpoints
-                .pathMatchers("/v3/api-docs/**").permitAll()
+                .pathMatchers("/swagger-ui.html").permitAll()
                 .pathMatchers("/swagger-ui/**").permitAll()
+                .pathMatchers("/v3/api-docs/**").permitAll()
                 .pathMatchers("/webjars/**").permitAll()
                 .pathMatchers("/*/v3/api-docs").permitAll()
                 .pathMatchers("/*/swagger-ui.html").permitAll()
+                // Service health endpoints
+                .pathMatchers("/*/health").permitAll()
+                .pathMatchers("/*/actuator/**").permitAll()
                 // Auth endpoints
                 .pathMatchers("/auth/**").permitAll()
                 .pathMatchers("/users/register").permitAll()
                 .pathMatchers("/users/login").permitAll()
+                // Public paths
+                .pathMatchers("/public/**").permitAll()
                 // All other requests need authentication
                 .anyExchange().authenticated()
             )
