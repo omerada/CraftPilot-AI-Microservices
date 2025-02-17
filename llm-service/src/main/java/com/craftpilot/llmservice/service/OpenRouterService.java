@@ -91,9 +91,9 @@ public class OpenRouterService {
         );
     }
 
-    private void publishEvent(String event) {
+    private void publishEvent(AIEvent event) {
         try {
-            kafkaTemplate.send(aiEventsTopic, event)
+            kafkaTemplate.send(aiEventsTopic, event.getRequestId(), event)
                 .whenComplete((result, ex) -> {
                     if (ex != null) {
                         log.error("Failed to publish event to kafka: {}", ex.getMessage());
