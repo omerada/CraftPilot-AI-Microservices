@@ -16,7 +16,7 @@ public class SecurityConfig {
 
     private final FirebaseAuthenticationFilter firebaseAuthenticationFilter;
 
-    public SecurityConfig(FirebaseAuthenticationFilter(firebaseAuthenticationFilter) { 
+    public SecurityConfig(FirebaseAuthenticationFilter firebaseAuthenticationFilter) { 
         this.firebaseAuthenticationFilter = firebaseAuthenticationFilter;
     }
 
