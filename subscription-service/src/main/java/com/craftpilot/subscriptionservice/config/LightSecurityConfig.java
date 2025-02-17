@@ -20,20 +20,29 @@ public class LightSecurityConfig {
 
     private static final String USER_ID_HEADER = "X-User-Id";
     private static final String USER_ROLE_HEADER = "X-User-Role";
-    private static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
-    private static final String API_KEY_HEADER = "X-Api-Key";
-    
+    private static final String USER_EMAIL_HEADER = "X-User-Email";
+
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
-            .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+            .csrf().disable()
+            .formLogin().disable()
+            .httpBasic().disable()
+            .headers(headers -> headers
+                .frameOptions().disable()
+                .cache().disable())
+            .exceptionHandling(handling -> handling
+                .authenticationEntryPoint((exchange, ex) -> {
+                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                    return exchange.getResponse().setComplete();
+                }))
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers("/actuator/health").permitAll()
-                .pathMatchers("/actuator/info").permitAll()
-                .pathMatchers("/v3/api-docs/**").permitAll()
-                .pathMatchers("/swagger-ui/**").permitAll()
+                .pathMatchers("/actuator/health", 
+                             "/actuator/info",
+                             "/v3/api-docs/**",
+                             "/swagger-ui/**",
+                             "/webjars/**",
+                             "/swagger-ui.html").permitAll()
                 .anyExchange().authenticated()
             )
             .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
@@ -43,29 +52,48 @@ public class LightSecurityConfig {
     @Bean
     public WebFilter headerValidationFilter() {
         return (exchange, chain) -> {
-            String userId = exchange.getRequest().getHeaders().getFirst("X-User-Id");
-            String userRole = exchange.getRequest().getHeaders().getFirst("X-User-Role");
-            String userEmail = exchange.getRequest().getHeaders().getFirst("X-User-Email");
-
-            // Public endpoints bypass
             String path = exchange.getRequest().getPath().value();
-            if (path.startsWith("/actuator/") || path.startsWith("/v3/api-docs") || path.startsWith("/swagger-ui")) {
+            
+            // Public endpoints bypass
+            if (isPublicPath(path)) {
                 return chain.filter(exchange);
             }
 
-            // Firebase user bilgilerini kontrol et
-            if (userId == null || userRole == null) {
+            // Header kontrolü
+            if (!hasValidHeaders(exchange)) {
                 exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
                 return exchange.getResponse().setComplete();
             }
 
-            // Admin endpoint'leri için rol kontrolü
-            if (path.startsWith("/admin") && !userRole.contains("ADMIN")) {
+            // Admin yetki kontrolü
+            if (isAdminPath(path) && !isAdminUser(exchange)) {
                 exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
                 return exchange.getResponse().setComplete();
             }
 
             return chain.filter(exchange);
         };
+    }
+
+    private boolean isPublicPath(String path) {
+        return path.startsWith("/actuator/") || 
+               path.startsWith("/v3/api-docs") || 
+               path.startsWith("/swagger-ui") ||
+               path.startsWith("/webjars/");
+    }
+
+    private boolean hasValidHeaders(ServerWebExchange exchange) {
+        String userId = exchange.getRequest().getHeaders().getFirst(USER_ID_HEADER);
+        String userRole = exchange.getRequest().getHeaders().getFirst(USER_ROLE_HEADER);
+        return userId != null && userRole != null;
+    }
+
+    private boolean isAdminPath(String path) {
+        return path.startsWith("/admin");
+    }
+
+    private boolean isAdminUser(ServerWebExchange exchange) {
+        String userRole = exchange.getRequest().getHeaders().getFirst(USER_ROLE_HEADER);
+        return userRole != null && userRole.contains("ADMIN");
     }
 }
