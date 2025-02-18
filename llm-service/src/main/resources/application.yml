@@ -13,6 +13,11 @@ server:
       worker: 4
       boss: 1
     validate-headers: false
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: never
+    include-exception: false
 
 spring:
   application:
@@ -24,8 +29,13 @@ spring:
     allow-bean-definition-overriding: true
   webflux:
     base-path: /
+    format:
+      date: yyyy-MM-dd
+      date-time: yyyy-MM-dd HH:mm:ss
+      time: HH:mm:ss
   codec:
     max-in-memory-size: 16MB
+    log-request-details: true
   kafka:
     properties:
       security.protocol: PLAINTEXT
@@ -126,6 +136,7 @@ logging:
     reactor.netty: DEBUG
     io.netty: DEBUG
     com.craftpilot.llmservice: DEBUG
+    org.springframework.security: DEBUG
 
 netty:
   native:

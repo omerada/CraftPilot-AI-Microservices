@@ -45,6 +45,7 @@ public class LLMController {
                 log.info("Başarılı yanıt gönderiliyor: {}", response);
                 return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Request-ID", request.getRequestId())
                     .body(response);
             })
             .doOnError(error -> log.error("İşlem hatası: ", error))

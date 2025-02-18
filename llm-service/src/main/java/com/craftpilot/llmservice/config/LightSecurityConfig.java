@@ -38,14 +38,11 @@ public class LightSecurityConfig {
         return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .cors(cors -> cors.disable())
-            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
-            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers("/**").permitAll()
+                .pathMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**", "/webjars/**", "/ai/**").permitAll()
+                .anyExchange().authenticated()
             )
-            .headers(headers -> headers.frameOptions().disable()
-                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data:; style-src 'self' 'unsafe-inline';"))
-            )
+            .httpBasic(httpBasic -> {})
             .build();
     }
 
