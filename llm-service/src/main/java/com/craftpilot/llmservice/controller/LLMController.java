@@ -21,7 +21,9 @@ import reactor.core.publisher.Mono;
 public class LLMController {
     private final LLMService llmService;
 
-    @PostMapping(value = "/completions")
+    @PostMapping(value = "/completions", 
+                produces = MediaType.APPLICATION_JSON_VALUE,
+                consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Text completion", description = "Verilen prompt için text completion yapar")
     public Mono<ResponseEntity<AIResponse>> textCompletion(@RequestBody AIRequest request) {
         log.debug("Incoming request: {}", request);
@@ -33,22 +35,17 @@ public class LLMController {
             })
             .flatMap(req -> {
                 req.setRequestType("TEXT");
-                return llmService.processTextCompletion(req);
+                return llmService.processTextCompletion(req)
+                    .doOnNext(response -> log.debug("Service response: {}", response));
             })
-            .map(response -> {
-                log.debug("Response received: {}", response);
-                return ResponseEntity.ok()
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(response);
-            })
+            .map(response -> ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(response))
             .doOnError(error -> log.error("Error processing request: ", error))
             .onErrorResume(error -> Mono.just(
                 ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(AIResponse.builder()
-                        .status("ERROR")
-                        .error(error.getMessage())
-                        .build())
+                    .body(AIResponse.error(error.getMessage()))
             ));
     }
 

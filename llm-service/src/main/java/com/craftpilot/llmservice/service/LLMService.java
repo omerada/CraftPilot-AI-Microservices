@@ -12,6 +12,7 @@ import reactor.core.publisher.Mono;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.Duration;
 
 @Service
 @Slf4j
@@ -49,22 +50,27 @@ public class LLMService {
             .bodyValue(createRequestBody(request))
             .retrieve()
             .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-            .doOnError(error -> log.error("OpenRouter API error: ", error));
+            .doOnError(error -> log.error("OpenRouter API error: ", error))
+            .timeout(Duration.ofSeconds(30))
+            .doOnNext(response -> log.debug("OpenRouter raw response: {}", response));
     }
 
     private Map<String, Object> createRequestBody(AIRequest request) {
         Map<String, Object> body = new HashMap<>();
         body.put("model", request.getModel());
         
-        if (request.getMessages() != null) {
+        if (request.getMessages() != null && !request.getMessages().isEmpty()) {
             body.put("messages", request.getMessages());
-        } else if (request.getPrompt() != null) {
+        } else {
             body.put("prompt", request.getPrompt());
         }
 
         body.put("max_tokens", request.getMaxTokens());
         body.put("temperature", request.getTemperature());
+        body.put("stop", null);
+        body.put("stream", false);
         
+        log.debug("Request body: {}", body);
         return body;
     }
 
@@ -92,6 +98,7 @@ public class LLMService {
 
     private String extractResponseText(Map<String, Object> response) {
         try {
+            log.debug("Extracting response from: {}", response);
             if (response.containsKey("choices")) {
                 List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
                 if (!choices.isEmpty()) {
@@ -104,11 +111,10 @@ public class LLMService {
                     }
                 }
             }
-            log.warn("Unable to extract response text from: {}", response);
-            return null;
+            throw new RuntimeException("Invalid response format from OpenRouter");
         } catch (Exception e) {
             log.error("Error extracting response text: ", e);
-            return null;
+            throw new RuntimeException("Failed to process AI response", e);
         }
     }
 
