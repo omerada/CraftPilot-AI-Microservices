@@ -21,6 +21,7 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:dev}
   main:
     web-application-type: reactive
+    allow-bean-definition-overriding: true
   webflux:
     base-path: /
   codec:
@@ -60,6 +61,7 @@ spring:
       client:
         proxy:
           type: NO_PROXY
+      native: false
 
 eureka:
   client:
@@ -131,3 +133,14 @@ netty:
   io:
     noNative: true
     noUnsafe: false
+  use-native-transport: false
+
+spring:
+  main:
+    jvm-args: >
+      -Dio.netty.noNative=true
+      -Dio.netty.tryReflectionSetAccessible=true
+      -Dio.netty.noUnsafe=true
+      -Djava.io.tmpdir=/tmp
+      -Dnetty.native.workdir=/tmp
+      -Dio.netty.leakDetection.level=DISABLED
