@@ -160,10 +160,22 @@
         <!-- Native support -->
         <dependency>
             <groupId>io.netty</groupId>
-            <artifactId>netty-tcnative</artifactId>
+            <artifactId>netty-tcnative-boringssl-static</artifactId>
             <version>${netty-tcnative.version}</version>
-            <classifier>linux-aarch_64</classifier>
+            <classifier>${os.detected.classifier}</classifier>
             <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-transport-native-epoll</artifactId>
+            <version>${netty.version}</version>
+            <classifier>${os.detected.classifier}</classifier>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-transport-native-unix-common</artifactId>
+            <version>${netty.version}</version>
+            <classifier>${os.detected.classifier}</classifier>
         </dependency>
 
         <!-- Explicit Reactor Netty dependency -->
