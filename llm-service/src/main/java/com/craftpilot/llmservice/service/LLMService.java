@@ -78,27 +78,22 @@ public class LLMService {
         Map<String, Object> body = new HashMap<>();
         body.put("model", request.getModel());
         
-        // Code completion için özel mesaj formatı
-        if ("CODE".equals(request.getRequestType())) {
-            List<Map<String, String>> messages = new ArrayList<>();
-            messages.add(Map.of(
-                "role", "system",
-                "content", "You are a code assistant. Write clean and well-documented code."
-            ));
-            messages.add(Map.of(
-                "role", "user",
-                "content", request.getPrompt()
-            ));
-            body.put("messages", messages);
-        } else if (request.getMessages() != null && !request.getMessages().isEmpty()) {
-            body.put("messages", request.getMessages());
-        } else {
-            body.put("prompt", request.getPrompt());
-        }
-
+        List<Map<String, Object>> messages = new ArrayList<>();
+        Map<String, Object> userMessage = new HashMap<>();
+        userMessage.put("role", "user");
+        
+        List<Map<String, Object>> content = new ArrayList<>();
+        Map<String, Object> textContent = new HashMap<>();
+        textContent.put("type", "text");
+        textContent.put("text", request.getPrompt());
+        content.add(textContent);
+        
+        userMessage.put("content", content);
+        messages.add(userMessage);
+        
+        body.put("messages", messages);
         body.put("max_tokens", request.getMaxTokens());
         body.put("temperature", request.getTemperature());
-        body.put("stream", false);
         
         log.debug("Oluşturulan request body: {}", body);
         return body;
@@ -126,23 +121,32 @@ public class LLMService {
 
     private String extractResponseText(Map<String, Object> response) {
         try {
-            log.debug("Extracting response from: {}", response);
+            log.debug("Yanıt içeriği: {}", response);
             if (response.containsKey("choices")) {
                 List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
                 if (!choices.isEmpty()) {
                     Map<String, Object> choice = choices.get(0);
                     if (choice.containsKey("message")) {
                         Map<String, Object> message = (Map<String, Object>) choice.get("message");
-                        return (String) message.get("content");
-                    } else if (choice.containsKey("text")) {
-                        return (String) choice.get("text");
+                        if (message.containsKey("content")) {
+                            if (message.get("content") instanceof List) {
+                                List<Map<String, Object>> contents = (List<Map<String, Object>>) message.get("content");
+                                return contents.stream()
+                                    .filter(content -> "text".equals(content.get("type")))
+                                    .map(content -> (String) content.get("text"))
+                                    .findFirst()
+                                    .orElse(null);
+                            } else {
+                                return (String) message.get("content");
+                            }
+                        }
                     }
                 }
             }
-            throw new RuntimeException("Invalid response format from OpenRouter");
+            throw new RuntimeException("Geçersiz API yanıt formatı");
         } catch (Exception e) {
-            log.error("Error extracting response text: ", e);
-            throw new RuntimeException("Failed to process AI response", e);
+            log.error("Yanıt işlenirken hata oluştu: ", e);
+            throw new RuntimeException("AI yanıtı işlenemedi", e);
         }
     }
 

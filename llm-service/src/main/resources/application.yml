@@ -110,6 +110,7 @@ openrouter:
     temperature: 0.7
     retryAttempts: 3
     retryDelay: 1000
+    http-referer: https://craftpilot.io
 
 kafka:
   topics:
