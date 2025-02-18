@@ -128,9 +128,9 @@ logging:
 
 netty:
   native:
-    enabled: false
+    enabled: true
   io:
-    noNative: true
-    noUnsafe: true
-  use-native-transport: false
+    noNative: false
+    noUnsafe: false
+  use-native-transport: true
   workdir: /tmp/netty

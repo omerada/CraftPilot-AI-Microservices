@@ -14,7 +14,7 @@ WORKDIR /app
 
 # Install required packages
 RUN apk update && \
-    apk add --no-cache curl tzdata libc6-compat libstdc++ && \
+    apk add --no-cache curl tzdata libc6-compat libstdc++ gcompat && \
     rm -rf /var/cache/apk/*
 
 # Create necessary directories
@@ -30,16 +30,18 @@ ENV JAVA_TOOL_OPTIONS="\
     -XX:+UseG1GC \
     -XX:+HeapDumpOnOutOfMemoryError \
     -XX:HeapDumpPath=/app/heapdump.hprof \
-    -Dio.netty.noNative=true \
-    -Dio.netty.noUnsafe=true \
+    -Dio.netty.noNative=false \
+    -Dio.netty.noUnsafe=false \
     -Dio.netty.tryReflectionSetAccessible=true \
     -Dio.netty.leakDetection.level=DISABLED \
     -Djava.io.tmpdir=/tmp \
-    -Djavax.net.debug=none \
+    -Dnetty.native.workdir=/tmp/netty \
     -Dio.netty.native.workdir=/tmp/netty \
     --add-opens=java.base/java.nio=ALL-UNNAMED \
     --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED \
-    --add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
+    --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+    --add-exports=java.base/jdk.internal.misc=ALL-UNNAMED \
+    --add-exports=java.base/sun.nio.ch=ALL-UNNAMED"
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
   CMD curl -f http://localhost:8062/actuator/health || exit 1
