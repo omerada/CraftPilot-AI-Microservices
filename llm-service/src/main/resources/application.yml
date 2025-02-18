@@ -131,6 +131,6 @@ netty:
     enabled: false
   io:
     noNative: true
-    noUnsafe: false
+    noUnsafe: true
   use-native-transport: false
   workdir: /tmp/netty
