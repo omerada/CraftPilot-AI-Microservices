@@ -24,22 +24,6 @@ spring:
     base-path: /
   codec:
     max-in-memory-size: 16MB
-  reactor:
-    netty:
-      client:
-        protocols: http11
-        maxConnections: 500
-        maxIdleTime: 20s
-        maxLifeTime: 60s
-      pool:
-        type: elastic
-        max-connections: 500
-        maxIdleTime: 20s
-        maxLifeTime: 60s
-        leasingStrategy: fifo
-      resources:
-        loop-resources:
-          preferred-native-transport: false
   kafka:
     properties:
       security.protocol: PLAINTEXT

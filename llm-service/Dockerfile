@@ -19,18 +19,7 @@ ENV OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
 COPY --from=build /build/target/*.jar app.jar
 
 # JVM ve Netty ayarları
-ENV JAVA_OPTS="\
-    -XX:+UseG1GC \
-    -XX:MaxGCPauseMillis=100 \
-    -XX:+UseStringDeduplication \
-    -XX:MaxRAMPercentage=75.0 \
-    -XX:+ExitOnOutOfMemoryError \
-    -Dio.netty.tryReflectionSetAccessible=true \
-    -Dio.netty.noUnsafe=true \
-    -Dio.netty.nativeTransport=false \
-    -Dio.netty.noKeySetOptimization=true \
-    -Djava.security.egd=file:/dev/./urandom \
-    -Dnetworkaddress.cache.ttl=60"
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 
 ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
 
