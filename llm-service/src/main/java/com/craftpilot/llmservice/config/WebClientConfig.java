@@ -49,13 +49,34 @@ public class WebClientConfig {
             .defaultHeader("Authorization", "Bearer " + apiKey)
             .filter(logRequest())
             .filter(logResponse())
+            .filter(errorHandler())
             .build();
+    }
+
+    private ExchangeFilterFunction errorHandler() {
+        return ExchangeFilterFunction.ofResponseProcessor(clientResponse -> {
+            if (clientResponse.statusCode().is2xxSuccessful()) {
+                return Mono.just(clientResponse);
+            } else {
+                return clientResponse.bodyToMono(String.class)
+                    .flatMap(errorBody -> {
+                        log.error("Error response: {}", errorBody);
+                        return Mono.error(new RuntimeException("API Error: " + errorBody));
+                    });
+            }
+        });
     }
 
     private ExchangeFilterFunction logRequest() {
         return ExchangeFilterFunction.ofRequestProcessor(clientRequest -> {
-            log.info("Request: {} {}", clientRequest.method(), clientRequest.url());
-            log.debug("Request Headers: {}", clientRequest.headers());
+            log.info("Outgoing Request: {} {}", clientRequest.method(), clientRequest.url());
+            clientRequest.headers().forEach((name, values) -> 
+                log.debug("Request Header: {}={}", name, values));
+            
+            if (clientRequest.body() != null) {
+                log.debug("Request Body: {}", clientRequest.body());
+            }
+            
             return Mono.just(clientRequest);
         });
     }
@@ -63,10 +84,14 @@ public class WebClientConfig {
     private ExchangeFilterFunction logResponse() {
         return ExchangeFilterFunction.ofResponseProcessor(clientResponse -> {
             log.info("Response Status: {}", clientResponse.statusCode());
-            log.debug("Response Headers: {}", clientResponse.headers().asHttpHeaders());
+            clientResponse.headers().asHttpHeaders().forEach((name, values) -> 
+                log.debug("Response Header: {}={}", name, values));
+
             return clientResponse.bodyToMono(String.class)
+                .defaultIfEmpty("<empty body>")
                 .doOnNext(body -> log.debug("Response Body: {}", body))
-                .then(Mono.just(clientResponse));
+                .map(body -> clientResponse.mutate()
+                    .body(body).build());
         });
     }
 }

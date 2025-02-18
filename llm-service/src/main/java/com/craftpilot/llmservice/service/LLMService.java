@@ -5,10 +5,12 @@ import com.craftpilot.llmservice.model.AIResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,25 +54,43 @@ public class LLMService {
         return openRouterWebClient.post()
             .uri(endpoint)
             .bodyValue(requestBody)
-            .exchangeToMono(response -> {
-                if (response.statusCode().is2xxSuccessful()) {
-                    return response.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                        .doOnNext(responseBody -> log.debug("OpenRouter yanıtı: {}", responseBody));
-                } else {
-                    return response.bodyToMono(String.class)
-                        .flatMap(error -> Mono.error(new RuntimeException("API Hatası: " + error)));
-                }
-            })
+            .retrieve()
+            .onStatus(HttpStatus::is4xxClientError, response ->
+                response.bodyToMono(String.class)
+                    .flatMap(error -> {
+                        log.error("Client error: {}", error);
+                        return Mono.error(new RuntimeException("API client error: " + error));
+                    }))
+            .onStatus(HttpStatus::is5xxServerError, response ->
+                response.bodyToMono(String.class)
+                    .flatMap(error -> {
+                        log.error("Server error: {}", error);
+                        return Mono.error(new RuntimeException("API server error: " + error));
+                    }))
+            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
             .timeout(Duration.ofSeconds(30))
-            .doOnError(error -> log.error("OpenRouter API hatası: ", error))
-            .onErrorResume(error -> Mono.error(new RuntimeException("API isteği başarısız: " + error.getMessage())));
+            .doOnNext(response -> log.debug("OpenRouter raw response: {}", response))
+            .doOnError(error -> log.error("API call error: ", error))
+            .onErrorResume(error -> Mono.error(new RuntimeException("API request failed: " + error.getMessage())));
     }
 
     private Map<String, Object> createRequestBody(AIRequest request) {
         Map<String, Object> body = new HashMap<>();
         body.put("model", request.getModel());
         
-        if (request.getMessages() != null && !request.getMessages().isEmpty()) {
+        // Code completion için özel mesaj formatı
+        if ("CODE".equals(request.getRequestType())) {
+            List<Map<String, String>> messages = new ArrayList<>();
+            messages.add(Map.of(
+                "role", "system",
+                "content", "You are a code assistant. Write clean and well-documented code."
+            ));
+            messages.add(Map.of(
+                "role", "user",
+                "content", request.getPrompt()
+            ));
+            body.put("messages", messages);
+        } else if (request.getMessages() != null && !request.getMessages().isEmpty()) {
             body.put("messages", request.getMessages());
         } else {
             body.put("prompt", request.getPrompt());
