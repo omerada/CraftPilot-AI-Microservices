@@ -33,6 +33,7 @@ spring:
       date: yyyy-MM-dd
       date-time: yyyy-MM-dd HH:mm:ss
       time: HH:mm:ss
+    log-request-details: true
   codec:
     max-in-memory-size: 16MB
     log-request-details: true
@@ -137,6 +138,8 @@ logging:
     io.netty: DEBUG
     com.craftpilot.llmservice: DEBUG
     org.springframework.security: DEBUG
+    org.springframework.web.reactive: DEBUG
+    reactor.netty.http.client: DEBUG
 
 netty:
   native:

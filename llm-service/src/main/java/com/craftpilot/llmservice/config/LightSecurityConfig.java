@@ -38,11 +38,24 @@ public class LightSecurityConfig {
         return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .cors(cors -> cors.disable())
+            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**", "/webjars/**", "/ai/**").permitAll()
+                .pathMatchers(getPublicPaths()).permitAll()
+                .pathMatchers("/admin/**").hasRole("ADMIN")
                 .anyExchange().authenticated()
             )
-            .httpBasic(httpBasic -> {})
+            .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
+            .exceptionHandling(handling -> handling
+                .authenticationEntryPoint((exchange, ex) -> {
+                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                    return exchange.getResponse().setComplete();
+                })
+            )
+            .headers(headers -> headers
+                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'"))
+                .xssProtection(xss -> xss.disable())
+            )
             .build();
     }
 

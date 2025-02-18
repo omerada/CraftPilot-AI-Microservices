@@ -15,6 +15,8 @@ import reactor.netty.http.client.HttpClient;
 import reactor.core.publisher.Mono;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.netty.transport.logging.AdvancedByteBufFormat;
+import reactor.netty.transport.logging.LogLevel;
 
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
@@ -53,15 +55,18 @@ public class WebClientConfig {
     @Bean
     public WebClient openRouterWebClient() {
         HttpClient httpClient = HttpClient.create()
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 30000)
             .responseTimeout(Duration.ofSeconds(30))
             .doOnConnected(conn -> conn
                 .addHandlerLast(new ReadTimeoutHandler(30, TimeUnit.SECONDS))
-                .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)));
+                .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)))
+            .wiretap("reactor.netty.http.client.HttpClient", LogLevel.DEBUG, AdvancedByteBufFormat.TEXTUAL);
 
         return WebClient.builder()
             .baseUrl(baseUrl)
             .clientConnector(new ReactorClientHttpConnector(httpClient))
             .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
             .defaultHeader("HTTP-Referer", "https://craftpilot.io")
             .defaultHeader("Authorization", "Bearer " + apiKey)
             .filter(logRequest())
@@ -71,15 +76,19 @@ public class WebClientConfig {
 
     private ExchangeFilterFunction logRequest() {
         return ExchangeFilterFunction.ofRequestProcessor(clientRequest -> {
-            System.out.println("Request: " + clientRequest.method() + " " + clientRequest.url());
-            return reactor.core.publisher.Mono.just(clientRequest);
+            log.info("Request: {} {}", clientRequest.method(), clientRequest.url());
+            clientRequest.headers().forEach((name, values) -> 
+                log.debug("Request Header: {}={}", name, values));
+            return Mono.just(clientRequest);
         });
     }
 
     private ExchangeFilterFunction logResponse() {
         return ExchangeFilterFunction.ofResponseProcessor(clientResponse -> {
-            System.out.println("Response status: " + clientResponse.statusCode());
-            return reactor.core.publisher.Mono.just(clientResponse);
+            log.info("Response Status: {}", clientResponse.statusCode());
+            clientResponse.headers().asHttpHeaders().forEach((name, values) -> 
+                log.debug("Response Header: {}={}", name, values));
+            return Mono.just(clientResponse);
         });
     }
 }

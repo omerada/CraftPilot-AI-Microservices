@@ -45,14 +45,25 @@ public class LLMService {
     }
 
     private Mono<Map<String, Object>> callOpenRouter(String endpoint, AIRequest request) {
+        log.info("OpenRouter API çağrısı yapılıyor - Endpoint: {}, Request: {}", endpoint, request);
+        Map<String, Object> requestBody = createRequestBody(request);
+        log.debug("Request body: {}", requestBody);
+
         return openRouterWebClient.post()
             .uri(endpoint)
-            .bodyValue(createRequestBody(request))
-            .retrieve()
-            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-            .doOnError(error -> log.error("OpenRouter API error: ", error))
+            .bodyValue(requestBody)
+            .exchangeToMono(response -> {
+                if (response.statusCode().is2xxSuccessful()) {
+                    return response.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                        .doOnNext(responseBody -> log.debug("OpenRouter yanıtı: {}", responseBody));
+                } else {
+                    return response.bodyToMono(String.class)
+                        .flatMap(error -> Mono.error(new RuntimeException("API Hatası: " + error)));
+                }
+            })
             .timeout(Duration.ofSeconds(30))
-            .doOnNext(response -> log.debug("OpenRouter raw response: {}", response));
+            .doOnError(error -> log.error("OpenRouter API hatası: ", error))
+            .onErrorResume(error -> Mono.error(new RuntimeException("API isteği başarısız: " + error.getMessage())));
     }
 
     private Map<String, Object> createRequestBody(AIRequest request) {
@@ -67,32 +78,29 @@ public class LLMService {
 
         body.put("max_tokens", request.getMaxTokens());
         body.put("temperature", request.getTemperature());
-        body.put("stop", null);
         body.put("stream", false);
         
-        log.debug("Request body: {}", body);
+        log.debug("Oluşturulan request body: {}", body);
         return body;
     }
 
     private AIResponse mapToAIResponse(Map<String, Object> openRouterResponse, AIRequest request) {
-        log.debug("OpenRouter response: {}", openRouterResponse);
+        log.debug("OpenRouter yanıtı haritalanıyor: {}", openRouterResponse);
         
         String responseText = extractResponseText(openRouterResponse);
         if (responseText == null || responseText.trim().isEmpty()) {
-            log.warn("Empty response received from OpenRouter");
-            throw new RuntimeException("Empty response received from AI service");
+            log.warn("OpenRouter'dan boş yanıt alındı");
+            throw new RuntimeException("AI servisinden boş yanıt alındı");
         }
 
-        AIResponse response = AIResponse.builder()
-            .requestId(request.getRequestId())
-            .model(request.getModel())
-            .response(responseText)
-            .tokensUsed(extractTokenCount(openRouterResponse))
-            .processingTime(System.currentTimeMillis())
-            .status("SUCCESS")
-            .build();
+        AIResponse response = AIResponse.success(
+            responseText,
+            request.getModel(),
+            extractTokenCount(openRouterResponse),
+            request.getRequestId()
+        );
 
-        log.debug("Mapped response: {}", response);
+        log.debug("Haritalanan yanıt: {}", response);
         return response;
     }
 
