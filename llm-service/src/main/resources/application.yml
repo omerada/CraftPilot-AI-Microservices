@@ -125,6 +125,7 @@ logging:
     org.springframework.cloud: INFO
     reactor.netty: DEBUG
     io.netty: DEBUG
+    com.craftpilot.llmservice: DEBUG
 
 netty:
   native:
@@ -139,10 +140,22 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     enabled: true
-    operationsSorter: method
-    tagsSorter: alpha
+    configUrl: /v3/api-docs/swagger-config
+    urls:
+      - url: /v3/api-docs
+        name: LLM API
   api-docs:
     path: /v3/api-docs
     enabled: true
   show-actuator: true
   packages-to-scan: com.craftpilot.llmservice.controller
+  paths-to-match: /ai/**
+
+# CORS Yapılandırması
+cors:
+  allowed-origins: "*"
+  allowed-methods: "*"
+  allowed-headers: "*"
+  exposed-headers: "*"
+  allow-credentials: true
+  max-age: 3600

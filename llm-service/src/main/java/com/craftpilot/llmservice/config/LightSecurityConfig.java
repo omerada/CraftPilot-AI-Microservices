@@ -41,20 +41,10 @@ public class LightSecurityConfig {
             .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers(getPublicPaths()).permitAll()
-                .pathMatchers("/admin/**").hasRole("ADMIN")
-                .anyExchange().authenticated()
+                .pathMatchers("/**").permitAll()
             )
-            .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
-            .exceptionHandling(handling -> handling
-                .authenticationEntryPoint((exchange, ex) -> {
-                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                    return exchange.getResponse().setComplete();
-                })
-            )
-            .headers(headers -> headers
-                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'"))
-                .xssProtection(xss -> xss.disable())
+            .headers(headers -> headers.frameOptions().disable()
+                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data:; style-src 'self' 'unsafe-inline';"))
             )
             .build();
     }

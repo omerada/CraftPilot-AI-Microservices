@@ -26,27 +26,36 @@ public class LLMController {
                 consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Text completion", description = "Verilen prompt için text completion yapar")
     public Mono<ResponseEntity<AIResponse>> textCompletion(@RequestBody AIRequest request) {
-        log.debug("Incoming request: {}", request);
+        log.info("Gelen istek: {}", request);
+        
         return Mono.just(request)
             .doOnNext(req -> {
                 if (req.getPrompt() == null || req.getPrompt().trim().isEmpty()) {
-                    throw new IllegalArgumentException("Prompt cannot be empty");
+                    throw new IllegalArgumentException("Prompt boş olamaz");
                 }
+                log.debug("İstek doğrulandı: {}", req);
             })
             .flatMap(req -> {
                 req.setRequestType("TEXT");
                 return llmService.processTextCompletion(req)
-                    .doOnNext(response -> log.debug("Service response: {}", response));
+                    .doOnNext(response -> log.info("Servis yanıtı: {}", response))
+                    .doOnError(error -> log.error("Servis hatası: ", error));
             })
-            .map(response -> ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(response))
-            .doOnError(error -> log.error("Error processing request: ", error))
-            .onErrorResume(error -> Mono.just(
-                ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .map(response -> {
+                log.info("Başarılı yanıt gönderiliyor: {}", response);
+                return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(AIResponse.error(error.getMessage()))
-            ));
+                    .body(response);
+            })
+            .doOnError(error -> log.error("İşlem hatası: ", error))
+            .onErrorResume(error -> {
+                AIResponse errorResponse = AIResponse.error(error.getMessage());
+                log.error("Hata yanıtı gönderiliyor: {}", errorResponse);
+                return Mono.just(ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(errorResponse));
+            });
     }
 
     @PostMapping(value = "/chat/completions", 
