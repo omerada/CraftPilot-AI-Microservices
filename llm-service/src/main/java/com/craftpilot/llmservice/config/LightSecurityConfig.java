@@ -14,6 +14,7 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilterChain;
 import java.util.List;   
 import java.util.Arrays;   
+import org.springframework.http.HttpMethod;
 
 @Slf4j
 @Configuration
@@ -41,8 +42,8 @@ public class LightSecurityConfig {
             .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers(getPublicPaths()).permitAll()
-                .pathMatchers("/admin/**").hasRole("ADMIN")
+                .pathMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**", "/webjars/**").permitAll()
+                .pathMatchers(HttpMethod.POST, "/ai/**").permitAll()
                 .anyExchange().authenticated()
             )
             .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
@@ -53,7 +54,9 @@ public class LightSecurityConfig {
                 })
             )
             .headers(headers -> headers
-                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'"))
+                .frameOptions().disable()
+                .contentSecurityPolicy(csp -> csp
+                    .policyDirectives("default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data:;"))
                 .xssProtection(xss -> xss.disable())
             )
             .build();

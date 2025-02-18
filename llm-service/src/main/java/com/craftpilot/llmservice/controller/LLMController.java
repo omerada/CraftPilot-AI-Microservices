@@ -18,6 +18,7 @@ import reactor.core.publisher.Mono;
 @RequestMapping("/ai")
 @RequiredArgsConstructor
 @Tag(name = "LLM API", description = "AI dil modeli işlemleri için endpoints")
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class LLMController {
     private final LLMService llmService;
 
@@ -35,28 +36,17 @@ public class LLMController {
                 }
                 log.debug("İstek doğrulandı: {}", req);
             })
-            .flatMap(req -> {
-                req.setRequestType("TEXT");
-                return llmService.processTextCompletion(req)
-                    .doOnNext(response -> log.info("Servis yanıtı: {}", response))
-                    .doOnError(error -> log.error("Servis hatası: ", error));
-            })
-            .map(response -> {
-                log.info("Başarılı yanıt gönderiliyor: {}", response);
-                return ResponseEntity.ok()
+            .flatMap(req -> llmService.processTextCompletion(req))
+            .map(response -> ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(response))
+            .doOnSuccess(response -> log.info("Başarılı yanıt: {}", response))
+            .doOnError(error -> log.error("Hata: ", error))
+            .onErrorResume(error -> Mono.just(
+                ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .header("X-Request-ID", request.getRequestId())
-                    .body(response);
-            })
-            .doOnError(error -> log.error("İşlem hatası: ", error))
-            .onErrorResume(error -> {
-                AIResponse errorResponse = AIResponse.error(error.getMessage());
-                log.error("Hata yanıtı gönderiliyor: {}", errorResponse);
-                return Mono.just(ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(errorResponse));
-            });
+                    .body(AIResponse.error(error.getMessage()))
+            ));
     }
 
     @PostMapping(value = "/chat/completions", 

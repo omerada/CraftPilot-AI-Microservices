@@ -72,6 +72,9 @@ spring:
       client:
         proxy:
           type: NO_PROXY
+  security:
+    basic:
+      enabled: false
 
 eureka:
   client:
@@ -133,7 +136,7 @@ logging:
   level:
     root: INFO
     com.craftpilot: DEBUG
-    org.springframework.web: INFO
+    org.springframework.web: DEBUG
     org.springframework.cloud: INFO
     reactor.netty: DEBUG
     io.netty: DEBUG
