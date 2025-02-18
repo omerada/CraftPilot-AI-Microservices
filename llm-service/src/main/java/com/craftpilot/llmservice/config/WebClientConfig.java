@@ -15,8 +15,6 @@ import reactor.netty.http.client.HttpClient;
 import reactor.core.publisher.Mono;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.netty.transport.logging.AdvancedByteBufFormat;
-import reactor.netty.transport.logging.LogLevel;
 
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
@@ -33,26 +31,6 @@ public class WebClientConfig {
     private String baseUrl;
 
     @Bean
-    public WebClient webClient() {
-        HttpClient httpClient = HttpClient.create()
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
-                .responseTimeout(Duration.ofSeconds(5))
-                .doOnConnected(conn -> 
-                    conn.addHandlerLast(new ReadTimeoutHandler(5, TimeUnit.SECONDS))
-                        .addHandlerLast(new WriteTimeoutHandler(5, TimeUnit.SECONDS)));
-
-        return WebClient.builder()
-                .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .filter(ExchangeFilterFunction.ofRequestProcessor(
-                    clientRequest -> {
-                        log.debug("Making request to: {}", clientRequest.url());
-                        return Mono.just(clientRequest);
-                    }
-                ))
-                .build();
-    }
-
-    @Bean
     public WebClient openRouterWebClient() {
         HttpClient httpClient = HttpClient.create()
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 30000)
@@ -60,7 +38,7 @@ public class WebClientConfig {
             .doOnConnected(conn -> conn
                 .addHandlerLast(new ReadTimeoutHandler(30, TimeUnit.SECONDS))
                 .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)))
-            .wiretap("reactor.netty.http.client.HttpClient", LogLevel.DEBUG, AdvancedByteBufFormat.TEXTUAL);
+            .wiretap(true);
 
         return WebClient.builder()
             .baseUrl(baseUrl)
@@ -77,8 +55,7 @@ public class WebClientConfig {
     private ExchangeFilterFunction logRequest() {
         return ExchangeFilterFunction.ofRequestProcessor(clientRequest -> {
             log.info("Request: {} {}", clientRequest.method(), clientRequest.url());
-            clientRequest.headers().forEach((name, values) -> 
-                log.debug("Request Header: {}={}", name, values));
+            log.debug("Request Headers: {}", clientRequest.headers());
             return Mono.just(clientRequest);
         });
     }
@@ -86,9 +63,10 @@ public class WebClientConfig {
     private ExchangeFilterFunction logResponse() {
         return ExchangeFilterFunction.ofResponseProcessor(clientResponse -> {
             log.info("Response Status: {}", clientResponse.statusCode());
-            clientResponse.headers().asHttpHeaders().forEach((name, values) -> 
-                log.debug("Response Header: {}={}", name, values));
-            return Mono.just(clientResponse);
+            log.debug("Response Headers: {}", clientResponse.headers().asHttpHeaders());
+            return clientResponse.bodyToMono(String.class)
+                .doOnNext(body -> log.debug("Response Body: {}", body))
+                .then(Mono.just(clientResponse));
         });
     }
 }
