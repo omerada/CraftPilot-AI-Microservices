@@ -12,6 +12,7 @@ server:
     threads:
       worker: 4
       boss: 1
+    validate-headers: false
 
 spring:
   application:
@@ -50,6 +51,15 @@ spring:
           max-idle: 8
           min-idle: 2
           max-wait: 1000ms
+  reactor:
+    netty:
+      pool:
+        type: fixed
+        maxConnections: 500
+        acquireTimeout: 5000
+      client:
+        proxy:
+          type: NO_PROXY
 
 eureka:
   client:
@@ -114,3 +124,10 @@ logging:
     org.springframework.cloud: INFO
     reactor.netty: DEBUG
     io.netty: DEBUG
+
+netty:
+  native:
+    enabled: false
+  io:
+    noNative: true
+    noUnsafe: false

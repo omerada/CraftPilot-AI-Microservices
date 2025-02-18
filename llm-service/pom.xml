@@ -27,6 +27,7 @@
         <resilience4j.version>2.1.0</resilience4j.version>
         <openai-java.version>0.18.2</openai-java.version>
         <lombok.version>1.18.30</lombok.version>
+        <netty-tcnative.version>2.0.46.Final</netty-tcnative.version>
     </properties>
 
     <dependencies>
@@ -159,7 +160,7 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-transport-native-epoll</artifactId>
-            <classifier>linux-aarch_64</classifier>
+            <classifier>linux-${os.detected.arch}</classifier>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
@@ -171,7 +172,7 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-tcnative-boringssl-static</artifactId>
-            <classifier>linux-aarch_64</classifier>
+            <version>${netty-tcnative.version}</version>
         </dependency>
 
         <!-- Explicit Reactor Netty dependency -->
@@ -184,6 +185,12 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>jcl-over-slf4j</artifactId>
+        </dependency>
+
+        <!-- Add explicit Netty HTTP codec -->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-codec-http2</artifactId>
         </dependency>
     </dependencies>
 
@@ -229,5 +236,12 @@
                 </configuration>
             </plugin>
         </plugins>
+        <extensions>
+            <extension>
+                <groupId>kr.motd.maven</groupId>
+                <artifactId>os-maven-plugin</artifactId>
+                <version>1.7.1</version>
+            </extension>
+        </extensions>
     </build>
 </project>

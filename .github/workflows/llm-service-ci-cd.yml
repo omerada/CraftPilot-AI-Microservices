@@ -68,6 +68,9 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Create necessary directories
+            mkdir -p /opt/craftpilot/tmp/netty
+
             # Deploy LLM Service
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
             docker stop llm-service || true
@@ -76,6 +79,7 @@ jobs:
             # Tek satırda Docker run komutu (line continuation hatalarını önlemek için)
             docker run -d --name llm-service --network craftpilot-network --restart unless-stopped -p 8062:8062 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
+              -v /opt/craftpilot/tmp/netty:/tmp/netty \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}" \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
@@ -95,7 +99,10 @@ jobs:
               -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
               -e SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL=PLAINTEXT \
               -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
-              -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0" \
+              -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=false -Dnetty.native.workdir=/tmp/netty" \
+              --ulimit nofile=65536:65536 \
+              --cap-drop ALL \
+              --security-opt no-new-privileges \
               --health-cmd="curl -f http://localhost:8062/actuator/health/liveness || exit 1" \
               --health-interval=30s \
               --health-timeout=10s \
