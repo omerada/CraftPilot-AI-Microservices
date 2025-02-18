@@ -69,10 +69,17 @@ public class LLMService {
     }
 
     private AIResponse mapToAIResponse(Map<String, Object> openRouterResponse, AIRequest request) {
+        log.debug("OpenRouter yanıtı: {}", openRouterResponse); // Debug log ekleyelim
+        String responseText = extractResponseText(openRouterResponse);
+        if (responseText.isEmpty()) {
+            log.error("Boş yanıt alındı");
+            throw new RuntimeException("AI servisi boş yanıt döndü");
+        }
+
         return AIResponse.builder()
             .requestId(request.getRequestId())
             .model(request.getModel())
-            .response(extractResponseText(openRouterResponse))
+            .response(responseText)
             .tokensUsed(extractTokenCount(openRouterResponse))
             .processingTime(System.currentTimeMillis())
             .status("SUCCESS")

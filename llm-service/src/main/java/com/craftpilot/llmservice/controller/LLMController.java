@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,13 +26,25 @@ public class LLMController {
                 consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Text completion", description = "Verilen prompt için text completion yapar")
     public Mono<ResponseEntity<AIResponse>> textCompletion(@RequestBody AIRequest request) {
+        log.debug("Gelen istek: {}", request); // Debug log ekleyelim
         request.setRequestType("TEXT");
         return llmService.processTextCompletion(request)
-            .map(response -> ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(response))
-            .doOnError(error -> log.error("Text completion error: ", error))
-            .doOnSuccess(response -> log.debug("Text completion success: {}", response));
+            .map(response -> {
+                log.debug("Başarılı yanıt: {}", response); // Debug log ekleyelim
+                return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Request-ID", response.getRequestId())
+                    .body(response);
+            })
+            .onErrorResume(error -> {
+                log.error("İşlem hatası: ", error);
+                return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(AIResponse.builder()
+                        .status("ERROR")
+                        .response(error.getMessage())
+                        .build()));
+            });
     }
 
     @PostMapping(value = "/chat/completions", 
