@@ -69,14 +69,15 @@ public class LLMService {
     }
 
     private AIResponse mapToAIResponse(Map<String, Object> openRouterResponse, AIRequest request) {
-        log.debug("OpenRouter yanıtı: {}", openRouterResponse); // Debug log ekleyelim
+        log.debug("OpenRouter response: {}", openRouterResponse);
+        
         String responseText = extractResponseText(openRouterResponse);
-        if (responseText.isEmpty()) {
-            log.error("Boş yanıt alındı");
-            throw new RuntimeException("AI servisi boş yanıt döndü");
+        if (responseText == null || responseText.trim().isEmpty()) {
+            log.warn("Empty response received from OpenRouter");
+            throw new RuntimeException("Empty response received from AI service");
         }
 
-        return AIResponse.builder()
+        AIResponse response = AIResponse.builder()
             .requestId(request.getRequestId())
             .model(request.getModel())
             .response(responseText)
@@ -84,22 +85,31 @@ public class LLMService {
             .processingTime(System.currentTimeMillis())
             .status("SUCCESS")
             .build();
+
+        log.debug("Mapped response: {}", response);
+        return response;
     }
 
     private String extractResponseText(Map<String, Object> response) {
-        // OpenRouter response yapısına göre yanıt çıkarma
-        if (response.containsKey("choices")) {
-            List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
-            if (!choices.isEmpty()) {
-                Map<String, Object> choice = choices.get(0);
-                if (choice.containsKey("message")) {
-                    return ((Map<String, String>) choice.get("message")).get("content");
-                } else if (choice.containsKey("text")) {
-                    return (String) choice.get("text");
+        try {
+            if (response.containsKey("choices")) {
+                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+                if (!choices.isEmpty()) {
+                    Map<String, Object> choice = choices.get(0);
+                    if (choice.containsKey("message")) {
+                        Map<String, Object> message = (Map<String, Object>) choice.get("message");
+                        return (String) message.get("content");
+                    } else if (choice.containsKey("text")) {
+                        return (String) choice.get("text");
+                    }
                 }
             }
+            log.warn("Unable to extract response text from: {}", response);
+            return null;
+        } catch (Exception e) {
+            log.error("Error extracting response text: ", e);
+            return null;
         }
-        return "";
     }
 
     private Integer extractTokenCount(Map<String, Object> response) {

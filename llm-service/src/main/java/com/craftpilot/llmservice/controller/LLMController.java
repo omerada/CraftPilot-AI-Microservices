@@ -21,30 +21,35 @@ import reactor.core.publisher.Mono;
 public class LLMController {
     private final LLMService llmService;
 
-    @PostMapping(value = "/completions", 
-                produces = MediaType.APPLICATION_JSON_VALUE,
-                consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = "/completions")
     @Operation(summary = "Text completion", description = "Verilen prompt için text completion yapar")
     public Mono<ResponseEntity<AIResponse>> textCompletion(@RequestBody AIRequest request) {
-        log.debug("Gelen istek: {}", request); // Debug log ekleyelim
-        request.setRequestType("TEXT");
-        return llmService.processTextCompletion(request)
+        log.debug("Incoming request: {}", request);
+        return Mono.just(request)
+            .doOnNext(req -> {
+                if (req.getPrompt() == null || req.getPrompt().trim().isEmpty()) {
+                    throw new IllegalArgumentException("Prompt cannot be empty");
+                }
+            })
+            .flatMap(req -> {
+                req.setRequestType("TEXT");
+                return llmService.processTextCompletion(req);
+            })
             .map(response -> {
-                log.debug("Başarılı yanıt: {}", response); // Debug log ekleyelim
+                log.debug("Response received: {}", response);
                 return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_JSON)
-                    .header("X-Request-ID", response.getRequestId())
                     .body(response);
             })
-            .onErrorResume(error -> {
-                log.error("İşlem hatası: ", error);
-                return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .doOnError(error -> log.error("Error processing request: ", error))
+            .onErrorResume(error -> Mono.just(
+                ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(AIResponse.builder()
                         .status("ERROR")
-                        .response(error.getMessage())
-                        .build()));
-            });
+                        .error(error.getMessage())
+                        .build())
+            ));
     }
 
     @PostMapping(value = "/chat/completions", 
