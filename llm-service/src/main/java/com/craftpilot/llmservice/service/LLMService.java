@@ -55,13 +55,13 @@ public class LLMService {
             .uri(endpoint)
             .bodyValue(requestBody)
             .retrieve()
-            .onStatus(HttpStatus::is4xxClientError, response ->
+            .onStatus(status -> status.is4xxClientError(), response ->
                 response.bodyToMono(String.class)
                     .flatMap(error -> {
                         log.error("Client error: {}", error);
                         return Mono.error(new RuntimeException("API client error: " + error));
                     }))
-            .onStatus(HttpStatus::is5xxServerError, response ->
+            .onStatus(status -> status.is5xxServerError(), response ->
                 response.bodyToMono(String.class)
                     .flatMap(error -> {
                         log.error("Server error: {}", error);
