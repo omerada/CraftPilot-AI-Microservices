@@ -76,7 +76,6 @@ jobs:
             docker stop llm-service || true
             docker rm llm-service || true
 
-            # Tek satırda Docker run komutu (line continuation hatalarını önlemek için)
             docker run -d --name llm-service --network craftpilot-network --restart unless-stopped -p 8062:8062 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -v /opt/craftpilot/tmp/netty:/tmp/netty \
@@ -99,7 +98,7 @@ jobs:
               -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
               -e SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL=PLAINTEXT \
               -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
-              -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=false -Dnetty.native.workdir=/tmp/netty" \
+              -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty" \
               --ulimit nofile=65536:65536 \
               --cap-drop ALL \
               --security-opt no-new-privileges \

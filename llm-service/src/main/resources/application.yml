@@ -61,7 +61,6 @@ spring:
       client:
         proxy:
           type: NO_PROXY
-      native: false
 
 eureka:
   client:
@@ -134,13 +133,4 @@ netty:
     noNative: true
     noUnsafe: false
   use-native-transport: false
-
-spring:
-  main:
-    jvm-args: >
-      -Dio.netty.noNative=true
-      -Dio.netty.tryReflectionSetAccessible=true
-      -Dio.netty.noUnsafe=true
-      -Djava.io.tmpdir=/tmp
-      -Dnetty.native.workdir=/tmp
-      -Dio.netty.leakDetection.level=DISABLED
+  workdir: /tmp/netty

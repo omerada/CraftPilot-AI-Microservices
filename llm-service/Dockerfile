@@ -34,8 +34,7 @@ ENV JAVA_TOOL_OPTIONS="\
     -Dio.netty.noUnsafe=true \
     -Dio.netty.tryReflectionSetAccessible=true \
     -Dnetty.native.workdir=/tmp/netty \
-    -Djava.io.tmpdir=/tmp \
-    -Dio.netty.leakDetection.level=DISABLED"
+    -Djava.io.tmpdir=/tmp"
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
   CMD curl -f http://localhost:8062/actuator/health || exit 1
