@@ -134,3 +134,15 @@ netty:
     noUnsafe: true
   use-native-transport: true
   workdir: /tmp/netty
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operationsSorter: method
+    tagsSorter: alpha
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  show-actuator: true
+  packages-to-scan: com.craftpilot.llmservice.controller
