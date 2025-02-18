@@ -55,7 +55,7 @@ spring:
   reactor:
     netty:
       pool:
-        type: fixed
+        type: elastic
         maxConnections: 500
         acquireTimeout: 5000
       client:
@@ -128,9 +128,9 @@ logging:
 
 netty:
   native:
-    enabled: true
+    enabled: false
   io:
-    noNative: false
-    noUnsafe: false
+    noNative: true
+    noUnsafe: true
   use-native-transport: true
   workdir: /tmp/netty

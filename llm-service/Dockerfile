@@ -8,14 +8,18 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # Run stage
-FROM --platform=linux/arm64 eclipse-temurin:21-jre-alpine
+FROM --platform=linux/arm64 eclipse-temurin:21-jre
 
 WORKDIR /app
 
 # Install required packages
-RUN apk update && \
-    apk add --no-cache curl tzdata libc6-compat libstdc++ gcompat && \
-    rm -rf /var/cache/apk/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    curl \
+    tzdata \
+    libc6 \
+    libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create necessary directories
 RUN mkdir -p /tmp/netty /app/native-lib
@@ -28,20 +32,15 @@ ENV JAVA_TOOL_OPTIONS="\
     -XX:+UseContainerSupport \
     -XX:MaxRAMPercentage=75.0 \
     -XX:+UseG1GC \
-    -XX:+HeapDumpOnOutOfMemoryError \
-    -XX:HeapDumpPath=/app/heapdump.hprof \
-    -Dio.netty.noNative=false \
-    -Dio.netty.noUnsafe=false \
     -Dio.netty.tryReflectionSetAccessible=true \
-    -Dio.netty.leakDetection.level=DISABLED \
-    -Djava.io.tmpdir=/tmp \
-    -Dnetty.native.workdir=/tmp/netty \
-    -Dio.netty.native.workdir=/tmp/netty \
+    -Djavax.net.debug=ssl \
+    -Dio.netty.leakDetection.level=disabled \
+    -Djava.security.egd=file:/dev/./urandom \
+    -Djava.awt.headless=true \
+    -Dfile.encoding=UTF-8 \
     --add-opens=java.base/java.nio=ALL-UNNAMED \
-    --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED \
     --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-    --add-exports=java.base/jdk.internal.misc=ALL-UNNAMED \
-    --add-exports=java.base/sun.nio.ch=ALL-UNNAMED"
+    --add-opens=java.base/java.lang=ALL-UNNAMED"
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
   CMD curl -f http://localhost:8062/actuator/health || exit 1
