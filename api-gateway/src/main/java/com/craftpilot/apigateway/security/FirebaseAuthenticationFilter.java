@@ -58,24 +58,35 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     private Mono<FirebaseToken> extractAndValidateToken(ServerWebExchange exchange) {
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         
+        log.debug("Auth header received: {}", authHeader); // Debug log
+
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+            log.error("Invalid auth header format: {}", authHeader); // Error log
             return Mono.error(new AuthenticationException("Invalid authorization header"));
         }
 
         String token = authHeader.substring(BEARER_PREFIX.length());
+        log.debug("Extracted token (first 10 chars): {}", token.substring(0, Math.min(10, token.length()))); // Debug log
         return validateFirebaseToken(token);
     }
 
     private Mono<FirebaseToken> validateFirebaseToken(String token) {
         FirebaseToken cachedToken = tokenCache.getIfPresent(token);
         if (cachedToken != null) {
+            log.debug("Using cached token for user: {}", cachedToken.getUid()); // Debug log
             return Mono.just(cachedToken);
         }
 
         return Mono.fromCallable(() -> {
-            FirebaseToken verifiedToken = firebaseAuth.verifyIdToken(token);
-            tokenCache.put(token, verifiedToken);
-            return verifiedToken;
+            try {
+                FirebaseToken verifiedToken = firebaseAuth.verifyIdToken(token);
+                log.debug("Token verified successfully for user: {}", verifiedToken.getUid()); // Debug log
+                tokenCache.put(token, verifiedToken);
+                return verifiedToken;
+            } catch (Exception e) {
+                log.error("Token verification failed: {}", e.getMessage()); // Error log
+                throw e;
+            }
         });
     }
 
