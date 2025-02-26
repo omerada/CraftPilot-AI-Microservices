@@ -24,16 +24,11 @@ import java.util.concurrent.TimeUnit;
 public class FirebaseAuthenticationFilter implements WebFilter {
     
     private static final String BEARER_PREFIX = "Bearer ";
-    private static final Set<String> PUBLIC_PATHS = Set.of(
-        "/",
-        "/swagger-ui.html",
-        "/swagger-ui/**",
-        "/v3/api-docs/**",
-        "/webjars/**",
-        "/actuator/health",
-        "/actuator/info",
-        "/api/auth/**",
-        "/public/**"
+    private static final Set<String> PROTECTED_PATHS = Set.of(
+        "/admin/**",
+        "/users/profile/**",
+        "/credits/**",
+        "/subscriptions/**"
     );
 
     private final FirebaseAuth firebaseAuth;
@@ -45,8 +40,8 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
-
-        if (isPublicPath(path)) {
+        
+        if (!isProtectedPath(path)) {
             return chain.filter(exchange);
         }
 
@@ -114,34 +109,15 @@ public class FirebaseAuthenticationFilter implements WebFilter {
         return exchange.getResponse().setComplete();
     }
 
-    private boolean isPublicPath(String path) {
-        // Debug log ekleyelim
-        log.debug("Checking path: {}", path);
-        
-        // Static dosyalar için kontrol
-        if (path.matches(".+\\.(png|jpg|ico|css|js|html)$")) {
-            log.debug("Static resource access: {}", path);
-            return true;
-        }
-
-        // Exact match veya wildcard match kontrolü
-        boolean isPublic = PUBLIC_PATHS.stream().anyMatch(publicPath -> {
-            if (publicPath.endsWith("/**")) {
-                // Wildcard path kontrolü
-                String basePath = publicPath.substring(0, publicPath.length() - 2);
-                boolean matches = path.startsWith(basePath);
-                log.debug("Wildcard check - Path: {}, BasePath: {}, Matches: {}", path, basePath, matches);
-                return matches;
-            } else {
-                // Tam eşleşme kontrolü
-                boolean matches = path.equals(publicPath);
-                log.debug("Exact match check - Path: {}, PublicPath: {}, Matches: {}", path, publicPath, matches);
-                return matches;
-            }
-        });
-
-        log.debug("Final result for path {}: isPublic = {}", path, isPublic);
-        return isPublic;
+    private boolean isProtectedPath(String path) {
+        return PROTECTED_PATHS.stream()
+            .anyMatch(protectedPath -> {
+                if (protectedPath.endsWith("/**")) {
+                    String basePath = protectedPath.substring(0, protectedPath.length() - 2);
+                    return path.startsWith(basePath);
+                }
+                return path.equals(protectedPath);
+            });
     }
 
     private String extractUserRole(FirebaseToken token) {

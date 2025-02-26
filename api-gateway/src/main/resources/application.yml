@@ -61,9 +61,11 @@ spring:
             - Path=/ai/**
           filters:
             - StripPrefix=1
+            - RemoveRequestHeader=Cookie
             - name: CircuitBreaker
               args:
                 name: llmServiceCircuitBreaker
+                fallbackUri: forward:/fallback/ai
 
         - id: image-service
           uri: lb://image-service
@@ -115,7 +117,7 @@ spring:
                 name: redisServiceCircuitBreaker
 
       default-filters:
-        - DedupeResponseHeader=Access-Control-Allow-Origin
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin Access-Control-Allow-Methods
         - AddResponseHeader=Access-Control-Allow-Origin, *
         - AddResponseHeader=Access-Control-Allow-Methods, GET,POST,PUT,DELETE,OPTIONS,HEAD
         - AddResponseHeader=Access-Control-Allow-Headers, Origin,Content-Type,Accept,Authorization,X-Request-With,X-User-Id,X-User-Role,X-User-Email
@@ -123,8 +125,8 @@ spring:
         - AddResponseHeader=Access-Control-Allow-Credentials, true
         - AddResponseHeader=WWW-Authenticate, Bearer realm="craftpilot"
       httpclient:
-        connect-timeout: 5000
-        response-timeout: 5000
+        connect-timeout: 30000
+        response-timeout: 30000
     loadbalancer:
       cache:
         enabled: true
