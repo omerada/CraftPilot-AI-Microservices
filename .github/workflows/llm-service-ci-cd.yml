@@ -76,7 +76,12 @@ jobs:
             docker stop llm-service || true
             docker rm llm-service || true
                     
-            docker run -d --name llm-service --network craftpilot-network --restart unless-stopped -p 8062:8062 -p 5005:5005 \
+            docker run -d \
+              --name llm-service \
+              --network craftpilot-network \
+              --restart unless-stopped \
+              -p 8062:8062 \
+              -p 5005:5005 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -v /opt/craftpilot/tmp/netty:/tmp/netty \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -98,16 +103,6 @@ jobs:
               -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
               -e SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL=PLAINTEXT \
               -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
-              -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty" \
-              --ulimit nofile=65536:65536 \
-              --cap-drop ALL \
-              --security-opt no-new-privileges \
-              --health-cmd="curl -f http://localhost:8062/actuator/health/liveness || exit 1" \
-              --health-interval=30s \
-              --health-timeout=10s \
-              --health-retries=3 \
-              --health-start-period=120s \
-              ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
               -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005" \
               --ulimit nofile=65536:65536 \
               --cap-drop ALL \
@@ -117,7 +112,7 @@ jobs:
               --health-timeout=10s \
               --health-retries=3 \
               --health-start-period=120s \
-              ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64                    
+              ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
                     
 
 #            docker run -d --name llm-service --network craftpilot-network --restart unless-stopped -p 8062:8062 \
