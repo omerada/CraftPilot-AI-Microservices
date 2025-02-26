@@ -3,10 +3,12 @@ package com.craftpilot.apigateway.security;
 import com.google.firebase.auth.FirebaseToken;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Map;
 
 @Getter
 public class FirebaseUserDetails implements UserDetails {
@@ -14,17 +16,29 @@ public class FirebaseUserDetails implements UserDetails {
     private final String email;
     private final String name;
     private final boolean emailVerified;
+    private final String role;
 
     public FirebaseUserDetails(FirebaseToken token) {
         this.uid = token.getUid();
         this.email = token.getEmail();
         this.name = token.getName();
         this.emailVerified = token.isEmailVerified();
+        this.role = extractRole(token);
+    }
+
+    private String extractRole(FirebaseToken token) {
+        Map<String, Object> claims = token.getClaims();
+        if (claims.containsKey("role")) {
+            return claims.get("role").toString();
+        } else if (claims.containsKey("admin") && Boolean.TRUE.equals(claims.get("admin"))) {
+            return "ADMIN";
+        }
+        return "USER";
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return Collections.emptyList();
+        return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role));
     }
 
     @Override
@@ -56,4 +70,4 @@ public class FirebaseUserDetails implements UserDetails {
     public boolean isEnabled() {
         return emailVerified;
     }
-} 
+}

@@ -194,3 +194,5 @@ logging:
     org.springframework.cloud.gateway: ${LOG_LEVEL:INFO}
     org.springframework.cloud.netflix.eureka: ${LOG_LEVEL:INFO}
     com.netflix.discovery: ${LOG_LEVEL:INFO}
+    com.craftpilot.apigateway.security: DEBUG
+    org.springframework.security: DEBUG

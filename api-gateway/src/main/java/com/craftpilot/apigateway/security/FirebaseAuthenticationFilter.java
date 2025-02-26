@@ -95,14 +95,9 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             WebFilterChain chain,
             FirebaseToken firebaseToken) {
         
-        // Tüm gerekli header'ları ekleyelim
-        exchange.getRequest().mutate()
-            .header("X-User-Id", firebaseToken.getUid())
-            .header("X-User-Role", extractUserRole(firebaseToken))
-            .header("X-User-Email", firebaseToken.getEmail())
-            .build();
-
-        // Exchange'i modifiye edelim ve yeni header'ları ekleyelim
+        // SecurityContext'e kullanıcıyı ekleyelim
+        FirebaseUserDetails userDetails = new FirebaseUserDetails(firebaseToken);
+        
         ServerWebExchange modifiedExchange = exchange.mutate()
             .request(exchange.getRequest().mutate()
                 .header("X-User-Id", firebaseToken.getUid())
@@ -116,7 +111,12 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             extractUserRole(firebaseToken), 
             firebaseToken.getEmail());
 
-        return chain.filter(modifiedExchange);
+        return ReactiveSecurityContextHolder.getContext()
+            .map(context -> {
+                context.setAuthentication(new FirebaseAuthenticationToken(userDetails, firebaseToken));
+                return context;
+            })
+            .then(chain.filter(modifiedExchange));
     }
 
     private Mono<Void> handleAuthenticationError(ServerWebExchange exchange, Throwable error) {

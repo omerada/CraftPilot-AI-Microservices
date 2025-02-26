@@ -31,7 +31,7 @@ public class SecurityConfig {
                 .pathMatchers("/admin/**").hasRole("ADMIN")
                 .anyExchange().authenticated()
             )
-            .addFilterBefore(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHORIZATION)
+            .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
             .headers(headers -> headers
                 .frameOptions().disable()
                 .hsts().disable()
