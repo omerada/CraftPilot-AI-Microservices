@@ -27,7 +27,7 @@ public class SecurityConfig {
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .pathMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**", "/webjars/**").permitAll()
-                .pathMatchers("/ai/**", "/auth/**", "/public/**", "/fallback/**").permitAll()
+                .pathMatchers("/auth/**", "/public/**", "/fallback/**").permitAll() 
                 .pathMatchers("/admin/**").hasRole("ADMIN")
                 .anyExchange().authenticated()
             )
