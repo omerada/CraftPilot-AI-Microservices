@@ -68,14 +68,12 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Create necessary directories
             mkdir -p /opt/craftpilot/tmp/netty
 
-            # Deploy LLM Service
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
             docker stop llm-service || true
             docker rm llm-service || true
-                    
+
             docker run -d \
               --name llm-service \
               --network craftpilot-network \
@@ -112,8 +110,9 @@ jobs:
               --health-timeout=10s \
               --health-retries=3 \
               --health-start-period=120s \
-              ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
-                    
+              ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64 
+
+              
 
 #            docker run -d --name llm-service --network craftpilot-network --restart unless-stopped -p 8062:8062 \
 #              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
@@ -147,8 +146,6 @@ jobs:
 #              --health-retries=3 \
 #              --health-start-period=120s \
 #              ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
-
-
 
             echo "=== Waiting for service startup ==="
             max_attempts=20
