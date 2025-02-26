@@ -27,13 +27,13 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     private static final Set<String> PUBLIC_PATHS = Set.of(
         "/",
         "/swagger-ui.html",
-        "/swagger-ui/**",
-        "/v3/api-docs/**",
-        "/webjars/**",
+        "/swagger-ui/",
+        "/v3/api-docs/",
+        "/webjars/",
         "/actuator/health",
         "/actuator/info",
-        "/api/auth/**",
-        "/public/**"
+        "/auth/",
+        "/public/"
     );
 
     private final FirebaseAuth firebaseAuth;
@@ -115,8 +115,25 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     }
 
     private boolean isPublicPath(String path) {
-        return PUBLIC_PATHS.stream().anyMatch(path::startsWith) || 
-               path.matches(".+\\.(png|jpg|ico|css|js|html)$");
+        // Exact matches for specific paths
+        if (PUBLIC_PATHS.contains(path)) {
+            return true;
+        }
+        
+        // Check if path starts with any of the public paths
+        // But ensure we're checking complete path segments
+        return PUBLIC_PATHS.stream()
+            .filter(publicPath -> publicPath.endsWith("/"))
+            .anyMatch(publicPath -> {
+                if (path.startsWith(publicPath)) {
+                    // Check if the next character after the match is either end of string or '/'
+                    int matchLength = publicPath.length();
+                    return path.length() == matchLength || 
+                           path.charAt(matchLength) == '/';
+                }
+                return false;
+            }) || 
+            path.matches(".+\\.(png|jpg|ico|css|js|html)$");
     }
 
     private String extractUserRole(FirebaseToken token) {
