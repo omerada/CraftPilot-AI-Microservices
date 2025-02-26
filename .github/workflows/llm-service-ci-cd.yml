@@ -75,8 +75,8 @@ jobs:
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
             docker stop llm-service || true
             docker rm llm-service || true
-
-            docker run -d --name llm-service --network craftpilot-network --restart unless-stopped -p 8062:8062 \
+                    
+            docker run -d --name llm-service --network craftpilot-network --restart unless-stopped -p 8062:8062 -p 5005:5005 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -v /opt/craftpilot/tmp/netty:/tmp/netty \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -98,7 +98,7 @@ jobs:
               -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
               -e SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL=PLAINTEXT \
               -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
-              -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty" \
+              -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005" \
               --ulimit nofile=65536:65536 \
               --cap-drop ALL \
               --security-opt no-new-privileges \
@@ -107,7 +107,43 @@ jobs:
               --health-timeout=10s \
               --health-retries=3 \
               --health-start-period=120s \
-              ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
+              ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64                    
+                    
+
+#            docker run -d --name llm-service --network craftpilot-network --restart unless-stopped -p 8062:8062 \
+#              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
+#              -v /opt/craftpilot/tmp/netty:/tmp/netty \
+#              -e SPRING_PROFILES_ACTIVE=prod \
+#              -e OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}" \
+#              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+#              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+#              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+#              -e SPRING_SECURITY_USER_NAME=craftpilot \
+#              -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+#              -e SPRING_REDIS_HOST=redis \
+#              -e SPRING_REDIS_PORT=6379 \
+#              -e SPRING_REDIS_PASSWORD=13579ada \
+#              -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
+#              -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*" \
+#              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+#              -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+#              -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+#              -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+#              -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
+#              -e SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL=PLAINTEXT \
+#              -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
+#              -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty" \
+#              --ulimit nofile=65536:65536 \
+#              --cap-drop ALL \
+#              --security-opt no-new-privileges \
+#              --health-cmd="curl -f http://localhost:8062/actuator/health/liveness || exit 1" \
+#              --health-interval=30s \
+#              --health-timeout=10s \
+#              --health-retries=3 \
+#              --health-start-period=120s \
+#              ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
+
+
 
             echo "=== Waiting for service startup ==="
             max_attempts=20
@@ -126,7 +162,7 @@ jobs:
               # Application log kontrolü
               if docker logs llm-service 2>&1 | grep -q "Started LlmServiceApplication"; then
                 echo "Application startup completed"
-                
+
                 # Eureka registration kontrolü
                 if docker logs llm-service 2>&1 | grep -q "DiscoveryClient.*registration status: 204"; then
                   echo "Successfully registered with Eureka"
