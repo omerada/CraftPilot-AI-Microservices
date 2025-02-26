@@ -98,6 +98,16 @@ jobs:
               -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
               -e SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL=PLAINTEXT \
               -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
+              -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty" \
+              --ulimit nofile=65536:65536 \
+              --cap-drop ALL \
+              --security-opt no-new-privileges \
+              --health-cmd="curl -f http://localhost:8062/actuator/health/liveness || exit 1" \
+              --health-interval=30s \
+              --health-timeout=10s \
+              --health-retries=3 \
+              --health-start-period=120s \
+              ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
               -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005" \
               --ulimit nofile=65536:65536 \
               --cap-drop ALL \
