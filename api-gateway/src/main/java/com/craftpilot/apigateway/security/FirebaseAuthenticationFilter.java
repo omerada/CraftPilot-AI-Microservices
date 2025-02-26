@@ -7,6 +7,7 @@ import com.google.firebase.auth.FirebaseToken;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -32,7 +33,9 @@ public class FirebaseAuthenticationFilter implements WebFilter {
         "/webjars/**",
         "/actuator/health",
         "/actuator/info",
-        "/api/auth/**",
+        "/auth/**",
+        "/users/register",
+        "/users/login",
         "/public/**"
     );
 
@@ -45,10 +48,16 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
-
+        String method = exchange.getRequest().getMethod().toString();
+        
+        log.debug("Incoming request - Path: {}, Method: {}", path, method);
+        
         if (isPublicPath(path)) {
+            log.debug("Public path detected: {}", path);
             return chain.filter(exchange);
         }
+        
+        log.debug("Protected path detected: {}", path);
 
         return extractAndValidateToken(exchange)
             .flatMap(firebaseToken -> processAuthenticatedRequest(exchange, chain, firebaseToken))
@@ -115,8 +124,22 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     }
 
     private boolean isPublicPath(String path) {
-        return PUBLIC_PATHS.stream().anyMatch(path::startsWith) || 
-               path.matches(".+\\.(png|jpg|ico|css|js|html)$");
+        // OPTIONS isteklerini her zaman kabul et
+        if (exchange.getRequest().getMethod() == HttpMethod.OPTIONS) {
+            return true;
+        }
+
+        boolean isPublic = PUBLIC_PATHS.stream()
+            .anyMatch(publicPath -> {
+                if (publicPath.endsWith("/**")) {
+                    String basePath = publicPath.substring(0, publicPath.length() - 2);
+                    return path.startsWith(basePath);
+                }
+                return path.equals(publicPath);
+            }) || path.matches(".+\\.(png|jpg|ico|css|js|html)$");
+
+        log.debug("Path: {}, IsPublic: {}", path, isPublic);
+        return isPublic;
     }
 
     private String extractUserRole(FirebaseToken token) {
