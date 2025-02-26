@@ -24,11 +24,16 @@ import java.util.concurrent.TimeUnit;
 public class FirebaseAuthenticationFilter implements WebFilter {
     
     private static final String BEARER_PREFIX = "Bearer ";
-    private static final Set<String> PROTECTED_PATHS = Set.of(
-        "/admin/**",
-        "/users/profile/**",
-        "/credits/**",
-        "/subscriptions/**"
+    private static final Set<String> PUBLIC_PATHS = Set.of(
+        "/",
+        "/swagger-ui.html",
+        "/swagger-ui/**",
+        "/v3/api-docs/**",
+        "/webjars/**",
+        "/actuator/health",
+        "/actuator/info",
+        "/api/auth/**",
+        "/public/**"
     );
 
     private final FirebaseAuth firebaseAuth;
@@ -40,8 +45,8 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
-        
-        if (!isProtectedPath(path)) {
+
+        if (isPublicPath(path)) {
             return chain.filter(exchange);
         }
 
@@ -109,15 +114,9 @@ public class FirebaseAuthenticationFilter implements WebFilter {
         return exchange.getResponse().setComplete();
     }
 
-    private boolean isProtectedPath(String path) {
-        return PROTECTED_PATHS.stream()
-            .anyMatch(protectedPath -> {
-                if (protectedPath.endsWith("/**")) {
-                    String basePath = protectedPath.substring(0, protectedPath.length() - 2);
-                    return path.startsWith(basePath);
-                }
-                return path.equals(protectedPath);
-            });
+    private boolean isPublicPath(String path) {
+        return PUBLIC_PATHS.stream().anyMatch(path::startsWith) || 
+               path.matches(".+\\.(png|jpg|ico|css|js|html)$");
     }
 
     private String extractUserRole(FirebaseToken token) {

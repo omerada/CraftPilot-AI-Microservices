@@ -27,11 +27,23 @@ public class SecurityConfig {
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .pathMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**", "/webjars/**").permitAll()
-                .pathMatchers("/ai/**", "/auth/**", "/public/**").permitAll()
+                .pathMatchers("/ai/**", "/auth/**", "/public/**", "/fallback/**").permitAll()
+                .pathMatchers("/admin/**").hasRole("ADMIN")
                 .anyExchange().authenticated()
             )
             .addFilterBefore(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHORIZATION)
-            .headers(headers -> headers.frameOptions().disable())
+            .headers(headers -> headers
+                .frameOptions().disable()
+                .hsts().disable()
+                .contentSecurityPolicy(csp -> csp
+                    .policyDirectives("default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data:; connect-src *"))
+            )
+            .exceptionHandling(handling -> handling
+                .authenticationEntryPoint((exchange, ex) -> {
+                    exchange.getResponse().getHeaders().add("WWW-Authenticate", "Bearer");
+                    return exchange.getResponse().setComplete();
+                })
+            )
             .build();
     }
 }

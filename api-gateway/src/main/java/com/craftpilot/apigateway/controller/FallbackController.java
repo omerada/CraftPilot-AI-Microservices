@@ -46,7 +46,7 @@ public class FallbackController {
 
     @GetMapping("/ai")
     public Mono<ResponseEntity<Map<String, String>>> llmServiceFallback() {
-        return createFallbackResponse("AI/LLM");
+        return createFallbackResponse("Llm");
     }
 
     @GetMapping("/images")
