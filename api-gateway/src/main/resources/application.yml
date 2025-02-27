@@ -60,15 +60,13 @@ spring:
           predicates:
             - Path=/ai/**
           filters:
-            - StripPrefix=1
-            - RemoveRequestHeader=Cookie
             - name: CircuitBreaker
               args:
                 name: llmServiceCircuitBreaker
                 fallbackUri: forward:/fallback/ai
           metadata:
-            connect-timeout: 30000
-            response-timeout: 30000
+            connect-timeout: 60000
+            response-timeout: 60000
 
         - id: image-service
           uri: lb://image-service

@@ -27,26 +27,22 @@ public class LLMController {
                 consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Text completion", description = "Verilen prompt için text completion yapar")
     public Mono<ResponseEntity<AIResponse>> textCompletion(@RequestBody AIRequest request) {
-        log.info("Gelen istek: {}", request);
+        log.info("Text completion request received: {}", request);
         
         return Mono.just(request)
             .doOnNext(req -> {
                 if (req.getPrompt() == null || req.getPrompt().trim().isEmpty()) {
+                    log.error("Empty prompt received");
                     throw new IllegalArgumentException("Prompt boş olamaz");
                 }
-                log.debug("İstek doğrulandı: {}", req);
+                log.debug("Request validated: {}", req);
             })
             .flatMap(req -> llmService.processTextCompletion(req))
+            .doOnNext(response -> log.info("Generated response: {}", response))
             .map(response -> ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(response))
-            .doOnSuccess(response -> log.info("Başarılı yanıt: {}", response))
-            .doOnError(error -> log.error("Hata: ", error))
-            .onErrorResume(error -> Mono.just(
-                ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(AIResponse.error(error.getMessage()))
-            ));
+            .doOnError(error -> log.error("Error processing request: ", error));
     }
 
     @PostMapping(value = "/chat/completions", 

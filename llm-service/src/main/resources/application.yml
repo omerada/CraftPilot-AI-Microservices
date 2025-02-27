@@ -138,14 +138,10 @@ logging:
     root: INFO
     com.craftpilot: DEBUG
     org.springframework.web: DEBUG
-    org.springframework.cloud: INFO
+    org.springframework.cloud: DEBUG
     reactor.netty: DEBUG
     io.netty: DEBUG
     com.craftpilot.llmservice: DEBUG
-    org.springframework.security: DEBUG
-    org.springframework.web.reactive: DEBUG
-    reactor.netty.http.client: DEBUG
-    org.springframework.cloud.gateway: DEBUG
 
 netty:
   native:
