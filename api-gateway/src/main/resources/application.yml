@@ -66,6 +66,9 @@ spring:
               args:
                 name: llmServiceCircuitBreaker
                 fallbackUri: forward:/fallback/ai
+          metadata:
+            connect-timeout: 30000
+            response-timeout: 30000
 
         - id: image-service
           uri: lb://image-service

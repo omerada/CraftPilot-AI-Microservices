@@ -83,7 +83,8 @@ eureka:
     register-with-eureka: true
     fetch-registry: true
   instance:
-    prefer-ip-address: true
+    prefer-ip-address: false
+    hostname: ${HOSTNAME:llm-service}
     lease-renewal-interval-in-seconds: 10
     health-check-url-path: /actuator/health
 
@@ -144,6 +145,7 @@ logging:
     org.springframework.security: DEBUG
     org.springframework.web.reactive: DEBUG
     reactor.netty.http.client: DEBUG
+    org.springframework.cloud.gateway: DEBUG
 
 netty:
   native:

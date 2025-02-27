@@ -42,8 +42,10 @@ public class LightSecurityConfig {
             .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**", "/webjars/**").permitAll()
-                .pathMatchers(HttpMethod.POST, "/ai/**").permitAll()
+                .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .pathMatchers(getPublicPaths()).permitAll()
+                .pathMatchers("/actuator/**").permitAll()
+                .pathMatchers("/ai/**").permitAll()  // Önemli: /ai/** path'ini permit all yapıyoruz
                 .anyExchange().authenticated()
             )
             .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
