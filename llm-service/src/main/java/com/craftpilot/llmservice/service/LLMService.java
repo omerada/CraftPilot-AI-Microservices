@@ -50,16 +50,13 @@ public class LLMService {
     private Mono<Map<String, Object>> callOpenRouter(String endpoint, AIRequest request) {
         log.info("OpenRouter API çağrısı yapılıyor - Endpoint: {}, Request: {}", endpoint, request);
         Map<String, Object> requestBody = createRequestBody(request);
-        log.debug("Request body: {}", requestBody);
-
-        // Endpoint düzeltmesi
-        String correctedEndpoint = endpoint.replace("/v1/", "/");
+        
+        // URL path düzeltmesi
+        String correctedEndpoint = "/v1/chat/completions";  // Sabit endpoint kullan
 
         return openRouterWebClient.post()
             .uri(correctedEndpoint)
             .bodyValue(requestBody)
-            .header("HTTP-Referer", "https://craftpilot.io")  // OpenRouter için gerekli
-            .header("Accept", "application/json")
             .retrieve()
             .onStatus(HttpStatusCode::is4xxClientError, response ->
                 response.bodyToMono(String.class)
@@ -93,55 +90,55 @@ public class LLMService {
         // Messages formatını düzelt
         List<Map<String, Object>> messages = new ArrayList<>();
         Map<String, Object> message = new HashMap<>();
-        message.put("role", "user");
+        message.put("role", "user");uter formatına uygun şekilde düzenleme
         message.put("content", request.getPrompt());
         messages.add(message);
         body.put("messages", messages);
         
-        // Opsiyonel parametreler
-        if (request.getTemperature() != null) {
-            body.put("temperature", request.getTemperature());
-        }
-        if (request.getMaxTokens() != null) {
+        // Opsiyonel parametrelermatta oluştur
+        if (request.getTemperature() != null) {ntList = new ArrayList<>();
+            body.put("temperature", request.getTemperature());Map<String, Object> textContent = new HashMap<>();
+        }text");
+        if (request.getMaxTokens() != null) {pt());
             body.put("max_tokens", request.getMaxTokens());
         }
         
         log.debug("Created request body: {}", body);
-        return body;
+        return body;ody.put("messages", messages);
     }
 
-    // Özel exception sınıfı
-    public static class APIException extends RuntimeException {
-        public APIException(String message) {
-            super(message);
+    // Özel exception sınıfıgetTemperature() != null) {
+    public static class APIException extends RuntimeException {       body.put("temperature", request.getTemperature());
+        public APIException(String message) {        }
+            super(message);kens() != null) {
         }
     }
 
-    private AIResponse mapToAIResponse(Map<String, Object> openRouterResponse, AIRequest request) {
-        log.debug("OpenRouter yanıtı haritalanıyor: {}", openRouterResponse);
-        
+    private AIResponse mapToAIResponse(Map<String, Object> openRouterResponse, AIRequest request) {og.debug("Created request body: {}", body);
+        log.debug("OpenRouter yanıtı haritalanıyor: {}", openRouterResponse);   return body;
+            }
         String responseText = extractResponseText(openRouterResponse);
         if (responseText == null || responseText.trim().isEmpty()) {
-            log.warn("OpenRouter'dan boş yanıt alındı");
+            log.warn("OpenRouter'dan boş yanıt alındı");ic static class APIException extends RuntimeException {
             throw new RuntimeException("AI servisinden boş yanıt alındı");
         }
 
         AIResponse response = AIResponse.success(
             responseText,
-            request.getModel(),
-            extractTokenCount(openRouterResponse),
+            request.getModel(),    private AIResponse mapToAIResponse(Map<String, Object> openRouterResponse, AIRequest request) {
+            extractTokenCount(openRouterResponse),r: {}", openRouterResponse);
             request.getRequestId()
-        );
+        );xtractResponseText(openRouterResponse);
+rim().isEmpty()) {
+        log.debug("Haritalanan yanıt: {}", response);an boş yanıt alındı");
+        return response;  throw new RuntimeException("AI servisinden boş yanıt alındı");
+    }        }
 
-        log.debug("Haritalanan yanıt: {}", response);
-        return response;
-    }
-
-    private String extractResponseText(Map<String, Object> response) {
-        try {
-            log.debug("Yanıt içeriği: {}", response);
+    private String extractResponseText(Map<String, Object> response) {nse = AIResponse.success(
+        try {       responseText,
+            log.debug("Yanıt içeriği: {}", response);            request.getModel(),
             if (response.containsKey("choices")) {
-                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");equest.getRequestId()
                 if (!choices.isEmpty()) {
                     Map<String, Object> choice = choices.get(0);
                     if (choice.containsKey("message")) {
@@ -152,20 +149,27 @@ public class LLMService {
                                 return contents.stream()
                                     .filter(content -> "text".equals(content.get("type")))
                                     .map(content -> (String) content.get("text"))
-                                    .findFirst()
+                                    .findFirst()t<Map<String, Object>>) response.get("choices");
                                     .orElse(null);
                             } else {
-                                return (String) message.get("content");
-                            }
-                        }
-                    }
-                }
-            }
-            throw new RuntimeException("Geçersiz API yanıt formatı");
-        } catch (Exception e) {
-            log.error("Yanıt işlenirken hata oluştu: ", e);
+                                return (String) message.get("content");age")) {
+                            }e = (Map<String, Object>) choice.get("message");
+                        }containsKey("content")) {
+                    } {
+                }   List<Map<String, Object>> contents = (List<Map<String, Object>>) message.get("content");
+            }       return contents.stream()
+            throw new RuntimeException("Geçersiz API yanıt formatı");               .filter(content -> "text".equals(content.get("type")))
+        } catch (Exception e) {                   .map(content -> (String) content.get("text"))
+            log.error("Yanıt işlenirken hata oluştu: ", e);                       .findFirst()
             throw new RuntimeException("AI yanıtı işlenemedi", e);
-        }
+        }lse {
+    }("content");
+
+    private Integer extractTokenCount(Map<String, Object> response) {               }
+        Map<String, Object> usage = (Map<String, Object>) response.getOrDefault("usage", Map.of());               }
+        return ((Number) usage.getOrDefault("total_tokens", 0)).intValue();                }
+    }
+}
     }
 
     private Integer extractTokenCount(Map<String, Object> response) {
