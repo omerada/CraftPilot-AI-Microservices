@@ -47,12 +47,18 @@ public class LLMController {
     }
 
     private Mono<ResponseEntity<AIResponse>> handleError(Throwable error) {
+        log.error("Error processing request", error); // Detaylı loglama ekledik
+        
         if (error instanceof ValidationException) {
             return Mono.just(ResponseEntity.badRequest()
                     .body(AIResponse.error("Validation error: " + error.getMessage())));
+        } else if (error instanceof LLMService.APIException) {
+            return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(AIResponse.error("AI Service error: " + error.getMessage())));
         }
+        
         return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(AIResponse.error("Internal server error")));
+                .body(AIResponse.error("Internal server error: " + error.getMessage())));
     }
 
     private void auditResponse(AIResponse response) {

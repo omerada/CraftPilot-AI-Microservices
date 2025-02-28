@@ -37,7 +37,8 @@ public class WebClientConfig {
             .responseTimeout(Duration.ofSeconds(30))
             .doOnConnected(conn -> conn
                 .addHandlerLast(new ReadTimeoutHandler(30, TimeUnit.SECONDS))
-                .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)));
+                .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)))
+            .wiretap(true);  // Debug için network trafiğini logla
 
         return WebClient.builder()
             .baseUrl(baseUrl)
@@ -46,11 +47,9 @@ public class WebClientConfig {
             .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
             .defaultHeader("Authorization", "Bearer " + apiKey)
             .defaultHeader("HTTP-Referer", "https://craftpilot.io")
-            .codecs(configurer -> configurer
-                .defaultCodecs()
-                .maxInMemorySize(16 * 1024 * 1024))
             .filter(logRequest())
             .filter(logResponse())
+            .filter(errorHandler())
             .build();
     }
 
