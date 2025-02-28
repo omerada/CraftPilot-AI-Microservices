@@ -19,6 +19,12 @@ import org.springframework.web.server.WebFilterChain;
 import java.util.List;   
 import java.util.Arrays;   
 import org.springframework.http.HttpMethod;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import java.util.Collection;
+import java.util.Collections;
 
 @Slf4j
 @Configuration
@@ -52,11 +58,12 @@ public class LightSecurityConfig {
                 .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .pathMatchers(getPublicPaths()).permitAll()
                 .pathMatchers("/admin/**").hasRole("ADMIN")
-                .anyExchange().authenticated()
+                .anyExchange().permitAll()  // Değişiklik burada - authenticated() yerine permitAll()
             )
             .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
             .exceptionHandling(handling -> handling
                 .authenticationEntryPoint((exchange, ex) -> {
+                    log.error("Authentication error: ", ex);
                     exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
                     return exchange.getResponse().setComplete();
                 })
@@ -90,17 +97,26 @@ public class LightSecurityConfig {
                 return chain.filter(exchange);
             }
 
-            log.debug("Gelen Headers: {}", exchange.getRequest().getHeaders());
+            log.debug("Validating headers for path: {}", exchange.getRequest().getPath());
 
             for (RequiredHeader header : REQUIRED_HEADERS) {
                 String headerValue = exchange.getRequest().getHeaders().getFirst(header.name);
                 if (headerValue == null || headerValue.trim().isEmpty()) {
-                    log.error("Eksik Header: {} - {}", header.name, header.message);
+                    log.warn("Missing required header: {}", header.name);
                     return handleMissingHeader(exchange, header.message);
                 }
             }
 
-            return chain.filter(exchange);
+            // Header doğrulaması başarılı olduğunda bir authentication objesi oluştur
+            return chain.filter(exchange)
+                .contextWrite(context -> {
+                    // Basit bir authentication objesi oluştur
+                    ApiKeyAuthentication auth = new ApiKeyAuthentication(
+                        exchange.getRequest().getHeaders().getFirst("X-User-Id"),
+                        exchange.getRequest().getHeaders().getFirst("X-User-Role")
+                    );
+                    return ReactiveSecurityContextHolder.withAuthentication(auth);
+                });
         };
     }
 
@@ -127,6 +143,52 @@ public class LightSecurityConfig {
         RequiredHeader(String name, String message) {
             this.name = name;
             this.message = message;
+        }
+    }
+
+    private static class ApiKeyAuthentication implements Authentication {
+        private final String userId;
+        private final String role;
+        private boolean authenticated = true;
+
+        public ApiKeyAuthentication(String userId, String role) {
+            this.userId = userId;
+            this.role = role;
+        }
+
+        @Override
+        public Collection<? extends GrantedAuthority> getAuthorities() {
+            return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role));
+        }
+
+        @Override
+        public Object getCredentials() {
+            return null;
+        }
+
+        @Override
+        public Object getDetails() {
+            return null;
+        }
+
+        @Override
+        public Object getPrincipal() {
+            return userId;
+        }
+
+        @Override
+        public boolean isAuthenticated() {
+            return authenticated;
+        }
+
+        @Override
+        public void setAuthenticated(boolean authenticated) throws IllegalArgumentException {
+            this.authenticated = authenticated;
+        }
+
+        @Override
+        public String getName() {
+            return userId;
         }
     }
 }
