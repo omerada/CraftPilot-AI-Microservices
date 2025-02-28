@@ -50,11 +50,10 @@ public class LLMController {
     private Mono<ResponseEntity<AIResponse>> handleError(Throwable error) {
         if (error instanceof ValidationException) {
             return Mono.just(ResponseEntity.badRequest()
-                    .body(new AIResponse("Validation error: " + error.getMessage())));
+                    .body(AIResponse.error("Validation error: " + error.getMessage())));
         }
-        // ... diğer error handling cases
         return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new AIResponse("Internal server error")));
+                .body(AIResponse.error("Internal server error")));
     }
 
     private void auditResponse(AIResponse response) {

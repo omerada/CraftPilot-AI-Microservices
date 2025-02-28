@@ -9,8 +9,8 @@ import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import org.springframework.web.server.WebFilter;
 import reactor.core.publisher.Mono;
 import org.springframework.http.HttpStatus;
@@ -50,8 +50,8 @@ public class LightSecurityConfig {
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .pathMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
-                .pathMatchers("/ai/public/**").permitAll()
+                .pathMatchers(getPublicPaths()).permitAll()
+                .pathMatchers("/admin/**").hasRole("ADMIN")
                 .anyExchange().authenticated()
             )
             .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
@@ -62,9 +62,7 @@ public class LightSecurityConfig {
                 })
             )
             .headers(headers -> headers
-                .frameOptions().disable()
-                .contentSecurityPolicy(csp -> csp
-                    .policyDirectives("default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data:;"))
+                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'"))
                 .xssProtection(xss -> xss.disable())
             )
             .build();

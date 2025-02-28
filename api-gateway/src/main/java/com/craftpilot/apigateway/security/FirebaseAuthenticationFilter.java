@@ -80,21 +80,22 @@ public class FirebaseAuthenticationFilter implements WebFilter {
         FirebaseUserDetails userDetails = new FirebaseUserDetails(firebaseToken);
         FirebaseAuthenticationToken authToken = new FirebaseAuthenticationToken(userDetails, firebaseToken);
         
-        ServerWebExchange modifiedExchange = exchange.mutate()
+        // Exchange'i modifiye et
+        ServerWebExchange modifiedExchange = modifyExchange(exchange, firebaseToken);
+
+        // Security context'i güncelle ve chain'i devam ettir
+        return chain.filter(modifiedExchange)
+            .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authToken));
+    }
+
+    private ServerWebExchange modifyExchange(ServerWebExchange exchange, FirebaseToken firebaseToken) {
+        return exchange.mutate()
             .request(exchange.getRequest().mutate()
                 .header("X-User-Id", firebaseToken.getUid())
                 .header("X-User-Role", extractUserRole(firebaseToken))
                 .header("X-User-Email", firebaseToken.getEmail())
                 .build())
             .build();
-
-        log.debug("Added headers - UserId: {}, Role: {}, Email: {}", 
-            firebaseToken.getUid(), 
-            extractUserRole(firebaseToken), 
-            firebaseToken.getEmail());
-
-        return chain.filter(modifiedExchange)
-            .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authToken));
     }
 
     private Mono<Void> handleAuthenticationError(ServerWebExchange exchange, Throwable error) {
