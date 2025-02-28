@@ -32,8 +32,6 @@ public class SecurityConfig {
             )
             .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
             .headers(headers -> headers
-                .frameOptions().disable()
-                .hsts().disable()
                 .contentSecurityPolicy(csp -> csp
                     .policyDirectives("default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data:; connect-src *"))
             )
