@@ -59,11 +59,6 @@ spring:
           uri: lb://llm-service
           predicates:
             - Path=/ai/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: llmServiceCircuitBreaker
-                fallbackUri: forward:/fallback/ai
           metadata:
             connect-timeout: 60000
             response-timeout: 60000
