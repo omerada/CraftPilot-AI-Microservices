@@ -49,7 +49,6 @@ public class WebClientConfig {
             .defaultHeader("Authorization", "Bearer " + apiKey)
             .filter(logRequest())
             .filter(logResponse())
-            .filter(errorHandler())
             .build();
     }
 

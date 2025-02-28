@@ -51,52 +51,69 @@ public class LLMService {
         Map<String, Object> requestBody = createRequestBody(request);
         log.debug("Request body: {}", requestBody);
 
+        // Endpoint düzeltmesi
+        String correctedEndpoint = endpoint.replace("/v1/", "/");
+
         return openRouterWebClient.post()
-            .uri(endpoint)
+            .uri(correctedEndpoint)
             .bodyValue(requestBody)
+            .header("HTTP-Referer", "https://craftpilot.io")  // OpenRouter için gerekli
+            .header("Accept", "application/json")
             .retrieve()
-            .onStatus(status -> status.is4xxClientError(), response ->
+            .onStatus(HttpStatusCode::is4xxClientError, response ->
                 response.bodyToMono(String.class)
                     .flatMap(error -> {
                         log.error("Client error: {}", error);
-                        return Mono.error(new RuntimeException("API client error: " + error));
+                        return Mono.error(new APIException("Client error: " + error));
                     }))
-            .onStatus(status -> status.is5xxServerError(), response ->
+            .onStatus(HttpStatusCode::is5xxServerError, response ->
                 response.bodyToMono(String.class)
                     .flatMap(error -> {
                         log.error("Server error: {}", error);
-                        return Mono.error(new RuntimeException("API server error: " + error));
+                        return Mono.error(new APIException("Server error: " + error));
                     }))
             .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
             .timeout(Duration.ofSeconds(30))
             .doOnNext(response -> log.debug("OpenRouter raw response: {}", response))
             .doOnError(error -> log.error("API call error: ", error))
-            .onErrorResume(error -> Mono.error(new RuntimeException("API request failed: " + error.getMessage())));
+            .onErrorResume(error -> {
+                log.error("API request failed", error);
+                return Mono.error(new APIException("API request failed: " + error.getMessage()));
+            });
     }
 
     private Map<String, Object> createRequestBody(AIRequest request) {
         Map<String, Object> body = new HashMap<>();
-        body.put("model", request.getModel());
         
+        // Model kontrolü
+        body.put("model", request.getModel() != null ? 
+            request.getModel() : "google/gemini-pro");
+        
+        // Messages formatını düzelt
         List<Map<String, Object>> messages = new ArrayList<>();
-        Map<String, Object> userMessage = new HashMap<>();
-        userMessage.put("role", "user");
-        
-        List<Map<String, Object>> content = new ArrayList<>();
-        Map<String, Object> textContent = new HashMap<>();
-        textContent.put("type", "text");
-        textContent.put("text", request.getPrompt());
-        content.add(textContent);
-        
-        userMessage.put("content", content);
-        messages.add(userMessage);
-        
+        Map<String, Object> message = new HashMap<>();
+        message.put("role", "user");
+        message.put("content", request.getPrompt());
+        messages.add(message);
         body.put("messages", messages);
-        body.put("max_tokens", request.getMaxTokens());
-        body.put("temperature", request.getTemperature());
         
-        log.debug("Oluşturulan request body: {}", body);
+        // Opsiyonel parametreler
+        if (request.getTemperature() != null) {
+            body.put("temperature", request.getTemperature());
+        }
+        if (request.getMaxTokens() != null) {
+            body.put("max_tokens", request.getMaxTokens());
+        }
+        
+        log.debug("Created request body: {}", body);
         return body;
+    }
+
+    // Özel exception sınıfı
+    public static class APIException extends RuntimeException {
+        public APIException(String message) {
+            super(message);
+        }
     }
 
     private AIResponse mapToAIResponse(Map<String, Object> openRouterResponse, AIRequest request) {
