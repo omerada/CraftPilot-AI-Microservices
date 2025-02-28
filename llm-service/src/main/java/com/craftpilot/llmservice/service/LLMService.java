@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.time.Duration;
+import org.springframework.http.HttpStatusCode;  // Yeni import eklendi
 
 @Service
 @Slf4j
