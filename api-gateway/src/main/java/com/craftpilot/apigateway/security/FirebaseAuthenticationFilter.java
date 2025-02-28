@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
+import com.craftpilot.apigateway.security.SecurityConstants;
 import reactor.core.publisher.Mono;
 import java.util.Set;
 import java.util.Map;
@@ -24,17 +25,6 @@ import java.util.concurrent.TimeUnit;
 public class FirebaseAuthenticationFilter implements WebFilter {
     
     private static final String BEARER_PREFIX = "Bearer ";
-    private static final Set<String> PUBLIC_PATHS = Set.of(
-        "/",
-        "/swagger-ui.html",
-        "/swagger-ui/",
-        "/v3/api-docs/",
-        "/webjars/",
-        "/actuator/health",
-        "/actuator/info",
-        "/auth/",
-        "/public/"
-    );
 
     private final FirebaseAuth firebaseAuth;
     private final Cache<String, FirebaseToken> tokenCache = CacheBuilder.newBuilder()
@@ -45,8 +35,8 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
-
-        if (isPublicPath(path)) {
+ 
+        if (SecurityConstants.isPublicPath(path)) {
             return chain.filter(exchange);
         }
 
@@ -78,15 +68,10 @@ public class FirebaseAuthenticationFilter implements WebFilter {
         }
 
         return Mono.fromCallable(() -> {
-            try {
-                FirebaseToken verifiedToken = firebaseAuth.verifyIdToken(token);
-                log.debug("Token verified successfully for user: {}", verifiedToken.getUid()); // Debug log
-                tokenCache.put(token, verifiedToken);
-                return verifiedToken;
-            } catch (Exception e) {
-                log.error("Token verification failed: {}", e.getMessage()); // Error log
-                throw e;
-            }
+            FirebaseToken verifiedToken = firebaseAuth.verifyIdToken(token);
+            log.debug("Token verified successfully for user: {}", verifiedToken.getUid()); // Debug log
+            tokenCache.put(token, verifiedToken);
+            return verifiedToken;
         });
     }
 
