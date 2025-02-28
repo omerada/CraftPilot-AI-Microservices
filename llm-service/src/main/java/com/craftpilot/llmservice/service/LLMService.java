@@ -45,61 +45,34 @@ public class LLMService {
     }
 
     private Mono<Map<String, Object>> callOpenRouter(String endpoint, AIRequest request) {
-        log.info("OpenRouter API çağrısı yapılıyor - Endpoint: {}, Request: {}", endpoint, request);
         Map<String, Object> requestBody = createRequestBody(request);
         
-        String correctedEndpoint = "/v1/chat/completions";
-
         return openRouterWebClient.post()
-            .uri(correctedEndpoint)
+            .uri("/v1/chat/completions")
             .bodyValue(requestBody)
             .retrieve()
-            .onStatus(HttpStatusCode::is4xxClientError, response ->
+            .onStatus(HttpStatusCode::isError, response ->
                 response.bodyToMono(String.class)
                     .flatMap(error -> {
-                        log.error("Client error: {}", error);
-                        return Mono.error(new APIException("Client error: " + error));
-                    }))
-            .onStatus(HttpStatusCode::is5xxServerError, response ->
-                response.bodyToMono(String.class)
-                    .flatMap(error -> {
-                        log.error("Server error: {}", error);
-                        return Mono.error(new APIException("Server error: " + error));
+                        log.error("API error: {} - {}", response.statusCode(), error);
+                        return Mono.error(new APIException("API Error: " + error));
                     }))
             .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
             .timeout(Duration.ofSeconds(30))
-            .doOnNext(response -> log.debug("OpenRouter raw response: {}", response))
-            .doOnError(error -> log.error("API call error: ", error))
-            .onErrorResume(error -> {
-                log.error("API request failed", error);
-                return Mono.error(new APIException("API request failed: " + error.getMessage()));
-            });
+            .doOnError(error -> log.error("API request failed", error));
     }
 
     private Map<String, Object> createRequestBody(AIRequest request) {
         Map<String, Object> body = new HashMap<>();
-        
-        // Model kontrolü
         body.put("model", request.getModel() != null ? 
             request.getModel() : "google/gemini-2.0-flash-lite-preview-02-05:free");
         
-        // Messages formatını OpenRouter'ın beklediği şekilde oluştur
-        List<Map<String, Object>> messages = new ArrayList<>();
         Map<String, Object> message = new HashMap<>();
         message.put("role", "user");
+        message.put("content", request.getPrompt());
         
-        // Content'i array olarak gönder
-        List<Map<String, Object>> content = new ArrayList<>();
-        Map<String, Object> textContent = new HashMap<>();
-        textContent.put("type", "text");
-        textContent.put("text", request.getPrompt());
-        content.add(textContent);
+        body.put("messages", List.of(message));
         
-        message.put("content", content);
-        messages.add(message);
-        body.put("messages", messages);
-        
-        // Opsiyonel parametreler
         if (request.getTemperature() != null) {
             body.put("temperature", request.getTemperature());
         }
@@ -107,7 +80,6 @@ public class LLMService {
             body.put("max_tokens", request.getMaxTokens());
         }
         
-        log.debug("Created request body: {}", body);
         return body;
     }
 

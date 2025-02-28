@@ -37,18 +37,20 @@ public class WebClientConfig {
             .responseTimeout(Duration.ofSeconds(30))
             .doOnConnected(conn -> conn
                 .addHandlerLast(new ReadTimeoutHandler(30, TimeUnit.SECONDS))
-                .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)))
-            .wiretap(true);
+                .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)));
 
         return WebClient.builder()
             .baseUrl(baseUrl)
             .clientConnector(new ReactorClientHttpConnector(httpClient))
             .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
             .defaultHeader("Authorization", "Bearer " + apiKey)
             .defaultHeader("HTTP-Referer", "https://craftpilot.io")
+            .codecs(configurer -> configurer
+                .defaultCodecs()
+                .maxInMemorySize(16 * 1024 * 1024))
             .filter(logRequest())
             .filter(logResponse())
-            .filter(errorHandler())
             .build();
     }
 
@@ -59,20 +61,6 @@ public class WebClientConfig {
                 log.debug("WebClient Request Headers: {}", request.headers());
                 return next.exchange(request);
             });
-    }
-
-    private ExchangeFilterFunction errorHandler() {
-        return ExchangeFilterFunction.ofResponseProcessor(clientResponse -> {
-            if (clientResponse.statusCode().is2xxSuccessful()) {
-                return Mono.just(clientResponse);
-            } else {
-                return clientResponse.bodyToMono(String.class)
-                    .flatMap(errorBody -> {
-                        log.error("Error response: {}", errorBody);
-                        return Mono.error(new RuntimeException("API Error: " + errorBody));
-                    });
-            }
-        });
     }
 
     private ExchangeFilterFunction logRequest() {

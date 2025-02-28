@@ -35,16 +35,9 @@ spring:
     format:
       date: yyyy-MM-dd
       date-time: yyyy-MM-dd HH:mm:ss
-      time: HH:mm:ss
     log-request-details: true
-    cors:
-      allowed-origins: "*"
-      allowed-methods: "*"
-      allowed-headers: "*"
-      exposed-headers: "X-User-Id, X-User-Role, X-User-Email"
   codec:
     max-in-memory-size: 16MB
-    log-request-details: true
   kafka:
     properties:
       security.protocol: PLAINTEXT
@@ -151,11 +144,12 @@ logging:
   level:
     root: INFO
     com.craftpilot: DEBUG
-    org.springframework.web: DEBUG
+    org.springframework.web: INFO
     org.springframework.cloud: DEBUG
     reactor.netty: DEBUG
     io.netty: DEBUG
     com.craftpilot.llmservice: DEBUG
+    reactor.netty.http.client: DEBUG
 
 netty:
   native:
