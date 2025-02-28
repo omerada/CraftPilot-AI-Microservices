@@ -28,8 +28,7 @@ import jakarta.validation.ValidationException;
 @Validated
 public class LLMController {
     private final LLMService llmService;
-    private final CacheManager cacheManager;
-
+    
     @Cacheable(value = "completions", key = "#request.hashCode()")
     @PostMapping(value = "/completions", 
                 produces = MediaType.APPLICATION_JSON_VALUE,
