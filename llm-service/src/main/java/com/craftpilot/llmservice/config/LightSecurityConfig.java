@@ -25,6 +25,7 @@ import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Map;
 
 @Slf4j
 @Configuration
@@ -110,10 +111,10 @@ public class LightSecurityConfig {
             // Header doğrulaması başarılı olduğunda bir authentication objesi oluştur
             return chain.filter(exchange)
                 .contextWrite(context -> {
-                    // Basit bir authentication objesi oluştur
                     ApiKeyAuthentication auth = new ApiKeyAuthentication(
                         exchange.getRequest().getHeaders().getFirst("X-User-Id"),
-                        exchange.getRequest().getHeaders().getFirst("X-User-Role")
+                        exchange.getRequest().getHeaders().getFirst("X-User-Role"),
+                        exchange.getRequest().getHeaders().getFirst("X-User-Email")
                     );
                     return ReactiveSecurityContextHolder.withAuthentication(auth);
                 });
@@ -149,11 +150,13 @@ public class LightSecurityConfig {
     private static class ApiKeyAuthentication implements Authentication {
         private final String userId;
         private final String role;
+        private final String email;
         private boolean authenticated = true;
 
-        public ApiKeyAuthentication(String userId, String role) {
+        public ApiKeyAuthentication(String userId, String role, String email) {
             this.userId = userId;
             this.role = role;
+            this.email = email;
         }
 
         @Override
@@ -168,7 +171,11 @@ public class LightSecurityConfig {
 
         @Override
         public Object getDetails() {
-            return null;
+            return Collections.unmodifiableMap(Map.of(
+                "userId", userId,
+                "role", role,
+                "email", email
+            ));
         }
 
         @Override
