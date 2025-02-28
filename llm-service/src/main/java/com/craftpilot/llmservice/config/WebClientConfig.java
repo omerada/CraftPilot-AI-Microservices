@@ -38,7 +38,7 @@ public class WebClientConfig {
             .doOnConnected(conn -> conn
                 .addHandlerLast(new ReadTimeoutHandler(30, TimeUnit.SECONDS))
                 .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)))
-            .wiretap(true);  // Debug için network trafiğini logla
+            .wiretap(true);
 
         return WebClient.builder()
             .baseUrl(baseUrl)
@@ -49,7 +49,9 @@ public class WebClientConfig {
             .defaultHeader("HTTP-Referer", "https://craftpilot.io")
             .filter(logRequest())
             .filter(logResponse())
-            .filter(errorHandler())
+            .codecs(configurer -> configurer
+                .defaultCodecs()
+                .maxInMemorySize(16 * 1024 * 1024))
             .build();
     }
 
@@ -75,6 +77,8 @@ public class WebClientConfig {
             return Mono.just(clientRequest);
         });
     }
+
+    // errorHandler() metodunu kaldırdık çünkü hata yönetimi LLMService'de yapılıyor
 
     private ExchangeFilterFunction logResponse() {
         return ExchangeFilterFunction.ofResponseProcessor(clientResponse -> {
