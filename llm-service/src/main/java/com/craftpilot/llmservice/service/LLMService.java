@@ -9,12 +9,16 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.time.Duration;
+import java.util.Objects;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 @Slf4j
@@ -42,6 +46,65 @@ public class LLMService {
     public Mono<AIResponse> processImageGeneration(AIRequest request) {
         return Mono.error(new UnsupportedOperationException(
             "Image generation is not supported by OpenRouter. Please use Stability AI or DALL-E API directly."));
+    }
+
+    public Flux<AIResponse> streamChatCompletion(AIRequest request) {
+        Map<String, Object> requestBody = createRequestBody(request);
+        requestBody.put("stream", true);  // Stream modunu aktifleştir
+        
+        return openRouterWebClient.post()
+            .uri("/v1/chat/completions")
+            .bodyValue(requestBody)
+            .retrieve()
+            .bodyToFlux(String.class)
+            .filter(chunk -> !chunk.isEmpty())
+            .map(chunk -> {
+                // SSE formatındaki chunk'ı parse et
+                if (chunk.startsWith("data: ")) {
+                    chunk = chunk.substring(6);
+                }
+                if ("[DONE]".equals(chunk)) {
+                    return null;
+                }
+                
+                try {
+                    Map<String, Object> response = parseChunk(chunk);
+                    String content = extractChunkContent(response);
+                    
+                    return AIResponse.builder()
+                        .requestId(request.getRequestId())
+                        .response(content)
+                        .model(request.getModel())
+                        .status("STREAMING")
+                        .success(true)
+                        .build();
+                } catch (Exception e) {
+                    log.error("Chunk parse error: {}", e.getMessage());
+                    return null;
+                }
+            })
+            .filter(Objects::nonNull)
+            .doOnComplete(() -> log.debug("Stream completed for request: {}", request.getRequestId()));
+    }
+
+    private Map<String, Object> parseChunk(String chunk) {
+        try {
+            return new ObjectMapper().readValue(chunk, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.error("Error parsing chunk: {}", chunk, e);
+            throw new APIException("Chunk parse error: " + e.getMessage());
+        }
+    }
+
+    private String extractChunkContent(Map<String, Object> response) {
+        try {
+            Map<String, Object> choice = ((List<Map<String, Object>>) response.get("choices")).get(0);
+            Map<String, Object> delta = (Map<String, Object>) choice.get("delta");
+            return (String) delta.get("content");
+        } catch (Exception e) {
+            log.error("Error extracting content from chunk: {}", response, e);
+            return "";
+        }
     }
 
     private Mono<Map<String, Object>> callOpenRouter(String endpoint, AIRequest request) {
@@ -74,7 +137,7 @@ public class LLMService {
         // Model seçimi ve kontrolü
         String model = request.getModel();
         if (model == null || model.trim().isEmpty()) {
-            model = "google/gemini-pro";  // Default model
+            model = "google/gemini-2.0-flash-lite-001";  // Default model
         }
         body.put("model", model);
         

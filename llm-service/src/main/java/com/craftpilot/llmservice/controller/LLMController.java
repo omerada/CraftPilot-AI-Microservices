@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
 
 import jakarta.validation.Valid;
 import jakarta.validation.ValidationException;
@@ -77,6 +78,16 @@ public class LLMController {
                 .body(response))
             .doOnError(error -> log.error("Chat completion error: ", error))
             .doOnSuccess(response -> log.debug("Chat completion success: {}", response));
+    }
+
+    @PostMapping(value = "/chat/completions/stream", 
+                produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Streaming chat completion", description = "Yanıtları anlık olarak stream eder")
+    public Flux<AIResponse> streamChatCompletion(@RequestBody AIRequest request) {
+        request.setRequestType("CHAT");
+        return llmService.streamChatCompletion(request)
+            .doOnNext(response -> log.debug("Streaming response chunk: {}", response))
+            .doOnError(error -> log.error("Stream error: ", error));
     }
 
     @PostMapping(value = "/images/generate", 
