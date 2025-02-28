@@ -90,9 +90,12 @@ public class LightSecurityConfig {
                 return chain.filter(exchange);
             }
 
+            log.debug("Gelen Headers: {}", exchange.getRequest().getHeaders());
+
             for (RequiredHeader header : REQUIRED_HEADERS) {
                 String headerValue = exchange.getRequest().getHeaders().getFirst(header.name);
                 if (headerValue == null || headerValue.trim().isEmpty()) {
+                    log.error("Eksik Header: {} - {}", header.name, header.message);
                     return handleMissingHeader(exchange, header.message);
                 }
             }

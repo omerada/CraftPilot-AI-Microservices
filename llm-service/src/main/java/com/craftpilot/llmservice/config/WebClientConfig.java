@@ -53,6 +53,15 @@ public class WebClientConfig {
             .build();
     }
 
+    @Bean
+    public WebClient.Builder webClientBuilder() {
+        return WebClient.builder()
+            .filter((request, next) -> {
+                log.debug("WebClient Request Headers: {}", request.headers());
+                return next.exchange(request);
+            });
+    }
+
     private ExchangeFilterFunction errorHandler() {
         return ExchangeFilterFunction.ofResponseProcessor(clientResponse -> {
             if (clientResponse.statusCode().is2xxSuccessful()) {
