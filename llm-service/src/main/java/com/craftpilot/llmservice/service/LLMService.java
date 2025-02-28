@@ -79,16 +79,27 @@ public class LLMService {
     private Map<String, Object> createRequestBody(AIRequest request) {
         Map<String, Object> body = new HashMap<>();
         
+        // Model kontrolü
         body.put("model", request.getModel() != null ? 
-            request.getModel() : "google/gemini-pro");
+            request.getModel() : "google/gemini-2.0-flash-lite-preview-02-05:free");
         
+        // Messages formatını OpenRouter'ın beklediği şekilde oluştur
         List<Map<String, Object>> messages = new ArrayList<>();
         Map<String, Object> message = new HashMap<>();
         message.put("role", "user");
-        message.put("content", request.getPrompt());
+        
+        // Content'i array olarak gönder
+        List<Map<String, Object>> content = new ArrayList<>();
+        Map<String, Object> textContent = new HashMap<>();
+        textContent.put("type", "text");
+        textContent.put("text", request.getPrompt());
+        content.add(textContent);
+        
+        message.put("content", content);
         messages.add(message);
         body.put("messages", messages);
         
+        // Opsiyonel parametreler
         if (request.getTemperature() != null) {
             body.put("temperature", request.getTemperature());
         }
@@ -125,6 +136,7 @@ public class LLMService {
 
     private String extractResponseText(Map<String, Object> response) {
         try {
+            log.debug("Extracting response from: {}", response);
             if (response.containsKey("choices")) {
                 List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
                 if (!choices.isEmpty()) {
@@ -132,15 +144,24 @@ public class LLMService {
                     if (choice.containsKey("message")) {
                         Map<String, Object> message = (Map<String, Object>) choice.get("message");
                         if (message.containsKey("content")) {
-                            return (String) message.get("content");
+                            if (message.get("content") instanceof List) {
+                                List<Map<String, Object>> contents = (List<Map<String, Object>>) message.get("content");
+                                return contents.stream()
+                                    .filter(content -> "text".equals(content.get("type")))
+                                    .map(content -> (String) content.get("text"))
+                                    .findFirst()
+                                    .orElse("");
+                            } else {
+                                return (String) message.get("content");
+                            }
                         }
                     }
                 }
             }
-            throw new RuntimeException("Geçersiz API yanıt formatı");
+            throw new APIException("Geçersiz API yanıt formatı");
         } catch (Exception e) {
-            log.error("Yanıt işlenirken hata oluştu: ", e);
-            throw new RuntimeException("AI yanıtı işlenemedi", e);
+            log.error("Yanıt işlenirken hata oluştu: {}", e.getMessage(), e);
+            throw new APIException("AI yanıtı işlenemedi: " + e.getMessage());
         }
     }
 
