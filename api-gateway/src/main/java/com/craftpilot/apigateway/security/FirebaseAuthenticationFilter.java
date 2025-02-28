@@ -9,13 +9,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
-import com.craftpilot.apigateway.security.SecurityConstants;
 import reactor.core.publisher.Mono;
-import java.util.Set;
+import reactor.core.scheduler.Schedulers;
+
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -24,8 +25,6 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class FirebaseAuthenticationFilter implements WebFilter {
     
-    private static final String BEARER_PREFIX = "Bearer ";
-
     private final FirebaseAuth firebaseAuth;
     private final Cache<String, FirebaseToken> tokenCache = CacheBuilder.newBuilder()
         .expireAfterWrite(5, TimeUnit.MINUTES)
@@ -35,7 +34,7 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
- 
+
         if (SecurityConstants.isPublicPath(path)) {
             return chain.filter(exchange);
         }
@@ -47,32 +46,30 @@ public class FirebaseAuthenticationFilter implements WebFilter {
 
     private Mono<FirebaseToken> extractAndValidateToken(ServerWebExchange exchange) {
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        
-        log.debug("Auth header received: {}", authHeader); // Debug log
-
-        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-            log.error("Invalid auth header format: {}", authHeader); // Error log
+          
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) { 
             return Mono.error(new AuthenticationException("Invalid authorization header"));
         }
-
-        String token = authHeader.substring(BEARER_PREFIX.length());
-        log.debug("Extracted token (first 10 chars): {}", token.substring(0, Math.min(10, token.length()))); // Debug log
+ 
+        String token = authHeader.substring(7);
         return validateFirebaseToken(token);
     }
 
     private Mono<FirebaseToken> validateFirebaseToken(String token) {
         FirebaseToken cachedToken = tokenCache.getIfPresent(token);
-        if (cachedToken != null) {
-            log.debug("Using cached token for user: {}", cachedToken.getUid()); // Debug log
+        if (cachedToken != null) { 
             return Mono.just(cachedToken);
         }
 
         return Mono.fromCallable(() -> {
-            FirebaseToken verifiedToken = firebaseAuth.verifyIdToken(token);
-            log.debug("Token verified successfully for user: {}", verifiedToken.getUid()); // Debug log
-            tokenCache.put(token, verifiedToken);
-            return verifiedToken;
-        });
+            try {
+                FirebaseToken verifiedToken = firebaseAuth.verifyIdToken(token);
+                tokenCache.put(token, verifiedToken);
+                return verifiedToken;
+            } catch (Exception e) {
+                throw new AuthenticationException("Invalid Firebase token: " + e.getMessage());
+            }
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
     private Mono<Void> processAuthenticatedRequest(
@@ -80,7 +77,6 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             WebFilterChain chain,
             FirebaseToken firebaseToken) {
         
-        // SecurityContext'e kullanıcıyı ekleyelim
         FirebaseUserDetails userDetails = new FirebaseUserDetails(firebaseToken);
         
         ServerWebExchange modifiedExchange = exchange.mutate()
@@ -96,11 +92,8 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             extractUserRole(firebaseToken), 
             firebaseToken.getEmail());
 
-        return ReactiveSecurityContextHolder.getContext()
-            .map(context -> {
-                context.setAuthentication(new FirebaseAuthenticationToken(userDetails, firebaseToken));
-                return context;
-            })
+        return ReactiveSecurityContextHolder.withAuthentication(
+                new FirebaseAuthenticationToken(userDetails, firebaseToken))
             .then(chain.filter(modifiedExchange));
     }
 
@@ -113,7 +106,6 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     private String extractUserRole(FirebaseToken token) {
         Map<String, Object> claims = token.getClaims();
         
-        // Rol bilgisi varsa al, yoksa USER olarak belirle
         if (claims.containsKey("role")) {
             return claims.get("role").toString();
         } else if (claims.containsKey("admin") && Boolean.TRUE.equals(claims.get("admin"))) {

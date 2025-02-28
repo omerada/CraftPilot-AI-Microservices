@@ -1,12 +1,16 @@
 package com.craftpilot.llmservice.config;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.server.WebFilter;
 import reactor.core.publisher.Mono;
 import org.springframework.http.HttpStatus;
@@ -20,6 +24,9 @@ import org.springframework.http.HttpMethod;
 @Configuration
 @EnableWebFluxSecurity
 public class LightSecurityConfig {
+
+    @Value("${security.cors.allowed-origins}")
+    private String[] allowedOrigins;
 
     private static final List<String> PUBLIC_PATHS = Arrays.asList(
         "/actuator/",
@@ -38,14 +45,13 @@ public class LightSecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .cors(cors -> cors.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .pathMatchers(getPublicPaths()).permitAll()
-                .pathMatchers("/actuator/**").permitAll()
-                .pathMatchers("/ai/**").permitAll()  // Önemli: /ai/** path'ini permit all yapıyoruz
+                .pathMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                .pathMatchers("/ai/public/**").permitAll()
                 .anyExchange().authenticated()
             )
             .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
@@ -62,6 +68,21 @@ public class LightSecurityConfig {
                 .xssProtection(xss -> xss.disable())
             )
             .build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList(allowedOrigins));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setExposedHeaders(Arrays.asList("X-Total-Count", "X-Error-Message"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     @Bean

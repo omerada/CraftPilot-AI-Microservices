@@ -7,12 +7,15 @@ server:
   shutdown: graceful
   netty:
     connection-timeout: 5000
-    idle-timeout: 15000
+    idle-timeout: 30000
     max-keep-alive-requests: 1000
     threads:
       worker: 4
       boss: 1
-    validate-headers: false
+    validate-headers: true
+    max-connections: 10000
+    max-initial-line-length: 8192
+    max-header-size: 16384
   error:
     include-message: always
     include-binding-errors: always
@@ -63,6 +66,12 @@ spring:
           max-idle: 8
           min-idle: 2
           max-wait: 1000ms
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000
+      cache-null-values: false
+      use-key-prefix: true
   reactor:
     netty:
       pool:
@@ -175,3 +184,26 @@ cors:
   exposed-headers: "*"
   allow-credentials: true
   max-age: 3600
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      llmService:
+        slidingWindowSize: 100
+        failureRateThreshold: 50
+        waitDurationInOpenState: 20s
+        permittedNumberOfCallsInHalfOpenState: 10
+  ratelimiter:
+    instances:
+      llmService:
+        limitForPeriod: 100
+        limitRefreshPeriod: 1s
+        timeoutDuration: 5s
+  bulkhead:
+    instances:
+      llmService:
+        maxConcurrentCalls: 50
+
+security:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
