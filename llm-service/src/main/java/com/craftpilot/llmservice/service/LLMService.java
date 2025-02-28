@@ -24,12 +24,12 @@ public class LLMService {
     private final WebClient openRouterWebClient;
 
     public Mono<AIResponse> processTextCompletion(AIRequest request) {
-        return callOpenRouter("/v1/completions", request)
-            .map(response -> mapToAIResponse(response, request));
+        // Text completion için chat/completions endpointi kullanılacak
+        return processChatCompletion(request);
     }
 
     public Mono<AIResponse> processChatCompletion(AIRequest request) {
-        return callOpenRouter("/v1/chat/completions", request)
+        return callOpenRouter("chat/completions", request)
             .map(response -> mapToAIResponse(response, request));
     }
 
@@ -49,7 +49,7 @@ public class LLMService {
         Map<String, Object> requestBody = createRequestBody(request);
         
         return openRouterWebClient.post()
-            .uri("/v1/chat/completions")
+            .uri(uriBuilder -> uriBuilder.path("/v1/" + endpoint).build())
             .bodyValue(requestBody)
             .retrieve()
             .onStatus(HttpStatusCode::isError, response ->
@@ -71,12 +71,14 @@ public class LLMService {
     private Map<String, Object> createRequestBody(AIRequest request) {
         Map<String, Object> body = new HashMap<>();
         
-        // Model seçimi
-        String model = request.getModel() != null ? 
-            request.getModel() : "google/gemini-pro";
+        // Model seçimi ve kontrolü
+        String model = request.getModel();
+        if (model == null || model.trim().isEmpty()) {
+            model = "google/gemini-pro";  // Default model
+        }
         body.put("model", model);
         
-        // Mesaj formatı
+        // Messages array formatı
         List<Map<String, Object>> messages = new ArrayList<>();
         Map<String, Object> message = new HashMap<>();
         message.put("role", "user");

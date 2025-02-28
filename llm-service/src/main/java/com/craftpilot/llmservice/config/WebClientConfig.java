@@ -41,17 +41,18 @@ public class WebClientConfig {
             .wiretap(true);
 
         return WebClient.builder()
-            .baseUrl(baseUrl)
+            .baseUrl("https://openrouter.ai/api")  // Base URL'i düzelttik
             .clientConnector(new ReactorClientHttpConnector(httpClient))
             .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
             .defaultHeader("Authorization", "Bearer " + apiKey)
             .defaultHeader("HTTP-Referer", "https://craftpilot.io")
-            .filter(logRequest())
-            .filter(logResponse())
+            .defaultHeader("X-Title", "Craft Pilot AI")
             .codecs(configurer -> configurer
                 .defaultCodecs()
                 .maxInMemorySize(16 * 1024 * 1024))
+            .filter(logRequest())
+            .filter(logResponse())
             .build();
     }
 
