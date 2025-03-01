@@ -5,6 +5,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Stream yanıtları için basit bir veri transfer nesnesi.
+ */
 @Data
 @Builder
 @NoArgsConstructor

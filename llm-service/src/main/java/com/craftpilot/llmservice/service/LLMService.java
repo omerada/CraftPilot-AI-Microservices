@@ -2,6 +2,7 @@ package com.craftpilot.llmservice.service;
 
 import com.craftpilot.llmservice.model.AIRequest;
 import com.craftpilot.llmservice.model.AIResponse;
+import com.craftpilot.llmservice.model.StreamResponse;  // Yeni import
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;

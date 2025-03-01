@@ -2,6 +2,7 @@ package com.craftpilot.llmservice.controller;
 
 import com.craftpilot.llmservice.model.AIRequest;
 import com.craftpilot.llmservice.model.AIResponse;
+import com.craftpilot.llmservice.model.StreamResponse;  // Yeni import
 import com.craftpilot.llmservice.service.LLMService;
 import com.craftpilot.llmservice.exception.ValidationException;
 import com.craftpilot.llmservice.exception.APIException;
