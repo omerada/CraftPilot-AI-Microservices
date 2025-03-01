@@ -35,7 +35,14 @@ spring:
     format:
       date: yyyy-MM-dd
       date-time: yyyy-MM-dd HH:mm:ss
-    log-request-details: true
+    log-request-details: false # Production'da false olmalı
+    connection:
+      pool:
+        maxIdleTime: 15m
+        maxLifeTime: 1h
+        maxSize: 1000
+        pendingAcquireMaxCount: 2000
+        pendingAcquireTimeout: 2s
   codec:
     max-in-memory-size: 16MB
   kafka:
@@ -70,15 +77,16 @@ spring:
       time-to-live: 3600000
       cache-null-values: false
       use-key-prefix: true
+      key-prefix: "llm:" # Cache key prefix eklendi
   reactor:
     netty:
       pool:
-        type: elastic
-        maxConnections: 500
-        acquireTimeout: 5000
-      client:
-        proxy:
-          type: NO_PROXY
+        type: fixed
+        maxConnections: 1000
+        acquireTimeout: 2000
+        maxIdleTime: 15000
+        metrics: true
+        leasingStrategy: fifo
   security:
     basic:
       enabled: false
@@ -140,16 +148,19 @@ kafka:
 
 logging:
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{traceId}] %-5level %logger{36} - %msg%n"
   level:
-    root: INFO
-    com.craftpilot: DEBUG
-    org.springframework.web: INFO
-    org.springframework.cloud: DEBUG
-    reactor.netty: DEBUG
-    io.netty: DEBUG
-    com.craftpilot.llmservice: DEBUG
-    reactor.netty.http.client: DEBUG
+    root: WARN # Default log seviyesi WARN
+    com.craftpilot: INFO # Uygulama logları INFO
+    org.springframework: WARN
+    reactor.netty: WARN
+    io.netty: WARN
+    reactor.netty.http.client: WARN
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.springframework.cache: WARN
+    org.springframework.data: WARN
+    io.micrometer: WARN
 
 netty:
   native:

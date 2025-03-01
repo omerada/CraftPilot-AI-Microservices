@@ -19,13 +19,20 @@ import java.time.Duration;
 import java.util.Objects;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.UUID;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContext;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class LLMService {
-    
+    private final ObjectMapper objectMapper;
     private final WebClient openRouterWebClient;
+    private final MeterRegistry meterRegistry;
 
     public Mono<AIResponse> processTextCompletion(AIRequest request) {
         // Text completion için chat/completions endpointi kullanılacak
@@ -89,7 +96,8 @@ public class LLMService {
 
     private Map<String, Object> parseChunk(String chunk) {
         try {
-            return new ObjectMapper().readValue(chunk, new TypeReference<Map<String, Object>>() {});
+            // Her seferinde yeni ObjectMapper oluşturmak yerine sınıf değişkenini kullan
+            return objectMapper.readValue(chunk, new TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
             log.error("Error parsing chunk: {}", chunk, e);
             throw new APIException("Chunk parse error: " + e.getMessage());
@@ -108,26 +116,54 @@ public class LLMService {
     }
 
     private Mono<Map<String, Object>> callOpenRouter(String endpoint, AIRequest request) {
-        log.info("OpenRouter API çağrısı yapılıyor - Request: {}", request);
-        Map<String, Object> requestBody = createRequestBody(request);
-        
-        return openRouterWebClient.post()
-            .uri(uriBuilder -> uriBuilder.path("/v1/" + endpoint).build())
-            .bodyValue(requestBody)
-            .retrieve()
-            .onStatus(HttpStatusCode::isError, response ->
-                response.bodyToMono(String.class)
-                    .flatMap(error -> {
-                        log.error("API error: Status={}, Body={}", response.statusCode(), error);
-                        return Mono.error(new APIException(String.format("OpenRouter API Error [%s]: %s", 
-                            response.statusCode(), error)));
-                    }))
-            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-            .timeout(Duration.ofSeconds(30))
-            .doOnNext(response -> log.debug("OpenRouter response: {}", response))
-            .onErrorResume(error -> {
-                log.error("Request failed", error);
-                return Mono.error(new APIException("OpenRouter request failed: " + error.getMessage()));
+        return ReactiveSecurityContextHolder.getContext()
+            .switchIfEmpty(Mono.error(new SecurityException("No security context found")))
+            .map(SecurityContext::getAuthentication)
+            .cast(ApiKeyAuthentication.class)
+            .flatMap(auth -> {
+                Timer.Sample sample = Timer.start(meterRegistry);
+                
+                if (request.getRequestId() == null || request.getRequestId().trim().isEmpty()) {
+                    request.setRequestId(generateRequestId(auth.getUserId()));
+                }
+                request.setUserId(auth.getUserId());
+                
+                return openRouterWebClient.post()
+                    .uri("/v1/" + endpoint)
+                    .bodyValue(createRequestBody(request))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, this::handleError)
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                    .timeout(Duration.ofSeconds(30))
+                    .doOnSuccess(response -> 
+                        sample.stop(Timer.builder("llm.request.duration")
+                            .tag("endpoint", endpoint)
+                            .tag("user", auth.getUserId())
+                            .register(meterRegistry)))
+                    .doOnError(error -> {
+                        log.error("Request failed for user {}: {}", auth.getUserId(), error.getMessage());
+                        sample.stop(Timer.builder("llm.request.error")
+                            .tag("endpoint", endpoint)
+                            .tag("user", auth.getUserId())
+                            .register(meterRegistry));
+                    });
+            });
+    }
+
+    private String generateRequestId(String userId) {
+        return String.format("%s-%s-%d", 
+            userId,
+            UUID.randomUUID().toString().substring(0, 8),
+            System.currentTimeMillis());
+    }
+
+    private Mono<? extends Throwable> handleError(ClientResponse response) {
+        return response.bodyToMono(String.class)
+            .flatMap(error -> {
+                String message = String.format("API Error [%s]: %s", 
+                    response.statusCode(), error);
+                log.error(message);
+                return Mono.error(new APIException(message));
             });
     }
 
@@ -155,7 +191,6 @@ public class LLMService {
         body.put("max_tokens", request.getMaxTokens() != null ? 
             request.getMaxTokens() : 2000);
         
-        log.debug("Created request body: {}", body);
         return body;
     }
 

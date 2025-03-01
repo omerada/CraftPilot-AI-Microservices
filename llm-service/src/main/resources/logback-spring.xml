@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="Console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Uygulama logları -->
+    <logger name="com.craftpilot.llmservice" level="INFO"/>
+    
+    <!-- Framework logları -->
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="reactor.netty" level="WARN"/>
+    <logger name="io.netty" level="WARN"/>
+    
+    <!-- Cache logları -->
+    <logger name="org.springframework.cache" level="INFO"/>
+    
+    <!-- Security logları -->
+    <logger name="org.springframework.security" level="WARN"/>
+    
+    <!-- Redis logları -->
+    <logger name="org.springframework.data.redis" level="WARN"/>
+    
+    <!-- Metrics logları -->
+    <logger name="io.micrometer" level="INFO"/>
+
+    <root level="INFO">
+        <appender-ref ref="Console"/>
+    </root>
+</configuration>

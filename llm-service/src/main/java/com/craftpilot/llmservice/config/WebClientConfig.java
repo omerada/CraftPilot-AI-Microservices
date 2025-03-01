@@ -67,31 +67,19 @@ public class WebClientConfig {
 
     private ExchangeFilterFunction logRequest() {
         return ExchangeFilterFunction.ofRequestProcessor(clientRequest -> {
-            log.info("Outgoing Request: {} {}", clientRequest.method(), clientRequest.url());
-            clientRequest.headers().forEach((name, values) -> 
-                log.debug("Request Header: {}={}", name, values));
-            
-            if (clientRequest.body() != null) {
-                log.debug("Request Body: {}", clientRequest.body());
+            if (log.isInfoEnabled()) {
+                log.info("Request: {} {}", clientRequest.method(), clientRequest.url());
             }
-            
             return Mono.just(clientRequest);
         });
     }
 
-    // errorHandler() metodunu kaldırdık çünkü hata yönetimi LLMService'de yapılıyor
-
     private ExchangeFilterFunction logResponse() {
         return ExchangeFilterFunction.ofResponseProcessor(clientResponse -> {
-            log.info("Response Status: {}", clientResponse.statusCode());
-            clientResponse.headers().asHttpHeaders().forEach((name, values) -> 
-                log.debug("Response Header: {}={}", name, values));
-
-            return clientResponse.bodyToMono(String.class)
-                .defaultIfEmpty("<empty body>")
-                .doOnNext(body -> log.debug("Response Body: {}", body))
-                .map(body -> clientResponse.mutate()
-                    .body(body).build());
+            if (log.isInfoEnabled()) {
+                log.info("Response Status: {}", clientResponse.statusCode());
+            }
+            return Mono.just(clientResponse);
         });
     }
 }
