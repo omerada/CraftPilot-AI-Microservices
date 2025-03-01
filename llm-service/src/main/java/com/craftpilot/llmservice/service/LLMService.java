@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -58,40 +59,67 @@ public class LLMService {
         Map<String, Object> requestBody = createRequestBody(request);
         requestBody.put("stream", true);
         
+        log.debug("Stream isteği gönderiliyor: {}", requestBody);
+        
         return openRouterWebClient.post()
-            .uri("/v1/chat/completions")
+            .uri("/chat/completions")  // URL düzeltildi
             .bodyValue(requestBody)
+            .headers(headers -> {
+                headers.setContentType(MediaType.APPLICATION_JSON);
+                headers.set("Accept", "text/event-stream");
+            })
             .retrieve()
             .bodyToFlux(String.class)
+            .doOnSubscribe(s -> log.debug("Stream başlatılıyor"))
+            .doOnNext(chunk -> log.debug("Ham chunk alındı: {}", chunk))
+            .filter(chunk -> chunk != null && !chunk.trim().isEmpty())
             .map(chunk -> {
                 if (chunk.startsWith("data: ")) {
-                    chunk = chunk.substring(6);
+                    chunk = chunk.substring(6).trim();
                 }
+                if (chunk.equals("[DONE]")) {
+                    return StreamResponse.builder()
+                        .content("")
+                        .done(true)
+                        .build();
+                }
+                
                 try {
+                    log.debug("JSON parse ediliyor: {}", chunk);
                     Map<String, Object> response = objectMapper.readValue(chunk, new TypeReference<Map<String, Object>>() {});
-                    List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
-                    Map<String, Object> choice = choices.get(0);
                     
-                    boolean isDone = (boolean) choice.getOrDefault("finish_reason", false);
-                    String content = "";
-                    
-                    if (choice.containsKey("delta")) {
-                        Map<String, Object> delta = (Map<String, Object>) choice.get("delta");
-                        if (delta.containsKey("content")) {
-                            content = (String) delta.get("content");
+                    if (response.containsKey("choices")) {
+                        List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+                        if (!choices.isEmpty()) {
+                            Map<String, Object> choice = choices.get(0);
+                            Map<String, Object> delta = (Map<String, Object>) choice.get("delta");
+                            
+                            String content = "";
+                            if (delta != null && delta.containsKey("content")) {
+                                content = (String) delta.get("content");
+                            }
+                            
+                            boolean isDone = choice.containsKey("finish_reason") && 
+                                           choice.get("finish_reason") != null;
+                            
+                            return StreamResponse.builder()
+                                .content(content)
+                                .done(isDone)
+                                .build();
                         }
                     }
                     
-                    return StreamResponse.builder()
-                        .content(content)
-                        .done(isDone)
-                        .build();
+                    log.warn("Beklenmeyen yanıt formatı: {}", response);
+                    return null;
+                    
                 } catch (Exception e) {
-                    log.error("Error parsing chunk: {}", e.getMessage());
+                    log.error("Chunk işlenirken hata: {} - Chunk: {}", e.getMessage(), chunk, e);
                     return null;
                 }
             })
-            .filter(Objects::nonNull);
+            .filter(Objects::nonNull)
+            .doOnError(e -> log.error("Stream işleminde hata: ", e))
+            .doOnComplete(() -> log.debug("Stream tamamlandı"));
     }
 
     private Mono<Map<String, Object>> callOpenRouter(String endpoint, AIRequest request) {

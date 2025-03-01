@@ -33,28 +33,22 @@ public class WebClientConfig {
     @Bean
     public WebClient openRouterWebClient() {
         HttpClient httpClient = HttpClient.create()
-            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
-            .option(ChannelOption.TCP_NODELAY, true)
-            .responseTimeout(Duration.ofSeconds(30))
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 30000)
+            .responseTimeout(Duration.ofSeconds(60))  // Timeout arttırıldı
             .doOnConnected(conn -> conn
-                .addHandlerLast(new ReadTimeoutHandler(30, TimeUnit.SECONDS))
-                .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)))
-            .compress(true)  // GZIP desteği
-            .secure();      // SSL/TLS desteği
+                .addHandlerLast(new ReadTimeoutHandler(60, TimeUnit.SECONDS))
+                .addHandlerLast(new WriteTimeoutHandler(60, TimeUnit.SECONDS)))
+            .compress(true);
 
         return WebClient.builder()
-            .baseUrl("https://openrouter.ai/api")
+            .baseUrl(baseUrl)
             .clientConnector(new ReactorClientHttpConnector(httpClient))
             .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
             .defaultHeader("Authorization", "Bearer " + apiKey)
             .defaultHeader("HTTP-Referer", "https://craftpilot.io")
-            .defaultHeader("X-Title", "Craft Pilot AI")
             .codecs(configurer -> configurer
                 .defaultCodecs()
                 .maxInMemorySize(16 * 1024 * 1024))
-            .filter(logRequest())
-            .filter(logResponse())
             .build();
     }
 
