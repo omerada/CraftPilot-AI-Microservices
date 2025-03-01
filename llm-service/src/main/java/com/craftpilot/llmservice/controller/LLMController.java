@@ -81,24 +81,11 @@ public class LLMController {
     @PostMapping(value = "/chat/completions/stream", 
                 produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "Streaming chat completion", description = "Yanıtları anlık olarak stream eder")
-    public Flux<StreamResponse> streamChatCompletion(
-            @RequestBody AIRequest request,
-            @RequestHeader(name = "X-User-Id", required = true) String userId,
-            @RequestHeader(name = "X-User-Email", required = true) String userEmail,
-            @RequestHeader(name = "X-User-Role", required = true) String userRole) {
-        
-        log.info("Stream request from user: {} ({}) with role: {}", 
-                userEmail, userId, userRole);
-
+    public Flux<StreamResponse> streamChatCompletion(@RequestBody AIRequest request) {
         request.setRequestType("CHAT");
-        request.setUserId(userId);
-
         return llmService.streamChatCompletion(request)
-            .doOnNext(response -> log.debug("Streaming response chunk for user {}: {}", 
-                    userId, response))
-            .doOnError(error -> log.error("Stream error for user {}: {}", 
-                    userId, error))
-            .doOnComplete(() -> log.info("Stream completed for user: {}", userId));
+            .doOnNext(response -> log.debug("Streaming response chunk: {}", response))
+            .doOnError(error -> log.error("Stream error: ", error));
     }
 
     @PostMapping(value = "/images/generate", 

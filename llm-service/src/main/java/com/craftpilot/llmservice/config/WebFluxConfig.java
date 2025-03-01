@@ -32,12 +32,8 @@ public class WebFluxConfig implements WebFluxConfigurer {
     public CorsWebFilter corsWebFilter() {
         CorsConfiguration corsConfig = new CorsConfiguration();
         corsConfig.setAllowCredentials(true);
-        corsConfig.addAllowedOriginPattern("*");
-        corsConfig.addAllowedHeader("X-User-Id");
-        corsConfig.addAllowedHeader("X-User-Email");
-        corsConfig.addAllowedHeader("X-User-Role");
-        corsConfig.addAllowedHeader("Content-Type");
-        corsConfig.addAllowedHeader("Accept");
+        corsConfig.addAllowedOrigin("*");
+        corsConfig.addAllowedHeader("*");
         corsConfig.addAllowedMethod("*");
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
