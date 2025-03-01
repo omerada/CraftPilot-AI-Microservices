@@ -205,8 +205,7 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 20s
         permittedNumberOfCallsInHalfOpenState: 10
-    configs:
-      default:
+      openRouter:
         slidingWindowSize: 10
         minimumNumberOfCalls: 5
         permittedNumberOfCallsInHalfOpenState: 3
@@ -214,9 +213,6 @@ resilience4j:
         waitDurationInOpenState: 5s
         failureRateThreshold: 50
         eventConsumerBufferSize: 10
-    instances:
-      openRouter:
-        baseConfig: default
   ratelimiter:
     instances:
       llmService:
