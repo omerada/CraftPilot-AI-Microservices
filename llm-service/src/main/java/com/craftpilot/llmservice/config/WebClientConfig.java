@@ -33,15 +33,17 @@ public class WebClientConfig {
     @Bean
     public WebClient openRouterWebClient() {
         HttpClient httpClient = HttpClient.create()
-            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 30000)
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
+            .option(ChannelOption.TCP_NODELAY, true)
             .responseTimeout(Duration.ofSeconds(30))
             .doOnConnected(conn -> conn
                 .addHandlerLast(new ReadTimeoutHandler(30, TimeUnit.SECONDS))
                 .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)))
-            .wiretap(true);
+            .compress(true)  // GZIP desteği
+            .secure();      // SSL/TLS desteği
 
         return WebClient.builder()
-            .baseUrl("https://openrouter.ai/api")  // Base URL'i düzelttik
+            .baseUrl("https://openrouter.ai/api")
             .clientConnector(new ReactorClientHttpConnector(httpClient))
             .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)

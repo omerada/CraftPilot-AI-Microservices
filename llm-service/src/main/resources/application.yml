@@ -8,10 +8,10 @@ server:
   netty:
     connection-timeout: 5000
     idle-timeout: 30000
-    max-keep-alive-requests: 1000
+    max-keep-alive-requests: 10000
     threads:
-      worker: 4
-      boss: 1
+      worker: 8 # CPU çekirdek sayısı x 2
+      boss: 2 # CPU çekirdek sayısı / 2
     validate-headers: true
     max-connections: 10000
     max-initial-line-length: 8192
@@ -81,12 +81,11 @@ spring:
   reactor:
     netty:
       pool:
-        type: fixed
-        maxConnections: 1000
-        acquireTimeout: 2000
-        maxIdleTime: 15000
-        metrics: true
-        leasingStrategy: fifo
+        type: fixed # 'elastic' yerine 'fixed' kullanıyoruz
+        maxConnections: 500 # Eş zamanlı maksimum bağlantı sayısı
+        pendingAcquireTimeout: 5000 # Bağlantı alma zaman aşımı (ms)
+        evictInBackground: 120000 # Arka planda temizleme süresi (ms)
+        metrics: true # Metrics aktif
   security:
     basic:
       enabled: false
