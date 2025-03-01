@@ -40,12 +40,17 @@ public class WebClientConfig {
                 .addHandlerLast(new WriteTimeoutHandler(60, TimeUnit.SECONDS)))
             .compress(true);
 
+        String apiUrl = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
+
         return WebClient.builder()
-            .baseUrl(baseUrl)
+            .baseUrl(apiUrl)
             .clientConnector(new ReactorClientHttpConnector(httpClient))
             .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .defaultHeader("Authorization", "Bearer " + apiKey)
             .defaultHeader("HTTP-Referer", "https://craftpilot.io")
+            .defaultHeader("X-Title", "Craft Pilot AI")
+            .filter(logRequest())
+            .filter(logResponse())
             .codecs(configurer -> configurer
                 .defaultCodecs()
                 .maxInMemorySize(16 * 1024 * 1024))

@@ -38,8 +38,10 @@ public class LLMService {
     }
 
     public Mono<AIResponse> processChatCompletion(AIRequest request) {
-        return callOpenRouter("/v1/chat/completions", request)
-            .map(response -> mapToAIResponse(response, request));
+        return callOpenRouter("chat/completions", request)  // URL düzeltildi
+            .doOnNext(response -> log.debug("OpenRouter yanıtı: {}", response))
+            .map(response -> mapToAIResponse(response, request))
+            .doOnError(e -> log.error("Chat completion error: ", e));
     }
 
     public Mono<AIResponse> processCodeCompletion(AIRequest request) {
@@ -123,13 +125,21 @@ public class LLMService {
     }
 
     private Mono<Map<String, Object>> callOpenRouter(String endpoint, AIRequest request) {
+        Map<String, Object> requestBody = createRequestBody(request);
+        log.debug("OpenRouter isteği: {} - Body: {}", endpoint, requestBody);
+        
         return openRouterWebClient.post()
-            .uri("/v1/" + endpoint)
-            .bodyValue(createRequestBody(request))
+            .uri(endpoint)  // /v1 kaldırıldı
+            .bodyValue(requestBody)
+            .headers(headers -> {
+                headers.setContentType(MediaType.APPLICATION_JSON);
+                headers.set("Accept", MediaType.APPLICATION_JSON_VALUE);
+            })
             .retrieve()
             .onStatus(HttpStatusCode::isError, this::handleError)
             .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-            .timeout(Duration.ofSeconds(30));
+            .timeout(Duration.ofSeconds(30))
+            .doOnError(e -> log.error("OpenRouter API error: ", e));
     }
 
     private Mono<? extends Throwable> handleError(ClientResponse response) {
@@ -149,14 +159,7 @@ public class LLMService {
         List<Map<String, Object>> messages = new ArrayList<>();
         Map<String, Object> userMessage = new HashMap<>();
         userMessage.put("role", "user");
-        
-        List<Map<String, Object>> content = new ArrayList<>();
-        Map<String, Object> textContent = new HashMap<>();
-        textContent.put("type", "text");
-        textContent.put("text", request.getPrompt());
-        content.add(textContent);
-        
-        userMessage.put("content", content);
+        userMessage.put("content", request.getPrompt());  // Direkt String olarak gönder
         messages.add(userMessage);
         
         body.put("messages", messages);
