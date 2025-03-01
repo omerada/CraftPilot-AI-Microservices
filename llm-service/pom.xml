@@ -136,6 +136,12 @@
             <artifactId>resilience4j-circuitbreaker</artifactId>
             <version>2.1.0</version>
         </dependency>
+
+        <!-- Reactive Circuit Breaker -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-circuitbreaker-reactor-resilience4j</artifactId>
+        </dependency>
     </dependencies>
 
     <dependencyManagement>

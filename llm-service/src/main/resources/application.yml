@@ -59,6 +59,9 @@ spring:
   cloud:
     discovery:
       enabled: true
+    circuitbreaker:
+      resilience4j:
+        enabled: true
   data:
     redis:
       host: ${REDIS_HOST:redis}
@@ -202,6 +205,18 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 20s
         permittedNumberOfCallsInHalfOpenState: 10
+    configs:
+      default:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+    instances:
+      openRouter:
+        baseConfig: default
   ratelimiter:
     instances:
       llmService:
