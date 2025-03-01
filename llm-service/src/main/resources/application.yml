@@ -8,10 +8,10 @@ server:
   netty:
     connection-timeout: 5000
     idle-timeout: 30000
-    max-keep-alive-requests: 10000
+    max-keep-alive-requests: 1000
     threads:
-      worker: 8 # CPU çekirdek sayısı x 2
-      boss: 2 # CPU çekirdek sayısı / 2
+      worker: 4
+      boss: 1
     validate-headers: true
     max-connections: 10000
     max-initial-line-length: 8192
@@ -27,6 +27,7 @@ spring:
     name: llm-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+    include: kafka-base
   main:
     web-application-type: reactive
     allow-bean-definition-overriding: true
@@ -35,16 +36,11 @@ spring:
     format:
       date: yyyy-MM-dd
       date-time: yyyy-MM-dd HH:mm:ss
-    log-request-details: false # Production'da false olmalı
-    connection:
-      pool:
-        maxIdleTime: 15m
-        maxLifeTime: 1h
-        maxSize: 1000
-        pendingAcquireMaxCount: 2000
-        pendingAcquireTimeout: 2s
+      time: HH:mm:ss
+    log-request-details: true
   codec:
     max-in-memory-size: 16MB
+    log-request-details: true
   kafka:
     properties:
       security.protocol: PLAINTEXT
@@ -59,9 +55,6 @@ spring:
   cloud:
     discovery:
       enabled: true
-    circuitbreaker:
-      resilience4j:
-        enabled: true
   data:
     redis:
       host: ${REDIS_HOST:redis}
@@ -80,15 +73,15 @@ spring:
       time-to-live: 3600000
       cache-null-values: false
       use-key-prefix: true
-      key-prefix: "llm:" # Cache key prefix eklendi
   reactor:
     netty:
       pool:
-        type: fixed # 'elastic' yerine 'fixed' kullanıyoruz
-        maxConnections: 500 # Eş zamanlı maksimum bağlantı sayısı
-        pendingAcquireTimeout: 5000 # Bağlantı alma zaman aşımı (ms)
-        evictInBackground: 120000 # Arka planda temizleme süresi (ms)
-        metrics: true # Metrics aktif
+        type: elastic
+        maxConnections: 500
+        acquireTimeout: 5000
+      client:
+        proxy:
+          type: NO_PROXY
   security:
     basic:
       enabled: false
@@ -137,32 +130,18 @@ kafka:
   topics:
     ai-events: ai-events
     llm-completions: llm-completions
-  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
-  consumer:
-    group-id: llm-service-group
-    auto-offset-reset: earliest
-  producer:
-    retries: 3
-    acks: all
-    properties:
-      max.block.ms: 5000
-      request.timeout.ms: 2000
 
 logging:
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{traceId}] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
   level:
-    root: WARN # Default log seviyesi WARN
-    com.craftpilot: INFO # Uygulama logları INFO
-    org.springframework: WARN
-    reactor.netty: WARN
-    io.netty: WARN
-    reactor.netty.http.client: WARN
-    org.springframework.web: WARN
-    org.springframework.security: WARN
-    org.springframework.cache: WARN
-    org.springframework.data: WARN
-    io.micrometer: WARN
+    root: INFO
+    com.craftpilot: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.cloud: DEBUG
+    reactor.netty: DEBUG
+    io.netty: DEBUG
+    com.craftpilot.llmservice: DEBUG
 
 netty:
   native:
@@ -205,14 +184,6 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 20s
         permittedNumberOfCallsInHalfOpenState: 10
-      openRouter:
-        slidingWindowSize: 10
-        minimumNumberOfCalls: 5
-        permittedNumberOfCallsInHalfOpenState: 3
-        automaticTransitionFromOpenToHalfOpenEnabled: true
-        waitDurationInOpenState: 5s
-        failureRateThreshold: 50
-        eventConsumerBufferSize: 10
   ratelimiter:
     instances:
       llmService:
