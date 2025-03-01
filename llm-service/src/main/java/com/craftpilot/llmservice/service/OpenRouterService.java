@@ -33,10 +33,7 @@ public class OpenRouterService {
             request.setRequestId(UUID.randomUUID().toString());
         }
         
-        return circuitBreaker.run(
-            callOpenRouterAPI(request),
-            throwable -> handleError(throwable, request)
-        );
+        return executeWithCircuitBreaker(callOpenRouterAPI(request));
     }
 
     private Mono<AIResponse> callOpenRouterAPI(AIRequest request) {
@@ -104,5 +101,10 @@ public class OpenRouterService {
         } catch (Exception e) {
             log.error("Error publishing event: {}", e.getMessage());
         }
+    }
+
+    public <T> Mono<T> executeWithCircuitBreaker(Mono<T> operation) {
+        return circuitBreaker.run(operation, throwable -> 
+            Mono.error(new RuntimeException("Service is not available", throwable)));
     }
 }
