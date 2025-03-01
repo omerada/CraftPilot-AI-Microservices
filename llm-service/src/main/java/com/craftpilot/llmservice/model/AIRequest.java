@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 import java.util.Map;
@@ -14,15 +13,12 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AIRequest {
-    @JsonProperty(access = JsonProperty.Access.READ_ONLY)  // format: userId-uuid-timestamp
     private String requestId;
-    
-    @JsonProperty(access = JsonProperty.Access.READ_ONLY)  // Otomatik set edilecek
-    private String userId;   
+    private String userId;
     private String model;
+    private String prompt;
     private List<Map<String, String>> messages;
     private Integer maxTokens;
     private Double temperature;
     private String requestType;
-    private String prompt;   
 }

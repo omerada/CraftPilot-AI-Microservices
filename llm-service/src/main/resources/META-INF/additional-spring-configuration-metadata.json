@@ -1,0 +1,10 @@
+{
+  "properties": [
+    {
+      "name": "resilience4j.circuitbreaker.instances.llmService.sliding-window-size",
+      "type": "java.lang.Integer",
+      "description": "Circuit breaker sliding window size",
+      "defaultValue": 100
+    }
+  ]
+}

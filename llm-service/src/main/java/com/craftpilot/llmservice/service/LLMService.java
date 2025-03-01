@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,12 +18,17 @@ import java.util.Map;
 import java.time.Duration;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.web.reactive.function.client.ClientResponse;
+import com.craftpilot.llmservice.exception.APIException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Objects;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class LLMService {
     private final WebClient openRouterWebClient; 
+    private final ObjectMapper objectMapper;
 
     public Mono<AIResponse> processTextCompletion(AIRequest request) {
         return callOpenRouter("/v1/completions", request)
@@ -47,6 +53,36 @@ public class LLMService {
             "Image generation is not supported by OpenRouter. Please use Stability AI or DALL-E API directly."));
     }
 
+    public Flux<AIResponse> streamChatCompletion(AIRequest request) {
+        Map<String, Object> requestBody = createRequestBody(request);
+        requestBody.put("stream", true);
+        
+        return openRouterWebClient.post()
+            .uri("/v1/chat/completions")
+            .bodyValue(requestBody)
+            .retrieve()
+            .bodyToFlux(String.class)
+            .map(chunk -> {
+                if (chunk.startsWith("data: ")) {
+                    chunk = chunk.substring(6);
+                }
+                try {
+                    Map<String, Object> response = objectMapper.readValue(chunk, new TypeReference<Map<String, Object>>() {});
+                    return AIResponse.builder()
+                        .requestId(request.getRequestId())
+                        .response(extractChunkContent(response))
+                        .model(request.getModel())
+                        .status("STREAMING")
+                        .success(true)
+                        .build();
+                } catch (Exception e) {
+                    log.error("Error parsing chunk: {}", e.getMessage());
+                    return null;
+                }
+            })
+            .filter(Objects::nonNull);
+    }
+
     private Mono<Map<String, Object>> callOpenRouter(String endpoint, AIRequest request) {
         return openRouterWebClient.post()
             .uri("/v1/" + endpoint)
@@ -63,7 +99,7 @@ public class LLMService {
                 String message = String.format("OpenRouter API Error [%s]: %s", 
                     response.statusCode(), error);
                 log.error(message);
-                return Mono.error(new RuntimeException(message));
+                return Mono.error(new APIException(message));
             });
     }
 
@@ -146,5 +182,16 @@ public class LLMService {
     private Integer extractTokenCount(Map<String, Object> response) {
         Map<String, Object> usage = (Map<String, Object>) response.getOrDefault("usage", Map.of());
         return ((Number) usage.getOrDefault("total_tokens", 0)).intValue();
+    }
+
+    private String extractChunkContent(Map<String, Object> response) {
+        try {
+            Map<String, Object> choice = ((List<Map<String, Object>>) response.get("choices")).get(0);
+            Map<String, Object> delta = (Map<String, Object>) choice.get("delta");
+            return (String) delta.get("content");
+        } catch (Exception e) {
+            log.error("Error extracting content from chunk: {}", response, e);
+            return "";
+        }
     }
 }
