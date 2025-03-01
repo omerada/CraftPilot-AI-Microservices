@@ -38,6 +38,14 @@ spring:
       date-time: yyyy-MM-dd HH:mm:ss
       time: HH:mm:ss
     log-request-details: true
+    cors:
+      allowed-origins:
+        - "https://app.craftpilot.io"
+        - "http://localhost:3000"
+      allowed-methods: "*"
+      allowed-headers: "*"
+      allow-credentials: true
+      max-age: 3600
   codec:
     max-in-memory-size: 16MB
     log-request-details: true
