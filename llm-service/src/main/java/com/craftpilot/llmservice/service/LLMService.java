@@ -53,7 +53,7 @@ public class LLMService {
             "Image generation is not supported by OpenRouter. Please use Stability AI or DALL-E API directly."));
     }
 
-    public Flux<AIResponse> streamChatCompletion(AIRequest request) {
+    public Flux<StreamResponse> streamChatCompletion(AIRequest request) {
         Map<String, Object> requestBody = createRequestBody(request);
         requestBody.put("stream", true);
         
@@ -68,12 +68,22 @@ public class LLMService {
                 }
                 try {
                     Map<String, Object> response = objectMapper.readValue(chunk, new TypeReference<Map<String, Object>>() {});
-                    return AIResponse.builder()
-                        .requestId(request.getRequestId())
-                        .response(extractChunkContent(response))
-                        .model(request.getModel())
-                        .status("STREAMING")
-                        .success(true)
+                    List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+                    Map<String, Object> choice = choices.get(0);
+                    
+                    boolean isDone = (boolean) choice.getOrDefault("finish_reason", false);
+                    String content = "";
+                    
+                    if (choice.containsKey("delta")) {
+                        Map<String, Object> delta = (Map<String, Object>) choice.get("delta");
+                        if (delta.containsKey("content")) {
+                            content = (String) delta.get("content");
+                        }
+                    }
+                    
+                    return StreamResponse.builder()
+                        .content(content)
+                        .done(isDone)
                         .build();
                 } catch (Exception e) {
                     log.error("Error parsing chunk: {}", e.getMessage());

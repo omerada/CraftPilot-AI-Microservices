@@ -80,7 +80,7 @@ public class LLMController {
     @PostMapping(value = "/chat/completions/stream", 
                 produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "Streaming chat completion", description = "Yanıtları anlık olarak stream eder")
-    public Flux<AIResponse> streamChatCompletion(@RequestBody AIRequest request) {
+    public Flux<StreamResponse> streamChatCompletion(@RequestBody AIRequest request) {
         request.setRequestType("CHAT");
         return llmService.streamChatCompletion(request)
             .doOnNext(response -> log.debug("Streaming response chunk: {}", response))
