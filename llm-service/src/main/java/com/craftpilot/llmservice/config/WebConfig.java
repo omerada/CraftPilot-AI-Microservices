@@ -12,7 +12,7 @@ public class WebConfig implements WebFluxConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-            .allowedOrigins("https://app.craftpilot.io", "http://localhost:3000")
+            .allowedOrigins("https://app.craftpilot.io", "http://localhost:5173")
             .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
             .allowedHeaders("*")
             .exposedHeaders("Access-Control-Allow-Origin")
