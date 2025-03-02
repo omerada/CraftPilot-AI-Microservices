@@ -9,73 +9,106 @@ import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsWebFilter;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import java.util.Arrays;
 
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
     private final FirebaseAuthenticationFilter firebaseAuthenticationFilter;
-    private final CorsWebFilter corsWebFilter;
 
-    public SecurityConfig(FirebaseAuthenticationFilter firebaseAuthenticationFilter, CorsWebFilter corsWebFilter) {
+    public SecurityConfig(FirebaseAuthenticationFilter firebaseAuthenticationFilter) {
         this.firebaseAuthenticationFilter = firebaseAuthenticationFilter;
-        this.corsWebFilter = corsWebFilter;
+    }
+
+    @Bean
+    public CorsWebFilter corsWebFilter() {
+        CorsConfiguration config = new CorsConfiguration();
+        
+        // İzin verilen originler
+        config.setAllowedOriginPatterns(Arrays.asList(
+            "http://localhost:*", 
+            "https://*.craftpilot.io", 
+            "https://craftpilot.io"
+        ));
+        
+        // İzin verilen metodlar
+        config.setAllowedMethods(Arrays.asList(
+            "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"
+        ));
+        
+        // İzin verilen başlıklar
+        config.setAllowedHeaders(Arrays.asList(
+            "Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With",
+            "X-User-Id", "X-User-Role", "X-User-Email"
+        ));
+        
+        // Expose edilen başlıklar
+        config.setExposedHeaders(Arrays.asList(
+            "Access-Control-Allow-Origin",
+            "Access-Control-Allow-Credentials",
+            "X-Total-Count"
+        ));
+        
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        
+        return new CorsWebFilter(source);
     }
 
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
-            // CORS - deprecated metodları kaldıralım 
-            .cors(cors -> {}) // Doğru şekilde sadece cors() kullan
-            .csrf(csrf -> csrf.disable())
-            .httpBasic(basic -> basic.disable())
-            .formLogin(form -> form.disable())
-            .logout(logout -> logout.disable())
-            
-            // Yetkilendirme kuralları
-            .authorizeExchange(exchanges -> exchanges
-                .pathMatchers(SecurityConstants.PUBLIC_PATHS.toArray(new String[0])).permitAll()
-                .pathMatchers("/admin/**").hasRole("ADMIN")
-                .anyExchange().permitAll()
-            )
-            
-            // Gateway filtreleri
-            .addFilterBefore(corsWebFilter, SecurityWebFiltersOrder.CORS)
-            
-            // HTTP Headers - deprecated metodları kaldıralım
-            .headers(headers -> headers
-                // XFrameOptions'ı düzeltelim - DISABLE yerine doğru bir enum değeri kullanalım
-                // Tercih 1: DENY kullanarak tüm frame embeddingi engelle
-                .frameOptions(frameOptions -> frameOptions.mode(org.springframework.security.web.server.header.XFrameOptionsServerHttpHeadersWriter.Mode.DENY))
+                .cors(cors -> {}) // CorsWebFilter zaten ekledik
+                .csrf(csrf -> csrf.disable())
+                .httpBasic(basic -> basic.disable())
+                .formLogin(form -> form.disable())
+                .logout(logout -> logout.disable())
                 
-                // Alternatif: frameOptions'ı devre dışı bırakmak istiyorsak tamamen kaldırma
-                // .frameOptions(frameOptions -> {}) // Bu şekilde tamamen devre dışı bırak
-                
-                .contentSecurityPolicy(csp -> csp
-                    .policyDirectives("default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-                                    "style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
-                                    "font-src 'self' data:; connect-src 'self' *")
+                // Yetkilendirme kuralları
+                .authorizeExchange(exchanges -> exchanges
+                    .pathMatchers(SecurityConstants.PUBLIC_PATHS.toArray(new String[0])).permitAll()
+                    .pathMatchers("/admin/**").hasRole("ADMIN")
+                    .anyExchange().authenticated()
                 )
-            )
-            
-            // Yetkilendirme hata işleme
-            .exceptionHandling(handling -> handling
-                .authenticationEntryPoint((exchange, ex) -> {
-                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                    
-                    // CORS başlıkları
-                    String origin = exchange.getRequest().getHeaders().getOrigin();
-                    if (origin != null) {
-                        exchange.getResponse().getHeaders().set("Access-Control-Allow-Origin", origin);
-                        exchange.getResponse().getHeaders().set("Access-Control-Allow-Credentials", "true");
-                    }
-                    
-                    // WWW-Authenticate başlığı - SADECE Bearer
-                    exchange.getResponse().getHeaders().set("WWW-Authenticate", "Bearer realm=\"craftpilot\"");
-                    return exchange.getResponse().setComplete();
-                })
-            )
-            .build();
+                
+                // Gateway filtreleri - Sadece FirebaseAuthenticationFilter kullan
+                .addFilterAt(corsWebFilter(), SecurityWebFiltersOrder.CORS)
+                .addFilterAfter(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION) 
+                
+                // HTTP Headers yapılandırması
+                .headers(headers -> headers
+                    .frameOptions(frameOptions -> frameOptions.mode(org.springframework.security.web.server.header.XFrameOptionsServerHttpHeadersWriter.Mode.DENY))
+                    .contentSecurityPolicy(csp -> csp
+                        .policyDirectives("default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+                                        "style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
+                                        "font-src 'self' data:; connect-src 'self' *")
+                    )
+                )
+                
+                // Yetkilendirme hata işleme
+                .exceptionHandling(handling -> handling
+                    .authenticationEntryPoint((exchange, ex) -> {
+                        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                        
+                        // CORS başlıkları
+                        String origin = exchange.getRequest().getHeaders().getOrigin();
+                        if (origin != null) {
+                            exchange.getResponse().getHeaders().set("Access-Control-Allow-Origin", origin);
+                            exchange.getResponse().getHeaders().set("Access-Control-Allow-Credentials", "true");
+                        }
+                        
+                        // WWW-Authenticate başlığı - SADECE Bearer
+                        exchange.getResponse().getHeaders().set("WWW-Authenticate", "Bearer realm=\"craftpilot\"");
+                        return exchange.getResponse().setComplete();
+                    })
+                )
+                .build();
     }
 }

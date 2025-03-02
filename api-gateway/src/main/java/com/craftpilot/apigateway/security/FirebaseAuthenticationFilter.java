@@ -10,7 +10,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.server.reactive.ServerHttpResponse; 
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -23,30 +23,30 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 10) 
+@Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class FirebaseAuthenticationFilter implements WebFilter {
-    
+
     private static final Logger log = LoggerFactory.getLogger(FirebaseAuthenticationFilter.class);
     private static final String BEARER_PREFIX = "Bearer ";
-    
+
     private final FirebaseAuth firebaseAuth;
     private final Cache<String, FirebaseToken> tokenCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(30, TimeUnit.MINUTES)
-        .maximumSize(1000)
-        .build();
-    
+            .expireAfterWrite(30, TimeUnit.MINUTES)
+            .maximumSize(1000)
+            .build();
+
     public FirebaseAuthenticationFilter(FirebaseAuth firebaseAuth) {
         this.firebaseAuth = firebaseAuth;
     }
 
     // Filtre işlevinden önce verilen path için kimlik doğrulaması gerekip gerekmediğini kontrol et
     private boolean shouldAuthenticate(String path, String method) {
-        boolean isPublic = SecurityConstants.isPublicPath(path) || 
-                           path.startsWith("/actuator") || 
-                           path.contains("/health") || 
-                           path.contains("/info") ||
-                           "OPTIONS".equals(method);
-                           
+        boolean isPublic = SecurityConstants.isPublicPath(path) ||
+                path.startsWith("/actuator") ||
+                path.contains("/health") ||
+                path.contains("/info") ||
+                "OPTIONS".equals(method);
+
         if (isPublic) {
             log.debug("Public path detected, authentication not required: {} {}", method, path);
             return false;
@@ -56,17 +56,41 @@ public class FirebaseAuthenticationFilter implements WebFilter {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        // Loglama - AuthenticationLoggingFilter'dan taşındı
+        String path = exchange.getRequest().getPath().value();
+        String method = exchange.getRequest().getMethod().name();
+        log.debug("Processing request: {} {}", method, path);
+
+        // Response tamamlandığında başlıkları kontrol et - GlobalResponseHeaderFilter'dan taşındı
+        exchange.getResponse().beforeCommit(() -> {
+            try {
+                ServerHttpResponse response = exchange.getResponse();
+                if (!response.isCommitted()) {
+                    HttpHeaders headers = response.getHeaders();
+                    
+                    // HTTP Basic kimlik doğrulama başlığı varsa düzelt
+                    if (headers.containsKey(HttpHeaders.WWW_AUTHENTICATE)) {
+                        String authHeader = headers.getFirst(HttpHeaders.WWW_AUTHENTICATE);
+                        if (authHeader != null && authHeader.contains("Basic")) {
+                            log.debug("Converting Basic auth to Bearer auth header");
+                            headers.set(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"craftpilot\"");
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // Başlık değiştirilemiyorsa yoksay
+                log.debug("Exception while setting WWW-Authenticate header (safe to ignore): {}", e.getMessage());
+            }
+            return Mono.empty();
+        });
+
         // İsteğin zaten filtrelenip filtrelenmediğini kontrol eden bir attribute ekleyelim
         if (exchange.getAttribute("FIREBASE_FILTERED") != null) {
             log.debug("Request already filtered, skipping duplicate processing");
             return chain.filter(exchange);
         }
         exchange.getAttributes().put("FIREBASE_FILTERED", Boolean.TRUE);
-        
-        String path = exchange.getRequest().getPath().value();
-        String method = exchange.getRequest().getMethod().name();
-        log.debug("Processing request: {} {}", method, path);
-        
+
         // Kimlik doğrulama gerektirmeyen path'lerin filtreden geçmesine izin ver
         if (!shouldAuthenticate(path, method)) {
             return chain.filter(exchange);
@@ -78,22 +102,22 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             log.debug("Missing or invalid Authorization header for path: {}", path);
             return handleUnauthorized(exchange);
         }
-        
+
         // Token doğrulama ve işleme - TOKEN'ı loglamayalım
         String token = authHeader.substring(BEARER_PREFIX.length());
         log.debug("Validating token for path: {}", path);
-        
+
         return validateFirebaseToken(token)
-            .flatMap(firebaseToken -> {
-                log.debug("Token validated successfully for user: {}", firebaseToken.getUid());
-                return processAuthenticatedRequest(exchange, chain, firebaseToken);
-            })
-            .onErrorResume(e -> {
-                log.error("Authentication error for path {}: {}", path, e.getMessage());
-                return handleUnauthorized(exchange);
-            });
+                .flatMap(firebaseToken -> {
+                    log.debug("Token validated successfully for user: {}", firebaseToken.getUid());
+                    return processAuthenticatedRequest(exchange, chain, firebaseToken);
+                })
+                .onErrorResume(e -> {
+                    log.error("Authentication error for path {}: {}", path, e.getMessage());
+                    return handleUnauthorized(exchange);
+                });
     }
-    
+
     private Mono<FirebaseToken> validateFirebaseToken(String token) {
         // Cache kontrol et
         FirebaseToken cachedToken = tokenCache.getIfPresent(token);

@@ -132,6 +132,7 @@ spring:
         connect-timeout: 30000
         response-timeout: 30000
       default-filters:
+        # Sadece gerekli başlık filtrelerini koru
         - RemoveRequestHeader=Cookie
         - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
         - AddResponseHeader=Access-Control-Allow-Origin, *
@@ -139,8 +140,7 @@ spring:
         - AddResponseHeader=Access-Control-Allow-Headers, Origin,Content-Type,Accept,Authorization,X-Request-With,X-User-Id,X-User-Role,X-User-Email
         - AddResponseHeader=Access-Control-Max-Age, 3600
         - AddResponseHeader=Access-Control-Allow-Credentials, true
-        - RemoveResponseHeader=WWW-Authenticate # WWW-Authenticate başlığını tamamen kaldırır
-        # Ya da: AddResponseHeader=WWW-Authenticate, Bearer realm="craftpilot"
+        - AddResponseHeader=WWW-Authenticate, Bearer realm="craftpilot"
 
 eureka:
   instance:
