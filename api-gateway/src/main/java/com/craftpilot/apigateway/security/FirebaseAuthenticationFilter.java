@@ -123,15 +123,36 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             WebFilterChain chain,
             FirebaseToken firebaseToken) {
         
-        FirebaseUserDetails userDetails = new FirebaseUserDetails(firebaseToken);
-        FirebaseAuthenticationToken authToken = new FirebaseAuthenticationToken(userDetails, firebaseToken);
-        
-        // Exchange'i modifiye et
-        ServerWebExchange modifiedExchange = modifyExchange(exchange, firebaseToken, userDetails);
+        try {
+            FirebaseUserDetails userDetails = new FirebaseUserDetails(firebaseToken);
+            FirebaseAuthenticationToken authToken = new FirebaseAuthenticationToken(userDetails, firebaseToken);
+            
+            // Debug için authToken bilgilerini logla
+            log.debug("Created authentication token for user: {} with roles: {}", 
+                    userDetails.getUid(), 
+                    userDetails.getAuthorities().stream()
+                              .map(auth -> auth.getAuthority())
+                              .reduce("", (a, b) -> a + "," + b));
+            
+            // Exchange'i modifiye et
+            ServerWebExchange modifiedExchange = modifyExchange(exchange, firebaseToken, userDetails);
 
-        // Security context'i güncelle ve chain'i devam ettir
-        return chain.filter(modifiedExchange)
-            .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authToken));
+            // Bu sorunu izole etmek için özel bir attribute ekleyelim
+            modifiedExchange.getAttributes().put("FIREBASE_AUTHENTICATED", Boolean.TRUE);
+            
+            // Security context'i güncelle ve chain'i devam ettir
+            return chain.filter(modifiedExchange)
+                .contextWrite(context -> {
+                    log.debug("Writing authentication to ReactiveSecurityContextHolder");
+                    return ReactiveSecurityContextHolder.withAuthentication(authToken);
+                })
+                .doOnSuccess(v -> log.debug("Filter chain completed successfully"))
+                .doOnError(e -> log.error("Error in filter chain: {}", e.getMessage(), e));
+        } catch (Exception e) {
+            // Burada bir hata olursa onu loglayalım
+            log.error("Exception in processAuthenticatedRequest: {}", e.getMessage(), e);
+            return handleUnauthorized(exchange);
+        }
     }
 
     private ServerWebExchange modifyExchange(
@@ -165,6 +186,10 @@ public class FirebaseAuthenticationFilter implements WebFilter {
         // WWW-Authenticate başlığını ayarla - SADECE Bearer
         exchange.getResponse().getHeaders().set("WWW-Authenticate", "Bearer realm=\"craftpilot\"");
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+        
+        // Unauthorized durumda yeterince detaylı log
+        log.debug("Returning 401 Unauthorized response for path: {}", 
+                exchange.getRequest().getPath().value());
         
         return exchange.getResponse().setComplete();
     }
