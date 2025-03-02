@@ -30,15 +30,17 @@ spring:
         corsConfigurations:
           "[/**]":
             allowedOrigins:
-              - "https://app.craftpilot.io"
-              - "https://api.craftpilot.io"
               - "http://localhost:5173"
+              - "http://localhost:3000"
+              - "https://craftpilot.io"
+              - "https://*.craftpilot.io"
             allowedMethods:
               - GET
               - POST
               - PUT
               - DELETE
               - OPTIONS
+              - PATCH
             allowedHeaders: "*"
             allowCredentials: true
             maxAge: 3600
@@ -170,7 +172,7 @@ management:
         include: health,info,metrics,prometheus
   endpoint:
     health:
-      show-details: always
+      show-details: when_authorized
       probes:
         enabled: true
   health:
@@ -185,9 +187,13 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
   level:
-    com.craftpilot.apigateway: ${LOG_LEVEL:INFO}
+    com.craftpilot.apigateway: INFO
     org.springframework.cloud.gateway: ${LOG_LEVEL:INFO}
     org.springframework.cloud.netflix.eureka: ${LOG_LEVEL:INFO}
     com.netflix.discovery: ${LOG_LEVEL:INFO}
     com.craftpilot.apigateway.security: DEBUG
-    org.springframework.security: DEBUG
+    org.springframework.security: INFO
+
+# Firebase
+firebase:
+  credentials-file: firebase-service-account.json

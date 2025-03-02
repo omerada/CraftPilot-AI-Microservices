@@ -10,7 +10,8 @@ public class FirebaseAuthenticationToken extends AbstractAuthenticationToken {
     private final FirebaseToken credentials;
 
     public FirebaseAuthenticationToken(FirebaseUserDetails principal, FirebaseToken credentials) {
-        super(Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + principal.getRole())));
+        // Methodunu çağırmak yerine principal'ın authorities'ini kullanalım
+        super(principal.getAuthorities());
         this.principal = principal;
         this.credentials = credentials;
         setAuthenticated(true);

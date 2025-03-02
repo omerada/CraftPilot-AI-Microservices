@@ -4,12 +4,11 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
-import org.springframework.security.core.context.SecurityContext;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
@@ -20,16 +19,21 @@ import reactor.core.scheduler.Schedulers;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-@Slf4j
 @Component
-@RequiredArgsConstructor
 public class FirebaseAuthenticationFilter implements WebFilter {
+    
+    private static final Logger log = LoggerFactory.getLogger(FirebaseAuthenticationFilter.class);
+    private static final String BEARER_PREFIX = "Bearer ";
     
     private final FirebaseAuth firebaseAuth;
     private final Cache<String, FirebaseToken> tokenCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(5, TimeUnit.MINUTES)
+        .expireAfterWrite(30, TimeUnit.MINUTES)
         .maximumSize(1000)
         .build();
+    
+    public FirebaseAuthenticationFilter(FirebaseAuth firebaseAuth) {
+        this.firebaseAuth = firebaseAuth;
+    }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
@@ -47,11 +51,11 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     private Mono<FirebaseToken> extractAndValidateToken(ServerWebExchange exchange) {
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
           
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) { 
+        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) { 
             return Mono.error(new AuthenticationException("Invalid authorization header"));
         }
  
-        String token = authHeader.substring(7);
+        String token = authHeader.substring(BEARER_PREFIX.length());
         return validateFirebaseToken(token);
     }
 
@@ -89,11 +93,15 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     }
 
     private ServerWebExchange modifyExchange(ServerWebExchange exchange, FirebaseToken firebaseToken) {
+        String userId = firebaseToken.getUid();
+        String role = extractUserRole(firebaseToken);
+        String email = firebaseToken.getEmail() != null ? firebaseToken.getEmail() : "no-email";
+
         return exchange.mutate()
             .request(exchange.getRequest().mutate()
-                .header("X-User-Id", firebaseToken.getUid())
-                .header("X-User-Role", extractUserRole(firebaseToken))
-                .header("X-User-Email", firebaseToken.getEmail())
+                .header("X-User-Id", userId)
+                .header("X-User-Role", role)
+                .header("X-User-Email", email)
                 .build())
             .build();
     }

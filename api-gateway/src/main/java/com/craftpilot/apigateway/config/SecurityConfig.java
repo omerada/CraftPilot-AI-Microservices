@@ -1,49 +1,59 @@
 package com.craftpilot.apigateway.config;
 
+import com.craftpilot.apigateway.security.FirebaseAuthenticationFilter;
+import com.craftpilot.apigateway.security.SecurityConstants;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.reactive.CorsWebFilter;
-import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
-import org.springframework.web.cors.CorsConfiguration;
-
-import java.util.Arrays;
 
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
-    @Bean
-    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
-        http
-            .csrf(csrf -> csrf.disable())
-            .authorizeExchange(auth -> auth
-                .pathMatchers("/actuator/**").permitAll()
-                .pathMatchers("/eureka/**").permitAll()
-                .anyExchange().authenticated())
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt());
-        
-        return http.build();
+    private final FirebaseAuthenticationFilter firebaseAuthenticationFilter;
+    private final CorsWebFilter corsWebFilter;
+
+    public SecurityConfig(FirebaseAuthenticationFilter firebaseAuthenticationFilter, CorsWebFilter corsWebFilter) {
+        this.firebaseAuthenticationFilter = firebaseAuthenticationFilter;
+        this.corsWebFilter = corsWebFilter;
     }
 
     @Bean
-    public CorsWebFilter corsFilter() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(Arrays.asList(
-            "https://app.craftpilot.io",
-            "https://api.craftpilot.io",
-            "http://localhost:5173"
-        ));
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(Arrays.asList("*"));
-        config.setAllowCredentials(true);
-        config.setMaxAge(3600L);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-
-        return new CorsWebFilter(source);
+    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+        return http
+            .cors(cors -> {}) // CORS yapılandırmasını etkinleştir
+            .csrf(ServerHttpSecurity.CsrfSpec::disable)
+            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+            .logout(ServerHttpSecurity.LogoutSpec::disable)
+            .authorizeExchange(exchanges -> exchanges
+                .pathMatchers(SecurityConstants.PUBLIC_PATHS.toArray(new String[0])).permitAll()
+                .pathMatchers("/admin/**").hasRole("ADMIN")
+                .anyExchange().authenticated()
+            )
+            .addFilterAt(corsWebFilter, SecurityWebFiltersOrder.CORS)
+            .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+            .headers(headers -> headers
+                .frameOptions(frameOptions -> frameOptions.disable()) 
+                .contentSecurityPolicy(csp -> csp
+                    .policyDirectives("default-src 'self'; " +
+                                    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+                                    "style-src 'self' 'unsafe-inline'; " +
+                                    "img-src 'self' data:; " +
+                                    "font-src 'self' data:; " +
+                                    "connect-src 'self' *")
+                )
+            )
+            .exceptionHandling(handling -> handling
+                .authenticationEntryPoint((exchange, ex) -> {
+                    exchange.getResponse().getHeaders().add("WWW-Authenticate", "Bearer");
+                    return exchange.getResponse().setComplete();
+                })
+            )
+            .build();
     }
 }

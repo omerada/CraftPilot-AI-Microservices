@@ -1,30 +1,38 @@
 package com.craftpilot.apigateway.security;
 
-import java.util.List;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
-public class SecurityConstants {
-    public static final List<String> PUBLIC_PATHS = List.of(
-        "/auth/**",
-        "/fallback/**",
+public final class SecurityConstants {
+    
+    private SecurityConstants() {
+        // Utility sınıfını instance'laştırmayı önlemek için
+    }
+
+    // Public endpoints
+    public static final Set<String> PUBLIC_PATHS = new HashSet<>(Arrays.asList(
         "/actuator/**",
-        "/auth/register",
-        "/auth/login",
-        "/auth/verify-email",
-        "/auth/reset-password",
-        "/subscription-plans/public/**",
-        "/docs/**",
+        "/public/**",
+        "/auth/**",
+        "/login",
         "/swagger-ui/**",
-        "/v3/api-docs/**"
-    );
+        "/swagger-resources/**",
+        "/v3/api-docs/**",
+        "/webjars/**"
+    ));
+
+    // Admin only paths
+    public static final Set<String> ADMIN_PATHS = new HashSet<>(Arrays.asList(
+        "/admin/**",
+        "/management/**"
+    ));
 
     public static boolean isPublicPath(String path) {
-        return PUBLIC_PATHS.stream()
-                .anyMatch(pattern -> {
-                    if (pattern.endsWith("/**")) {
-                        String basePattern = pattern.substring(0, pattern.length() - 3);
-                        return path.startsWith(basePattern);
-                    }
-                    return path.equals(pattern);
-                });
+        return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
+    }
+
+    public static boolean isAdminPath(String path) {
+        return ADMIN_PATHS.stream().anyMatch(path::startsWith);
     }
 }

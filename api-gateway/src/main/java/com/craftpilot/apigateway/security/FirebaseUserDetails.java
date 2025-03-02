@@ -1,7 +1,6 @@
 package com.craftpilot.apigateway.security;
 
 import com.google.firebase.auth.FirebaseToken;
-import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -10,7 +9,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 
-@Getter
 public class FirebaseUserDetails implements UserDetails {
     private final String uid;
     private final String email;
@@ -69,5 +67,25 @@ public class FirebaseUserDetails implements UserDetails {
     @Override
     public boolean isEnabled() {
         return emailVerified;
+    }
+    
+    public String getRole() {
+        return this.role;
+    }
+    
+    public String getUid() {
+        return this.uid;
+    }
+    
+    public String getEmail() {
+        return this.email;
+    }
+    
+    public String getName() {
+        return this.name;
+    }
+    
+    public boolean isEmailVerified() {
+        return this.emailVerified;
     }
 }
