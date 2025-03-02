@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: api-gateway
+  main:
+    allow-bean-definition-overriding: true
+    web-application-type: reactive
   security:
     basic:
       enabled: false
@@ -14,6 +17,7 @@ spring:
           enabled: true
           lower-case-service-id: true
       globalcors:
+        add-to-simple-url-handler-mapping: true
         corsConfigurations:
           "[/**]":
             allowedOrigins:
@@ -21,41 +25,31 @@ spring:
               - "http://localhost:3000"
               - "https://craftpilot.io"
               - "https://*.craftpilot.io"
-            allowedMethods: "*"
-            allowedHeaders: "*"
-            allowCredentials: true
-            exposedHeaders:
+            allowed-methods: "*"
+            allowed-headers: "*"
+            allow-credentials: true
+            exposed-headers:
+              - "Access-Control-Allow-Origin"
+              - "Access-Control-Allow-Credentials"
               - "X-Total-Count"
-            maxAge: 3600
       routes:
         - id: llm-service
           uri: lb://llm-service
           predicates:
             - Path=/ai/**
           filters:
-            - PreserveHostHeader
             - name: CircuitBreaker
               args:
                 name: llmServiceCircuitBreaker
+                fallbackUri: forward:/fallback
           metadata:
-            connect-timeout: 60000
-            response-timeout: 60000
+            connect-timeout: 30000
+            response-timeout: 30000
 
         - id: user-service
           uri: lb://user-service
           predicates:
             - Path=/users/**,/auth/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: userServiceCircuitBreaker
-
-        - id: image-service
-          uri: lb://image-service
-          predicates:
-            - Path=/images/**
-          filters:
-            - StripPrefix=1
 
         - id: admin-service
           uri: lb://admin-service
@@ -64,19 +58,21 @@ spring:
           filters:
             - StripPrefix=1
 
-        # Diğer servisler burada kısaltıldı
-
       httpclient:
-        connect-timeout: 30000
-        response-timeout: 30000
+        connect-timeout: 10000
+        response-timeout: 10000
 
 eureka:
+  instance:
+    prefer-ip-address: true
+    hostname: api-gateway
   client:
     service-url:
-      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://craftpilot:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka/}
+      defaultZone: http://eureka-server:8761/eureka/
     fetch-registry: true
     register-with-eureka: true
 
+# Basit endpointler için erişim ver
 management:
   endpoints:
     web:
@@ -84,12 +80,14 @@ management:
         include: health,info
   endpoint:
     health:
-      show-details: when_authorized
+      show-details: always
 
 logging:
   level:
     root: INFO
-    com.craftpilot.apigateway: DEBUG
+    com.craftpilot: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.web.reactive: DEBUG
 
 # Firebase
 firebase:
