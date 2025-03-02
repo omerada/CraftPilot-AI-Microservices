@@ -25,14 +25,15 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import org.springframework.web.cors.reactive.CorsWebFilter;
 
 @Slf4j
 @Configuration
 @EnableWebFluxSecurity
 public class LightSecurityConfig {
 
-    @Value("${security.cors.allowed-origins}")
-    private String[] allowedOrigins;
+    @Value("${spring.security.cors.allowed-origins}")
+    private List<String> allowedOrigins;
 
     private static final List<String> PUBLIC_PATHS = Arrays.asList(
         "/actuator/",
@@ -49,45 +50,28 @@ public class LightSecurityConfig {
 
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
-        return http
-            .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
-            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-            .authorizeExchange(exchanges -> exchanges
-                .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .pathMatchers(getPublicPaths()).permitAll()
-                .pathMatchers("/admin/**").hasRole("ADMIN")
-                .anyExchange().permitAll()  // Değişiklik burada - authenticated() yerine permitAll()
-            )
-            .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
-            .exceptionHandling(handling -> handling
-                .authenticationEntryPoint((exchange, ex) -> {
-                    log.error("Authentication error: ", ex);
-                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                    return exchange.getResponse().setComplete();
-                })
-            )
-            .headers(headers -> headers
-                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'"))
-                .xssProtection(xss -> xss.disable())
-            )
-            .build();
+        http
+            .csrf(csrf -> csrf.disable())
+            .authorizeExchange(auth -> auth
+                .pathMatchers("/actuator/**", "/ai/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                .anyExchange().authenticated());
+        
+        return http.build();
     }
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(allowedOrigins));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setExposedHeaders(Arrays.asList("X-Total-Count", "X-Error-Message"));
-        configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
-        
+    public CorsWebFilter corsFilter() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(allowedOrigins);
+        config.addAllowedMethod("*");
+        config.addAllowedHeader("*");
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
+        source.registerCorsConfiguration("/**", config);
+
+        return new CorsWebFilter(source);
     }
 
     @Bean

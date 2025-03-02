@@ -92,6 +92,15 @@ spring:
         proxy:
           type: NO_PROXY
   security:
+    cors:
+      allowed-origins:
+        - "https://app.craftpilot.io"
+        - "https://api.craftpilot.io"
+        - "http://localhost:5173"
+      allowed-methods: "*"
+      allowed-headers: "*"
+      allow-credentials: true
+      max-age: 3600
     basic:
       enabled: false
 
