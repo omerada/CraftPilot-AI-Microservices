@@ -41,6 +41,7 @@ spring:
     cors:
       allowed-origins:
         - "https://app.craftpilot.io"
+        - "https://api.craftpilot.io"
         - "http://localhost:5173"
       allowed-methods: "*"
       allowed-headers: "*"
@@ -193,8 +194,3 @@ resilience4j:
     instances:
       llmService:
         maxConcurrentCalls: 50
-
-security:
-  cors:
-    allowed-origins: "https://api.craftpilot.io,http://localhost:5173"
-

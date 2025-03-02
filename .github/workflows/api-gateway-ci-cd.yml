@@ -11,7 +11,7 @@ on:
       environment:
         description: "Environment to deploy to"
         required: true
-        default: "prod"
+        default: "debug"
         type: choice
         options:
           - prod

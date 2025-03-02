@@ -47,7 +47,7 @@ public class WebClientConfig {
             .clientConnector(new ReactorClientHttpConnector(httpClient))
             .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .defaultHeader("Authorization", "Bearer " + apiKey)
-            .defaultHeader("HTTP-Referer", "https://app.craftpilot.io")
+            .defaultHeader("HTTP-Referer", "https://craftpilot.io")
             .defaultHeader("X-Title", "Craft Pilot AI")
             .filter(logRequest())
             .filter(logResponse())
