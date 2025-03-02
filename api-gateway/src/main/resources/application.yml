@@ -76,6 +76,13 @@ spring:
           uri: lb://llm-service
           predicates:
             - Path=/ai/**
+          filters:
+            - PreserveHostHeader
+            - AddRequestHeader=X-Gateway-Origin,api-gateway
+            - name: CircuitBreaker
+              args:
+                name: llmServiceCircuitBreaker
+                fallbackUri: forward:/fallback
           metadata:
             connect-timeout: 60000
             response-timeout: 60000
@@ -207,10 +214,12 @@ logging:
     com.craftpilot.apigateway: DEBUG
     com.craftpilot.apigateway.security: DEBUG
     org.springframework.security: INFO
-    org.springframework.cloud.gateway: INFO
+    org.springframework.cloud.gateway: DEBUG
     org.springframework.web.cors: INFO
     reactor.netty.http.client: INFO
     com.google.firebase: DEBUG
+    org.springframework.web.reactive: DEBUG
+    org.springframework.security.web: DEBUG
 
 # Firebase
 firebase:

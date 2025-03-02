@@ -69,38 +69,20 @@ public class FirebaseAuthenticationFilter implements WebFilter {
         String method = exchange.getRequest().getMethod().name();
         log.debug("Processing request: {} {}", method, path);
 
-        // Response tamamlandığında başlıkları kontrol et
-        exchange.getResponse().beforeCommit(() -> {
-            try {
-                ServerHttpResponse response = exchange.getResponse();
-                if (!response.isCommitted()) {
-                    HttpHeaders headers = response.getHeaders();
-                    
-                    // HTTP Basic kimlik doğrulama başlığı varsa düzelt
-                    if (headers.containsKey(HttpHeaders.WWW_AUTHENTICATE)) {
-                        String authHeader = headers.getFirst(HttpHeaders.WWW_AUTHENTICATE);
-                        if (authHeader != null && authHeader.contains("Basic")) {
-                            log.debug("Converting Basic auth to Bearer auth header");
-                            headers.set(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"craftpilot\"");
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                // Başlık değiştirilemiyorsa yoksay
-                log.debug("Exception while setting WWW-Authenticate header (safe to ignore): {}", e.getMessage());
-            }
-            return Mono.empty();
-        });
-
         // İsteğin zaten filtrelenip filtrelenmediğini kontrol eden bir attribute ekleyelim
-        if (exchange.getAttribute("FIREBASE_FILTERED") != null) {
-            log.debug("Request already filtered, skipping duplicate processing");
+        // Bu filtrenin birden fazla kez uygulanmasını önlemek için kontrol yapılır
+        Object alreadyFiltered = exchange.getAttribute("FIREBASE_FILTERED");
+        if (alreadyFiltered != null) {
+            log.debug("Request already filtered with result: {}, skipping duplicate processing", alreadyFiltered);
             return chain.filter(exchange);
         }
-        exchange.getAttributes().put("FIREBASE_FILTERED", Boolean.TRUE);
+        
+        // Filtre işleminin başladığını işaretleyelim
+        exchange.getAttributes().put("FIREBASE_FILTERED", "PROCESSING");
 
         // Kimlik doğrulama gerektirmeyen path'lerin filtreden geçmesine izin ver
         if (!shouldAuthenticate(path, method)) {
+            exchange.getAttributes().put("FIREBASE_FILTERED", "PUBLIC_PATH");
             return chain.filter(exchange);
         }
 
@@ -108,6 +90,7 @@ public class FirebaseAuthenticationFilter implements WebFilter {
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
             log.debug("Missing or invalid Authorization header for path: {}", path);
+            exchange.getAttributes().put("FIREBASE_FILTERED", "MISSING_AUTH_HEADER");
             return handleUnauthorized(exchange);
         }
 
@@ -119,10 +102,12 @@ public class FirebaseAuthenticationFilter implements WebFilter {
         return validateFirebaseToken(token)
                 .flatMap(firebaseToken -> {
                     log.debug("Token validated successfully for user: {}", firebaseToken.getUid());
+                    exchange.getAttributes().put("FIREBASE_FILTERED", "TOKEN_VALID");
                     return processAuthenticatedRequest(exchange, chain, firebaseToken, token);
                 })
                 .onErrorResume(e -> {
                     log.error("Authentication error for path {}: {}", path, e.getMessage());
+                    exchange.getAttributes().put("FIREBASE_FILTERED", "AUTH_ERROR");
                     return handleUnauthorized(exchange);
                 });
     }
@@ -178,18 +163,22 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             // SecurityContext'i oluştur ve kaydet
             SecurityContextImpl securityContext = new SecurityContextImpl(authToken);
             
-            // SecurityContext'i ReactiveSecurityContextHolder'a yaz VE repository'ye kaydet
-            return this.securityContextRepository.save(exchange, securityContext)
-                .then(chain.filter(modifiedExchange)
+            // Exchange içinde context'i değiştirin - bu critical
+            return this.securityContextRepository.save(modifiedExchange, securityContext)
+                .then(
+                    // Güvenlik context'ini ayarla ve isteği ileri gönder
+                    chain.filter(modifiedExchange)
                     .contextWrite(context -> {
                         log.debug("Writing authentication to ReactiveSecurityContextHolder");
                         return ReactiveSecurityContextHolder.withAuthentication(authToken);
-                    }))
+                    })
+                )
                 .doOnSuccess(v -> log.debug("Filter chain completed successfully"))
                 .doOnError(e -> log.error("Error in filter chain: {}", e.getMessage(), e));
                 
         } catch (Exception e) {
             log.error("Exception in processAuthenticatedRequest: {}", e.getMessage(), e);
+            exchange.getAttributes().put("FIREBASE_FILTERED", "PROCESS_ERROR");
             return handleUnauthorized(exchange);
         }
     }
@@ -206,14 +195,16 @@ public class FirebaseAuthenticationFilter implements WebFilter {
         
         log.debug("Setting user headers - ID: {}, Role: {}, Email: {}", userId, role, email);
         
-        // İsteğe kullanıcı bilgilerini ekle
+        // İsteğe kullanıcı bilgilerini ekle - downstream servislere iletmek için
         return exchange.mutate()
             .request(exchange.getRequest().mutate()
                 .header("X-User-Id", userId)
                 .header("X-User-Role", role)
                 .header("X-User-Email", email)
-                // Orijinal token'ı kullanıyoruz
+                // Downstream servise orijinal token'ı ilet
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + originalToken)
+                // Headerları korumak için
+                .header("X-Auth-Status", "Validated") // Ayarla için ek bir header
                 .build())
             .build();
     }

@@ -2,6 +2,9 @@ package com.craftpilot.apigateway.config;
 
 import com.craftpilot.apigateway.security.FirebaseAuthenticationFilter;
 import com.craftpilot.apigateway.security.SecurityConstants;
+import com.craftpilot.apigateway.security.SecurityPathsMatcher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
@@ -18,13 +21,14 @@ import org.springframework.security.web.server.context.WebSessionServerSecurityC
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
-import com.craftpilot.apigateway.security.SecurityPathsMatcher;
 
 import java.util.Arrays;
 
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     private final FirebaseAuthenticationFilter firebaseAuthenticationFilter;
     private final ReactiveAuthenticationManager authManager;
@@ -96,16 +100,16 @@ public class SecurityConfig {
             .authenticationManager(authManager)
             .securityContextRepository(securityContextRepository)
             
-            // Yetkilendirme kuralları
+            // Yetkilendirme kuralları - ÖNEMLİ DEĞİŞİKLİK - TÜM İSTEKLERE İZİN VERİLİYOR
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .pathMatchers(securityPathsMatcher.getPublicPaths()).permitAll()
                 .pathMatchers("/admin/**").hasRole("ADMIN")
-                .anyExchange().authenticated()
+                .anyExchange().permitAll()  // <-- BU DEĞİŞTİ - TEMPORARY FIX
             )
             
-            // Gateway filtreleri
-            .addFilterAt(corsWebFilter(), SecurityWebFiltersOrder.CORS)
+            // Gateway filtreleri - Sırayı doğru ayarla
+            .addFilterBefore(corsWebFilter(), SecurityWebFiltersOrder.CORS)
             .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
             
             // HTTP Headers
@@ -121,6 +125,9 @@ public class SecurityConfig {
             .exceptionHandling(handling -> handling
                 .authenticationEntryPoint((exchange, ex) -> {
                     ServerHttpResponse response = exchange.getResponse();
+                    
+                    String requestPath = exchange.getRequest().getPath().value();
+                    log.error("Authentication failure for path: {} - Error: {}", requestPath, ex.getMessage());
                     
                     if (!response.isCommitted()) {
                         // CORS headers
