@@ -128,6 +128,23 @@ spring:
         enabled: true
         caffeine:
           spec: maximumSize=500,expireAfterWrite=5s
+    gateway:
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - "https://app.craftpilot.io"
+              - "https://api.craftpilot.io"
+              - "http://localhost:5173"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
   jackson:
     deserialization:
       UNWRAP_ROOT_VALUE: true
@@ -192,20 +209,3 @@ logging:
     com.netflix.discovery: ${LOG_LEVEL:INFO}
     com.craftpilot.apigateway.security: DEBUG
     org.springframework.security: DEBUG
-
-cors:
-  allowed-origins:
-    - "https://api.craftpilot.io"
-    - "http://localhost:5173"
-  allowed-methods:
-    - "GET"
-    - "POST"
-    - "PUT"
-    - "DELETE"
-    - "OPTIONS"
-  allowed-headers: "*"
-  exposed-headers:
-    - "Authorization"
-    - "X-Total-Count"
-  allow-credentials: true
-  max-age: 3600
