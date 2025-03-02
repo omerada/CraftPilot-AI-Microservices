@@ -152,6 +152,10 @@ spring:
         - AddResponseHeader=Access-Control-Allow-Headers, Origin,Content-Type,Accept,Authorization,X-Request-With,X-User-Id,X-User-Role,X-User-Email
         - AddResponseHeader=Access-Control-Max-Age, 3600
         - AddResponseHeader=Access-Control-Allow-Credentials, true
+        - name: CircuitBreaker
+          args:
+            name: defaultCircuitBreaker
+            fallbackUri: forward:/fallback
 
 eureka:
   instance:

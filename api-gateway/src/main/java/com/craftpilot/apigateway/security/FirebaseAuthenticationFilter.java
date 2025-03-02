@@ -11,7 +11,11 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextImpl;
+import org.springframework.security.web.server.context.ServerSecurityContextRepository;
+import org.springframework.security.web.server.context.WebSessionServerSecurityContextRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
@@ -19,7 +23,6 @@ import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Component
@@ -34,9 +37,14 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             .expireAfterWrite(30, TimeUnit.MINUTES)
             .maximumSize(1000)
             .build();
+    private final ServerSecurityContextRepository securityContextRepository;
+    private final ReactiveAuthenticationManager authManager;
 
-    public FirebaseAuthenticationFilter(FirebaseAuth firebaseAuth) {
+    public FirebaseAuthenticationFilter(FirebaseAuth firebaseAuth, 
+                                       ReactiveAuthenticationManager authManager) {
         this.firebaseAuth = firebaseAuth;
+        this.authManager = authManager;
+        this.securityContextRepository = new WebSessionServerSecurityContextRepository();
     }
 
     // Filtre işlevinden önce verilen path için kimlik doğrulaması gerekip gerekmediğini kontrol et
@@ -56,12 +64,12 @@ public class FirebaseAuthenticationFilter implements WebFilter {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        // Loglama - AuthenticationLoggingFilter'dan taşındı
+        // Loglama işlemi
         String path = exchange.getRequest().getPath().value();
         String method = exchange.getRequest().getMethod().name();
         log.debug("Processing request: {} {}", method, path);
 
-        // Response tamamlandığında başlıkları kontrol et - GlobalResponseHeaderFilter'dan taşındı
+        // Response tamamlandığında başlıkları kontrol et
         exchange.getResponse().beforeCommit(() -> {
             try {
                 ServerHttpResponse response = exchange.getResponse();
@@ -103,14 +111,15 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             return handleUnauthorized(exchange);
         }
 
-        // Token doğrulama ve işleme - TOKEN'ı loglamayalım
+        // Token doğrulama ve işleme
         String token = authHeader.substring(BEARER_PREFIX.length());
         log.debug("Validating token for path: {}", path);
 
+        // Orijinal token'ı processAuthenticatedRequest metoduna aktarıyoruz
         return validateFirebaseToken(token)
                 .flatMap(firebaseToken -> {
                     log.debug("Token validated successfully for user: {}", firebaseToken.getUid());
-                    return processAuthenticatedRequest(exchange, chain, firebaseToken);
+                    return processAuthenticatedRequest(exchange, chain, firebaseToken, token);
                 })
                 .onErrorResume(e -> {
                     log.error("Authentication error for path {}: {}", path, e.getMessage());
@@ -146,7 +155,8 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     private Mono<Void> processAuthenticatedRequest(
             ServerWebExchange exchange,
             WebFilterChain chain,
-            FirebaseToken firebaseToken) {
+            FirebaseToken firebaseToken,
+            String originalToken) {  
         
         try {
             FirebaseUserDetails userDetails = new FirebaseUserDetails(firebaseToken);
@@ -156,25 +166,29 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             log.debug("Created authentication token for user: {} with roles: {}", 
                     userDetails.getUid(), 
                     userDetails.getAuthorities().stream()
-                              .map(auth -> auth.getAuthority())
-                              .reduce("", (a, b) -> a + "," + b));
+                             .map(auth -> auth.getAuthority())
+                             .reduce("", (a, b) -> a + "," + b));
             
-            // Exchange'i modifiye et
-            ServerWebExchange modifiedExchange = modifyExchange(exchange, firebaseToken, userDetails);
-
-            // Bu sorunu izole etmek için özel bir attribute ekleyelim
+            // Exchange'i modifiye et - orijinal token'ı da aktarıyoruz
+            ServerWebExchange modifiedExchange = modifyExchange(exchange, firebaseToken, userDetails, originalToken);
+            
+            // Bu attribute, diğer filtrelerde kullanmak için eklenmiştir
             modifiedExchange.getAttributes().put("FIREBASE_AUTHENTICATED", Boolean.TRUE);
             
-            // Security context'i güncelle ve chain'i devam ettir
-            return chain.filter(modifiedExchange)
-                .contextWrite(context -> {
-                    log.debug("Writing authentication to ReactiveSecurityContextHolder");
-                    return ReactiveSecurityContextHolder.withAuthentication(authToken);
-                })
+            // SecurityContext'i oluştur ve kaydet
+            SecurityContextImpl securityContext = new SecurityContextImpl(authToken);
+            
+            // SecurityContext'i ReactiveSecurityContextHolder'a yaz VE repository'ye kaydet
+            return this.securityContextRepository.save(exchange, securityContext)
+                .then(chain.filter(modifiedExchange)
+                    .contextWrite(context -> {
+                        log.debug("Writing authentication to ReactiveSecurityContextHolder");
+                        return ReactiveSecurityContextHolder.withAuthentication(authToken);
+                    }))
                 .doOnSuccess(v -> log.debug("Filter chain completed successfully"))
                 .doOnError(e -> log.error("Error in filter chain: {}", e.getMessage(), e));
+                
         } catch (Exception e) {
-            // Burada bir hata olursa onu loglayalım
             log.error("Exception in processAuthenticatedRequest: {}", e.getMessage(), e);
             return handleUnauthorized(exchange);
         }
@@ -183,7 +197,8 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     private ServerWebExchange modifyExchange(
             ServerWebExchange exchange, 
             FirebaseToken firebaseToken, 
-            FirebaseUserDetails userDetails) {
+            FirebaseUserDetails userDetails,
+            String originalToken) {  
         
         String userId = firebaseToken.getUid();
         String role = userDetails.getRole();
@@ -197,8 +212,8 @@ public class FirebaseAuthenticationFilter implements WebFilter {
                 .header("X-User-Id", userId)
                 .header("X-User-Role", role)
                 .header("X-User-Email", email)
-                // Orijinal Authorization header'ını da downstream servislere iletiyoruz
-                .header("Authorization", "Bearer " + firebaseToken.getUid())
+                // Orijinal token'ı kullanıyoruz
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + originalToken)
                 .build())
             .build();
     }
