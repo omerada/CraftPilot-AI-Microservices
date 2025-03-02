@@ -5,8 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
-import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
+import org.springframework.http.HttpStatusCode;  
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.stereotype.Component;
@@ -26,14 +25,14 @@ public class AuthenticationLoggingFilter implements GlobalFilter, Ordered {
         
         // İstek tamamlandığında loglama
         exchange.getResponse().beforeCommit(() -> {
-            HttpStatus status = exchange.getResponse().getStatusCode();
+            HttpStatusCode statusCode = exchange.getResponse().getStatusCode(); // HttpStatus yerine HttpStatusCode
             Boolean isAuthenticated = exchange.getAttribute("FIREBASE_AUTHENTICATED");
             
             log.debug("Response status for {} {}: {} (Authenticated: {})",
-                    method, path, status, isAuthenticated != null ? isAuthenticated : "unknown");
+                    method, path, statusCode, isAuthenticated != null ? isAuthenticated : "unknown");
             
             // 401 durumlarında tüm response başlıklarını loglayalım
-            if (status == HttpStatus.UNAUTHORIZED) {
+            if (statusCode != null && statusCode.value() == 401) { // Direk karşılaştırma yerine value() kullan
                 log.debug("401 Response headers: {}", exchange.getResponse().getHeaders());
             }
             

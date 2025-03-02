@@ -26,27 +26,27 @@ public class SecurityConfig {
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
-            // CSRF ve diğer güvenlik ayarları
-            .cors().and()
+            // CORS - deprecated metodları kaldıralım 
+            .cors(cors -> {}) // Doğru şekilde sadece cors() kullan
             .csrf(csrf -> csrf.disable())
             .httpBasic(basic -> basic.disable())
             .formLogin(form -> form.disable())
             .logout(logout -> logout.disable())
             
-            // Yetkilendirme kuralları - Hepsini izin ver, gerçek kontrol Firebase filter'da yapılacak
+            // Yetkilendirme kuralları
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(SecurityConstants.PUBLIC_PATHS.toArray(new String[0])).permitAll()
                 .pathMatchers("/admin/**").hasRole("ADMIN")
-                .anyExchange().permitAll()  // Gerçek kontrolü firebaseAuthenticationFilter yapacak
+                .anyExchange().permitAll()
             )
             
-            // Gateway filtreleri ve Spring Security filtrelerini ayrı tutma
-            // firebaseAuthenticationFilter'ı buraya eklemeyin, zaten WebFilter olarak otomatik eklenecek
+            // Gateway filtreleri
             .addFilterBefore(corsWebFilter, SecurityWebFiltersOrder.CORS)
             
-            // HTTP Headers
+            // HTTP Headers - deprecated metodları kaldıralım
             .headers(headers -> headers
-                .frameOptions().disable()
+                // frameOptions().disable() yerine direkt frame-options'ı disable et
+                .frameOptions(frameOptions -> frameOptions.mode(org.springframework.security.web.server.header.XFrameOptionsServerHttpHeadersWriter.Mode.DISABLE))
                 .contentSecurityPolicy(csp -> csp
                     .policyDirectives("default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
                                     "style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
