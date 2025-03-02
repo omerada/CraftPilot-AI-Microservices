@@ -205,4 +205,5 @@ resilience4j:
 
 security:
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
+    allowed-origins: "https://api.craftpilot.io,http://localhost:5173"
+
