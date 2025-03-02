@@ -57,22 +57,37 @@ public class FirebaseConfig {
     }
 
     @Bean
-    public FirebaseAuth firebaseAuth() throws IOException {
-        if (FirebaseApp.getApps().isEmpty()) {
+    public FirebaseAuth firebaseAuth() {
+        // FirebaseApp.getApps() null olabilir, bu durumu kontrol et
+        if (FirebaseApp.getApps() == null || FirebaseApp.getApps().isEmpty()) {
             try {
-                InputStream serviceAccount = new ClassPathResource(credentialsPath).getInputStream();
-                FirebaseOptions options = FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-                    .build();
-
-                FirebaseApp.initializeApp(options);
-                log.info("Firebase application has been initialized");
+                log.info("Initializing Firebase Auth in firebaseAuth() bean");
+                
+                // Önce dosyanın varlığını kontrol et
+                Resource resource = resourceLoader.getResource("file:" + credentialsPath);
+                if (!resource.exists()) {
+                    resource = new ClassPathResource("firebase-service-account.json");
+                    if (!resource.exists()) {
+                        throw new IOException("Firebase credentials file not found at: " + credentialsPath);
+                    }
+                    log.info("Using firebase-service-account.json from classpath");
+                }
+                
+                try (InputStream serviceAccount = resource.getInputStream()) {
+                    FirebaseOptions options = FirebaseOptions.builder()
+                        .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+                        .build();
+                    
+                    FirebaseApp app = FirebaseApp.initializeApp(options);
+                    log.info("Firebase application has been initialized: {}", app.getName());
+                }
             } catch (IOException e) {
                 log.error("Error initializing Firebase application: {}", e.getMessage(), e);
-                throw e;
+                throw new IllegalStateException("Firebase initialization failed: " + e.getMessage(), e);
             }
         }
         
+        log.info("Returning FirebaseAuth instance");
         return FirebaseAuth.getInstance();
     }
 }

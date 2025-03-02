@@ -33,24 +33,24 @@ public class SecurityConfig {
             .formLogin(form -> form.disable())
             .logout(logout -> logout.disable())
             
-            // Yetkilendirme kuralları
+            // Yetkilendirme kuralları - Hepsini izin ver, gerçek kontrol Firebase filter'da yapılacak
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(SecurityConstants.PUBLIC_PATHS.toArray(new String[0])).permitAll()
                 .pathMatchers("/admin/**").hasRole("ADMIN")
-                .anyExchange().authenticated()
+                .anyExchange().permitAll()  // Gerçek kontrolü firebaseAuthenticationFilter yapacak
             )
             
-            // Filtre sıralaması
+            // Gateway filtreleri ve Spring Security filtrelerini ayrı tutma
+            // firebaseAuthenticationFilter'ı buraya eklemeyin, zaten WebFilter olarak otomatik eklenecek
             .addFilterBefore(corsWebFilter, SecurityWebFiltersOrder.CORS)
-            .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
             
             // HTTP Headers
             .headers(headers -> headers
                 .frameOptions().disable()
                 .contentSecurityPolicy(csp -> csp
                     .policyDirectives("default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-                                      "style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
-                                      "font-src 'self' data:; connect-src 'self' *")
+                                    "style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
+                                    "font-src 'self' data:; connect-src 'self' *")
                 )
             )
             

@@ -190,12 +190,14 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
   level:
-    com.craftpilot.apigateway: INFO
+    root: INFO
+    com.craftpilot.apigateway: DEBUG
     com.craftpilot.apigateway.security: DEBUG
     org.springframework.security: INFO
     org.springframework.cloud.gateway: INFO
-    org.springframework.web.cors: DEBUG
+    org.springframework.web.cors: INFO
     reactor.netty.http.client: INFO
+    com.google.firebase: DEBUG
 
 # Firebase
 firebase:
