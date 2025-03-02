@@ -1,38 +1,40 @@
 package com.craftpilot.apigateway.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
-import java.util.List;
 import java.util.Arrays;
 
 @Configuration
 public class CorsConfig {
 
-    @Value("${cors.allowed-origins:https://craftpilot.app,https://app.craftpilot.io,https://api.craftpilot.io,http://localhost:5173}")
-    private List<String> allowedOrigins;
-
-    @Value("${cors.max-age:7200}")
-    private Long maxAge;
-
     @Bean
     public CorsWebFilter corsWebFilter() {
-        CorsConfiguration corsConfig = new CorsConfiguration();
-        corsConfig.setAllowedOrigins(Arrays.asList(
-            "http://localhost:5173",
-            "http://localhost:3000", 
-            "https://craftpilot.io",
-            "https://app.craftpilot.io",
-            "https://api.craftpilot.io"
+        CorsConfiguration config = new CorsConfiguration();
+        
+        // İzin verilen originler
+        config.setAllowedOriginPatterns(Arrays.asList(
+            "http://localhost:*", 
+            "https://*.craftpilot.io", 
+            "https://craftpilot.io"
         ));
-        corsConfig.setMaxAge(8000L);
-        corsConfig.setAllowCredentials(true);
-        corsConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        corsConfig.setAllowedHeaders(Arrays.asList(
+        
+        // İzin verilen metodlar
+        config.setAllowedMethods(Arrays.asList(
+            HttpMethod.GET.name(),
+            HttpMethod.POST.name(),
+            HttpMethod.PUT.name(),
+            HttpMethod.DELETE.name(),
+            HttpMethod.PATCH.name(),
+            HttpMethod.OPTIONS.name()
+        ));
+        
+        // İzin verilen başlıklar
+        config.setAllowedHeaders(Arrays.asList(
             "Origin", 
             "Content-Type", 
             "Accept", 
@@ -40,19 +42,22 @@ public class CorsConfig {
             "X-Requested-With",
             "X-User-Id",
             "X-User-Role",
-            "X-User-Email", 
-            "Access-Control-Request-Method", 
-            "Access-Control-Request-Headers"
+            "X-User-Email"
         ));
-        corsConfig.setExposedHeaders(Arrays.asList(
-            "Access-Control-Allow-Origin", 
+        
+        // Expose edilen başlıklar
+        config.setExposedHeaders(Arrays.asList(
+            "Access-Control-Allow-Origin",
             "Access-Control-Allow-Credentials",
             "X-Total-Count"
         ));
-
+        
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
+        
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", corsConfig);
-
+        source.registerCorsConfiguration("/**", config);
+        
         return new CorsWebFilter(source);
     }
 }

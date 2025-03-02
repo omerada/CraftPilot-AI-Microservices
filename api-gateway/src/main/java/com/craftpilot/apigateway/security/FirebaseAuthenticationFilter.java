@@ -6,6 +6,8 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
@@ -20,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE + 10) // Sıralamayı netleştir
 public class FirebaseAuthenticationFilter implements WebFilter {
     
     private static final Logger log = LoggerFactory.getLogger(FirebaseAuthenticationFilter.class);
@@ -37,50 +40,53 @@ public class FirebaseAuthenticationFilter implements WebFilter {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        // Request path bilgisini log'la
         String path = exchange.getRequest().getPath().value();
-
-        // Actuator veya diğer public path'leri izin ver
-        if (SecurityConstants.isPublicPath(path) || path.startsWith("/actuator")) {
-            return chain.filter(exchange);
-        }
-
-        // Health check veya OPTIONS istekleri için atla
         String method = exchange.getRequest().getMethod().name();
-        if (path.contains("/health") || path.contains("/info") || "OPTIONS".equals(method)) {
+        log.debug("Processing request: {} {}", method, path);
+        
+        // Actuator veya public path kontrolü
+        if (SecurityConstants.isPublicPath(path) || path.startsWith("/actuator") || 
+            path.contains("/health") || path.contains("/info") || "OPTIONS".equals(method)) {
+            log.debug("Public path detected, skipping authentication: {}", path);
             return chain.filter(exchange);
         }
 
-        // Authorization header kontrolü yap
-        return extractAndValidateToken(exchange)
-            .flatMap(firebaseToken -> processAuthenticatedRequest(exchange, chain, firebaseToken))
-            .onErrorResume(e -> handleAuthenticationError(exchange, e));
-    }
-
-    private Mono<FirebaseToken> extractAndValidateToken(ServerWebExchange exchange) {
+        // Auth header kontrolü
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-          
-        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) { 
-            log.debug("Authorization header eksik veya geçersiz: {}", 
-                authHeader != null ? authHeader.substring(0, Math.min(authHeader.length(), 10)) + "..." : "null");
-            return Mono.error(new AuthenticationException("Invalid authorization header"));
+        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+            log.debug("Missing or invalid Authorization header for path: {}", path);
+            return handleUnauthorized(exchange);
         }
- 
-        String token = authHeader.substring(BEARER_PREFIX.length());
-        return validateFirebaseToken(token);
-    }
 
+        // Token doğrulama ve işleme
+        String token = authHeader.substring(BEARER_PREFIX.length());
+        return validateFirebaseToken(token)
+            .flatMap(firebaseToken -> {
+                log.debug("Token validated successfully for user: {}", firebaseToken.getUid());
+                return processAuthenticatedRequest(exchange, chain, firebaseToken);
+            })
+            .onErrorResume(e -> {
+                log.error("Authentication error: {}", e.getMessage());
+                return handleUnauthorized(exchange);
+            });
+    }
+    
     private Mono<FirebaseToken> validateFirebaseToken(String token) {
+        // Cache kontrol et
         FirebaseToken cachedToken = tokenCache.getIfPresent(token);
         if (cachedToken != null) { 
             return Mono.just(cachedToken);
         }
 
+        // Tokeni doğrula
         return Mono.fromCallable(() -> {
             try {
                 FirebaseToken verifiedToken = firebaseAuth.verifyIdToken(token);
                 tokenCache.put(token, verifiedToken);
                 return verifiedToken;
             } catch (Exception e) {
+                log.error("Token validation failed: {}", e.getMessage());
                 throw new AuthenticationException("Invalid Firebase token: " + e.getMessage());
             }
         }).subscribeOn(Schedulers.boundedElastic());
@@ -95,39 +101,31 @@ public class FirebaseAuthenticationFilter implements WebFilter {
         FirebaseAuthenticationToken authToken = new FirebaseAuthenticationToken(userDetails, firebaseToken);
         
         // Exchange'i modifiye et
-        ServerWebExchange modifiedExchange = modifyExchange(exchange, firebaseToken);
+        ServerWebExchange modifiedExchange = modifyExchange(exchange, firebaseToken, userDetails);
 
         // Security context'i güncelle ve chain'i devam ettir
         return chain.filter(modifiedExchange)
             .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authToken));
     }
 
-    private ServerWebExchange modifyExchange(ServerWebExchange exchange, FirebaseToken firebaseToken) {
+    private ServerWebExchange modifyExchange(ServerWebExchange exchange, FirebaseToken firebaseToken, FirebaseUserDetails userDetails) {
         String userId = firebaseToken.getUid();
-        String role = extractUserRole(firebaseToken);
+        String role = userDetails.getRole();
         String email = firebaseToken.getEmail() != null ? firebaseToken.getEmail() : "no-email";
 
+        log.debug("Setting user headers - ID: {}, Role: {}, Email: {}", userId, role, email);
+        
         return exchange.mutate()
             .request(exchange.getRequest().mutate()
                 .header("X-User-Id", userId)
-                .header("X-User-Role", role)
+                .header("X-User-Role", role) 
                 .header("X-User-Email", email)
                 .build())
             .build();
     }
 
-    private Mono<Void> handleAuthenticationError(ServerWebExchange exchange, Throwable error) {
-        // Debug seviyesinde log tut - production'da çok fazla log oluşturmaması için
-        if (log.isDebugEnabled()) {
-            log.debug("Authentication error for path {}: {}", 
-                      exchange.getRequest().getPath().value(), error.getMessage());
-        }
-        
-        // OPTIONS istekleri için 200 OK dön
-        if (exchange.getRequest().getMethod().name().equals("OPTIONS")) {
-            exchange.getResponse().setStatusCode(HttpStatus.OK);
-            return exchange.getResponse().setComplete();
-        }
+    private Mono<Void> handleUnauthorized(ServerWebExchange exchange) {
+        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
         
         // CORS başlıkları ekle
         String origin = exchange.getRequest().getHeaders().getOrigin();
@@ -136,22 +134,10 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             exchange.getResponse().getHeaders().set("Access-Control-Allow-Credentials", "true");
         }
         
-        // SADECE Bearer authentication bilgisi gönder, Basic'i kaldır
+        // WWW-Authenticate başlığını ayarla - SADECE Bearer
         exchange.getResponse().getHeaders().set("WWW-Authenticate", "Bearer realm=\"craftpilot\"");
-        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
         
         return exchange.getResponse().setComplete();
-    }
-
-    private String extractUserRole(FirebaseToken token) {
-        Map<String, Object> claims = token.getClaims();
-        
-        if (claims.containsKey("role")) {
-            return claims.get("role").toString();
-        } else if (claims.containsKey("admin") && Boolean.TRUE.equals(claims.get("admin"))) {
-            return "ADMIN";
-        }
-        return "USER";
     }
 
     private static class AuthenticationException extends RuntimeException {
