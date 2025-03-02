@@ -26,6 +26,22 @@ spring:
         locator:
           enabled: true
           lower-case-service-id: true
+      globalcors:
+        corsConfigurations:
+          "[/**]":
+            allowedOrigins:
+              - "https://app.craftpilot.io"
+              - "https://api.craftpilot.io"
+              - "http://localhost:5173"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
       routes:
         # Core Services
         - id: user-service
@@ -111,7 +127,9 @@ spring:
             - name: CircuitBreaker
               args:
                 name: redisServiceCircuitBreaker
-
+      httpclient:
+        connect-timeout: 30000
+        response-timeout: 30000
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin Access-Control-Allow-Methods
         - AddResponseHeader=Access-Control-Allow-Origin, *
@@ -120,42 +138,6 @@ spring:
         - AddResponseHeader=Access-Control-Max-Age, 3600
         - AddResponseHeader=Access-Control-Allow-Credentials, true
         - AddResponseHeader=WWW-Authenticate, Bearer realm="craftpilot"
-      httpclient:
-        connect-timeout: 30000
-        response-timeout: 30000
-    loadbalancer:
-      cache:
-        enabled: true
-        caffeine:
-          spec: maximumSize=500,expireAfterWrite=5s
-    gateway:
-      globalcors:
-        corsConfigurations:
-          '[/**]':
-            allowedOrigins:
-              - "https://app.craftpilot.io"
-              - "https://api.craftpilot.io"
-              - "http://localhost:5173"
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - DELETE
-              - OPTIONS
-            allowedHeaders: "*"
-            allowCredentials: true
-            maxAge: 3600
-  jackson:
-    deserialization:
-      UNWRAP_ROOT_VALUE: true
-      FAIL_ON_UNKNOWN_PROPERTIES: false
-      ACCEPT_SINGLE_VALUE_AS_ARRAY: true
-    serialization:
-      WRAP_ROOT_VALUE: true
-      FAIL_ON_EMPTY_BEANS: false
-    mapper:
-      ACCEPT_CASE_INSENSITIVE_PROPERTIES: true
-      DEFAULT_VIEW_INCLUSION: true
 
 eureka:
   instance:

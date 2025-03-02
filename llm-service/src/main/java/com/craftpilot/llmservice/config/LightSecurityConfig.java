@@ -1,7 +1,6 @@
 package com.craftpilot.llmservice.config;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
@@ -32,16 +31,6 @@ import org.springframework.web.cors.reactive.CorsWebFilter;
 @EnableWebFluxSecurity
 public class LightSecurityConfig {
 
-    @Value("${spring.security.cors.allowed-origins}")
-    private List<String> allowedOrigins;
-
-    private static final List<String> PUBLIC_PATHS = Arrays.asList(
-        "/actuator/",
-        "/v3/api-docs",
-        "/swagger-ui",
-        "/webjars/"
-    );
-
     private static final List<RequiredHeader> REQUIRED_HEADERS = Arrays.asList(
         new RequiredHeader("X-User-Id", "User ID is required"),
         new RequiredHeader("X-User-Role", "User role is required"),
@@ -52,35 +41,15 @@ public class LightSecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         http
             .csrf(csrf -> csrf.disable())
-            .authorizeExchange(auth -> auth
-                .pathMatchers("/actuator/**", "/ai/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
-                .anyExchange().authenticated());
+            .authorizeExchange(auth -> auth.anyExchange().permitAll());
         
         return http.build();
     }
 
     @Bean
-    public CorsWebFilter corsFilter() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(allowedOrigins);
-        config.addAllowedMethod("*");
-        config.addAllowedHeader("*");
-        config.setAllowCredentials(true);
-        config.setMaxAge(3600L);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-
-        return new CorsWebFilter(source);
-    }
-
-    @Bean
     public WebFilter headerValidationFilter() {
         return (exchange, chain) -> {
-            if (isPublicPath(exchange.getRequest().getPath().value())) {
-                return chain.filter(exchange);
-            }
-
+          
             log.debug("Validating headers for path: {}", exchange.getRequest().getPath());
 
             for (RequiredHeader header : REQUIRED_HEADERS) {
@@ -103,17 +72,7 @@ public class LightSecurityConfig {
                 });
         };
     }
-
-    private boolean isPublicPath(String path) {
-        return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
-    }
-
-    private String[] getPublicPaths() {
-        return PUBLIC_PATHS.stream()
-            .map(path -> path + "**")
-            .toArray(String[]::new);
-    }
-
+ 
     private Mono<Void> handleMissingHeader(ServerWebExchange exchange, String message) {
         exchange.getResponse().setStatusCode(HttpStatus.BAD_REQUEST);
         exchange.getResponse().getHeaders().add("X-Error-Message", message);

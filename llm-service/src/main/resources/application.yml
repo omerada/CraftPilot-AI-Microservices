@@ -38,15 +38,6 @@ spring:
       date-time: yyyy-MM-dd HH:mm:ss
       time: HH:mm:ss
     log-request-details: true
-    cors:
-      allowed-origins:
-        - "https://app.craftpilot.io"
-        - "https://api.craftpilot.io"
-        - "http://localhost:5173"
-      allowed-methods: "*"
-      allowed-headers: "*"
-      allow-credentials: true
-      max-age: 3600
   codec:
     max-in-memory-size: 16MB
     log-request-details: true
@@ -92,15 +83,6 @@ spring:
         proxy:
           type: NO_PROXY
   security:
-    cors:
-      allowed-origins:
-        - "https://app.craftpilot.io"
-        - "https://api.craftpilot.io"
-        - "http://localhost:5173"
-      allowed-methods: "*"
-      allowed-headers: "*"
-      allow-credentials: true
-      max-age: 3600
     basic:
       enabled: false
 
@@ -169,21 +151,6 @@ netty:
     noUnsafe: true
   use-native-transport: true
   workdir: /tmp/netty
-
-springdoc:
-  swagger-ui:
-    path: /swagger-ui.html
-    enabled: true
-    configUrl: /v3/api-docs/swagger-config
-    urls:
-      - url: /v3/api-docs
-        name: LLM API
-  api-docs:
-    path: /v3/api-docs
-    enabled: true
-  show-actuator: true
-  packages-to-scan: com.craftpilot.llmservice.controller
-  paths-to-match: /ai/**
 
 resilience4j:
   circuitbreaker:
