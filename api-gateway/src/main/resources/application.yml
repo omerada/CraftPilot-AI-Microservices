@@ -132,7 +132,9 @@ spring:
         connect-timeout: 30000
         response-timeout: 30000
       default-filters:
-        # Sadece gerekli başlık filtrelerini koru
+        # WWW-Authenticate header'ını temizle ve yeniden ayarla
+        - RemoveResponseHeader=WWW-Authenticate
+        - AddResponseHeader=WWW-Authenticate, Bearer realm="craftpilot"
         - RemoveRequestHeader=Cookie
         - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
         - AddResponseHeader=Access-Control-Allow-Origin, *
@@ -140,7 +142,18 @@ spring:
         - AddResponseHeader=Access-Control-Allow-Headers, Origin,Content-Type,Accept,Authorization,X-Request-With,X-User-Id,X-User-Role,X-User-Email
         - AddResponseHeader=Access-Control-Max-Age, 3600
         - AddResponseHeader=Access-Control-Allow-Credentials, true
-        - AddResponseHeader=WWW-Authenticate, Bearer realm="craftpilot"
+        # Daha önce eklendiği için burada tekrar ekleme
+        # - AddResponseHeader=WWW-Authenticate, Bearer realm="craftpilot"
+      
+      # Upstream veya downstream header'larında herhangi bir kayıp olmaması için:
+      strip-prefix: false
+      preserve-host-header: true
+      httpclient:
+        connect-timeout: 30000
+        response-timeout: 30000
+        # HTTP Basic Authentication kullanımını engelle
+        basic-auth:
+          enabled: false
 
 eureka:
   instance:

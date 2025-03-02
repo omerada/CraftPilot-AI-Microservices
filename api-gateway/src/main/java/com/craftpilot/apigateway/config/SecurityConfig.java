@@ -71,8 +71,9 @@ public class SecurityConfig {
                 .formLogin(form -> form.disable())
                 .logout(logout -> logout.disable())
                 
-                // Yetkilendirme kuralları
+                // Yetkilendirme kuralları - Daha fazla path'i public yap
                 .authorizeExchange(exchanges -> exchanges
+                    .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll() // OPTIONS isteklerini daima permit et
                     .pathMatchers(SecurityConstants.PUBLIC_PATHS.toArray(new String[0])).permitAll()
                     .pathMatchers("/admin/**").hasRole("ADMIN")
                     .anyExchange().authenticated()
@@ -92,21 +93,25 @@ public class SecurityConfig {
                     )
                 )
                 
-                // Yetkilendirme hata işleme
+                // Yetkilendirme hata işleme - SPA yönlendirmesi için HTML ile düzenlenebilir
                 .exceptionHandling(handling -> handling
                     .authenticationEntryPoint((exchange, ex) -> {
-                        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                        ServerHttpResponse response = exchange.getResponse();
                         
-                        // CORS başlıkları
+                        // Önce CORS başlıklarını ayarla
                         String origin = exchange.getRequest().getHeaders().getOrigin();
                         if (origin != null) {
-                            exchange.getResponse().getHeaders().set("Access-Control-Allow-Origin", origin);
-                            exchange.getResponse().getHeaders().set("Access-Control-Allow-Credentials", "true");
+                            response.getHeaders().set("Access-Control-Allow-Origin", origin);
+                            response.getHeaders().set("Access-Control-Allow-Credentials", "true");
                         }
                         
-                        // WWW-Authenticate başlığı - SADECE Bearer
-                        exchange.getResponse().getHeaders().set("WWW-Authenticate", "Bearer realm=\"craftpilot\"");
-                        return exchange.getResponse().setComplete();
+                        // Basic Auth pop-up'ını önlemek için WWW-Authenticate başlığı düzenlemesi
+                        // Basic yerine sadece Bearer içeriyor
+                        response.getHeaders().remove(HttpHeaders.WWW_AUTHENTICATE);
+                        response.getHeaders().set(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"craftpilot\"");
+                        response.setStatusCode(HttpStatus.UNAUTHORIZED);
+                        
+                        return response.setComplete();
                     })
                 )
                 .build();

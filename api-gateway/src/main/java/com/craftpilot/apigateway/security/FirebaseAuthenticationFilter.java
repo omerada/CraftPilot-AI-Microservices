@@ -191,11 +191,14 @@ public class FirebaseAuthenticationFilter implements WebFilter {
         
         log.debug("Setting user headers - ID: {}, Role: {}, Email: {}", userId, role, email);
         
+        // İsteğe kullanıcı bilgilerini ekle
         return exchange.mutate()
             .request(exchange.getRequest().mutate()
                 .header("X-User-Id", userId)
                 .header("X-User-Role", role)
                 .header("X-User-Email", email)
+                // Orijinal Authorization header'ını da downstream servislere iletiyoruz
+                .header("Authorization", "Bearer " + firebaseToken.getUid())
                 .build())
             .build();
     }
@@ -212,8 +215,9 @@ public class FirebaseAuthenticationFilter implements WebFilter {
                     response.getHeaders().set("Access-Control-Allow-Credentials", "true");
                 }
                 
-                // WWW-Authenticate başlığını ayarla - SADECE Bearer
-                response.getHeaders().set("WWW-Authenticate", "Bearer realm=\"craftpilot\"");
+                // WWW-Authenticate başlığını ayarla - Basic kısmını tamamen kaldır
+                response.getHeaders().remove(HttpHeaders.WWW_AUTHENTICATE);  // Önce mevcut başlığı temizle
+                response.getHeaders().set(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"craftpilot\"");
                 response.setStatusCode(HttpStatus.UNAUTHORIZED);
             }
             
