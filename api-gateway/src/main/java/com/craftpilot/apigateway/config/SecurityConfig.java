@@ -9,6 +9,7 @@ import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.reactive.CorsWebFilter;
+import org.springframework.http.HttpStatus;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -27,7 +28,7 @@ public class SecurityConfig {
         return http
             .cors(cors -> {}) // CORS yapılandırmasını etkinleştir
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+            .httpBasic(httpBasic -> httpBasic.disable()) // HTTP Basic'i tamamen devre dışı bırakalım
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .logout(ServerHttpSecurity.LogoutSpec::disable)
             .authorizeExchange(exchanges -> exchanges
@@ -50,7 +51,17 @@ public class SecurityConfig {
             )
             .exceptionHandling(handling -> handling
                 .authenticationEntryPoint((exchange, ex) -> {
-                    exchange.getResponse().getHeaders().add("WWW-Authenticate", "Bearer");
+                    // Basic Authentication yerine sadece Bearer kullanıyoruz
+                    exchange.getResponse().getHeaders().set("WWW-Authenticate", "Bearer realm=\"craftpilot\"");
+                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                    
+                    // CORS için ekstra başlıklar ekleyebiliriz
+                    String origin = exchange.getRequest().getHeaders().getOrigin();
+                    if (origin != null) {
+                        exchange.getResponse().getHeaders().set("Access-Control-Allow-Origin", origin);
+                        exchange.getResponse().getHeaders().set("Access-Control-Allow-Credentials", "true");
+                    }
+                    
                     return exchange.getResponse().setComplete();
                 })
             )

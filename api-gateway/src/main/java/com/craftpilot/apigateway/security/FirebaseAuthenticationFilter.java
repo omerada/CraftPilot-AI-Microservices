@@ -129,8 +129,17 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             return exchange.getResponse().setComplete();
         }
         
-        // Diğer istekler için 401
+        // CORS başlıkları ekle
+        String origin = exchange.getRequest().getHeaders().getOrigin();
+        if (origin != null) {
+            exchange.getResponse().getHeaders().set("Access-Control-Allow-Origin", origin);
+            exchange.getResponse().getHeaders().set("Access-Control-Allow-Credentials", "true");
+        }
+        
+        // SADECE Bearer authentication bilgisi gönder, Basic'i kaldır
+        exchange.getResponse().getHeaders().set("WWW-Authenticate", "Bearer realm=\"craftpilot\"");
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+        
         return exchange.getResponse().setComplete();
     }
 

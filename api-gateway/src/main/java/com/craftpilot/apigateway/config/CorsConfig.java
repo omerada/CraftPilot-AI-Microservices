@@ -8,6 +8,7 @@ import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
+import java.util.Arrays;
 
 @Configuration
 public class CorsConfig {
@@ -21,25 +22,29 @@ public class CorsConfig {
     @Bean
     public CorsWebFilter corsWebFilter() {
         CorsConfiguration corsConfig = new CorsConfiguration();
-        corsConfig.setAllowedOrigins(List.of(
-            "http://localhost:5173",  // Geliştirme ortamı
-            "http://localhost:3000",  // Diğer olası geliştirme portu
-            "https://craftpilot.io", // Prod domain (kendi alan adınızla değiştirin)
-            "https://*.craftpilot.io" // Alt domainler (kendi alan adınızla değiştirin)
+        corsConfig.setAllowedOrigins(Arrays.asList(
+            "http://localhost:5173",
+            "http://localhost:3000", 
+            "https://craftpilot.io",
+            "https://app.craftpilot.io",
+            "https://api.craftpilot.io"
         ));
         corsConfig.setMaxAge(8000L);
         corsConfig.setAllowCredentials(true);
-        corsConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        corsConfig.setAllowedHeaders(List.of(
+        corsConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        corsConfig.setAllowedHeaders(Arrays.asList(
             "Origin", 
             "Content-Type", 
             "Accept", 
             "Authorization", 
-            "X-Requested-With", 
+            "X-Requested-With",
+            "X-User-Id",
+            "X-User-Role",
+            "X-User-Email", 
             "Access-Control-Request-Method", 
             "Access-Control-Request-Headers"
         ));
-        corsConfig.setExposedHeaders(List.of(
+        corsConfig.setExposedHeaders(Arrays.asList(
             "Access-Control-Allow-Origin", 
             "Access-Control-Allow-Credentials",
             "X-Total-Count"
