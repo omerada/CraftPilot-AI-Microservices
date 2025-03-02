@@ -177,12 +177,22 @@ springdoc:
 
 # CORS Yapılandırması
 cors:
-  allowed-origins: "*"
-  allowed-methods: "*"
+  allowed-origins:
+    - "https://api.craftpilot.io"
+    - "http://localhost:5173"
+  allowed-methods:
+    - "GET"
+    - "POST"
+    - "PUT"
+    - "DELETE"
+    - "OPTIONS"
   allowed-headers: "*"
-  exposed-headers: "*"
+  exposed-headers:
+    - "Authorization"
+    - "X-Total-Count"
   allow-credentials: true
   max-age: 3600
+
 
 resilience4j:
   circuitbreaker:
