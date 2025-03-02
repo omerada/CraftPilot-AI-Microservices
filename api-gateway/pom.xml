@@ -63,7 +63,15 @@
 			<artifactId>spring-boot-starter-cache</artifactId>
 		</dependency>
 
-		
+		<!-- Add OAuth2 Resource Server dependency -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-resource-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
 
 		<!-- Resilience4j Dependencies -->
 		<dependency>
@@ -114,6 +122,14 @@
 			<scope>runtime</scope>
 			<optional>true</optional>
 		</dependency>
+
+		 <!-- Add Lombok dependency and ensure @Slf4j is working -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.30</version>
+            <scope>provided</scope>
+        </dependency>
 
 		<!-- Test Dependencies -->
 		<dependency>

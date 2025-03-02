@@ -1,56 +1,43 @@
 server:
   port: ${SERVER_PORT:8080}
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+    min-response-size: 1024
 
 spring:
-  application:
-    name: api-gateway
   main:
     allow-bean-definition-overriding: true
-    web-application-type: reactive
+  application:
+    name: api-gateway
   security:
     basic:
       enabled: false
   cloud:
+    config:
+      enabled: false
+    discovery:
+      enabled: true
+      client:
+        composite-indicator:
+          enabled: false
     gateway:
       discovery:
         locator:
           enabled: true
           lower-case-service-id: true
-      globalcors:
-        add-to-simple-url-handler-mapping: true
-        corsConfigurations:
-          "[/**]":
-            allowedOrigins:
-              - "http://localhost:5173"
-              - "http://localhost:3000"
-              - "https://craftpilot.io"
-              - "https://*.craftpilot.io"
-            allowed-methods: "*"
-            allowed-headers: "*"
-            allow-credentials: true
-            exposed-headers:
-              - "Access-Control-Allow-Origin"
-              - "Access-Control-Allow-Credentials"
-              - "X-Total-Count"
       routes:
-        - id: llm-service
-          uri: lb://llm-service
-          predicates:
-            - Path=/ai/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: llmServiceCircuitBreaker
-                fallbackUri: forward:/fallback
-          metadata:
-            connect-timeout: 30000
-            response-timeout: 30000
-
+        # Core Services
         - id: user-service
           uri: lb://user-service
           predicates:
             - Path=/users/**,/auth/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: userServiceCircuitBreaker
 
+        # Business Services
         - id: admin-service
           uri: lb://admin-service
           predicates:
@@ -58,37 +45,219 @@ spring:
           filters:
             - StripPrefix=1
 
+        - id: analytics-service
+          uri: lb://analytics-service
+          predicates:
+            - Path=/analytics/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: analyticsServiceCircuitBreaker
+
+        - id: llm-service
+          uri: lb://llm-service
+          predicates:
+            - Path=/ai/**
+          metadata:
+            connect-timeout: 120000
+            response-timeout: 120000
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: llmServiceCircuitBreaker
+                fallbackUri: forward:/ai-fallback
+
+        - id: image-service
+          uri: lb://image-service
+          predicates:
+            - Path=/images/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: imageServiceCircuitBreaker
+
+        - id: credit-service
+          uri: lb://credit-service
+          predicates:
+            - Path=/credits/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: creditServiceCircuitBreaker
+
+        - id: subscription-service
+          uri: lb://subscription-service
+          predicates:
+            - Path=/subscriptions/**,/subscription-plans/**,/payments/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: subscriptionServiceCircuitBreaker
+
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/notifications/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: notificationServiceCircuitBreaker
+
+        - id: redis-service
+          uri: lb://redis-service
+          predicates:
+            - Path=/cache/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: redisServiceCircuitBreaker
+
+      default-filters:
+        - AddRequestHeader=X-Forwarded-Prefix, /
+        - name: Retry
+          args:
+            retries: 3
+            methods: GET,POST,PUT,DELETE
+            series: SERVER_ERROR
+            exceptions: java.io.IOException,java.util.concurrent.TimeoutException
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: 50
+            redis-rate-limiter.burstCapacity: 100
+            redis-rate-limiter.requestedTokens: 1
+        - name: CircuitBreaker
+          args:
+            name: defaultCircuitBreaker
+            fallbackUri: forward:/fallback
       httpclient:
-        connect-timeout: 10000
-        response-timeout: 10000
+        connect-timeout: 30000
+        response-timeout: 30000
+        pool:
+          max-idle-time: 15s
+          max-connections: 1000
+          type: ELASTIC
+          metrics: true
+          acquire-timeout: 60000
+    loadbalancer:
+      cache:
+        enabled: true
+        caffeine:
+          spec: maximumSize=500,expireAfterWrite=5s
+  jackson:
+    deserialization:
+      UNWRAP_ROOT_VALUE: true
+      FAIL_ON_UNKNOWN_PROPERTIES: false
+      ACCEPT_SINGLE_VALUE_AS_ARRAY: true
+    serialization:
+      WRAP_ROOT_VALUE: true
+      FAIL_ON_EMPTY_BEANS: false
+    mapper:
+      ACCEPT_CASE_INSENSITIVE_PROPERTIES: true
+      DEFAULT_VIEW_INCLUSION: true
 
 eureka:
   instance:
-    prefer-ip-address: true
-    hostname: api-gateway
+    prefer-ip-address: false
+    hostname: ${HOSTNAME:api-gateway}
+    instance-id: ${spring.application.name}:${random.uuid}
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+    metadata-map:
+      zone: primary
+      profile: ${spring.profiles.active:prod}
+      management.context-path: ${server.servlet.context-path:/}actuator
   client:
     service-url:
-      defaultZone: http://eureka-server:8761/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://craftpilot:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
+    registry-fetch-interval-seconds: 5
+    should-enforce-registration-at-init: true
+    enabled: true
+    use-dns-for-fetching-service-urls: false
+    registry:
+      availability-zones:
+        default: defaultZone
 
-# Basit endpointler için erişim ver
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus,gateway,circuitbreakers
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: db,redis,discovery
+        liveness:
+          include: ping
+  health:
+    circuitbreakers:
+      enabled: true
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+    enable:
+      jvm: true
+      process: true
+      system: true
+      http: true
 
 logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n"
   level:
-    root: INFO
-    com.craftpilot: DEBUG
-    org.springframework.cloud.gateway: DEBUG
-    org.springframework.web.reactive: DEBUG
+    com.craftpilot.apigateway: ${LOG_LEVEL:INFO}
+    org.springframework.cloud.gateway: ${LOG_LEVEL:INFO}
+    org.springframework.cloud.netflix.eureka: ${LOG_LEVEL:INFO}
+    com.netflix.discovery: ${LOG_LEVEL:INFO}
+    com.craftpilot.apigateway.security: ${SECURITY_LOG_LEVEL:INFO}
+    org.springframework.security: ${SECURITY_LOG_LEVEL:INFO}
 
-# Firebase
-firebase:
-  credentials-file: firebase-service-account.json
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 100
+        minimumNumberOfCalls: 10
+        permittedNumberOfCallsInHalfOpenState: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 60s
+    instances:
+      llmServiceCircuitBreaker:
+        baseConfig: default
+        slidingWindowSize: 50
+        waitDurationInOpenState: 30s
+      userServiceCircuitBreaker:
+        baseConfig: default
+      subscriptionServiceCircuitBreaker:
+        baseConfig: default
+
+  ratelimiter:
+    configs:
+      default:
+        limitForPeriod: 100
+        limitRefreshPeriod: 1s
+        timeoutDuration: 5s
+    instances:
+      userService:
+        baseConfig: default
+        limitForPeriod: 200
+      llmService:
+        baseConfig: default
+        limitForPeriod: 50

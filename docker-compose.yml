@@ -130,22 +130,20 @@ services:
 
   # API Gateway
   api-gateway:
-    image: ${DOCKERHUB_USERNAME}/api-gateway:latest-arm64
+    image: craftpilot/api-gateway
+    container_name: api-gateway
     environment:
-      <<: *common-variables
-      SERVER_PORT: 8080
-      SPRING_FIREBASE_CREDENTIALS_PATH: /app/config/firebase-credentials.json
+      - SERVER_PORT=8080
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_PROFILES_ACTIVE=prod
     ports:
       - "8080:8080"
-    volumes:
-      - ${GCP_SA_KEY_PATH}:/app/config/firebase-credentials.json:ro
-    networks:
-      craftpilot-network:
-        ipv4_address: 172.18.0.14
     depends_on:
-      eureka-server:
-        condition: service_healthy
-    <<: *common-deploy
+      - eureka-server
+    networks:
+      - craftpilot-network
+    volumes:
+      - ./firebase-service-account.json:/app/firebase-service-account.json
 
   # Redis Service
   redis-service:

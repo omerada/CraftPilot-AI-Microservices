@@ -1,62 +1,49 @@
 package com.craftpilot.apigateway.security;
 
 import com.google.firebase.auth.FirebaseToken;
+import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
+import java.util.Collections;
+import java.util.Map;
 
+@Getter
 public class FirebaseUserDetails implements UserDetails {
     private final String uid;
     private final String email;
-    private final boolean emailVerified;
     private final String name;
-    private final String picture;
+    private final boolean emailVerified;
     private final String role;
-    private final Collection<GrantedAuthority> authorities;
 
-    public FirebaseUserDetails(FirebaseToken firebaseToken) {
-        this.uid = firebaseToken.getUid();
-        this.email = firebaseToken.getEmail();
-        this.emailVerified = firebaseToken.isEmailVerified();
-        this.name = firebaseToken.getName();
-        this.picture = firebaseToken.getPicture();
-        this.role = determineRole(firebaseToken);
-        this.authorities = buildAuthorities(this.role);
+    public FirebaseUserDetails(FirebaseToken token) {
+        this.uid = token.getUid();
+        this.email = token.getEmail();
+        this.name = token.getName();
+        this.emailVerified = token.isEmailVerified();
+        this.role = extractRole(token);
     }
 
-    private String determineRole(FirebaseToken token) {
-        // Normalde burada gerçek rol mantığı olacak
-        // Örneğin token'ın claims'inden rol bilgisini çekebiliriz
-        // Şimdilik basitçe USER rolü veriyoruz
+    private String extractRole(FirebaseToken token) {
+        Map<String, Object> claims = token.getClaims();
+        if (claims.containsKey("role")) {
+            return claims.get("role").toString();
+        } else if (claims.containsKey("admin") && Boolean.TRUE.equals(claims.get("admin"))) {
+            return "ADMIN";
+        }
         return "USER";
-    }
-
-    private Collection<GrantedAuthority> buildAuthorities(String role) {
-        List<GrantedAuthority> authorities = new ArrayList<>();
-        authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
-        return authorities;
-    }
-
-    public String getUid() {
-        return uid;
-    }
-
-    public String getRole() {
-        return role;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return authorities;
+        return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role));
     }
 
     @Override
     public String getPassword() {
-        return null; // Firebase Auth kullanıyoruz, şifreleri burada tutmuyoruz
+        return null;
     }
 
     @Override
@@ -81,6 +68,6 @@ public class FirebaseUserDetails implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return emailVerified;
     }
 }
