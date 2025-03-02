@@ -2,28 +2,28 @@ package com.craftpilot.apigateway.security;
 
 import com.google.firebase.auth.FirebaseToken;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import java.util.Collections;
+import org.springframework.security.core.GrantedAuthority;
+
+import java.util.Collection;
 
 public class FirebaseAuthenticationToken extends AbstractAuthenticationToken {
-    private final FirebaseUserDetails principal;
-    private final FirebaseToken credentials;
+    private final FirebaseUserDetails userDetails;
+    private final FirebaseToken firebaseToken;
 
-    public FirebaseAuthenticationToken(FirebaseUserDetails principal, FirebaseToken credentials) {
-        // Methodunu çağırmak yerine principal'ın authorities'ini kullanalım
-        super(principal.getAuthorities());
-        this.principal = principal;
-        this.credentials = credentials;
+    public FirebaseAuthenticationToken(FirebaseUserDetails userDetails, FirebaseToken firebaseToken) {
+        super(userDetails.getAuthorities());
+        this.userDetails = userDetails;
+        this.firebaseToken = firebaseToken;
         setAuthenticated(true);
     }
 
     @Override
     public Object getCredentials() {
-        return credentials;
+        return firebaseToken;
     }
 
     @Override
     public Object getPrincipal() {
-        return principal;
+        return userDetails;
     }
 }

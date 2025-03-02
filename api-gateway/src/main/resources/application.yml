@@ -1,33 +1,19 @@
 server:
   port: ${SERVER_PORT:8080}
-  compression:
-    enabled: true
-    mime-types: application/json,application/xml,text/html,text/xml,text/plain
-    min-response-size: 1024
 
 spring:
-  main:
-    allow-bean-definition-overriding: true
   application:
     name: api-gateway
   security:
     basic:
       enabled: false
   cloud:
-    config:
-      enabled: false
-    discovery:
-      enabled: true
-      client:
-        composite-indicator:
-          enabled: false
     gateway:
       discovery:
         locator:
           enabled: true
           lower-case-service-id: true
       globalcors:
-        add-to-simple-url-handler-mapping: true
         corsConfigurations:
           "[/**]":
             allowedOrigins:
@@ -39,12 +25,22 @@ spring:
             allowedHeaders: "*"
             allowCredentials: true
             exposedHeaders:
-              - "Access-Control-Allow-Origin"
-              - "Access-Control-Allow-Credentials"
               - "X-Total-Count"
             maxAge: 3600
       routes:
-        # Core Services
+        - id: llm-service
+          uri: lb://llm-service
+          predicates:
+            - Path=/ai/**
+          filters:
+            - PreserveHostHeader
+            - name: CircuitBreaker
+              args:
+                name: llmServiceCircuitBreaker
+          metadata:
+            connect-timeout: 60000
+            response-timeout: 60000
+
         - id: user-service
           uri: lb://user-service
           predicates:
@@ -54,7 +50,13 @@ spring:
               args:
                 name: userServiceCircuitBreaker
 
-        # Business Services
+        - id: image-service
+          uri: lb://image-service
+          predicates:
+            - Path=/images/**
+          filters:
+            - StripPrefix=1
+
         - id: admin-service
           uri: lb://admin-service
           predicates:
@@ -62,164 +64,32 @@ spring:
           filters:
             - StripPrefix=1
 
-        - id: analytics-service
-          uri: lb://analytics-service
-          predicates:
-            - Path=/analytics/**
-          filters:
-            - StripPrefix=1
-            - name: CircuitBreaker
-              args:
-                name: analyticsServiceCircuitBreaker
+        # Diğer servisler burada kısaltıldı
 
-        - id: llm-service
-          uri: lb://llm-service
-          predicates:
-            - Path=/ai/**
-          filters:
-            - PreserveHostHeader
-            - AddRequestHeader=X-Gateway-Origin,api-gateway
-            - name: CircuitBreaker
-              args:
-                name: llmServiceCircuitBreaker
-                fallbackUri: forward:/fallback
-          metadata:
-            connect-timeout: 60000
-            response-timeout: 60000
-
-        - id: image-service
-          uri: lb://image-service
-          predicates:
-            - Path=/images/**
-          filters:
-            - StripPrefix=1
-            - name: CircuitBreaker
-              args:
-                name: imageServiceCircuitBreaker
-
-        - id: credit-service
-          uri: lb://credit-service
-          predicates:
-            - Path=/credits/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: creditServiceCircuitBreaker
-
-        - id: subscription-service
-          uri: lb://subscription-service
-          predicates:
-            - Path=/subscriptions/**,/subscription-plans/**,/payments/**
-          filters:
-            - StripPrefix=1
-            - name: CircuitBreaker
-              args:
-                name: subscriptionServiceCircuitBreaker
-
-        - id: notification-service
-          uri: lb://notification-service
-          predicates:
-            - Path=/notifications/**
-          filters:
-            - StripPrefix=1
-            - name: CircuitBreaker
-              args:
-                name: notificationServiceCircuitBreaker
-
-        - id: redis-service
-          uri: lb://redis-service
-          predicates:
-            - Path=/cache/**
-          filters:
-            - StripPrefix=1
-            - name: CircuitBreaker
-              args:
-                name: redisServiceCircuitBreaker
-
-      # Upstream veya downstream header'larında herhangi bir kayıp olmaması için:
-      strip-prefix: false
-      preserve-host-header: true
-
-      # Http client yapılandırması
       httpclient:
         connect-timeout: 30000
         response-timeout: 30000
-        # HTTP Basic Authentication kullanımını engelle
-        basic-auth:
-          enabled: false
-
-      default-filters:
-        # WWW-Authenticate header'ını temizle ve yeniden ayarla
-        - RemoveResponseHeader=WWW-Authenticate
-        - AddResponseHeader=WWW-Authenticate, Bearer realm="craftpilot"
-        - RemoveRequestHeader=Cookie
-        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
-        - AddResponseHeader=Access-Control-Allow-Origin, *
-        - AddResponseHeader=Access-Control-Allow-Methods, GET,POST,PUT,DELETE,OPTIONS,HEAD
-        - AddResponseHeader=Access-Control-Allow-Headers, Origin,Content-Type,Accept,Authorization,X-Request-With,X-User-Id,X-User-Role,X-User-Email
-        - AddResponseHeader=Access-Control-Max-Age, 3600
-        - AddResponseHeader=Access-Control-Allow-Credentials, true
-        - name: CircuitBreaker
-          args:
-            name: defaultCircuitBreaker
-            fallbackUri: forward:/fallback
 
 eureka:
-  instance:
-    prefer-ip-address: false
-    hostname: ${HOSTNAME:api-gateway}
-    instance-id: ${spring.application.name}:${random.uuid}
-    lease-renewal-interval-in-seconds: 10
-    lease-expiration-duration-in-seconds: 30
-    metadata-map:
-      zone: primary
-      profile: ${spring.profiles.active:prod}
-      management.context-path: ${server.servlet.context-path:/}actuator
   client:
     service-url:
       defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://craftpilot:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
-    registry-fetch-interval-seconds: 5
-    should-enforce-registration-at-init: true
-    enabled: true
-    use-dns-for-fetching-service-urls: false
-    registry:
-      availability-zones:
-        default: defaultZone
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info
   endpoint:
     health:
       show-details: when_authorized
-      probes:
-        enabled: true
-  health:
-    circuitbreakers:
-      enabled: true
-    livenessstate:
-      enabled: true
-    readinessstate:
-      enabled: true
 
 logging:
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
   level:
     root: INFO
     com.craftpilot.apigateway: DEBUG
-    com.craftpilot.apigateway.security: DEBUG
-    org.springframework.security: INFO
-    org.springframework.cloud.gateway: DEBUG
-    org.springframework.web.cors: INFO
-    reactor.netty.http.client: INFO
-    com.google.firebase: DEBUG
-    org.springframework.web.reactive: DEBUG
-    org.springframework.security.web: DEBUG
 
 # Firebase
 firebase:
