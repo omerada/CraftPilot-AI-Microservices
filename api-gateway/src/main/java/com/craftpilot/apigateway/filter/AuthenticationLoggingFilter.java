@@ -7,12 +7,14 @@ import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.util.Collection;
 import java.util.Collections;
 
 @Component
@@ -44,24 +46,66 @@ public class AuthenticationLoggingFilter implements GlobalFilter, Ordered {
 
         // Mevcut security context'i kontrol et ve logla
         return ReactiveSecurityContextHolder.getContext()
-            .map(SecurityContext::getAuthentication)
-            .defaultIfEmpty(null)
-            .flatMap(authentication -> {
-                if (authentication != null) {
-                    log.debug("Current authentication: User={}, Authorities={}",
-                            authentication.getName(), 
-                            authentication.getAuthorities());
+            .doOnNext(securityContext -> {
+                // SecurityContext bulundu, Authentication nesnesi kontrol edilmeli
+                if (securityContext != null && securityContext.getAuthentication() != null) {
+                    Authentication auth = securityContext.getAuthentication();
+                    log.debug("Current authentication: User={}, Authorities={}", 
+                        auth.getName(),
+                        auth.getAuthorities());
                 } else {
-                    log.debug("No authentication found in context");
+                    log.debug("No authentication found in security context or authentication is null");
                 }
-                return chain.filter(exchange);
             })
-            .switchIfEmpty(chain.filter(exchange));
+            .then(chain.filter(exchange))
+            // SecurityContext bulunamadığında da filtre zincirini devam ettir
+            .switchIfEmpty(Mono.defer(() -> {
+                log.debug("No security context found");
+                return chain.filter(exchange);
+            }));
     }
 
     @Override
     public int getOrder() {
         // FirebaseAuthenticationFilter'dan sonra, ancak çoğu filtreden önce çalışsın
         return Ordered.HIGHEST_PRECEDENCE + 20;
+    }
+    
+    // Boş Authentication için yardımcı sınıf gerekiyorsa
+    private static class EmptyAuthentication implements Authentication {
+        @Override
+        public Collection<? extends GrantedAuthority> getAuthorities() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public Object getCredentials() {
+            return null;
+        }
+
+        @Override
+        public Object getDetails() {
+            return null;
+        }
+
+        @Override
+        public Object getPrincipal() {
+            return "anonymous";
+        }
+
+        @Override
+        public boolean isAuthenticated() {
+            return false;
+        }
+
+        @Override
+        public void setAuthenticated(boolean isAuthenticated) {
+            // İşlem yapma
+        }
+
+        @Override
+        public String getName() {
+            return "anonymous";
+        }
     }
 }
