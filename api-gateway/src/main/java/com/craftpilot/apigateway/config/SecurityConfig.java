@@ -45,8 +45,13 @@ public class SecurityConfig {
             
             // HTTP Headers - deprecated metodları kaldıralım
             .headers(headers -> headers
-                // frameOptions().disable() yerine direkt frame-options'ı disable et
-                .frameOptions(frameOptions -> frameOptions.mode(org.springframework.security.web.server.header.XFrameOptionsServerHttpHeadersWriter.Mode.DISABLE))
+                // XFrameOptions'ı düzeltelim - DISABLE yerine doğru bir enum değeri kullanalım
+                // Tercih 1: DENY kullanarak tüm frame embeddingi engelle
+                .frameOptions(frameOptions -> frameOptions.mode(org.springframework.security.web.server.header.XFrameOptionsServerHttpHeadersWriter.Mode.DENY))
+                
+                // Alternatif: frameOptions'ı devre dışı bırakmak istiyorsak tamamen kaldırma
+                // .frameOptions(frameOptions -> {}) // Bu şekilde tamamen devre dışı bırak
+                
                 .contentSecurityPolicy(csp -> csp
                     .policyDirectives("default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
                                     "style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
