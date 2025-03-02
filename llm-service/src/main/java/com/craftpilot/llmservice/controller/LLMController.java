@@ -2,12 +2,12 @@ package com.craftpilot.llmservice.controller;
 
 import com.craftpilot.llmservice.model.AIRequest;
 import com.craftpilot.llmservice.model.AIResponse;
-import com.craftpilot.llmservice.model.StreamResponse;  // Yeni import
+import com.craftpilot.llmservice.model.StreamResponse;
 import com.craftpilot.llmservice.service.LLMService;
 import com.craftpilot.llmservice.exception.ValidationException;
 import com.craftpilot.llmservice.exception.APIException;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -22,16 +22,14 @@ import jakarta.validation.Valid;
 @Slf4j
 @RestController
 @RequestMapping("/ai")
-@RequiredArgsConstructor
-@Tag(name = "LLM API")
+@RequiredArgsConstructor 
 public class LLMController {
     
     private final LLMService llmService;
     
     @PostMapping(value = "/completions",
                 produces = MediaType.APPLICATION_JSON_VALUE,
-                consumes = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Text completion", description = "Verilen prompt için text completion yapar")
+                consumes = MediaType.APPLICATION_JSON_VALUE) 
     public Mono<ResponseEntity<AIResponse>> textCompletion(
             @Valid @RequestBody AIRequest request,
             @RequestHeader(required = false) String userId) {
@@ -66,8 +64,7 @@ public class LLMController {
 
     @PostMapping(value = "/chat/completions", 
                 produces = MediaType.APPLICATION_JSON_VALUE,
-                consumes = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Chat completion", description = "Sohbet formatında AI yanıtı üretir")
+                consumes = MediaType.APPLICATION_JSON_VALUE) 
     public Mono<ResponseEntity<AIResponse>> chatCompletion(@RequestBody AIRequest request) {
         request.setRequestType("CHAT");
         return llmService.processChatCompletion(request)
@@ -79,8 +76,7 @@ public class LLMController {
     }
 
     @PostMapping(value = "/chat/completions/stream", 
-                produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @Operation(summary = "Streaming chat completion", description = "Yanıtları anlık olarak stream eder")
+                produces = MediaType.TEXT_EVENT_STREAM_VALUE) 
     public Flux<StreamResponse> streamChatCompletion(@RequestBody AIRequest request) {
         request.setRequestType("CHAT");
         return llmService.streamChatCompletion(request)
@@ -90,8 +86,7 @@ public class LLMController {
 
     @PostMapping(value = "/images/generate", 
                 produces = MediaType.APPLICATION_JSON_VALUE,
-                consumes = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Image generation", description = "Verilen prompt'a göre resim üretir")
+                consumes = MediaType.APPLICATION_JSON_VALUE) 
     public Mono<ResponseEntity<AIResponse>> generateImage(@RequestBody AIRequest request) {
         request.setRequestType("IMAGE");
         return llmService.processImageGeneration(request)
@@ -104,8 +99,7 @@ public class LLMController {
 
     @PostMapping(value = "/code/completion", 
                 produces = MediaType.APPLICATION_JSON_VALUE,
-                consumes = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Code completion", description = "Kod tamamlama ve geliştirme yapar")
+                consumes = MediaType.APPLICATION_JSON_VALUE) 
     public Mono<ResponseEntity<AIResponse>> codeCompletion(@RequestBody AIRequest request) {
         request.setRequestType("CODE");
         return llmService.processCodeCompletion(request)
