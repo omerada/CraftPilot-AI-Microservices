@@ -10,6 +10,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.server.reactive.ServerHttpResponse; 
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -176,22 +177,31 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     }
 
     private Mono<Void> handleUnauthorized(ServerWebExchange exchange) {
-        // CORS başlıkları ekle
-        String origin = exchange.getRequest().getHeaders().getOrigin();
-        if (origin != null) {
-            exchange.getResponse().getHeaders().set("Access-Control-Allow-Origin", origin);
-            exchange.getResponse().getHeaders().set("Access-Control-Allow-Credentials", "true");
+        ServerHttpResponse response = exchange.getResponse();
+        
+        try {
+            // CORS başlıkları ekle - response commit edilmemişse
+            if (!response.isCommitted()) {
+                String origin = exchange.getRequest().getHeaders().getOrigin();
+                if (origin != null) {
+                    response.getHeaders().set("Access-Control-Allow-Origin", origin);
+                    response.getHeaders().set("Access-Control-Allow-Credentials", "true");
+                }
+                
+                // WWW-Authenticate başlığını ayarla - SADECE Bearer
+                response.getHeaders().set("WWW-Authenticate", "Bearer realm=\"craftpilot\"");
+                response.setStatusCode(HttpStatus.UNAUTHORIZED);
+            }
+            
+            // Unauthorized durumda yeterince detaylı log
+            log.debug("Returning 401 Unauthorized response for path: {}", 
+                    exchange.getRequest().getPath().value());
+        } catch (UnsupportedOperationException e) {
+            // Başlıklar değiştirilemiyorsa (muhtemelen yanıt commit edildiği için)
+            log.debug("Cannot set response headers: {}", e.getMessage());
         }
         
-        // WWW-Authenticate başlığını ayarla - SADECE Bearer
-        exchange.getResponse().getHeaders().set("WWW-Authenticate", "Bearer realm=\"craftpilot\"");
-        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-        
-        // Unauthorized durumda yeterince detaylı log
-        log.debug("Returning 401 Unauthorized response for path: {}", 
-                exchange.getRequest().getPath().value());
-        
-        return exchange.getResponse().setComplete();
+        return response.setComplete();
     }
 
     private static class AuthenticationException extends RuntimeException {

@@ -6,41 +6,49 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+/**
+ * Bu filtre, yanıt başlıklarını güvenli bir şekilde değiştirmek için kullanılır.
+ * Başlık değişiklikleri, response commit edilmeden önce yapılmalıdır.
+ */
 @Component
 public class GlobalResponseHeaderFilter implements GlobalFilter, Ordered {
     private static final Logger log = LoggerFactory.getLogger(GlobalResponseHeaderFilter.class);
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        ServerHttpResponse response = exchange.getResponse();
+        
+        // Yanıt başlıklarını güncellemeye çalışmadan önce zinciri devam ettirelim
         return chain.filter(exchange)
-            .then(Mono.fromRunnable(() -> {
-                HttpHeaders headers = exchange.getResponse().getHeaders();
-                
-                // WWW-Authenticate başlığı kontrolü ve manipülasyonu
-                if (headers.containsKey(HttpHeaders.WWW_AUTHENTICATE)) {
-                    String authHeader = headers.getFirst(HttpHeaders.WWW_AUTHENTICATE);
-                    if (authHeader != null && authHeader.contains("Basic")) {
-                        log.debug("Removing Basic auth from WWW-Authenticate header");
-                        headers.set(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"craftpilot\"");
+            .then(Mono.defer(() -> {
+                try {
+                    // WWW-Authenticate başlığı kontrolü - yalnızca yanıt commit edilmemişse değiştir
+                    if (response.getHeaders().containsKey(HttpHeaders.WWW_AUTHENTICATE) && !response.isCommitted()) {
+                        String authHeader = response.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE);
+                        if (authHeader != null && authHeader.contains("Basic")) {
+                            log.debug("Replacing WWW-Authenticate header value: {}", authHeader);
+                            
+                            // Mevcut başlığı temizlemek yerine yeni değerini ayarlamak daha güvenlidir
+                            response.getHeaders().set(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"craftpilot\"");
+                        }
                     }
+                } catch (UnsupportedOperationException e) {
+                    // Başlık değiştirilemiyorsa sadece bu durumu loglayalım
+                    log.debug("Cannot modify WWW-Authenticate header: Response headers are read-only");
                 }
                 
-                // CORS başlıklarını ayarla
-                String origin = exchange.getRequest().getHeaders().getOrigin();
-                if (origin != null) {
-                    headers.setAccessControlAllowOrigin(origin);
-                    headers.setAccessControlAllowCredentials(true);
-                }
+                return Mono.empty();
             }));
     }
 
     @Override
     public int getOrder() {
-        // En son çalışması için
-        return Ordered.LOWEST_PRECEDENCE;
+        // Çoğu filtreden önce çalışsın
+        return Ordered.HIGHEST_PRECEDENCE + 5;
     }
 }
