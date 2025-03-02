@@ -192,3 +192,20 @@ logging:
     com.netflix.discovery: ${LOG_LEVEL:INFO}
     com.craftpilot.apigateway.security: DEBUG
     org.springframework.security: DEBUG
+
+cors:
+  allowed-origins:
+    - "https://api.craftpilot.io"
+    - "http://localhost:5173"
+  allowed-methods:
+    - "GET"
+    - "POST"
+    - "PUT"
+    - "DELETE"
+    - "OPTIONS"
+  allowed-headers: "*"
+  exposed-headers:
+    - "Authorization"
+    - "X-Total-Count"
+  allow-credentials: true
+  max-age: 3600
