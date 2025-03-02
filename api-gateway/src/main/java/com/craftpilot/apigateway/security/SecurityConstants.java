@@ -19,7 +19,11 @@ public final class SecurityConstants {
         "/swagger-ui/**",
         "/swagger-resources/**",
         "/v3/api-docs/**",
-        "/webjars/**"
+        "/webjars/**",
+        "/health",
+        "/info",
+        "/favicon.ico",
+        "/error"
     ));
 
     // Admin only paths

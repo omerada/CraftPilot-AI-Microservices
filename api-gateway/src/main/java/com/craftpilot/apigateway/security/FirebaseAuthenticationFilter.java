@@ -39,10 +39,18 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
 
-        if (SecurityConstants.isPublicPath(path)) {
+        // Actuator veya diğer public path'leri izin ver
+        if (SecurityConstants.isPublicPath(path) || path.startsWith("/actuator")) {
             return chain.filter(exchange);
         }
 
+        // Health check veya OPTIONS istekleri için atla
+        String method = exchange.getRequest().getMethod().name();
+        if (path.contains("/health") || path.contains("/info") || "OPTIONS".equals(method)) {
+            return chain.filter(exchange);
+        }
+
+        // Authorization header kontrolü yap
         return extractAndValidateToken(exchange)
             .flatMap(firebaseToken -> processAuthenticatedRequest(exchange, chain, firebaseToken))
             .onErrorResume(e -> handleAuthenticationError(exchange, e));
@@ -52,6 +60,8 @@ public class FirebaseAuthenticationFilter implements WebFilter {
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
           
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) { 
+            log.debug("Authorization header eksik veya geçersiz: {}", 
+                authHeader != null ? authHeader.substring(0, Math.min(authHeader.length(), 10)) + "..." : "null");
             return Mono.error(new AuthenticationException("Invalid authorization header"));
         }
  
@@ -107,7 +117,19 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     }
 
     private Mono<Void> handleAuthenticationError(ServerWebExchange exchange, Throwable error) {
-        log.error("Authentication error: {}", error.getMessage());
+        // Debug seviyesinde log tut - production'da çok fazla log oluşturmaması için
+        if (log.isDebugEnabled()) {
+            log.debug("Authentication error for path {}: {}", 
+                      exchange.getRequest().getPath().value(), error.getMessage());
+        }
+        
+        // OPTIONS istekleri için 200 OK dön
+        if (exchange.getRequest().getMethod().name().equals("OPTIONS")) {
+            exchange.getResponse().setStatusCode(HttpStatus.OK);
+            return exchange.getResponse().setComplete();
+        }
+        
+        // Diğer istekler için 401
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
         return exchange.getResponse().setComplete();
     }
