@@ -74,21 +74,13 @@ spring:
           uri: lb://llm-service
           predicates:
             - Path=/ai/**
-          metadata:
-            connect-timeout: 120000
-            response-timeout: 120000
           filters:
             - name: CircuitBreaker
               args:
                 name: llmServiceCircuitBreaker
-            - name: RewritePath
-              args:
-                regexp: "/ai/(?<segment>.*)"
-                replacement: "/${segment}"
-            - AddRequestHeader=Content-Type, application/json
-            - AddRequestHeader=Accept, text/event-stream
+            - StripPrefix=1
             - PreserveHostHeader
-            - name: RequestSize # LLM istekleri için özel boyut limiti
+            - name: RequestSize
               args:
                 maxSize: 50MB
 

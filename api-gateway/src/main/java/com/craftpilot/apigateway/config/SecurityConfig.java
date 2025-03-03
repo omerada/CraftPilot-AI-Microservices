@@ -1,7 +1,6 @@
 package com.craftpilot.apigateway.config;
 
 import com.craftpilot.apigateway.security.FirebaseAuthenticationFilter;
-import com.craftpilot.apigateway.security.SecurityConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,12 +10,8 @@ import org.springframework.security.config.annotation.web.reactive.EnableWebFlux
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.web.cors.reactive.CorsWebFilter;
-import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.http.HttpMethod;
-import java.util.Arrays;
+import org.springframework.http.HttpStatus;
+import reactor.core.publisher.Mono;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -30,51 +25,23 @@ public class SecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .cors(cors -> cors.disable())  // CORS'u disable ediyoruz çünkü Ingress'te yönetiyoruz
             .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-            .logout(ServerHttpSecurity.LogoutSpec::disable)
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers(HttpMethod.OPTIONS).permitAll()
-                .pathMatchers(SecurityConstants.PUBLIC_PATHS.toArray(new String[0])).permitAll()
+                .pathMatchers("/auth/**", "/actuator/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .anyExchange().authenticated()
             )
-            .addFilterAfter(firebaseAuthenticationFilter, SecurityWebFiltersOrder.CORS)
+            .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+            .exceptionHandling(handling -> handling
+                .authenticationEntryPoint((exchange, ex) -> {
+                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                    return exchange.getResponse().writeWith(
+                        Mono.just(exchange.getResponse().bufferFactory()
+                            .wrap("Authentication failed".getBytes()))
+                    );
+                })
+            )
             .build();
-    }
-
-    @Bean
-    public org.springframework.web.cors.reactive.CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowCredentials(true);
-        config.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:*",
-            "https://*.craftpilot.io",
-            "https://craftpilot.io"
-        ));
-        config.setAllowedMethods(Arrays.asList(
-            HttpMethod.GET.name(),
-            HttpMethod.POST.name(),
-            HttpMethod.PUT.name(),
-            HttpMethod.DELETE.name(),
-            HttpMethod.OPTIONS.name(),
-            HttpMethod.PATCH.name()
-        ));
-        config.setAllowedHeaders(Arrays.asList(
-            "Origin", 
-            "Content-Type",
-            "Accept",
-            "Authorization",
-            "X-Requested-With",
-            "X-User-Id",
-            "X-User-Role",
-            "X-User-Email"
-        ));
-        config.setMaxAge(3600L);
-
-        org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource source = 
-            new org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
     }
 }
