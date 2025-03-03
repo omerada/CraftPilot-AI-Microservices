@@ -79,7 +79,7 @@ spring:
             - name: CircuitBreaker
               args:
                 name: llmServiceCircuitBreaker
-                fallbackUri: forward:/ai-fallback
+                fallbackUri: forward:/ai-fallback-fallback # Düzeltilmiş fallback yolu
 
         - id: image-service
           uri: lb://image-service
@@ -269,6 +269,10 @@ resilience4j:
         baseConfig: default
         slidingWindowSize: 30
         waitDurationInOpenState: 20s
+        failureRateThreshold: 50
+        permittedNumberOfCallsInHalfOpenState: 3
+        registerHealthIndicator: true
+        allowHealthIndicatorToFail: true
       userServiceCircuitBreaker:
         baseConfig: default
 

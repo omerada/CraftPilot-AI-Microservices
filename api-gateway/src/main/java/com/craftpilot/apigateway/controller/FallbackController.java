@@ -34,6 +34,19 @@ public class FallbackController {
                 .body(response));
     }
 
+    @GetMapping("/ai-fallback")
+    public Mono<ResponseEntity<Map<String, Object>>> aiServiceFallback() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("timestamp", LocalDateTime.now());
+        response.put("status", HttpStatus.SERVICE_UNAVAILABLE.value());
+        response.put("message", "AI service is temporarily unavailable");
+        response.put("service", "llm-service");
+        
+        return Mono.just(ResponseEntity
+                .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(response));
+    }
+
     private String formatServiceName(String serviceName) {
         return serviceName.substring(0, 1).toUpperCase() + 
                serviceName.substring(1).toLowerCase().replace("-", " ");
