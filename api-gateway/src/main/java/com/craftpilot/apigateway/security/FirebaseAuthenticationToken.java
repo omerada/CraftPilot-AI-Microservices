@@ -1,12 +1,14 @@
 package com.craftpilot.apigateway.security;
 
+import com.google.firebase.auth.FirebaseToken;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
 
 public class FirebaseAuthenticationToken extends AbstractAuthenticationToken {
-    private final FirebaseUserDetails principal;
-    private final String credentials;
+    private final UserDetails principal;
+    private final FirebaseToken credentials;
 
-    public FirebaseAuthenticationToken(FirebaseUserDetails principal, String credentials) {
+    public FirebaseAuthenticationToken(UserDetails principal, FirebaseToken credentials) {
         super(principal.getAuthorities());
         this.principal = principal;
         this.credentials = credentials;
@@ -14,12 +16,12 @@ public class FirebaseAuthenticationToken extends AbstractAuthenticationToken {
     }
 
     @Override
-    public String getCredentials() {
+    public Object getCredentials() {
         return credentials;
     }
 
     @Override
-    public FirebaseUserDetails getPrincipal() {
+    public Object getPrincipal() {
         return principal;
     }
 }

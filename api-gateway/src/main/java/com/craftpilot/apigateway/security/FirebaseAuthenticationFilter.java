@@ -1,9 +1,13 @@
 package com.craftpilot.apigateway.security;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -14,50 +18,47 @@ import reactor.core.publisher.Mono;
 import org.springframework.http.HttpHeaders;
 import reactor.core.scheduler.Schedulers;
 
-@Slf4j
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
 @Component
 @RequiredArgsConstructor
 public class FirebaseAuthenticationFilter implements WebFilter {
+    private static final Logger log = LoggerFactory.getLogger(FirebaseAuthenticationFilter.class);
     private final FirebaseAuth firebaseAuth;
+    
+    private final Cache<String, FirebaseToken> tokenCache = CacheBuilder.newBuilder()
+            .expireAfterWrite(1, TimeUnit.HOURS)
+            .maximumSize(1000)
+            .build();
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return chain.filter(exchange);
-        }
-
-        String token = authHeader.substring(7);
-
-        return Mono.fromCallable(() -> firebaseAuth.verifyIdToken(token))
-            .subscribeOn(Schedulers.boundedElastic())
-            .map(this::createAuthentication)
-            .flatMap(authentication -> chain.filter(exchange)
-                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication)))
-            .onErrorResume(e -> {
-                log.error("Error processing Firebase token", e);
-                return chain.filter(exchange);
-            });
+        return extractAndValidateToken(exchange)
+                .flatMap(token -> processAuthenticatedRequest(exchange, chain, token))
+                .onErrorResume(AuthenticationException.class, 
+                    error -> handleAuthenticationError(exchange, error))
+                .onErrorResume(Exception.class, 
+                    error -> {
+                        log.error("Unexpected error during authentication", error);
+                        return chain.filter(exchange);
+                    });
     }
-
-    private Authentication createAuthentication(FirebaseToken firebaseToken) {
-        FirebaseUserDetails userDetails = new FirebaseUserDetails(firebaseToken);
 
     private Mono<FirebaseToken> extractAndValidateToken(ServerWebExchange exchange) {
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-          
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) { 
+        
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return Mono.error(new AuthenticationException("Invalid authorization header"));
         }
- 
+
         String token = authHeader.substring(7);
         return validateFirebaseToken(token);
     }
 
     private Mono<FirebaseToken> validateFirebaseToken(String token) {
         FirebaseToken cachedToken = tokenCache.getIfPresent(token);
-        if (cachedToken != null) { 
+        if (cachedToken != null) {
             return Mono.just(cachedToken);
         }
 
@@ -80,22 +81,20 @@ public class FirebaseAuthenticationFilter implements WebFilter {
         FirebaseUserDetails userDetails = new FirebaseUserDetails(firebaseToken);
         FirebaseAuthenticationToken authToken = new FirebaseAuthenticationToken(userDetails, firebaseToken);
         
-        // Exchange'i modifiye et
         ServerWebExchange modifiedExchange = modifyExchange(exchange, firebaseToken);
 
-        // Security context'i güncelle ve chain'i devam ettir
         return chain.filter(modifiedExchange)
-            .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authToken));
+                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authToken));
     }
 
     private ServerWebExchange modifyExchange(ServerWebExchange exchange, FirebaseToken firebaseToken) {
         return exchange.mutate()
-            .request(exchange.getRequest().mutate()
-                .header("X-User-Id", firebaseToken.getUid())
-                .header("X-User-Role", extractUserRole(firebaseToken))
-                .header("X-User-Email", firebaseToken.getEmail())
-                .build())
-            .build();
+                .request(exchange.getRequest().mutate()
+                        .header("X-User-Id", firebaseToken.getUid())
+                        .header("X-User-Role", extractUserRole(firebaseToken))
+                        .header("X-User-Email", firebaseToken.getEmail() != null ? firebaseToken.getEmail() : "")
+                        .build())
+                .build();
     }
 
     private Mono<Void> handleAuthenticationError(ServerWebExchange exchange, Throwable error) {
