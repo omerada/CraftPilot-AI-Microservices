@@ -14,7 +14,8 @@ public class SecurityConstants {
         "/subscription-plans/public/**",
         "/docs/**",
         "/swagger-ui/**",
-        "/v3/api-docs/**"
+        "/v3/api-docs/**",
+        "/favicon.ico"
     );
 
     public static boolean isPublicPath(String path) {

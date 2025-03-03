@@ -86,11 +86,11 @@ spring:
           predicates:
             - Path=/ai/**
           metadata:
+            secured: true
+            roles: [USER, ADMIN]
+            methods: [GET, POST]
             connect-timeout: 120000
             response-timeout: 120000
-            secured: true
-            methods: [POST, GET]
-            roles: [USER, ADMIN]
           filters:
             - name: CircuitBreaker
               args:
@@ -102,8 +102,10 @@ spring:
                 replacement: "/${segment}"
             - AddRequestHeader=Content-Type, application/json
             - AddRequestHeader=Accept, text/event-stream
-            - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
             - PreserveHostHeader
+            - name: RequestSize # LLM istekleri için özel boyut limiti
+              args:
+                maxSize: 50MB
 
         - id: image-service
           uri: lb://image-service
@@ -320,9 +322,3 @@ spring.sleuth:
     correlation-enabled: true
     remote-fields: x-request-id
     local-fields: country-code,user-id
-
-cors:
-  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,https://craftpilot.io,https://*.craftpilot.io}
-  allowed-methods: GET,POST,PUT,DELETE,OPTIONS,PATCH
-  max-age: 3600
-  allow-credentials: true
