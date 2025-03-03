@@ -34,19 +34,11 @@ public class SecurityConfig {
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
-                .pathMatchers(
-                    "/actuator/**", 
-                    "/v3/api-docs/**", 
-                    "/swagger-ui/**",
-                    "/webjars/**", 
-                    "/fallback/**",
-                    "/favicon.ico",
-                    "/auth/login",
-                    "/auth/register",
-                    "/auth/reset-password").permitAll()
-                .pathMatchers("/admin/**").hasRole("ADMIN")
+                .pathMatchers(SecurityConstants.PUBLIC_PATHS.toArray(new String[0])).permitAll()
                 .anyExchange().authenticated()
             )
+            // Filtrelerin sıralamasını düzelt
+            .addFilterBefore(corsWebFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
             .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
             .build();
     }

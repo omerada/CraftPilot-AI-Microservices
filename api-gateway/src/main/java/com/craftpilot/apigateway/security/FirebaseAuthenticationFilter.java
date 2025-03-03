@@ -48,8 +48,8 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
         
-        // Public endpoints için authentication bypass
-        if (isPublicPath(path) || exchange.getRequest().getMethod() == HttpMethod.OPTIONS) {
+        // Tekrar eden kontrolleri kaldır
+        if (SecurityConstants.isPublicPath(path) || exchange.getRequest().getMethod() == HttpMethod.OPTIONS) {
             return chain.filter(exchange);
         }
 
@@ -72,18 +72,6 @@ public class FirebaseAuthenticationFilter implements WebFilter {
                         return handleAuthenticationError(exchange, 
                             new AuthenticationException("Internal authentication error"));
                     });
-    }
-
-    private boolean isPublicPath(String path) {
-        return Arrays.asList(
-            "/actuator/",
-            "/v3/api-docs",
-            "/swagger-ui",
-            "/webjars/",
-            "/auth/login",
-            "/auth/register",
-            "/auth/reset-password"
-        ).stream().anyMatch(path::startsWith);
     }
 
     private Mono<FirebaseToken> extractAndValidateToken(ServerWebExchange exchange) {
