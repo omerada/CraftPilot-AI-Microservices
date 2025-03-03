@@ -223,7 +223,7 @@ management:
         enabled: true
       group:
         readiness:
-          include: db,diskSpace,ping
+          include: ping,redis,diskSpace # db yerine redis ekledik
         liveness:
           include: ping
   health:
@@ -234,10 +234,10 @@ management:
     readinessstate:
       enabled: true
     redis:
-      enabled: false
+      enabled: true # Redis health check'i aktif edildi
     diskspace:
       enabled: true
-    validate-group-membership: false
+    validate-group-membership: true
 
   metrics:
     tags:
