@@ -154,156 +154,157 @@ spring:
         - name: RequestSize
           args:
             maxSize: 10MB
-        - AddResponseHeader=X-Response-Time, ${responseTime}
-        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+        # Response time header'ını kaldır, global filter olarak ekleyelim
 
-  data:
-    redis:
-      host: ${REDIS_HOST:redis}
+  data:            name: X-Response-Time
+    redis:     value: ${request.duration:0}ms
+      host: ${REDIS_HOST:redis}DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:13579ada}
 
-  httpclient:
-    connect-timeout: 30000
-    response-timeout: 30000
+  httpclient:      host: ${REDIS_HOST:redis}
+    connect-timeout: 30000{REDIS_PORT:6379}
+    response-timeout: 30000SSWORD:13579ada}
     pool:
-      max-idle-time: 15s
-      max-connections: 1000
+      max-idle-time: 15sent:
+      max-connections: 100000
       type: ELASTIC
       metrics: true
-      acquire-timeout: 60000
+      acquire-timeout: 60000: 15s
   loadbalancer:
-    cache:
-      enabled: true
-      caffeine:
+    cache:STIC
+      enabled: trueics: true
+      caffeine:ut: 60000
         spec: maximumSize=500,expireAfterWrite=5s
   jackson:
-    deserialization:
+    deserialization:led: true
       UNWRAP_ROOT_VALUE: true
-      FAIL_ON_UNKNOWN_PROPERTIES: false
+      FAIL_ON_UNKNOWN_PROPERTIES: false,expireAfterWrite=5s
       ACCEPT_SINGLE_VALUE_AS_ARRAY: true
     serialization:
-      WRAP_ROOT_VALUE: true
-      FAIL_ON_EMPTY_BEANS: false
-    mapper:
-      ACCEPT_CASE_INSENSITIVE_PROPERTIES: true
+      WRAP_ROOT_VALUE: trueVALUE: true
+      FAIL_ON_EMPTY_BEANS: falseRTIES: false
+    mapper:AY: true
+      ACCEPT_CASE_INSENSITIVE_PROPERTIES: truezation:
       DEFAULT_VIEW_INCLUSION: true
 
-eureka:
-  instance:
-    prefer-ip-address: false
+eureka:    mapper:
+  instance:CCEPT_CASE_INSENSITIVE_PROPERTIES: true
+    prefer-ip-address: falseLT_VIEW_INCLUSION: true
     hostname: ${HOSTNAME:api-gateway}
     instance-id: ${spring.application.name}:${random.uuid}
     lease-renewal-interval-in-seconds: 10
     lease-expiration-duration-in-seconds: 30
     metadata-map:
-      zone: primary
-      profile: ${spring.profiles.active:prod}
+      zone: primary${spring.application.name}:${random.uuid}
+      profile: ${spring.profiles.active:prod}nterval-in-seconds: 10
       management.context-path: ${server.servlet.context-path:/actuator}
   client:
-    service-url:
-      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://craftpilot:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka/}
+    service-url:e: primary
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://craftpilot:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka/}{spring.profiles.active:prod}
     fetch-registry: true
     register-with-eureka: true
     registry-fetch-interval-seconds: 5
-    should-enforce-registration-at-init: true
+    should-enforce-registration-at-init: trueVICE_URL_DEFAULTZONE:http://craftpilot:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka/}
     enabled: true
-    use-dns-for-fetching-service-urls: false
+    use-dns-for-fetching-service-urls: false-eureka: true
     availability-zones:
-      default: defaultZone
+      default: defaultZonestration-at-init: true
 
-management:
-  endpoints:
-    web:
+management:    use-dns-for-fetching-service-urls: false
+  endpoints:ility-zones:
+    web:t: defaultZone
       exposure:
         include: "*"
   endpoint:
     health:
-      show-details: always
+      show-details: alwaysure:
       probes:
         enabled: true
       group:
-        readiness:
+        readiness:etails: always
           include: ping,redis,diskSpace # db yerine redis ekledik
         liveness:
           include: ping
   health:
-    circuitbreakers:
+    circuitbreakers: include: ping,redis,diskSpace # db yerine redis ekledik
       enabled: true
-    livenessstate:
+    livenessstate:ping
       enabled: true
-    readinessstate:
+    readinessstate::
       enabled: true
     redis:
-      enabled: true # Redis health check'i aktif edildi
+      enabled: true # Redis health check'i aktif edildiled: true
     diskspace:
-      enabled: true
+      enabled: true true
     validate-group-membership: true
-
-  metrics:
-    tags:
-      application: ${spring.application.name}
+check'i aktif edildi
+  metrics:    diskspace:
+    tags:led: true
+      application: ${spring.application.name}ate-group-membership: true
     distribution:
       percentiles-histogram:
         http.server.requests: true
-      sla:
-        http.server.requests: 10ms,50ms,100ms,200ms,500ms
+      sla:ation.name}
+        http.server.requests: 10ms,50ms,100ms,200ms,500msbution:
     enable:
-      all: true
+      all: truep.server.requests: true
 
-logging:
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n"
+logging:        http.server.requests: 10ms,50ms,100ms,200ms,500ms
+  pattern:le:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n" true
   level:
     root: INFO
     com.craftpilot.apigateway: DEBUG
-    org.springframework.cloud.gateway: INFO
+    org.springframework.cloud.gateway: INFO.SSS} [%thread] [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n"
     org.springframework.cloud.netflix.eureka: ${LOG_LEVEL:INFO}
     com.netflix.discovery: ${LOG_LEVEL:INFO}
     com.craftpilot.apigateway.security: ${SECURITY_LOG_LEVEL:INFO}
     org.springframework.security: INFO
-    reactor.netty.http.client: INFO
-
-resilience4j:
-  circuitbreaker:
-    configs:
+    reactor.netty.http.client: INFOeureka: ${LOG_LEVEL:INFO}
+VEL:INFO}
+resilience4j:    com.craftpilot.apigateway.security: ${SECURITY_LOG_LEVEL:INFO}
+  circuitbreaker:gframework.security: INFO
+    configs:.http.client: INFO
       default:
         slidingWindowType: TIME_BASED
         slidingWindowSize: 60
         minimumNumberOfCalls: 5
         waitDurationInOpenState: 30s
-        failureRateThreshold: 50
+        failureRateThreshold: 50D
         permittedNumberOfCallsInHalfOpenState: 3
         automaticTransitionFromOpenToHalfOpenEnabled: true
         eventConsumerBufferSize: 100
     instances:
-      llmServiceCircuitBreaker:
-        baseConfig: default
-        slidingWindowSize: 30
+      llmServiceCircuitBreaker:tedNumberOfCallsInHalfOpenState: 3
+        baseConfig: defaultOpenToHalfOpenEnabled: true
+        slidingWindowSize: 30Size: 100
         waitDurationInOpenState: 20s
         failureRateThreshold: 50
         permittedNumberOfCallsInHalfOpenState: 3
         registerHealthIndicator: true
         allowHealthIndicatorToFail: true
       userServiceCircuitBreaker:
-        baseConfig: default
-
-  timelimiter:
-    configs:
-      default:
+        baseConfig: defaultHalfOpenState: 3
+ator: true
+  timelimiter:        allowHealthIndicatorToFail: true
+    configs:iceCircuitBreaker:
+      default:Config: default
         timeoutDuration: 5s
         cancelRunningFuture: true
     instances:
       userServiceTimeLimiter:
         timeoutDuration: 2s
-      llmServiceTimeLimiter:
+      llmServiceTimeLimiter:: true
         timeoutDuration: 30s
-
-# Tracing Configuration
-spring.sleuth:
-  sampler:
+:
+# Tracing Configuration        timeoutDuration: 2s
+spring.sleuth:iter:
+  sampler:tDuration: 30s
     probability: 1.0
-  baggage:
-    correlation-enabled: true
+  baggage:ion
+    correlation-enabled: trueuth:
+    remote-fields: x-request-id
+    local-fields: country-code,user-id
     remote-fields: x-request-id
     local-fields: country-code,user-id
