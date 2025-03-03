@@ -125,30 +125,22 @@ spring:
             methods: GET,POST,PUT,DELETE
             series: SERVER_ERROR
             exceptions: java.io.IOException,java.util.concurrent.TimeoutException
-        - name: RequestRateLimiter
-          args:
-            local-rate-limiter:
-              replenish-rate: 50
-              burst-capacity: 100
-              request-tokens: 1
-        - name: CircuitBreaker
-          args:
-            name: defaultCircuitBreaker
-            fallbackUri: forward:/fallback
-      httpclient:
-        connect-timeout: 30000
-        response-timeout: 30000
-        pool:
-          max-idle-time: 15s
-          max-connections: 1000
-          type: ELASTIC
-          metrics: true
-          acquire-timeout: 60000
-    loadbalancer:
-      cache:
-        enabled: true
-        caffeine:
-          spec: maximumSize=500,expireAfterWrite=5s
+
+
+  httpclient:
+    connect-timeout: 30000
+    response-timeout: 30000
+    pool:
+      max-idle-time: 15s
+      max-connections: 1000
+      type: ELASTIC
+      metrics: true
+      acquire-timeout: 60000
+  loadbalancer:
+    cache:
+      enabled: true
+      caffeine:
+        spec: maximumSize=500,expireAfterWrite=5s
   jackson:
     deserialization:
       UNWRAP_ROOT_VALUE: true
@@ -160,8 +152,6 @@ spring:
     mapper:
       ACCEPT_CASE_INSENSITIVE_PROPERTIES: true
       DEFAULT_VIEW_INCLUSION: true
-  data:
-    redis: null
 
 eureka:
   instance:
@@ -173,7 +163,7 @@ eureka:
     metadata-map:
       zone: primary
       profile: ${spring.profiles.active:prod}
-      management.context-path: ${server.servlet.context-path:/}actuator
+      management.context-path: ${server.servlet.context-path:/actuator}
   client:
     service-url:
       defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://craftpilot:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka/}
@@ -183,9 +173,8 @@ eureka:
     should-enforce-registration-at-init: true
     enabled: true
     use-dns-for-fetching-service-urls: false
-    registry:
-      availability-zones:
-        default: defaultZone
+    availability-zones:
+      default: defaultZone
 
 management:
   endpoints:
@@ -266,9 +255,12 @@ resilience4j:
         limitRefreshPeriod: 1s
         timeoutDuration: 5s
     instances:
-      userService:
+      globalRateLimiter:
+        baseConfig: default
+        limitForPeriod: 1000
+      userServiceRateLimiter:
         baseConfig: default
         limitForPeriod: 200
-      llmService:
+      aiServiceRateLimiter:
         baseConfig: default
         limitForPeriod: 50
