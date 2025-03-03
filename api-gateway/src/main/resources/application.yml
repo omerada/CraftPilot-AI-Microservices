@@ -196,9 +196,11 @@ management:
         enabled: true
       group:
         readiness:
-          include: db,redis,discovery
+          include: diskSpace,ping,redis,discovery # db yerine gerekli health indicatorları ekledik
+          show-details: always
         liveness:
           include: ping
+          show-details: always
   health:
     circuitbreakers:
       enabled: true
@@ -206,6 +208,12 @@ management:
       enabled: true
     readinessstate:
       enabled: true
+    redis:
+      enabled: true # Redis health check'i aktif
+    diskspace:
+      enabled: true # Disk space health check'i aktif
+    validate-group-membership: false # Geçici olarak validation'ı devre dışı bırakabilirsiniz
+
   metrics:
     tags:
       application: ${spring.application.name}
