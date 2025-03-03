@@ -52,12 +52,12 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             return chain.filter(exchange);
         }
 
-        String token = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        if (token == null || !token.startsWith("Bearer ")) {
+        final String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return handleAuthenticationError(exchange, "Missing or invalid token");
         }
 
-        token = token.substring(7);
+        final String token = authHeader.substring(7);
 
         return Mono.fromCallable(() -> firebaseAuth.verifyIdToken(token))
             .subscribeOn(Schedulers.boundedElastic())

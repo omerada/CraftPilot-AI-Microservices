@@ -82,7 +82,7 @@ spring:
             - PreserveHostHeader
             - name: RequestSize
               args:
-                maxSize: 50MB
+                maxSize: 10MB
 
         - id: image-service
           uri: lb://image-service
