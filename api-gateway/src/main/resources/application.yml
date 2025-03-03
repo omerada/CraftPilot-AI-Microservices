@@ -13,6 +13,8 @@ spring:
   security:
     basic:
       enabled: false
+    filter:
+      order: 1
   cloud:
     config:
       enabled: false
@@ -47,6 +49,16 @@ spring:
                 redis-rate-limiter.burstCapacity: 40
                 key-resolver: "#{@userKeyResolver}"
 
+        - id: auth-service
+          uri: lb://user-service
+          predicates:
+            - Path=/auth/**
+          filters:
+            - StripPrefix=0
+            - PreserveHostHeader
+          metadata:
+            secured: false # Authentication bypass for auth endpoints
+
         # Business Services
         - id: admin-service
           uri: lb://admin-service
@@ -79,7 +91,7 @@ spring:
             - name: CircuitBreaker
               args:
                 name: llmServiceCircuitBreaker
-                fallbackUri: forward:/fallback/ai-fallback 
+                fallbackUri: forward:/fallback/ai-fallback
 
         - id: image-service
           uri: lb://image-service
@@ -144,6 +156,7 @@ spring:
           args:
             maxSize: 10MB
         - AddResponseHeader=X-Response-Time, ${responseTime}
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
 
   data:
     redis:

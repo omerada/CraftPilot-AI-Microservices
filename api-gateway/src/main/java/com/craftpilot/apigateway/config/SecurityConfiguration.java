@@ -13,6 +13,7 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import reactor.core.publisher.Mono;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -21,18 +22,6 @@ public class SecurityConfiguration {
 
     private final FirebaseAuthenticationFilter firebaseAuthenticationFilter;
     private final CorsWebFilter corsWebFilter;
-
-    private static final String[] PUBLIC_PATHS = {
-        "/actuator/**",
-        "/v3/api-docs/**",
-        "/swagger-ui/**",
-        "/webjars/**",
-        "/fallback/**",
-        "/auth/login",
-        "/auth/register",
-        "/auth/reset-password",
-        "/favicon.ico"
-    };
 
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -44,7 +33,9 @@ public class SecurityConfiguration {
             .logout(ServerHttpSecurity.LogoutSpec::disable)
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
-                .pathMatchers(PUBLIC_PATHS).permitAll()
+                .pathMatchers(HttpMethod.POST, "/auth/**").permitAll() // POST işlemleri için özel izin
+                .pathMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**", 
+                            "/webjars/**", "/fallback/**", "/favicon.ico").permitAll()
                 .pathMatchers("/admin/**").hasRole("ADMIN")
                 .anyExchange().authenticated()
             )
@@ -53,11 +44,17 @@ public class SecurityConfiguration {
             .exceptionHandling(handling -> handling
                 .authenticationEntryPoint((exchange, ex) -> {
                     exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                    return exchange.getResponse().setComplete();
+                    return exchange.getResponse().writeWith(
+                        Mono.just(exchange.getResponse().bufferFactory()
+                            .wrap("Unauthorized access".getBytes()))
+                    );
                 })
                 .accessDeniedHandler((exchange, denied) -> {
                     exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
-                    return exchange.getResponse().setComplete();
+                    return exchange.getResponse().writeWith(
+                        Mono.just(exchange.getResponse().bufferFactory()
+                            .wrap("Access denied".getBytes()))
+                    );
                 })
             )
             .build();

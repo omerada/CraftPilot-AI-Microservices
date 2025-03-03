@@ -45,20 +45,21 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
         
-        // Sadece public path'ler için authentication bypass
-        if (isPublicPath(path)) {
+        // Public endpoints için authentication bypass
+        if (isPublicPath(path) || exchange.getRequest().getMethod() == HttpMethod.OPTIONS) {
             return chain.filter(exchange);
         }
 
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         
-        // Auth header zorunlu
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            log.debug("No valid authorization header found for path: {}", path);
             return handleAuthenticationError(exchange, 
-                new AuthenticationException("Authorization header is required"));
+                new AuthenticationException("Authorization header is missing or invalid"));
         }
 
         return extractAndValidateToken(exchange)
+                .doOnError(error -> log.error("Token validation error: {}", error.getMessage()))
                 .flatMap(token -> processAuthenticatedRequest(exchange, chain, token))
                 .onErrorResume(AuthenticationException.class, 
                     error -> handleAuthenticationError(exchange, error))
@@ -71,7 +72,16 @@ public class FirebaseAuthenticationFilter implements WebFilter {
     }
 
     private boolean isPublicPath(String path) {
-        return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
+        return Arrays.asList(
+            "/actuator/",
+            "/v3/api-docs",
+            "/swagger-ui",
+            "/webjars/",
+            "/fallback/",
+            "/auth/login",
+            "/auth/register",
+            "/auth/reset-password"
+        ).stream().anyMatch(path::startsWith);
     }
 
     private Mono<FirebaseToken> extractAndValidateToken(ServerWebExchange exchange) {
