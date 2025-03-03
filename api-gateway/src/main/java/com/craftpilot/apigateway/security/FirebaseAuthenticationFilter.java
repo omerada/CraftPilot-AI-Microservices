@@ -39,7 +39,9 @@ public class FirebaseAuthenticationFilter implements WebFilter {
         "/v3/api-docs",
         "/swagger-ui",
         "/webjars/",
-        "/fallback/"
+        "/auth/login",
+        "/auth/register",
+        "/auth/reset-password"
     );
 
     @Override
@@ -78,7 +80,6 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             "/v3/api-docs",
             "/swagger-ui",
             "/webjars/",
-            "/fallback/",
             "/auth/login",
             "/auth/register",
             "/auth/reset-password"

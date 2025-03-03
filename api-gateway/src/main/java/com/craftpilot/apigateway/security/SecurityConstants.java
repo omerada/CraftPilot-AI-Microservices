@@ -5,7 +5,6 @@ import java.util.List;
 public class SecurityConstants {
     public static final List<String> PUBLIC_PATHS = List.of(
         "/auth/**",
-        "/fallback/**",
         "/actuator/**",
         "/auth/register",
         "/auth/login",

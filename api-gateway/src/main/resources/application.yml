@@ -38,7 +38,6 @@ spring:
             - name: CircuitBreaker
               args:
                 name: userServiceCircuitBreaker
-                fallbackUri: forward:/fallback/user-service
             - name: RequestRateLimiter
               args:
                 redis-rate-limiter.replenishRate: 20
@@ -82,7 +81,6 @@ spring:
             - name: CircuitBreaker
               args:
                 name: llmServiceCircuitBreaker
-                fallbackUri: forward:/fallback/ai-fallback
             - name: RewritePath
               args:
                 regexp: "/ai/(?<segment>.*)"
