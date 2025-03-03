@@ -25,18 +25,17 @@ public class CorsConfiguration {
     public CorsWebFilter corsWebFilter() {
         org.springframework.web.cors.CorsConfiguration config = new org.springframework.web.cors.CorsConfiguration();
         
-        config.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:*",
-            "https://*.craftpilot.io",
-            "https://craftpilot.io"
-        ));
+        // Tüm origin'lere izin ver (daha güvenli bir yaklaşım için spesifik domainler belirlenebilir)
+        config.setAllowedOriginPatterns(Arrays.asList("*"));
         
+        // Tüm HTTP metodlarına izin ver
         config.setAllowedMethods(Arrays.asList(
             HttpMethod.GET.name(),
             HttpMethod.POST.name(),
             HttpMethod.PUT.name(),
             HttpMethod.DELETE.name(),
-            HttpMethod.OPTIONS.name()
+            HttpMethod.OPTIONS.name(),
+            HttpMethod.PATCH.name()
         ));
         
         config.setAllowedHeaders(Arrays.asList(

@@ -33,6 +33,7 @@ public class SecurityConfiguration {
             .logout(ServerHttpSecurity.LogoutSpec::disable)
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
+                .pathMatchers(HttpMethod.POST, "/ai/**").authenticated()
                 .pathMatchers(
                     "/actuator/**", 
                     "/v3/api-docs/**", 

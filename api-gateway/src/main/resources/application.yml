@@ -93,9 +93,14 @@ spring:
               args:
                 name: llmServiceCircuitBreaker
                 fallbackUri: forward:/fallback/ai-fallback
+            - name: RewritePath
+              args:
+                regexp: "/ai/(?<segment>.*)"
+                replacement: "/${segment}"
             - AddRequestHeader=Content-Type, application/json
             - AddRequestHeader=Accept, text/event-stream
             - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+            - PreserveHostHeader
 
         - id: image-service
           uri: lb://image-service
