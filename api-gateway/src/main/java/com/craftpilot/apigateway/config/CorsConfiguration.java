@@ -7,6 +7,7 @@ import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
+import org.springframework.http.HttpMethod;
 
 @Configuration
 public class CorsConfiguration {
@@ -24,15 +25,20 @@ public class CorsConfiguration {
     public CorsWebFilter corsWebFilter() {
         org.springframework.web.cors.CorsConfiguration config = new org.springframework.web.cors.CorsConfiguration();
         
-        // Wildcard domain desteği için pattern matching özelliğini aktif et
         config.setAllowedOriginPatterns(Arrays.asList(
             "http://localhost:*",
             "https://*.craftpilot.io",
             "https://craftpilot.io"
         ));
         
-        config.setAllowedOrigins(allowedOrigins);
-        config.setAllowedMethods(allowedMethods);
+        config.setAllowedMethods(Arrays.asList(
+            HttpMethod.GET.name(),
+            HttpMethod.POST.name(),
+            HttpMethod.PUT.name(),
+            HttpMethod.DELETE.name(),
+            HttpMethod.OPTIONS.name()
+        ));
+        
         config.setAllowedHeaders(Arrays.asList(
             "Origin", 
             "Content-Type",
@@ -43,13 +49,16 @@ public class CorsConfiguration {
             "X-User-Role",
             "X-User-Email"
         ));
+        
         config.setExposedHeaders(Arrays.asList(
             "X-Total-Count",
             "X-Response-Time",
-            "X-Error-Message"
+            "X-Error-Message",
+            "Access-Control-Allow-Origin"
         ));
+        
         config.setAllowCredentials(true);
-        config.setMaxAge(maxAge);
+        config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

@@ -33,9 +33,16 @@ public class SecurityConfiguration {
             .logout(ServerHttpSecurity.LogoutSpec::disable)
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
-                .pathMatchers(HttpMethod.POST, "/auth/**").permitAll() // POST işlemleri için özel izin
-                .pathMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**", 
-                            "/webjars/**", "/fallback/**", "/favicon.ico").permitAll()
+                .pathMatchers(
+                    "/actuator/**", 
+                    "/v3/api-docs/**", 
+                    "/swagger-ui/**",
+                    "/webjars/**", 
+                    "/fallback/**",
+                    "/favicon.ico",
+                    "/auth/login",
+                    "/auth/register",
+                    "/auth/reset-password").permitAll()
                 .pathMatchers("/admin/**").hasRole("ADMIN")
                 .anyExchange().authenticated()
             )
