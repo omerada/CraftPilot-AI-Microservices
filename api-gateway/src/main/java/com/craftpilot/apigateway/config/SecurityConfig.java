@@ -14,6 +14,7 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.http.HttpMethod;
 import java.util.Arrays;
 
@@ -29,20 +30,21 @@ public class SecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .cors(cors -> cors.configurationSource(corsConfiguration()))
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+            .logout(ServerHttpSecurity.LogoutSpec::disable)
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
                 .pathMatchers(SecurityConstants.PUBLIC_PATHS.toArray(new String[0])).permitAll()
                 .anyExchange().authenticated()
             )
-            .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+            .addFilterAfter(firebaseAuthenticationFilter, SecurityWebFiltersOrder.CORS)
             .build();
     }
 
     @Bean
-    public CorsConfiguration corsConfiguration() {
+    public org.springframework.web.cors.reactive.CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
         config.setAllowedOriginPatterns(Arrays.asList(
@@ -50,16 +52,29 @@ public class SecurityConfig {
             "https://*.craftpilot.io",
             "https://craftpilot.io"
         ));
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        config.setAllowedHeaders(Arrays.asList("*"));
+        config.setAllowedMethods(Arrays.asList(
+            HttpMethod.GET.name(),
+            HttpMethod.POST.name(),
+            HttpMethod.PUT.name(),
+            HttpMethod.DELETE.name(),
+            HttpMethod.OPTIONS.name(),
+            HttpMethod.PATCH.name()
+        ));
+        config.setAllowedHeaders(Arrays.asList(
+            "Origin", 
+            "Content-Type",
+            "Accept",
+            "Authorization",
+            "X-Requested-With",
+            "X-User-Id",
+            "X-User-Role",
+            "X-User-Email"
+        ));
         config.setMaxAge(3600L);
-        return config;
-    }
 
-    @Bean
-    public CorsWebFilter corsWebFilter() {
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", corsConfiguration());
-        return new CorsWebFilter(source);
+        org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource source = 
+            new org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 }
