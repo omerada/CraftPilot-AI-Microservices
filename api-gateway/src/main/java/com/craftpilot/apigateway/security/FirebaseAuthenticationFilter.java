@@ -17,6 +17,8 @@ import reactor.core.publisher.Mono;
 import org.springframework.http.HttpHeaders;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -31,8 +33,31 @@ public class FirebaseAuthenticationFilter implements WebFilter {
             .maximumSize(1000)
             .build();
 
+    private static final List<String> PUBLIC_PATHS = Arrays.asList(
+        "/actuator/",
+        "/v3/api-docs",
+        "/swagger-ui",
+        "/webjars/",
+        "/fallback/"
+    );
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        String path = exchange.getRequest().getPath().value();
+        
+        // Sadece public path'ler için authentication bypass
+        if (isPublicPath(path)) {
+            return chain.filter(exchange);
+        }
+
+        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        
+        // Auth header zorunlu
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return handleAuthenticationError(exchange, 
+                new AuthenticationException("Authorization header is required"));
+        }
+
         return extractAndValidateToken(exchange)
                 .flatMap(token -> processAuthenticatedRequest(exchange, chain, token))
                 .onErrorResume(AuthenticationException.class, 
@@ -40,8 +65,13 @@ public class FirebaseAuthenticationFilter implements WebFilter {
                 .onErrorResume(Exception.class, 
                     error -> {
                         log.error("Unexpected error during authentication", error);
-                        return chain.filter(exchange);
+                        return handleAuthenticationError(exchange, 
+                            new AuthenticationException("Internal authentication error"));
                     });
+    }
+
+    private boolean isPublicPath(String path) {
+        return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
     }
 
     private Mono<FirebaseToken> extractAndValidateToken(ServerWebExchange exchange) {
@@ -96,10 +126,11 @@ public class FirebaseAuthenticationFilter implements WebFilter {
                 .build();
     }
 
-    private Mono<Void> handleAuthenticationError(ServerWebExchange exchange, Throwable error) {
+    private Mono<Void> handleAuthenticationError(ServerWebExchange exchange, AuthenticationException error) {
         log.error("Authentication error: {}", error.getMessage());
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-        return exchange.getResponse().setComplete();
+        return exchange.getResponse().writeWith(Mono.just(exchange.getResponse()
+            .bufferFactory().wrap(error.getMessage().getBytes())));
     }
 
     private String extractUserRole(FirebaseToken token) {

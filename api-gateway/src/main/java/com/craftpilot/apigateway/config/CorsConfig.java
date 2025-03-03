@@ -7,23 +7,36 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
 public class CorsConfig {
 
-    @Value("${cors.allowed-origins:https://craftpilot.app,https://app.craftpilot.io,https://api.craftpilot.io,http://localhost:5173}")
+    @Value("${cors.allowed-origins:https://craftpilot.app,https://app.craftpilot.io,https://api.craftpilot.io,http://localhost:5173,http://localhost:3000}")
     private List<String> allowedOrigins;
 
-    @Value("${cors.max-age:7200}")
+    @Value("${cors.allowed-methods:GET,POST,PUT,DELETE,OPTIONS,PATCH}")
+    private List<String> allowedMethods;
+
+    @Value("${cors.max-age:3600}")
     private Long maxAge;
+
+    @Value("${cors.allow-credentials:true}")
+    private Boolean allowCredentials;
 
     @Bean
     public CorsWebFilter corsWebFilter() {
         CorsConfiguration corsConfig = new CorsConfiguration();
+        
+        // Origins
         corsConfig.setAllowedOrigins(allowedOrigins);
-        corsConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
-        corsConfig.setAllowedHeaders(List.of(
+        
+        // Methods
+        corsConfig.setAllowedMethods(allowedMethods);
+        
+        // Headers
+        corsConfig.setAllowedHeaders(Arrays.asList(
             "Origin",
             "Content-Type",
             "Accept",
@@ -31,12 +44,27 @@ public class CorsConfig {
             "X-Requested-With",
             "X-User-Id",
             "X-User-Role",
-            "X-User-Email"
+            "X-User-Email",
+            "X-Api-Key",
+            "X-Request-ID",
+            "Cache-Control",
+            "If-Match",
+            "If-None-Match"
         ));
-        corsConfig.setExposedHeaders(List.of(
-            "X-Error-Message"
+        
+        // Exposed Headers
+        corsConfig.setExposedHeaders(Arrays.asList(
+            "X-Error-Message",
+            "X-Rate-Limit-Remaining",
+            "X-Total-Count",
+            "X-Response-Time",
+            "ETag"
         ));
-        corsConfig.setAllowCredentials(true);
+        
+        // Credentials
+        corsConfig.setAllowCredentials(allowCredentials);
+        
+        // Max Age
         corsConfig.setMaxAge(maxAge);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

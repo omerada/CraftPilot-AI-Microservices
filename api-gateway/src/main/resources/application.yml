@@ -26,21 +26,6 @@ spring:
         locator:
           enabled: true
           lower-case-service-id: true
-      # CORS Configuration
-      globalcors:
-        cors-configurations:
-          "[/**]":
-            allowedOrigins: ${ALLOWED_ORIGINS:*}
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - DELETE
-              - OPTIONS
-            allowedHeaders: "*"
-            exposedHeaders: "*"
-            allowCredentials: true
-            maxAge: 3600
       routes:
         # Core Services
         - id: user-service
@@ -50,6 +35,7 @@ spring:
           metadata:
             response-timeout: 5000
             connect-timeout: 2000
+            secured: true # Authentication gerekli
           filters:
             - name: CircuitBreaker
               args:
@@ -66,6 +52,9 @@ spring:
           uri: lb://admin-service
           predicates:
             - Path=/admin/**
+          metadata:
+            secured: true
+            roles: [ADMIN] # Sadece ADMIN rolü erişebilir
           filters:
             - StripPrefix=1
 
@@ -155,6 +144,20 @@ spring:
           args:
             maxSize: 10MB
         - AddResponseHeader=X-Response-Time, ${responseTime}
+      globalcors:
+        cors-configurations:
+          "[/**]":
+            allowedOrigins: ${ALLOWED_ORIGINS:*}
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            exposedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
 
   data:
     redis:
