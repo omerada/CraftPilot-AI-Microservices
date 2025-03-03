@@ -26,16 +26,40 @@ spring:
         locator:
           enabled: true
           lower-case-service-id: true
+      # CORS Configuration
+      globalcors:
+        cors-configurations:
+          "[/**]":
+            allowedOrigins: ${ALLOWED_ORIGINS:*}
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            exposedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
       routes:
         # Core Services
         - id: user-service
           uri: lb://user-service
           predicates:
             - Path=/users/**,/auth/**
+          metadata:
+            response-timeout: 5000
+            connect-timeout: 2000
           filters:
             - name: CircuitBreaker
               args:
                 name: userServiceCircuitBreaker
+                fallbackUri: forward:/fallback/user-service
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 40
+                key-resolver: "#{@userKeyResolver}"
 
         # Business Services
         - id: admin-service
@@ -124,8 +148,19 @@ spring:
             retries: 3
             methods: GET,POST,PUT,DELETE
             series: SERVER_ERROR
-            exceptions: java.io.IOException,java.util.concurrent.TimeoutException
+            exceptions:
+              - java.io.IOException
+              - java.util.concurrent.TimeoutException
+        - name: RequestSize
+          args:
+            maxSize: 10MB
+        - AddResponseHeader=X-Response-Time, ${responseTime}
 
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:13579ada}
 
   httpclient:
     connect-timeout: 30000
@@ -180,7 +215,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus,gateway,circuitbreakers
+        include: "*"
   endpoint:
     health:
       show-details: always
@@ -188,11 +223,9 @@ management:
         enabled: true
       group:
         readiness:
-          include: diskSpace,ping
-          show-details: always
+          include: db,diskSpace,ping
         liveness:
           include: ping
-          show-details: always
   health:
     circuitbreakers:
       enabled: true
@@ -212,55 +245,60 @@ management:
     distribution:
       percentiles-histogram:
         http.server.requests: true
+      sla:
+        http.server.requests: 10ms,50ms,100ms,200ms,500ms
     enable:
-      jvm: true
-      process: true
-      system: true
-      http: true
+      all: true
 
 logging:
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n"
   level:
-    com.craftpilot.apigateway: ${LOG_LEVEL:INFO}
-    org.springframework.cloud.gateway: ${LOG_LEVEL:INFO}
+    root: INFO
+    com.craftpilot.apigateway: DEBUG
+    org.springframework.cloud.gateway: INFO
     org.springframework.cloud.netflix.eureka: ${LOG_LEVEL:INFO}
     com.netflix.discovery: ${LOG_LEVEL:INFO}
     com.craftpilot.apigateway.security: ${SECURITY_LOG_LEVEL:INFO}
-    org.springframework.security: ${SECURITY_LOG_LEVEL:INFO}
+    org.springframework.security: INFO
+    reactor.netty.http.client: INFO
 
 resilience4j:
   circuitbreaker:
     configs:
       default:
-        slidingWindowSize: 100
-        minimumNumberOfCalls: 10
-        permittedNumberOfCallsInHalfOpenState: 10
+        slidingWindowType: TIME_BASED
+        slidingWindowSize: 60
+        minimumNumberOfCalls: 5
+        waitDurationInOpenState: 30s
         failureRateThreshold: 50
-        waitDurationInOpenState: 60s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        eventConsumerBufferSize: 100
     instances:
       llmServiceCircuitBreaker:
         baseConfig: default
-        slidingWindowSize: 50
-        waitDurationInOpenState: 30s
+        slidingWindowSize: 30
+        waitDurationInOpenState: 20s
       userServiceCircuitBreaker:
         baseConfig: default
-      subscriptionServiceCircuitBreaker:
-        baseConfig: default
 
-  ratelimiter:
+  timelimiter:
     configs:
       default:
-        limitForPeriod: 100
-        limitRefreshPeriod: 1s
         timeoutDuration: 5s
+        cancelRunningFuture: true
     instances:
-      globalRateLimiter:
-        baseConfig: default
-        limitForPeriod: 1000
-      userServiceRateLimiter:
-        baseConfig: default
-        limitForPeriod: 200
-      aiServiceRateLimiter:
-        baseConfig: default
-        limitForPeriod: 50
+      userServiceTimeLimiter:
+        timeoutDuration: 2s
+      llmServiceTimeLimiter:
+        timeoutDuration: 30s
+
+# Tracing Configuration
+spring.sleuth:
+  sampler:
+    probability: 1.0
+  baggage:
+    correlation-enabled: true
+    remote-fields: x-request-id
+    local-fields: country-code,user-id

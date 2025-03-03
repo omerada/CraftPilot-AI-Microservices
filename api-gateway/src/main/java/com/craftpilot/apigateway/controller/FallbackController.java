@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import java.util.HashMap;
 import java.util.Map;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/fallback")
@@ -19,6 +20,18 @@ public class FallbackController {
         response.put("message", formatServiceName(serviceName) + " service is currently unavailable");
         response.put("timestamp", String.valueOf(System.currentTimeMillis()));
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response));
+    }
+
+    @GetMapping("/user-service")
+    public Mono<ResponseEntity<Map<String, Object>>> userServiceFallback() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("timestamp", LocalDateTime.now());
+        response.put("status", HttpStatus.SERVICE_UNAVAILABLE.value());
+        response.put("message", "User service is temporarily unavailable");
+        
+        return Mono.just(ResponseEntity
+                .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(response));
     }
 
     private String formatServiceName(String serviceName) {
