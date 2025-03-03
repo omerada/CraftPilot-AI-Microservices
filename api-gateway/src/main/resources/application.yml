@@ -66,6 +66,7 @@ spring:
             - Path=/admin/**
           metadata:
             secured: true
+            methods: [GET, POST, PUT, DELETE]
             roles: [ADMIN] # Sadece ADMIN rolü erişebilir
           filters:
             - StripPrefix=1
@@ -88,6 +89,8 @@ spring:
             connect-timeout: 120000
             response-timeout: 120000
             secured: true
+            methods: [POST, GET]
+            roles: [USER, ADMIN]
           filters:
             - name: CircuitBreaker
               args:

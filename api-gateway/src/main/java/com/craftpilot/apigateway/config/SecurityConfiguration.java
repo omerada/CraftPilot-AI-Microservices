@@ -33,7 +33,6 @@ public class SecurityConfiguration {
             .logout(ServerHttpSecurity.LogoutSpec::disable)
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
-                .pathMatchers(HttpMethod.POST, "/ai/**").authenticated()
                 .pathMatchers(
                     "/actuator/**", 
                     "/v3/api-docs/**", 
@@ -44,8 +43,7 @@ public class SecurityConfiguration {
                     "/auth/login",
                     "/auth/register",
                     "/auth/reset-password").permitAll()
-                .pathMatchers("/admin/**").hasRole("ADMIN")
-                .anyExchange().authenticated()
+                .anyExchange().access(new RouteMetadataAuthorizationManager()) // Yeni authorization manager
             )
             .addFilterAt(corsWebFilter, SecurityWebFiltersOrder.CORS)
             .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
