@@ -34,10 +34,6 @@ spring:
           uri: lb://user-service
           predicates:
             - Path=/users/**,/auth/**
-          metadata:
-            response-timeout: 5000
-            connect-timeout: 2000
-            secured: true # Authentication gerekli
           filters:
             - name: CircuitBreaker
               args:
@@ -56,18 +52,12 @@ spring:
           filters:
             - StripPrefix=0
             - PreserveHostHeader
-          metadata:
-            secured: false # Authentication bypass for auth endpoints
 
         # Business Services
         - id: admin-service
           uri: lb://admin-service
           predicates:
             - Path=/admin/**
-          metadata:
-            secured: true
-            methods: [GET, POST, PUT, DELETE]
-            roles: [ADMIN] # Sadece ADMIN rolü erişebilir
           filters:
             - StripPrefix=1
 
@@ -86,9 +76,6 @@ spring:
           predicates:
             - Path=/ai/**
           metadata:
-            secured: true
-            roles: [USER, ADMIN]
-            methods: [GET, POST]
             connect-timeout: 120000
             response-timeout: 120000
           filters:
