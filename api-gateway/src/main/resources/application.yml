@@ -127,9 +127,10 @@ spring:
             exceptions: java.io.IOException,java.util.concurrent.TimeoutException
         - name: RequestRateLimiter
           args:
-            redis-rate-limiter.replenishRate: 50
-            redis-rate-limiter.burstCapacity: 100
-            redis-rate-limiter.requestedTokens: 1
+            local-rate-limiter:
+              replenish-rate: 50
+              burst-capacity: 100
+              request-tokens: 1
         - name: CircuitBreaker
           args:
             name: defaultCircuitBreaker
@@ -159,6 +160,8 @@ spring:
     mapper:
       ACCEPT_CASE_INSENSITIVE_PROPERTIES: true
       DEFAULT_VIEW_INCLUSION: true
+  data:
+    redis: null
 
 eureka:
   instance:
@@ -196,7 +199,7 @@ management:
         enabled: true
       group:
         readiness:
-          include: diskSpace,ping,redis,discovery # db yerine gerekli health indicatorları ekledik
+          include: diskSpace,ping
           show-details: always
         liveness:
           include: ping
@@ -209,10 +212,10 @@ management:
     readinessstate:
       enabled: true
     redis:
-      enabled: true # Redis health check'i aktif
+      enabled: false
     diskspace:
-      enabled: true # Disk space health check'i aktif
-    validate-group-membership: false # Geçici olarak validation'ı devre dışı bırakabilirsiniz
+      enabled: true
+    validate-group-membership: false
 
   metrics:
     tags:
