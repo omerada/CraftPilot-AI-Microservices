@@ -1,19 +1,20 @@
 package com.craftpilot.apigateway.config;
 
 import com.craftpilot.apigateway.security.FirebaseAuthenticationFilter;
-import jakarta.ws.rs.HttpMethod;
+import com.craftpilot.apigateway.security.SecurityConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
+import org.springframework.http.HttpMethod;
 import java.util.Arrays;
 
 @Configuration
@@ -28,13 +29,23 @@ public class SecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .cors(cors -> cors.configurationSource(corsConfigurationSource())) 
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
-                .pathMatchers(SecurityConstants.PUBLIC_PATHS.toArray(new String[0])).permitAll()
-                .anyExchange().access(new RouteMetadataAuthorizationManager())
+                .pathMatchers(
+                    "/actuator/**", 
+                    "/v3/api-docs/**", 
+                    "/swagger-ui/**",
+                    "/webjars/**", 
+                    "/fallback/**",
+                    "/favicon.ico",
+                    "/auth/login",
+                    "/auth/register",
+                    "/auth/reset-password").permitAll()
+                .pathMatchers("/admin/**").hasRole("ADMIN")
+                .anyExchange().authenticated()
             )
             .addFilterAt(firebaseAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
             .build();
