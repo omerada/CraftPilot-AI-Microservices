@@ -16,6 +16,7 @@ import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 import org.springframework.http.HttpHeaders;
 import reactor.core.scheduler.Schedulers;
+import org.springframework.http.HttpMethod;
 
 import java.util.Arrays;
 import java.util.List;
