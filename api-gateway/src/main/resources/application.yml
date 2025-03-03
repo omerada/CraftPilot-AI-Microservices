@@ -12,7 +12,7 @@ spring:
     name: api-gateway
   security:
     basic:
-      enabled: false # Basic auth'u application seviyesinde de kapat
+      enabled: false  
     filter:
       order: 1
   cloud:
@@ -133,20 +133,6 @@ spring:
               args:
                 name: redisServiceCircuitBreaker
 
-      default-filters:
-        - AddRequestHeader=X-Forwarded-Prefix, /
-        - name: Retry
-          args:
-            retries: 3
-            methods: GET,POST,PUT,DELETE,OPTIONS
-            series: SERVER_ERROR
-            exceptions:
-              - java.io.IOException
-              - java.util.concurrent.TimeoutException
-        - name: RequestSize
-          args:
-            maxSize: 10MB
-
   data:
     redis:
       host: ${REDIS_HOST:redis}
@@ -168,18 +154,6 @@ spring:
       enabled: true
       caffeine:
         spec: maximumSize=500,expireAfterWrite=5s
-
-  jackson:
-    deserialization:
-      UNWRAP_ROOT_VALUE: true
-      FAIL_ON_UNKNOWN_PROPERTIES: false
-      ACCEPT_SINGLE_VALUE_AS_ARRAY: true
-    serialization:
-      WRAP_ROOT_VALUE: true
-      FAIL_ON_EMPTY_BEANS: false
-    mapper:
-      ACCEPT_CASE_INSENSITIVE_PROPERTIES: true
-      DEFAULT_VIEW_INCLUSION: true
 
 eureka:
   instance:
@@ -232,17 +206,6 @@ management:
       enabled: true
     validate-group-membership: true
 
-  metrics:
-    tags:
-      application: ${spring.application.name}
-    distribution:
-      percentiles-histogram:
-        http.server.requests: true
-      sla:
-        http.server.requests: 10ms,50ms,100ms,200ms,500ms
-    enable:
-      all: true
-
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n"
@@ -289,12 +252,3 @@ resilience4j:
         timeoutDuration: 2s
       llmServiceTimeLimiter:
         timeoutDuration: 30s
-
-# Tracing Configuration
-spring.sleuth:
-  sampler:
-    probability: 1.0
-  baggage:
-    correlation-enabled: true
-    remote-fields: x-request-id
-    local-fields: country-code,user-id
