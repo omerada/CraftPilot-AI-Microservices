@@ -79,7 +79,7 @@ spring:
             - name: CircuitBreaker
               args:
                 name: llmServiceCircuitBreaker
-                fallbackUri: forward:/ai-fallback-fallback # Düzeltilmiş fallback yolu
+                fallbackUri: forward:/fallback/ai-fallback 
 
         - id: image-service
           uri: lb://image-service
