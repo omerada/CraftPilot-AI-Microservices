@@ -7,6 +7,8 @@ import org.springframework.web.server.WebFilter;
 import reactor.core.publisher.Mono;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ServerWebExchange;
+import java.util.List;           // List için import ekledik
+import java.util.Arrays;         // Arrays için import ekledik
 
 @Slf4j
 @Configuration
