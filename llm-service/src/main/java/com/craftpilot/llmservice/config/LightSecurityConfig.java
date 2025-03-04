@@ -6,8 +6,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.config.web.server.SecurityWebFiltersOrder;   
-import org.springframework.web.server.WebFilter;
 import reactor.core.publisher.Mono;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ServerWebExchange;
@@ -33,8 +31,6 @@ public class LightSecurityConfig {
 
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
-        WebFilter headerFilter = headerValidationFilter();
-        
         return http
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.disable())
@@ -42,36 +38,32 @@ public class LightSecurityConfig {
             .formLogin(form -> form.disable())
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(PUBLIC_PATHS.toArray(new String[0])).permitAll()
-                .anyExchange().permitAll()
+                .anyExchange().authenticated()
             )
+            .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
+            .addFilter((exchange, chain) -> {
+                String path = exchange.getRequest().getPath().value();
+                
+                if (isPublicPath(path)) {
+                    return chain.filter(exchange);
+                }
+
+                for (RequiredHeader header : REQUIRED_HEADERS) {
+                    String headerValue = exchange.getRequest().getHeaders().getFirst(header.name);
+                    if (headerValue == null || headerValue.trim().isEmpty()) {
+                        return handleMissingHeader(exchange, header.message);
+                    }
+                }
+
+                return chain.filter(exchange);
+            })
             .exceptionHandling(handling -> handling
                 .authenticationEntryPoint((exchange, ex) -> {
                     exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
                     return exchange.getResponse().setComplete();
                 })
             )
-            .addFilterAt(headerFilter, SecurityWebFiltersOrder.AUTHENTICATION)
             .build();
-    }
-
-    @Bean
-    public WebFilter headerValidationFilter() {
-        return (exchange, chain) -> {
-            String path = exchange.getRequest().getPath().value();
-            
-            if (isPublicPath(path)) {
-                return chain.filter(exchange);
-            }
-
-            for (RequiredHeader header : REQUIRED_HEADERS) {
-                String headerValue = exchange.getRequest().getHeaders().getFirst(header.name);
-                if (headerValue == null || headerValue.trim().isEmpty()) {
-                    return handleMissingHeader(exchange, header.message);
-                }
-            }
-
-            return chain.filter(exchange);
-        };
     }
 
     private boolean isPublicPath(String path) {

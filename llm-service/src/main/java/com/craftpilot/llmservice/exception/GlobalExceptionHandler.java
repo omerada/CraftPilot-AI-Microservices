@@ -31,7 +31,12 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Mono<ErrorResponse> handleGenericException(Exception ex) {
         log.error("Unexpected error occurred: ", ex);
-        return Mono.just(createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred"));
+        return Mono.just(ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .error("Internal Server Error")
+                .message(ex.getMessage())
+                .build());
     }
 
     private ErrorResponse createErrorResponse(HttpStatus status, String message) {
