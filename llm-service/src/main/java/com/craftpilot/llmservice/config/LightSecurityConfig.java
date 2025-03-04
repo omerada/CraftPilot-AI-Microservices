@@ -32,13 +32,23 @@ public class LightSecurityConfig {
 
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
-        http
+        return http
             .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.disable())
+            .httpBasic(basic -> basic.disable())
+            .formLogin(form -> form.disable())
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(PUBLIC_PATHS.toArray(new String[0])).permitAll()
-                .anyExchange().authenticated()
-            );
-        return http.build();
+                .anyExchange().permitAll()
+            )
+            .exceptionHandling(handling -> handling
+                .authenticationEntryPoint((exchange, ex) -> {
+                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                    return exchange.getResponse().setComplete();
+                })
+            )
+            .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
+            .build();
     }
 
     @Bean
