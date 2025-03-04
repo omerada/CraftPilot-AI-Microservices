@@ -55,18 +55,16 @@ public class SecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         FirebaseAuthFilter firebaseFilter = new FirebaseAuthFilter(firebaseAuth);
 
-        return http
-            .securityMatcher(ServerWebExchangeMatchers.anyExchange())
-            .csrf().disable()
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .authorizeExchange(exchanges -> exchanges
+        http.csrf(csrfSpec -> csrfSpec.disable())  // Explicitly disable CSRF
+            .cors(corsSpec -> corsSpec.configurationSource(corsConfigurationSource()));
+
+        return http.authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
                 .pathMatchers(PUBLIC_PATHS.toArray(new String[0])).permitAll()
-                .anyExchange().permitAll()
-            )
+                .anyExchange().permitAll())
             .addFilterBefore(firebaseFilter, SecurityWebFiltersOrder.AUTHENTICATION)
-            .httpBasic().disable()
-            .formLogin().disable()
+            .httpBasic(basic -> basic.disable())
+            .formLogin(form -> form.disable())
             .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
             .build();
     }
@@ -75,15 +73,34 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         
-        config.addAllowedOriginPattern("*");
+        // Origin patterns yerine specific origins kullan
+        config.setAllowedOrigins(Arrays.asList(
+            "http://localhost:5173",
+            "https://app.craftpilot.io"
+        ));
+        
+        config.setAllowedMethods(Arrays.asList(
+            HttpMethod.GET.name(),
+            HttpMethod.POST.name(),
+            HttpMethod.PUT.name(),
+            HttpMethod.DELETE.name(),
+            HttpMethod.OPTIONS.name()
+        ));
+        
+        config.setAllowedHeaders(Arrays.asList(
+            HttpHeaders.AUTHORIZATION,
+            HttpHeaders.CONTENT_TYPE,
+            "X-User-Id",
+            "X-User-Email",
+            "X-User-Role"
+        ));
+        
+        config.setExposedHeaders(Arrays.asList(
+            "X-Total-Count",
+            "X-Error-Message"
+        ));
+        
         config.setAllowCredentials(true);
-        
-        config.addAllowedMethod("*");
-        
-        config.addAllowedHeader("*");
-        
-        config.addExposedHeader("X-Total-Count");
-        config.addExposedHeader("X-Error-Message");
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

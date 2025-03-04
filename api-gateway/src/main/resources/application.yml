@@ -160,17 +160,22 @@ spring:
       - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
     globalcors:
       add-to-simple-url-handler-mapping: true
-      corsConfigurations:
+      cors-configurations:
         "[/**]":
           allowedOrigins:
-            - "https://app.craftpilot.io"
             - "http://localhost:5173"
-          allowedMethods: "*"
+            - "https://app.craftpilot.io"
+          allowedMethods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - OPTIONS
           allowedHeaders: "*"
-          allowCredentials: true
           exposedHeaders:
             - "X-Total-Count"
             - "X-Error-Message"
+          allowCredentials: true
           maxAge: 3600
 
 eureka:
