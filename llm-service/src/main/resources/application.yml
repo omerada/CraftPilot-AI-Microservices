@@ -101,18 +101,23 @@ eureka:
 management:
   endpoints:
     web:
-      base-path: /actuator
       exposure:
-        include: "*"
+        include: health,info
+      base-path: /actuator
   endpoint:
     health:
       show-details: always
       probes:
         enabled: true
+      group:
+        readiness:
+          include: "*"
+        liveness:
+          include: "*"
   health:
-    livenessState:
+    livenessstate:
       enabled: true
-    readinessState:
+    readinessstate:
       enabled: true
 
 openrouter:
