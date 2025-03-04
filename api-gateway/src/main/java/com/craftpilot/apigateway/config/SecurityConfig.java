@@ -53,26 +53,20 @@ public class SecurityConfig {
     );
 
     @Bean
-    @Order(Ordered.HIGHEST_PRECEDENCE)
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+        FirebaseAuthFilter firebaseFilter = new FirebaseAuthFilter(firebaseAuth);
+        
         return http
-            .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .authorizeExchange(exchanges -> exchanges
-                .pathMatchers(PUBLIC_PATHS.toArray(new String[0])).permitAll()
+            .csrf().disable()
+            .cors().configurationSource(corsConfigurationSource()).and()
+            .authorizeExchange()
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
-                .anyExchange().permitAll()  // Changed from authenticated() to permitAll()
-            )
-            .addFilterAt(new FirebaseAuthFilter(firebaseAuth), SecurityWebFiltersOrder.AUTHENTICATION)
-            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
-            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-            .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
-            .exceptionHandling(handling -> handling
-                .authenticationEntryPoint((exchange, ex) -> {
-                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                    return exchange.getResponse().setComplete();
-                })
-            )
+                .pathMatchers("/actuator/**", "/api/public/**", "/api/auth/signup", "/api/auth/login").permitAll()
+                .anyExchange().permitAll()
+            .and()
+            .addFilterAt(firebaseFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+            .httpBasic().disable()
+            .formLogin().disable()
             .build();
     }
 

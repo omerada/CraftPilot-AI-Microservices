@@ -65,50 +65,34 @@ public class FirebaseAuthFilter implements WebFilter {
     }
 
     private Mono<Void> validateTokenAndAddHeaders(String token, ServerWebExchange exchange, WebFilterChain chain) {
-        return Mono.fromCallable(() -> verifyToken(token))
-            .subscribeOn(Schedulers.boundedElastic())
-            .flatMap(decodedToken -> {
-                if (decodedToken != null) {
-                    ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
-                        .headers(headers -> addUserHeaders(headers, decodedToken))
-                        .build();
+        try {
+            FirebaseToken decodedToken = verifyToken(token);
+            if (decodedToken != null) {
+                log.debug("Token verified for user: {}", decodedToken.getUid());
+                
+                ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
+                    .header("X-User-Id", decodedToken.getUid())
+                    .header("X-User-Email", decodedToken.getEmail())
+                    .header("X-User-Role", extractUserRole(decodedToken.getClaims()))
+                    .build();
 
-                    return chain.filter(exchange.mutate().request(mutatedRequest).build());
-                }
-                return handleUnauthorized(exchange);
-            })
-            .onErrorResume(e -> {
-                log.error("Token validation error: {}", e.getMessage());
-                return handleUnauthorized(exchange);
-            });
+                return chain.filter(exchange.mutate().request(mutatedRequest).build());
+            }
+            log.error("Token verification returned null");
+            return handleUnauthorized(exchange);
+        } catch (Exception e) {
+            log.error("Token validation failed with error: {}", e.getMessage(), e);
+            return handleUnauthorized(exchange);
+        }
     }
 
     private FirebaseToken verifyToken(String token) {
         try {
             return firebaseAuth.verifyIdToken(token);
         } catch (FirebaseAuthException e) {
-            log.error("Firebase token verification failed: {}", e.getMessage());
+            log.error("Firebase token verification failed: {}", e.getMessage(), e);
             return null;
         }
-    }
-
-    private void addUserHeaders(HttpHeaders headers, FirebaseToken token) {
-        Map<String, Object> claims = token.getClaims();
-        
-        // Mevcut headerlari temizle
-        headers.clear();
-        
-        // Yeni headerlari ekle
-        headers.set("X-User-Id", token.getUid());
-        headers.set("X-User-Email", token.getEmail());
-        headers.set("X-User-Role", extractUserRole(claims));
-        
-        // Authorization header'ını koru
-        headers.set(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token.getUid());
-        
-        // Content-Type ve diğer önemli headerları ekle
-        headers.set(HttpHeaders.CONTENT_TYPE, "application/json");
-        headers.set(HttpHeaders.ACCEPT, "*/*");
     }
 
     private String extractUserRole(Map<String, Object> claims) {
