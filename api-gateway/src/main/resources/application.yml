@@ -12,7 +12,7 @@ spring:
     name: api-gateway
   security:
     basic:
-      enabled: false  
+      enabled: false
     filter:
       order: 1
   cloud:
@@ -154,6 +154,18 @@ spring:
       enabled: true
       caffeine:
         spec: maximumSize=500,expireAfterWrite=5s
+
+  gateway:
+    globalcors:
+      corsConfigurations:
+        "[/**]":
+          allowedOrigins:
+            - "https://app.craftpilot.io"
+            - "http://localhost:5173"
+          allowedMethods: "*"
+          allowedHeaders: "*"
+          allowCredentials: true
+          maxAge: 3600
 
 eureka:
   instance:
