@@ -9,6 +9,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
@@ -17,6 +18,8 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
+import java.util.UUID;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -44,7 +47,13 @@ public class FirebaseAuthFilter implements WebFilter {
             return handleUnauthorized(exchange);
         }
 
-        return validateTokenAndAddHeaders(token, exchange, chain);
+        // Add CSRF token to response headers
+        exchange.getResponse().getHeaders().add("X-CSRF-TOKEN", generateCsrfToken());
+        
+        return validateTokenAndAddHeaders(token, exchange, chain)
+            .contextWrite(context -> ReactiveSecurityContextHolder.withAuthentication(
+                new UsernamePasswordAuthenticationToken("user", null, Collections.emptyList())
+            ));
     }
 
     private boolean isPublicPath(String path) {
@@ -103,5 +112,9 @@ public class FirebaseAuthFilter implements WebFilter {
     private Mono<Void> handleUnauthorized(ServerWebExchange exchange) {
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
         return exchange.getResponse().setComplete();
+    }
+
+    private String generateCsrfToken() {
+        return UUID.randomUUID().toString();
     }
 }

@@ -13,7 +13,6 @@ import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
-import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
@@ -55,10 +54,10 @@ public class SecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         FirebaseAuthFilter firebaseFilter = new FirebaseAuthFilter(firebaseAuth);
 
-        http.csrf(csrfSpec -> csrfSpec.disable())  // Explicitly disable CSRF
-            .cors(corsSpec -> corsSpec.configurationSource(corsConfigurationSource()));
-
-        return http.authorizeExchange(exchanges -> exchanges
+        return http
+            .csrf(csrf -> csrf.disable())  // Disable CSRF for API Gateway
+            .cors(corsSpec -> corsSpec.configurationSource(corsConfigurationSource()))
+            .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
                 .pathMatchers(PUBLIC_PATHS.toArray(new String[0])).permitAll()
                 .anyExchange().permitAll())
