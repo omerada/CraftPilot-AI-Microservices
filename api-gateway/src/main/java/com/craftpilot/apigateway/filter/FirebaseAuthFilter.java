@@ -93,17 +93,22 @@ public class FirebaseAuthFilter implements WebFilter {
     }
 
     private void addUserHeaders(HttpHeaders headers, FirebaseToken token) {
-        // Clear existing auth-related headers
-        headers.remove(HttpHeaders.AUTHORIZATION);
-        headers.remove("X-User-Id");
-        headers.remove("X-User-Email");
-        headers.remove("X-User-Role");
-        
-        // Add new header values
         Map<String, Object> claims = token.getClaims();
-        headers.add("X-User-Id", token.getUid());
-        headers.add("X-User-Email", token.getEmail());
-        headers.add("X-User-Role", extractUserRole(claims));
+        
+        // Mevcut headerlari temizle
+        headers.clear();
+        
+        // Yeni headerlari ekle
+        headers.set("X-User-Id", token.getUid());
+        headers.set("X-User-Email", token.getEmail());
+        headers.set("X-User-Role", extractUserRole(claims));
+        
+        // Authorization header'ını koru
+        headers.set(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token.getUid());
+        
+        // Content-Type ve diğer önemli headerları ekle
+        headers.set(HttpHeaders.CONTENT_TYPE, "application/json");
+        headers.set(HttpHeaders.ACCEPT, "*/*");
     }
 
     private String extractUserRole(Map<String, Object> claims) {

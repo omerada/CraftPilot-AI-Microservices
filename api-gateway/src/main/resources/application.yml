@@ -12,7 +12,7 @@ spring:
     name: api-gateway
   security:
     basic:
-      enabled: false
+      enabled: false  
     filter:
       order: 1
   cloud:
@@ -42,7 +42,6 @@ spring:
               args:
                 redis-rate-limiter.replenishRate: 20
                 redis-rate-limiter.burstCapacity: 40
-                redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
 
         - id: auth-service

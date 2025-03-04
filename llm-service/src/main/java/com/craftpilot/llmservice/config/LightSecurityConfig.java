@@ -13,6 +13,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ServerWebExchange;
 import java.util.List;
 import java.util.Arrays;
+import org.springframework.web.cors.CorsConfiguration;  // Added import
+import org.springframework.web.cors.CorsConfigurationSource;  // Added import
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;  // Added import
 
 @Slf4j
 @Configuration
@@ -37,21 +40,28 @@ public class LightSecurityConfig {
         
         return http
             .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))  // CORS ekle
             .httpBasic(basic -> basic.disable())
             .formLogin(form -> form.disable())
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(PUBLIC_PATHS.toArray(new String[0])).permitAll()
                 .anyExchange().permitAll()
             )
-            .exceptionHandling(handling -> handling
-                .authenticationEntryPoint((exchange, ex) -> {
-                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                    return exchange.getResponse().setComplete();
-                })
-            )
             .addFilterAt(headerFilter, SecurityWebFiltersOrder.AUTHENTICATION)
             .build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList("*"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setExposedHeaders(Arrays.asList("X-Total-Count", "X-Error-Message"));
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     @Bean
