@@ -12,7 +12,7 @@ spring:
     name: api-gateway
   security:
     basic:
-      enabled: false
+      enabled: false # Disable basic auth globally
     filter:
       order: 1
   cloud:

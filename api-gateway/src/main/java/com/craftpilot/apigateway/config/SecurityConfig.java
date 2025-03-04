@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
@@ -16,6 +17,7 @@ import org.springframework.security.web.server.context.NoOpServerSecurityContext
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
 import java.util.List;
@@ -57,13 +59,21 @@ public class SecurityConfig {
         return http
             .csrf(csrf -> csrf.disable())  // Disable CSRF for API Gateway
             .cors(corsSpec -> corsSpec.configurationSource(corsConfigurationSource()))
+            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)  // Explicitly disable basic auth
+            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)  // Explicitly disable form login
+            .securityHeaders(headers -> headers.frameOptions().disable()  // Disable X-Frame-Options
+                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'")))
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
                 .pathMatchers(PUBLIC_PATHS.toArray(new String[0])).permitAll()
                 .anyExchange().permitAll())
             .addFilterBefore(firebaseFilter, SecurityWebFiltersOrder.AUTHENTICATION)
-            .httpBasic(basic -> basic.disable())
-            .formLogin(form -> form.disable())
+            .exceptionHandling(exceptionHandling -> exceptionHandling
+                .authenticationEntryPoint((exchange, ex) -> {
+                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                    return exchange.getResponse().writeWith(Mono.just(exchange.getResponse()
+                        .bufferFactory().wrap("Unauthorized".getBytes())));
+                }))
             .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
             .build();
     }
