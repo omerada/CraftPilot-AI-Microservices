@@ -6,16 +6,18 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.config.web.server.SecurityWebFiltersOrder;  // Added import
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.web.server.WebFilter;
 import reactor.core.publisher.Mono;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import org.springframework.web.cors.reactive.CorsWebFilter;
+import org.springframework.web.cors.CorsConfiguration;
 import java.util.List;
 import java.util.Arrays;
-import org.springframework.web.cors.CorsConfiguration;  // Added import
-import org.springframework.web.cors.CorsConfigurationSource;  // Added import
-import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;  // Added import
 
 @Slf4j
 @Configuration
@@ -40,7 +42,7 @@ public class LightSecurityConfig {
         
         return http
             .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))  // CORS ekle
+            .cors(cors -> cors.configurationSource(createCorsConfigurationSource()))
             .httpBasic(basic -> basic.disable())
             .formLogin(form -> form.disable())
             .authorizeExchange(exchanges -> exchanges
@@ -52,15 +54,21 @@ public class LightSecurityConfig {
     }
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("*"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setExposedHeaders(Arrays.asList("X-Total-Count", "X-Error-Message"));
+    public CorsConfigurationSource createCorsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(Arrays.asList("*"));
+        config.setAllowedMethods(Arrays.asList(
+            HttpMethod.GET.name(),
+            HttpMethod.POST.name(),
+            HttpMethod.PUT.name(),
+            HttpMethod.DELETE.name(),
+            HttpMethod.OPTIONS.name()
+        ));
+        config.setAllowedHeaders(Arrays.asList("*"));
+        config.setExposedHeaders(Arrays.asList("X-Total-Count", "X-Error-Message"));
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration("/**", config);
         return source;
     }
 
