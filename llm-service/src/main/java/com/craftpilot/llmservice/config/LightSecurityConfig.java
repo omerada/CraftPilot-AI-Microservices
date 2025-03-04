@@ -10,6 +10,8 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.http.HttpStatus;
 import reactor.core.publisher.Mono;
 import java.util.Map;
+import java.util.List;
+import java.util.Arrays;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -21,6 +23,12 @@ public class LightSecurityConfig {
             "X-User-Email", "User email is required"
     );
 
+    private static final List<String> PUBLIC_PATHS = Arrays.asList(
+            "/actuator/**",
+            "/actuator/health/**",
+            "/actuator/info/**"
+    );
+
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
@@ -28,14 +36,30 @@ public class LightSecurityConfig {
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
-                        .anyExchange().permitAll()
+                        .pathMatchers(PUBLIC_PATHS.toArray(new String[0])).permitAll()
+                        .anyExchange().authenticated()
                 )
-                .addFilterAt(validateHeadersFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
+                .addFilterBefore(validateHeadersFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();
     }
 
     private org.springframework.web.server.WebFilter validateHeadersFilter() {
-        return (exchange, chain) -> validateHeaders(exchange, chain);
+        return (exchange, chain) -> {
+            String path = exchange.getRequest().getPath().value();
+            if (isPublicPath(path)) {
+                return chain.filter(exchange);
+            }
+            return validateHeaders(exchange, chain);
+        };
+    }
+
+    private boolean isPublicPath(String path) {
+        return PUBLIC_PATHS.stream()
+                .anyMatch(pattern -> 
+                    pattern.endsWith("/**") 
+                        ? path.startsWith(pattern.substring(0, pattern.length() - 3))
+                        : path.equals(pattern)
+                );
     }
 
     private Mono<Void> validateHeaders(ServerWebExchange exchange, org.springframework.web.server.WebFilterChain chain) {
