@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder;  // Added import
 import org.springframework.web.server.WebFilter;
 import reactor.core.publisher.Mono;
 import org.springframework.http.HttpStatus;
@@ -32,6 +33,8 @@ public class LightSecurityConfig {
 
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+        WebFilter headerFilter = headerValidationFilter();
+        
         return http
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.disable())
@@ -47,7 +50,7 @@ public class LightSecurityConfig {
                     return exchange.getResponse().setComplete();
                 })
             )
-            .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
+            .addFilterAt(headerFilter, SecurityWebFiltersOrder.AUTHENTICATION)
             .build();
     }
 
