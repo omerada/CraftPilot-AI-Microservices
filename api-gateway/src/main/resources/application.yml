@@ -156,7 +156,10 @@ spring:
         spec: maximumSize=500,expireAfterWrite=5s
 
   gateway:
+    default-filters:
+      - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
     globalcors:
+      add-to-simple-url-handler-mapping: true
       corsConfigurations:
         "[/**]":
           allowedOrigins:
@@ -165,6 +168,9 @@ spring:
           allowedMethods: "*"
           allowedHeaders: "*"
           allowCredentials: true
+          exposedHeaders:
+            - "X-Total-Count"
+            - "X-Error-Message"
           maxAge: 3600
 
 eureka:

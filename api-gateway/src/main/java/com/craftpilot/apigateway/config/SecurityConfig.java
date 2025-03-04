@@ -13,7 +13,7 @@ import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
-import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;  // Add this import
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
@@ -57,16 +57,16 @@ public class SecurityConfig {
 
         return http
             .securityMatcher(ServerWebExchangeMatchers.anyExchange())
-            .csrf(csrf -> csrf.disable())
+            .csrf().disable()
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers(PUBLIC_PATHS.toArray(new String[0])).permitAll()
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
+                .pathMatchers(PUBLIC_PATHS.toArray(new String[0])).permitAll()
                 .anyExchange().permitAll()
             )
             .addFilterBefore(firebaseFilter, SecurityWebFiltersOrder.AUTHENTICATION)
-            .httpBasic(basic -> basic.disable())
-            .formLogin(form -> form.disable())
+            .httpBasic().disable()
+            .formLogin().disable()
             .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
             .build();
     }
@@ -75,25 +75,15 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         
-        config.setAllowedOriginPatterns(ALLOWED_ORIGINS);
-        config.setAllowedMethods(Arrays.asList(
-            HttpMethod.GET.name(),
-            HttpMethod.POST.name(),
-            HttpMethod.PUT.name(),
-            HttpMethod.DELETE.name(),
-            HttpMethod.OPTIONS.name()
-        ));
-        
-        config.setAllowedHeaders(Arrays.asList(
-            HttpHeaders.AUTHORIZATION,
-            HttpHeaders.CONTENT_TYPE,
-            HttpHeaders.ACCEPT,
-            "X-User-Id",
-            "X-User-Email",
-            "X-User-Role"
-        ));
-        
+        config.addAllowedOriginPattern("*");
         config.setAllowCredentials(true);
+        
+        config.addAllowedMethod("*");
+        
+        config.addAllowedHeader("*");
+        
+        config.addExposedHeader("X-Total-Count");
+        config.addExposedHeader("X-Error-Message");
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
