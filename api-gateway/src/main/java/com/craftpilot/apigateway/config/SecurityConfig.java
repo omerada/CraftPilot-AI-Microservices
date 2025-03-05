@@ -64,8 +64,10 @@ public class SecurityConfig {
             .formLogin(form -> form.disable())    // Form login'i tamamen kapatıyoruz
             .logout(logout -> logout.disable())   // Logout endpoint'i kapatıyoruz
             .anonymous(anonymous -> anonymous.disable())  // Anonim erişimi kapatıyoruz
-            .securityHeaders(headers -> headers.frameOptions().disable()  // Disable X-Frame-Options
-                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'")))
+            .headers(headers -> headers
+                // Replace deprecated frameOptions with modern security headers
+                .xssProtection(xss -> xss.disable())
+                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; frame-ancestors 'self'")))
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
                 .pathMatchers(PUBLIC_PATHS.toArray(new String[0])).permitAll()
