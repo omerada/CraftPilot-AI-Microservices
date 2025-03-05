@@ -16,24 +16,29 @@ public class GatewayConfig {
     public GlobalFilter removeWwwAuthenticateHeaderFilter() {
         return (exchange, chain) -> {
             return chain.filter(exchange).then(Mono.fromRunnable(() -> {
-                if (exchange.getResponse().getStatusCode() == HttpStatus.UNAUTHORIZED) {
-                    exchange.getResponse().getHeaders().remove(HttpHeaders.WWW_AUTHENTICATE);
-                    log.debug("Removed WWW-Authenticate header from 401 response");
-                }
+                // 401 yanıtında ve tüm yanıtlarda WWW-Authenticate header'ını kaldır
+                exchange.getResponse().getHeaders().remove(HttpHeaders.WWW_AUTHENTICATE);
+                log.debug("WWW-Authenticate header kaldırıldı");
             }));
         };
     }
     
     @Bean
-    public GlobalFilter preserveAuthorizationFilter() {
+    public GlobalFilter modifyAuthorizationHeaderFilter() {
         return (exchange, chain) -> {
-            // Forward the Authorization header to backend services 
+            // Firebase token yerine belki backend servisin beklediği formatta token
             String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-            if (authHeader != null && !authHeader.isEmpty()) {
-                exchange.getRequest().mutate()
-                    .header(HttpHeaders.AUTHORIZATION, authHeader)
+            String userId = exchange.getRequest().getHeaders().getFirst("X-User-Id");
+            
+            if (authHeader != null && !authHeader.isEmpty() && userId != null) {
+                log.debug("AuthorizationHeader ve UserId mevcut, isteği iletiyorum");
+                
+                // Firebase token'ı olduğu gibi bırakıyoruz
+                ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
+                    .header("X-Firebase-Verified", "true")
                     .build();
-                log.debug("Forwarding Authorization header to backend service");
+                    
+                return chain.filter(exchange.mutate().request(mutatedRequest).build());
             }
             
             return chain.filter(exchange);

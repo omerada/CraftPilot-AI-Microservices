@@ -100,14 +100,22 @@ public class FirebaseAuthFilter implements WebFilter {
             if (decodedToken != null) {
                 log.debug("Token doğrulandı, kullanıcı: {}", decodedToken.getUid());
                 
+                // Orijinal Authorization header'ını al
+                String originalAuth = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+                
                 // Yeni bir request oluştur ve auth header'larını ekle
                 ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
                     .header("X-User-Id", decodedToken.getUid())
                     .header("X-User-Email", decodedToken.getEmail() != null ? decodedToken.getEmail() : "")
                     .header("X-User-Role", extractUserRole(decodedToken.getClaims()))
-                    .header("X-Auth-Processed", "true")  // İşlendiğini belirtmek için
-                    // Orijinal Authorization header'ını da geçirelim
+                    .header("X-Auth-Processed", "true")
+                    // Orijinal Authorization header'ını AYNEN koru
+                    .header(HttpHeaders.AUTHORIZATION, originalAuth)
                     .build();
+                
+                // Response header'larına CSRF token ve diğer bilgileri ekle
+                exchange.getResponse().getHeaders().add("X-CSRF-TOKEN", generateCsrfToken());
+                exchange.getResponse().getHeaders().remove(HttpHeaders.WWW_AUTHENTICATE);
                 
                 return chain.filter(exchange.mutate().request(mutatedRequest).build());
             }

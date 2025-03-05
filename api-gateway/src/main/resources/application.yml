@@ -88,6 +88,14 @@ spring:
               args:
                 name: X-Forwarded-Prefix
                 value: /ai
+            - name: AddRequestHeader
+              args:
+                name: X-Skip-Authentication
+                value: "true"
+            - name: RewritePath
+              args:
+                regexp: /ai/?(?<remaining>.*)
+                replacement: /${remaining}
 
         - id: image-service
           uri: lb://image-service
