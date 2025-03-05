@@ -42,8 +42,9 @@ ENV JAVA_TOOL_OPTIONS="\
     --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
     --add-opens=java.base/java.lang=ALL-UNNAMED"
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
-  CMD curl -f http://localhost:8062/actuator/health || exit 1
+# Health check düzeltmesi
+HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8062/health || curl -f http://localhost:8062/actuator/health || exit 1
 
 EXPOSE 8062
 
