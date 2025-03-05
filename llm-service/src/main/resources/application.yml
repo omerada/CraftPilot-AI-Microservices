@@ -1,5 +1,5 @@
 server:
-  port: 8062
+  port: ${SERVER_PORT:8081}
   compression:
     enabled: true
     mime-types: application/json,text/plain
@@ -16,6 +16,13 @@ server:
     max-connections: 10000
     max-initial-line-length: 8192
     max-header-size: 16384
+  tomcat:
+    connection-timeout: 60000
+    max-connections: 1000
+    max-keep-alive-requests: 1000
+    threads:
+      max: 200
+      min-spare: 20
   error:
     include-message: always
     include-binding-errors: always
@@ -85,6 +92,11 @@ spring:
   security:
     basic:
       enabled: false
+  netty:
+    connection-timeout: 60000
+  mvc:
+    async:
+      request-timeout: 60000
 
 eureka:
   client:
@@ -102,7 +114,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
       base-path: /actuator
   endpoint:
     health:
@@ -144,9 +156,10 @@ logging:
     com.craftpilot: DEBUG
     org.springframework.web: DEBUG
     org.springframework.cloud: DEBUG
-    reactor.netty: DEBUG
+    reactor.netty: INFO
     io.netty: DEBUG
     com.craftpilot.llmservice: DEBUG
+    org.springframework.security: INFO
 
 netty:
   native:

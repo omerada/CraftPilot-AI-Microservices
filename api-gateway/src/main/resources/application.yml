@@ -78,6 +78,7 @@ spring:
             - name: CircuitBreaker
               args:
                 name: llmServiceCircuitBreaker
+                fallbackUri: forward:/fallback/llm-service
             - StripPrefix=1
             - PreserveHostHeader
             - name: RequestSize
@@ -279,20 +280,22 @@ resilience4j:
       llmServiceCircuitBreaker:
         baseConfig: default
         slidingWindowSize: 30
-        waitDurationInOpenState: 20s
-        failureRateThreshold: 50
-        permittedNumberOfCallsInHalfOpenState: 3
+        waitDurationInOpenState: 30s
+        failureRateThreshold: 60
+        permittedNumberOfCallsInHalfOpenState: 5
         registerHealthIndicator: true
-        allowHealthIndicatorToFail: true
+        allowHealthIndicatorToFail: false
+        ignoreExceptions:
+          - org.springframework.web.reactive.function.client.WebClientResponseException
       userServiceCircuitBreaker:
         baseConfig: default
   timelimiter:
     configs:
       default:
-        timeoutDuration: 5s
+        timeoutDuration: 10s
         cancelRunningFuture: true
     instances:
       userServiceTimeLimiter:
-        timeoutDuration: 2s
+        timeoutDuration: 5s
       llmServiceTimeLimiter:
-        timeoutDuration: 30s
+        timeoutDuration: 60s
