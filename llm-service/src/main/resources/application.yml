@@ -96,74 +96,84 @@ eureka:
     prefer-ip-address: false
     hostname: ${HOSTNAME:llm-service}
     lease-renewal-interval-in-seconds: 10
-    health-check-url-path: /actuator/health
+    health-check-url-path: /health
     status-page-url-path: /actuator/info
     home-page-url: http://${eureka.instance.hostname}:${server.port}/
 
 management:
   endpoints:
-        include: health,info
-      base-path: /actuator
+    web:
+      exposure:
         include: health,info
       base-path: /actuator
   endpoint:
-      probes:
-        enabled: truelways
+    health:
+      show-details: always
       probes:
         enabled: true
       group:
-    key: ${OPENROUTER_API_KEY}:
+        readiness:
+          include: "*"
+        liveness:
+          include: ping,diskSpace
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+openrouter:
+  api:
+    key: ${OPENROUTER_API_KEY}
     url: https://openrouter.ai/api/v1
-    defaultModel: google/gemini-2.0-flash-lite-preview-02-05:freeiveness:
-    maxTokens: 2000 "*"
+    defaultModel: google/gemini-2.0-flash-lite-preview-02-05:free
+    maxTokens: 2000
     temperature: 0.7
     retryAttempts: 3
     retryDelay: 1000
-    http-referer: https://craftpilot.io    readinessstate:
-ed: true
+    http-referer: https://craftpilot.io
+
 kafka:
   topics:
     ai-events: ai-events
     llm-completions: llm-completions
-enrouter.ai/api/v1
-logging:ogle/gemini-2.0-flash-lite-preview-02-05:free
+
+logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
   level:
-    root: INFO    retryDelay: 1000
-    com.craftpilot: DEBUGtp-referer: https://craftpilot.io
+    root: INFO
+    com.craftpilot: DEBUG
     org.springframework.web: DEBUG
     org.springframework.cloud: DEBUG
     reactor.netty: DEBUG
-    io.netty: DEBUG    ai-events: ai-events
-    com.craftpilot.llmservice: DEBUGcompletions: llm-completions
+    io.netty: DEBUG
+    com.craftpilot.llmservice: DEBUG
 
 netty:
-  native:n:
-    enabled: false%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
+  native:
+    enabled: false
   io:
     noNative: true
     noUnsafe: true
-  use-native-transport: trueweb: DEBUG
-  workdir: /tmp/nettywork.cloud: DEBUG
+  use-native-transport: true
+  workdir: /tmp/netty
 
-resilience4j:    io.netty: DEBUG
-  circuitbreaker:m.craftpilot.llmservice: DEBUG
-nces:
-netty:
-        slidingWindowSize: 100ive:
+resilience4j:
+  circuitbreaker:
+    instances:
+      llmService:
+        slidingWindowSize: 100
         failureRateThreshold: 50
         waitDurationInOpenState: 20s
         permittedNumberOfCallsInHalfOpenState: 10
   ratelimiter:
-    instances:  use-native-transport: true
-      llmService:mp/netty
+    instances:
+      llmService:
         limitForPeriod: 100
         limitRefreshPeriod: 1s
         timeoutDuration: 5s
   bulkhead:
     instances:
       llmService:
-        maxConcurrentCalls: 50
-        permittedNumberOfCallsInHalfOpenState: 10  ratelimiter:    instances:      llmService:        limitForPeriod: 100        limitRefreshPeriod: 1s        timeoutDuration: 5s  bulkhead:    instances:      llmService:
         maxConcurrentCalls: 50
