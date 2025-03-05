@@ -158,6 +158,11 @@ spring:
   gateway:
     default-filters:
       - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
+      - AddResponseHeader=X-Powered-By,Craft-Pilot-API-Gateway
+      - RemoveRequestHeader=Cookie
+      - name: RequestSize
+        args:
+          maxSize: 10MB
     globalcors:
       add-to-simple-url-handler-mapping: true
       cors-configurations:
@@ -171,10 +176,12 @@ spring:
             - PUT
             - DELETE
             - OPTIONS
+            - PATCH
           allowedHeaders: "*"
           exposedHeaders:
             - "X-Total-Count"
             - "X-Error-Message"
+            - "X-CSRF-TOKEN"
           allowCredentials: true
           maxAge: 3600
 
@@ -241,6 +248,7 @@ logging:
     com.craftpilot.apigateway.security: ${SECURITY_LOG_LEVEL:INFO}
     org.springframework.security: INFO
     reactor.netty.http.client: INFO
+    reactor.netty: INFO
 
 resilience4j:
   circuitbreaker:

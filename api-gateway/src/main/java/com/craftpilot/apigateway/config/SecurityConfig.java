@@ -13,6 +13,7 @@ import org.springframework.security.config.annotation.web.reactive.EnableWebFlux
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.authentication.HttpStatusServerEntryPoint;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
@@ -57,26 +58,30 @@ public class SecurityConfig {
         FirebaseAuthFilter firebaseFilter = new FirebaseAuthFilter(firebaseAuth);
 
         return http
-            .csrf(csrf -> csrf.disable())
+            .csrf(csrf -> csrf.disable())  // Disable CSRF for API Gateway
             .cors(corsSpec -> corsSpec.configurationSource(corsConfigurationSource()))
-            .httpBasic(basic -> basic.disable())
-            .formLogin(form -> form.disable())
-            .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
+            .httpBasic(basic -> basic.disable())  // Basic auth'u tamamen kapatıyoruz
+            .formLogin(form -> form.disable())    // Form login'i tamamen kapatıyoruz
+            .logout(logout -> logout.disable())   // Logout endpoint'i kapatıyoruz
+            .anonymous(anonymous -> anonymous.disable())  // Anonim erişimi kapatıyoruz
+            .securityHeaders(headers -> headers.frameOptions().disable()  // Disable X-Frame-Options
+                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'")))
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
                 .pathMatchers(PUBLIC_PATHS.toArray(new String[0])).permitAll()
-                .anyExchange().authenticated()
-            )
+                .anyExchange().permitAll())
             .addFilterBefore(firebaseFilter, SecurityWebFiltersOrder.AUTHENTICATION)
             .exceptionHandling(exceptionHandling -> exceptionHandling
-                .authenticationEntryPoint((exchange, ex) -> {
-                    log.debug("Authentication failed: {}", ex.getMessage());
-                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                    exchange.getResponse().getHeaders().remove(HttpHeaders.WWW_AUTHENTICATE); // Remove Basic auth header
-                    return exchange.getResponse().writeWith(Mono.just(exchange.getResponse()
-                        .bufferFactory().wrap("Unauthorized".getBytes())));
-                })
-            )
+                .authenticationEntryPoint(new HttpStatusServerEntryPoint(HttpStatus.UNAUTHORIZED))
+                .accessDeniedHandler((exchange, denied) -> {
+                    exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+                    return exchange.getResponse().writeWith(
+                        Mono.just(exchange.getResponse().bufferFactory().wrap(
+                            "{\"error\":\"Erişim engellendi\",\"status\":403}".getBytes()
+                        ))
+                    );
+                }))
+            .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
             .build();
     }
 
