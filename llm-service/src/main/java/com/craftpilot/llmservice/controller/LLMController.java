@@ -19,7 +19,7 @@ import jakarta.validation.Valid;
 
 @Slf4j
 @RestController
-@RequestMapping("/")  
+@RequestMapping("/ai")  
 @RequiredArgsConstructor 
 public class LLMController {
     
@@ -60,17 +60,16 @@ public class LLMController {
         // Audit logging implementation
     }
 
-    @PostMapping(value = "/chat/completions", 
-                produces = MediaType.APPLICATION_JSON_VALUE,
-                consumes = MediaType.APPLICATION_JSON_VALUE) 
+    @PostMapping("/chat/completions")
     public Mono<ResponseEntity<AIResponse>> chatCompletion(@RequestBody AIRequest request) {
+        log.info("Chat completion request received: {}", request);
         request.setRequestType("CHAT");
-        return llmService.processChatCompletion(request)
-            .map(response -> ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(response))
+        
+        return Mono.just(request)
+            .flatMap(llmService::processChatCompletion)
+            .map(ResponseEntity::ok)
             .doOnError(error -> log.error("Chat completion error: ", error))
-            .doOnSuccess(response -> log.debug("Chat completion success: {}", response));
+            .onErrorResume(this::handleError);
     }
 
     @PostMapping(value = "/chat/completions/stream", 
