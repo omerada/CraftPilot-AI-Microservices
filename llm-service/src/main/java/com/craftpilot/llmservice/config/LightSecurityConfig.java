@@ -23,10 +23,7 @@ public class LightSecurityConfig {
             "/actuator/health",
             "/actuator/info",
             "/health",
-            "/info",
-            "/chat", // Chat endpoint'ini doğrudan ekleyelim
-            "/chat/completions", // API Gateway'den gelen yol
-            "/chat/completions/stream" // Stream endpoint'i
+            "/info"
     );
 
     @Bean
