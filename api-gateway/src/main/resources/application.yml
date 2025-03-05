@@ -83,6 +83,11 @@ spring:
             - name: RequestSize
               args:
                 maxSize: 10MB
+            - RemoveRequestHeader=www-authenticate
+            - name: AddRequestHeader
+              args:
+                name: X-Forwarded-Prefix
+                value: /ai
 
         - id: image-service
           uri: lb://image-service

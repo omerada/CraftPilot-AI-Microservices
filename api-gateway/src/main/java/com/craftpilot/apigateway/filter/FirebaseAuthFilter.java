@@ -106,6 +106,7 @@ public class FirebaseAuthFilter implements WebFilter {
                     .header("X-User-Email", decodedToken.getEmail() != null ? decodedToken.getEmail() : "")
                     .header("X-User-Role", extractUserRole(decodedToken.getClaims()))
                     .header("X-Auth-Processed", "true")  // İşlendiğini belirtmek için
+                    // Orijinal Authorization header'ını da geçirelim
                     .build();
                 
                 return chain.filter(exchange.mutate().request(mutatedRequest).build());
