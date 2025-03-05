@@ -8,8 +8,6 @@ import com.craftpilot.llmservice.exception.ValidationException;
 import com.craftpilot.llmservice.exception.APIException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -21,7 +19,7 @@ import jakarta.validation.Valid;
 
 @Slf4j
 @RestController
-@RequestMapping("/ai")
+@RequestMapping("/")  // "/ai" yerine "/" olarak değiştirildi
 @RequiredArgsConstructor 
 public class LLMController {
     
