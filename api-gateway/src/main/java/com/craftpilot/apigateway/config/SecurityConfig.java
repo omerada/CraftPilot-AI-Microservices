@@ -57,24 +57,26 @@ public class SecurityConfig {
         FirebaseAuthFilter firebaseFilter = new FirebaseAuthFilter(firebaseAuth);
 
         return http
-            .csrf(csrf -> csrf.disable())  // Disable CSRF for API Gateway
+            .csrf(csrf -> csrf.disable())
             .cors(corsSpec -> corsSpec.configurationSource(corsConfigurationSource()))
-            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)  // Explicitly disable basic auth
-            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)  // Explicitly disable form login
-            .securityHeaders(headers -> headers.frameOptions().disable()  // Disable X-Frame-Options
-                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'")))
+            .httpBasic(basic -> basic.disable())
+            .formLogin(form -> form.disable())
+            .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
                 .pathMatchers(PUBLIC_PATHS.toArray(new String[0])).permitAll()
-                .anyExchange().permitAll())
+                .anyExchange().authenticated()
+            )
             .addFilterBefore(firebaseFilter, SecurityWebFiltersOrder.AUTHENTICATION)
             .exceptionHandling(exceptionHandling -> exceptionHandling
                 .authenticationEntryPoint((exchange, ex) -> {
+                    log.debug("Authentication failed: {}", ex.getMessage());
                     exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                    exchange.getResponse().getHeaders().remove(HttpHeaders.WWW_AUTHENTICATE); // Remove Basic auth header
                     return exchange.getResponse().writeWith(Mono.just(exchange.getResponse()
                         .bufferFactory().wrap("Unauthorized".getBytes())));
-                }))
-            .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
+                })
+            )
             .build();
     }
 
