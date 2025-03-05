@@ -74,6 +74,7 @@ spring:
           uri: lb://llm-service
           predicates:
             - Path=/ai/**
+            - Method=GET,POST,PUT,DELETE,OPTIONS
           filters:
             - name: CircuitBreaker
               args:
@@ -83,9 +84,6 @@ spring:
             - name: RequestSize
               args:
                 maxSize: 10MB
-            - name: Method
-              args:
-                methods: GET,POST,PUT,DELETE,OPTIONS
             - RemoveRequestHeader=www-authenticate
             - name: AddRequestHeader
               args:
