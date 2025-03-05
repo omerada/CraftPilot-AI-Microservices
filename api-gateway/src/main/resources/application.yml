@@ -93,6 +93,7 @@ spring:
               args:
                 name: X-Skip-Authentication
                 value: "true"
+            - StripPrefix=1
 
         - id: image-service
           uri: lb://image-service
