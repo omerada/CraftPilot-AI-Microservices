@@ -79,11 +79,13 @@ spring:
               args:
                 name: llmServiceCircuitBreaker
                 fallbackUri: forward:/fallback/llm-service
-            - StripPrefix=1
             - PreserveHostHeader
             - name: RequestSize
               args:
                 maxSize: 10MB
+            - name: Method
+              args:
+                methods: GET,POST,PUT,DELETE,OPTIONS
             - RemoveRequestHeader=www-authenticate
             - name: AddRequestHeader
               args:

@@ -60,12 +60,6 @@ public class LightSecurityConfig {
             
             // X-User-Id header'ı kontrolü
             String userId = request.getHeaders().getFirst("X-User-Id");
-            String skipAuth = request.getHeaders().getFirst("X-Skip-Authentication");
-            
-            if (skipAuth != null && "true".equalsIgnoreCase(skipAuth)) {
-                log.debug("X-Skip-Authentication true olduğu için kimlik doğrulama atlanıyor");
-                return chain.filter(exchange);
-            }
             
             if (userId == null || userId.isEmpty()) {
                 log.warn("Gerekli X-User-Id header eksik, ancak isteğe devam ediliyor");
