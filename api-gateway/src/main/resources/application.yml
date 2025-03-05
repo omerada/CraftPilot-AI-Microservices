@@ -95,10 +95,6 @@ spring:
               args:
                 name: X-Skip-Authentication
                 value: "true"
-            - name: RewritePath
-              args:
-                regexp: /ai/?(?<remaining>.*)
-                replacement: /${remaining}
 
         - id: image-service
           uri: lb://image-service
