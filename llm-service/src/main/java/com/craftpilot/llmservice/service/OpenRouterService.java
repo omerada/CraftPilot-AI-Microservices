@@ -44,7 +44,6 @@ public class OpenRouterService {
                 .retrieve()
                 .bodyToMono(AIResponse.class)
                 .map(response -> {
-                    response.setRequestId(request.getRequestId());
                     sendAIEvent(request, response, "AI_COMPLETION");
                     return response;
                 });
@@ -54,10 +53,11 @@ public class OpenRouterService {
         log.error("Error calling OpenRouter API for request {}: {}", 
                 request.getRequestId(), throwable.getMessage());
         
+        // Updated to use the new AIResponse structure
         AIResponse errorResponse = AIResponse.builder()
-                .error("Service temporarily unavailable")
+                .response("Service temporarily unavailable") // Changed from .error() to .response()
                 .model(request.getModel() != null ? request.getModel() : config.getDefaultModel())
-                .requestId(request.getRequestId())
+                .success(false) // Added this to indicate error status
                 .build();
 
         sendAIEvent(request, null, throwable.getMessage());
