@@ -37,14 +37,26 @@ public class LLMController {
             .map(response -> ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(response))
-            .doOnError(error -> log.error("Chat completion error: {}", error.getMessage(), error))
+            .doOnError(error -> {
+                log.error("Chat completion error: {}", error.getMessage(), error);
+                // Detaylı hata logu
+                if (error.getCause() != null) {
+                    log.error("Root cause: {}", error.getCause().getMessage());
+                }
+            })
             .onErrorResume(error -> {
-                AIResponse errorResponse = AIResponse.error(
-                    "AI yanıtı işlenirken hata: " + error.getMessage()
-                );
-                return Mono.just(ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(errorResponse));
+                String errorMessage = error.getMessage();
+                if (errorMessage != null && errorMessage.contains("API hatası:")) {
+                    // API hatasını doğrudan ilet
+                    return Mono.just(ResponseEntity
+                        .status(HttpStatus.BAD_GATEWAY)
+                        .body(AIResponse.error(errorMessage)));
+                } else {
+                    // Genel hata mesajı
+                    return Mono.just(ResponseEntity
+                        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(AIResponse.error("LLM servisinde bir hata oluştu: " + errorMessage)));
+                }
             });
     }
 

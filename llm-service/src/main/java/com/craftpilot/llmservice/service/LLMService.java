@@ -136,15 +136,23 @@ public class LLMService {
         log.debug("OpenRouter isteği: {} - Body: {}", endpoint, requestBody);
         
         return openRouterWebClient.post()
-            .uri(endpoint)  // /v1 kaldırıldı
+            .uri(endpoint)
             .bodyValue(requestBody)
             .headers(headers -> {
                 headers.setContentType(MediaType.APPLICATION_JSON);
                 headers.set("Accept", MediaType.APPLICATION_JSON_VALUE);
             })
-            .retrieve()
-            .onStatus(HttpStatusCode::isError, this::handleError)
-            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+            .exchangeToMono(response -> {
+                if (response.statusCode().is2xxSuccessful()) {
+                    return response.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {});
+                } else {
+                    return response.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                        .flatMap(errorBody -> {
+                            log.error("API hatası: {} - {}", response.statusCode(), errorBody);
+                            return Mono.just(errorBody); // Hata yanıtını işleyebilmek için doğru formatta dön
+                        });
+                }
+            })
             .timeout(Duration.ofSeconds(30))
             .doOnError(e -> log.error("OpenRouter API error: ", e));
     }
@@ -201,6 +209,21 @@ public class LLMService {
         try {
             log.debug("Yanıt içeriği: {}", response);
             
+            // API hata mesajlarını kontrol et
+            if (response.containsKey("error")) {
+                Object errorObj = response.get("error");
+                if (errorObj instanceof String) {
+                    throw new RuntimeException("API hatası: " + errorObj);
+                } else if (errorObj instanceof Map) {
+                    Map<String, Object> errorMap = (Map<String, Object>) errorObj;
+                    String errorMessage = errorMap.containsKey("message") 
+                        ? errorMap.get("message").toString() 
+                        : "Bilinmeyen API hatası";
+                    throw new RuntimeException("API hatası: " + errorMessage);
+                }
+                throw new RuntimeException("API hatası: " + errorObj);
+            }
+
             // Daha ayrıntılı debugging ekleyelim
             log.debug("Response keys: {}", response.keySet());
             
@@ -265,6 +288,22 @@ public class LLMService {
                 return (String) response.values().iterator().next();
             }
             
+            // Hata durumunda anlamlı bir hata mesajı oluştur
+            StringBuilder detailBuilder = new StringBuilder("API yanıt anahtarları: ");
+            for (String key : response.keySet()) {
+                Object value = response.get(key);
+                detailBuilder.append(key).append("=");
+                if (value == null) {
+                    detailBuilder.append("null");
+                } else if (value instanceof String) {
+                    String strVal = (String)value;
+                    detailBuilder.append(strVal.length() > 50 ? strVal.substring(0, 50) + "..." : strVal);
+                } else {
+                    detailBuilder.append(value.getClass().getSimpleName());
+                }
+                detailBuilder.append(", ");
+            }
+            
             // Yanıt formatını JSON olarak logla
             try {
                 log.error("Bilinmeyen yanıt formatı: {}", new ObjectMapper().writeValueAsString(response));
@@ -272,7 +311,7 @@ public class LLMService {
                 log.error("Yanıt JSON dönüştürme hatası", e);
             }
             
-            throw new RuntimeException("Geçersiz API yanıt formatı: " + response.keySet());
+            throw new RuntimeException("Geçersiz API yanıt formatı: " + detailBuilder.toString());
         } catch (Exception e) {
             log.error("Yanıt işlenirken hata oluştu: {}", e.getMessage(), e);
             throw new RuntimeException("AI yanıtı işlenemedi: " + e.getMessage(), e);
