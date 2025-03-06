@@ -222,30 +222,30 @@ public class LLMService {
                             log.debug("Content type: {}", content != null ? content.getClass().getName() : "null");
                             
                             if (content instanceof String) {
-                                return (String) content;       else if (choice.containsKey("text")) {
+                                return (String) content;
                             } else if (content instanceof List) {
                                 List<Map<String, Object>> contents = (List<Map<String, Object>>) content;
-                                return contents.stream()bilir (özellikle stream yanıtlarında)
-                                    .filter(item -> "text".equals(item.get("type")))oice.containsKey("delta")) {
-                                    .map(item -> (String) item.get("text"))ce.get("delta");
-                                    .findFirst()  if (delta.containsKey("content")) {
-                                    .orElse("");                   return (String) delta.get("content");
-                            }                   }
-                        }                   }
-                    }                 }
-
-
-
-
-
-
-
-
-
-
-
-
-}    }        }            return "";            log.error("Error extracting content from chunk: {}", response, e);        } catch (Exception e) {            return (String) delta.get("content");            Map<String, Object> delta = (Map<String, Object>) choice.get("delta");            Map<String, Object> choice = ((List<Map<String, Object>>) response.get("choices")).get(0);        try {                    // GPT türü modeller için text alanını kontrol et            }
+                                return contents.stream()
+                                    .filter(item -> "text".equals(item.get("type")))
+                                    .map(item -> (String) item.get("text"))
+                                    .findFirst()
+                                    .orElse("");
+                            }
+                        }
+                    }
+                    // GPT türü modeller için text alanını kontrol et
+                    else if (choice.containsKey("text")) {
+                        return (String) choice.get("text");
+                    }
+                    // Ayrıca delta içinde de olabilir (özellikle stream yanıtlarında)
+                    else if (choice.containsKey("delta")) {
+                        Map<String, Object> delta = (Map<String, Object>) choice.get("delta");
+                        if (delta.containsKey("content")) {
+                            return (String) delta.get("content");
+                        }
+                    }
+                }
+            }
             
             // Farklı yanıt formatlarını işle
             if (response.containsKey("output") && response.get("output") instanceof String) {
@@ -257,34 +257,7 @@ public class LLMService {
             }
             
             if (response.containsKey("generated_text") && response.get("generated_text") instanceof String) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}    }        }            return "";            log.error("Error extracting content from chunk: {}", response, e);        } catch (Exception e) {            return (String) delta.get("content");            Map<String, Object> delta = (Map<String, Object>) choice.get("delta");            Map<String, Object> choice = ((List<Map<String, Object>>) response.get("choices")).get(0);        try {    private String extractChunkContent(Map<String, Object> response) {    }        return ((Number) usage.getOrDefault("total_tokens", 0)).intValue();        Map<String, Object> usage = (Map<String, Object>) response.getOrDefault("usage", Map.of());    private Integer extractTokenCount(Map<String, Object> response) {    }        }            throw new RuntimeException("AI yanıtı işlenemedi: " + e.getMessage(), e);            log.error("Yanıt işlenirken hata oluştu: {}", e.getMessage(), e);        } catch (Exception e) {            throw new RuntimeException("Geçersiz API yanıt formatı: " + response.keySet());                        }                log.error("Yanıt JSON dönüştürme hatası", e);                return (String) response.get("generated_text");
+                return (String) response.get("generated_text");
             }
             
             // Eğer response'un kendisi String ise direkt döndür (bazı LLM API'leri için)
@@ -296,3 +269,18 @@ public class LLMService {
             try {
                 log.error("Bilinmeyen yanıt formatı: {}", new ObjectMapper().writeValueAsString(response));
             } catch (Exception e) {
+                log.error("Yanıt JSON dönüştürme hatası", e);
+            }
+            
+            throw new RuntimeException("Geçersiz API yanıt formatı: " + response.keySet());
+        } catch (Exception e) {
+            log.error("Yanıt işlenirken hata oluştu: {}", e.getMessage(), e);
+            throw new RuntimeException("AI yanıtı işlenemedi: " + e.getMessage(), e);
+        }
+    }
+
+    private Integer extractTokenCount(Map<String, Object> response) {
+        Map<String, Object> usage = (Map<String, Object>) response.getOrDefault("usage", Map.of());
+        return ((Number) usage.getOrDefault("total_tokens", 0)).intValue();
+    }
+}
