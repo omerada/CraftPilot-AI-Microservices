@@ -29,13 +29,23 @@ public class LLMController {
                 produces = MediaType.APPLICATION_JSON_VALUE,
                 consumes = MediaType.APPLICATION_JSON_VALUE) 
     public Mono<ResponseEntity<AIResponse>> chatCompletion(@RequestBody AIRequest request) {
+        log.info("Chat completion request received: {}", request);
         request.setRequestType("CHAT");
+        
         return llmService.processChatCompletion(request)
+            .doOnSuccess(response -> log.debug("Chat completion success: {}", response))
             .map(response -> ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(response))
-            .doOnError(error -> log.error("Chat completion error: ", error))
-            .doOnSuccess(response -> log.debug("Chat completion success: {}", response));
+            .doOnError(error -> log.error("Chat completion error: {}", error.getMessage(), error))
+            .onErrorResume(error -> {
+                AIResponse errorResponse = AIResponse.error(
+                    "AI yanıtı işlenirken hata: " + error.getMessage()
+                );
+                return Mono.just(ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(errorResponse));
+            });
     }
 
     @PostMapping(value = "/chat/completions/stream", 

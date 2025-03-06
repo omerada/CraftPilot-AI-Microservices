@@ -35,8 +35,20 @@ public class LLMService {
     public Mono<AIResponse> processChatCompletion(AIRequest request) {
         return callOpenRouter("chat/completions", request)  // URL düzeltildi
             .doOnNext(response -> log.debug("OpenRouter yanıtı: {}", response))
-            .map(response -> mapToAIResponse(response, request))
-            .doOnError(e -> log.error("Chat completion error: ", e));
+            .map(response -> {
+                try {
+                    return mapToAIResponse(response, request);
+                } catch (Exception e) {
+                    log.error("AI yanıtı işlenirken hata: {}", e.getMessage(), e);
+                    throw new RuntimeException("AI yanıtı haritalanırken hata: " + e.getMessage(), e);
+                }
+            })
+            .timeout(Duration.ofSeconds(60))
+            .doOnError(e -> log.error("Chat completion error: {}", e.getMessage(), e))
+            .onErrorResume(e -> {
+                log.error("Hata yakalandı ve işlendi: {}", e.getMessage());
+                return Mono.just(AIResponse.error("AI servisi hatası: " + e.getMessage()));
+            });
     }
 
     public Mono<AIResponse> processCodeCompletion(AIRequest request) {
@@ -188,47 +200,99 @@ public class LLMService {
     private String extractResponseText(Map<String, Object> response) {
         try {
             log.debug("Yanıt içeriği: {}", response);
+            
+            // Daha ayrıntılı debugging ekleyelim
+            log.debug("Response keys: {}", response.keySet());
+            
             if (response.containsKey("choices")) {
                 List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+                log.debug("Choices size: {}", choices.size());
+                
                 if (!choices.isEmpty()) {
                     Map<String, Object> choice = choices.get(0);
+                    log.debug("Choice keys: {}", choice.keySet());
+                    
+                    // Choice içinde message veya text olabilir
                     if (choice.containsKey("message")) {
                         Map<String, Object> message = (Map<String, Object>) choice.get("message");
+                        log.debug("Message keys: {}", message.keySet());
+                        
                         if (message.containsKey("content")) {
-                            if (message.get("content") instanceof List) {
-                                List<Map<String, Object>> contents = (List<Map<String, Object>>) message.get("content");
-                                return contents.stream()
-                                    .filter(content -> "text".equals(content.get("type")))
-                                    .map(content -> (String) content.get("text"))
-                                    .findFirst()
-                                    .orElse(null);
-                            } else {
-                                return (String) message.get("content");
-                            }
-                        }
-                    }
-                }
+                            Object content = message.get("content");
+                            log.debug("Content type: {}", content != null ? content.getClass().getName() : "null");
+                            
+                            if (content instanceof String) {
+                                return (String) content;       else if (choice.containsKey("text")) {
+                            } else if (content instanceof List) {
+                                List<Map<String, Object>> contents = (List<Map<String, Object>>) content;
+                                return contents.stream()bilir (özellikle stream yanıtlarında)
+                                    .filter(item -> "text".equals(item.get("type")))oice.containsKey("delta")) {
+                                    .map(item -> (String) item.get("text"))ce.get("delta");
+                                    .findFirst()  if (delta.containsKey("content")) {
+                                    .orElse("");                   return (String) delta.get("content");
+                            }                   }
+                        }                   }
+                    }                 }
+
+
+
+
+
+
+
+
+
+
+
+
+}    }        }            return "";            log.error("Error extracting content from chunk: {}", response, e);        } catch (Exception e) {            return (String) delta.get("content");            Map<String, Object> delta = (Map<String, Object>) choice.get("delta");            Map<String, Object> choice = ((List<Map<String, Object>>) response.get("choices")).get(0);        try {                    // GPT türü modeller için text alanını kontrol et            }
+            
+            // Farklı yanıt formatlarını işle
+            if (response.containsKey("output") && response.get("output") instanceof String) {
+                return (String) response.get("output");
             }
-            throw new RuntimeException("Geçersiz API yanıt formatı");
-        } catch (Exception e) {
-            log.error("Yanıt işlenirken hata oluştu: ", e);
-            throw new RuntimeException("AI yanıtı işlenemedi", e);
-        }
-    }
+            
+            if (response.containsKey("completion") && response.get("completion") instanceof String) {
+                return (String) response.get("completion");
+            }
+            
+            if (response.containsKey("generated_text") && response.get("generated_text") instanceof String) {
 
-    private Integer extractTokenCount(Map<String, Object> response) {
-        Map<String, Object> usage = (Map<String, Object>) response.getOrDefault("usage", Map.of());
-        return ((Number) usage.getOrDefault("total_tokens", 0)).intValue();
-    }
 
-    private String extractChunkContent(Map<String, Object> response) {
-        try {
-            Map<String, Object> choice = ((List<Map<String, Object>>) response.get("choices")).get(0);
-            Map<String, Object> delta = (Map<String, Object>) choice.get("delta");
-            return (String) delta.get("content");
-        } catch (Exception e) {
-            log.error("Error extracting content from chunk: {}", response, e);
-            return "";
-        }
-    }
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}    }        }            return "";            log.error("Error extracting content from chunk: {}", response, e);        } catch (Exception e) {            return (String) delta.get("content");            Map<String, Object> delta = (Map<String, Object>) choice.get("delta");            Map<String, Object> choice = ((List<Map<String, Object>>) response.get("choices")).get(0);        try {    private String extractChunkContent(Map<String, Object> response) {    }        return ((Number) usage.getOrDefault("total_tokens", 0)).intValue();        Map<String, Object> usage = (Map<String, Object>) response.getOrDefault("usage", Map.of());    private Integer extractTokenCount(Map<String, Object> response) {    }        }            throw new RuntimeException("AI yanıtı işlenemedi: " + e.getMessage(), e);            log.error("Yanıt işlenirken hata oluştu: {}", e.getMessage(), e);        } catch (Exception e) {            throw new RuntimeException("Geçersiz API yanıt formatı: " + response.keySet());                        }                log.error("Yanıt JSON dönüştürme hatası", e);                return (String) response.get("generated_text");
+            }
+            
+            // Eğer response'un kendisi String ise direkt döndür (bazı LLM API'leri için)
+            if (response.size() == 1 && response.values().iterator().next() instanceof String) {
+                return (String) response.values().iterator().next();
+            }
+            
+            // Yanıt formatını JSON olarak logla
+            try {
+                log.error("Bilinmeyen yanıt formatı: {}", new ObjectMapper().writeValueAsString(response));
+            } catch (Exception e) {
