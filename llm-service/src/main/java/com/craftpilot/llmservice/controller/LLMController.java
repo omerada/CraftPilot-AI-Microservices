@@ -24,41 +24,6 @@ import jakarta.validation.Valid;
 public class LLMController {
     
     private final LLMService llmService;
-    
-    @PostMapping(value = "/completions",
-                produces = MediaType.APPLICATION_JSON_VALUE,
-                consumes = MediaType.APPLICATION_JSON_VALUE) 
-    public Mono<ResponseEntity<AIResponse>> textCompletion(
-            @Valid @RequestBody AIRequest request,
-            @RequestHeader(required = false) String userId) {
-        
-        log.info("Text completion request received: {}", request);
-        
-        return llmService.processTextCompletion(request)
-            .doOnNext(this::auditResponse)
-            .map(ResponseEntity::ok)
-            .doOnError(e -> log.error("Error processing completion", e))
-            .onErrorResume(this::handleError);
-    }
-
-    private Mono<ResponseEntity<AIResponse>> handleError(Throwable error) {
-        log.error("Error processing request", error); // Detaylı loglama ekledik
-        
-        if (error instanceof ValidationException) {
-            return Mono.just(ResponseEntity.badRequest()
-                    .body(AIResponse.error("Validation error: " + error.getMessage())));
-        } else if (error instanceof APIException) {
-            return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(AIResponse.error("AI Service error: " + error.getMessage())));
-        }
-        
-        return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(AIResponse.error("Internal server error: " + error.getMessage())));
-    }
-
-    private void auditResponse(AIResponse response) {
-        // Audit logging implementation
-    }
 
     @PostMapping(value = "/chat/completions", 
                 produces = MediaType.APPLICATION_JSON_VALUE,

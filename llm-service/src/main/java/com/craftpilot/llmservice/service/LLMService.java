@@ -32,11 +32,6 @@ public class LLMService {
     private final WebClient openRouterWebClient; 
     private final ObjectMapper objectMapper;
 
-    public Mono<AIResponse> processTextCompletion(AIRequest request) {
-        return callOpenRouter("/v1/completions", request)
-            .map(response -> mapToAIResponse(response, request));
-    }
-
     public Mono<AIResponse> processChatCompletion(AIRequest request) {
         return callOpenRouter("chat/completions", request)  // URL düzeltildi
             .doOnNext(response -> log.debug("OpenRouter yanıtı: {}", response))
