@@ -29,11 +29,11 @@ public class LLMController {
                 produces = MediaType.APPLICATION_JSON_VALUE,
                 consumes = MediaType.APPLICATION_JSON_VALUE) 
     public Mono<ResponseEntity<AIResponse>> chatCompletion(@RequestBody AIRequest request) {
-        log.info("Chat completion request received: {}", request);
+        log.info("Chat completion request received");
         request.setRequestType("CHAT");
         
         return llmService.processChatCompletion(request)
-            .doOnSuccess(response -> log.debug("Chat completion success: {}", response))
+            .doOnSuccess(response -> log.debug("Chat completion success"))
             .map(response -> ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(response))
@@ -63,10 +63,13 @@ public class LLMController {
     @PostMapping(value = "/chat/completions/stream", 
                 produces = MediaType.TEXT_EVENT_STREAM_VALUE) 
     public Flux<StreamResponse> streamChatCompletion(@RequestBody AIRequest request) {
+        log.info("Stream chat completion request received");
         request.setRequestType("CHAT");
+        
         return llmService.streamChatCompletion(request)
-            .doOnNext(response -> log.debug("Streaming response chunk: {}", response))
-            .doOnError(error -> log.error("Stream error: ", error));
+            .doOnNext(response -> log.debug("Streaming response chunk received"))
+            .doOnError(error -> log.error("Stream error: {}", error.getMessage(), error))
+            .doOnComplete(() -> log.info("Stream completed for request"));
     }
 
     @PostMapping(value = "/images/generate", 

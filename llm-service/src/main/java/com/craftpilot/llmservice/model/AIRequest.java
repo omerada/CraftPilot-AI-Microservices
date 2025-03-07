@@ -16,8 +16,8 @@ public class AIRequest {
     private String requestId;
     private String userId;
     private String model;
-    private String prompt;
-    private List<Map<String, String>> messages;
+    private String prompt; // Geriye dönük uyumluluk için korundu
+    private List<Map<String, Object>> messages; // Sohbet geçmişi için
     private Integer maxTokens;
     private Double temperature;
     private String requestType;

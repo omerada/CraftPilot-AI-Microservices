@@ -171,13 +171,32 @@ public class LLMService {
         Map<String, Object> body = new HashMap<>();
         body.put("model", request.getModel());
         
-        List<Map<String, Object>> messages = new ArrayList<>();
-        Map<String, Object> userMessage = new HashMap<>();
-        userMessage.put("role", "user");
-        userMessage.put("content", request.getPrompt());  // Direkt String olarak gönder
-        messages.add(userMessage);
+        // Eğer messages dizisi mevcutsa, doğrudan onu kullan
+        if (request.getMessages() != null && !request.getMessages().isEmpty()) {
+            body.put("messages", request.getMessages());
+        } 
+        // Değilse, prompt alanından messages oluştur (geriye dönük uyumluluk)
+        else if (request.getPrompt() != null && !request.getPrompt().isEmpty()) {
+            List<Map<String, Object>> messages = new ArrayList<>();
+            
+            // İsteğe bağlı olarak system mesajı ekle
+            Map<String, Object> systemMessage = new HashMap<>();
+         //   systemMessage.put("role", "system");
+           // systemMessage.put("content", "Sen yardımcı bir AI asistanısın. Kullanıcıya doğru, yararlı ve detaylı yanıtlar ver.");
+          //  messages.add(systemMessage);
+            
+            // Kullanıcı mesajını ekle
+            Map<String, Object> userMessage = new HashMap<>();
+            userMessage.put("role", "user");
+            userMessage.put("content", request.getPrompt());
+            messages.add(userMessage);
+            
+            body.put("messages", messages);
+        } else {
+            // Her iki alan da boşsa, hata fırlat
+            throw new IllegalArgumentException("Request must contain either 'prompt' or 'messages'");
+        }
         
-        body.put("messages", messages);
         body.put("max_tokens", request.getMaxTokens());
         body.put("temperature", request.getTemperature());
         
