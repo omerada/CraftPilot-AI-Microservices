@@ -11,6 +11,15 @@ on:
     paths:
       - "user-service/**"
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy to"
+        required: true
+        default: "prod"
+        type: choice
+        options:
+          - prod
+          - debug
 
 jobs:
   build-and-deploy:
@@ -98,36 +107,74 @@ jobs:
             docker rm -f user-service || true
 
             echo "=== Starting User Service ==="
-            docker run -d \
-              --name user-service \
-              --network craftpilot-network \
-              --restart unless-stopped \
-              -p 8060:8060 \
-              -v /opt/craftpilot/gcp/credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
-              -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
-              -e SPRING_PROFILES_ACTIVE=prod \
-              -e SERVER_PORT=8060 \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e EUREKA_INSTANCE_HOSTNAME=user-service \
-              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
-              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
-              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
-              -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
-              -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
-              -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
-              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics" \
-              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-              -e SPRING_APPLICATION_NAME=user-service \
-              --health-cmd="curl -f http://localhost:8060/actuator/health || exit 1" \
-              --health-interval=10s \
-              --health-retries=10 \
-              --health-timeout=5s \
-              --health-start-period=40s \
-              ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
+            if [[ "${{ github.event.inputs.environment }}" == "debug" ]]; then
+              docker run -d \
+                --name user-service \
+                --network craftpilot-network \
+                --restart unless-stopped \
+                -p 8060:8060 \
+                -p 5007:5007 \
+                -v /opt/craftpilot/gcp/credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
+                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
+                -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e SERVER_PORT=8060 \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_INSTANCE_HOSTNAME=user-service \
+                -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+                -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+                -e REDIS_HOST=redis \
+                -e REDIS_PORT=6379 \
+                -e REDIS_PASSWORD=13579ada \
+                -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics,loggers,env" \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e SPRING_APPLICATION_NAME=user-service \
+                -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_NETFLIX_EUREKA=DEBUG \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_REDIS=DEBUG \
+                -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5007" \
+                --health-cmd="curl -f http://localhost:8060/actuator/health || exit 1" \
+                --health-interval=10s \
+                --health-retries=10 \
+                --health-timeout=5s \
+                --health-start-period=60s \
+                ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
+            else
+              docker run -d \
+                --name user-service \
+                --network craftpilot-network \
+                --restart unless-stopped \
+                -p 8060:8060 \
+                -v /opt/craftpilot/gcp/credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
+                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
+                -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e SERVER_PORT=8060 \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_INSTANCE_HOSTNAME=user-service \
+                -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+                -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+                -e REDIS_HOST=redis \
+                -e REDIS_PORT=6379 \
+                -e REDIS_PASSWORD=13579ada \
+                -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics" \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e SPRING_APPLICATION_NAME=user-service \
+                --health-cmd="curl -f http://localhost:8060/actuator/health || exit 1" \
+                --health-interval=10s \
+                --health-retries=10 \
+                --health-timeout=5s \
+                --health-start-period=40s \
+                ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
+            fi
 
             echo "=== Waiting for Service to Start ==="
             max_attempts=30
@@ -139,7 +186,7 @@ jobs:
               # Container durumu kontrolü
               if ! docker ps --filter "name=user-service" --format '{{.Status}}' | grep -q "Up"; then
                 echo "Container is not running anymore. Checking logs..."
-                docker logs user-service
+                docker logs user-service --tail 300
                 exit 1
               fi
               
@@ -152,13 +199,23 @@ jobs:
                   echo "Successfully registered with Eureka"
                   
                   # Final health check
-                  response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8060/actuator/health)
-                  if [ "$response" = "200" ]; then
-                    echo "✓ Health check passed"
+                  HEALTH_CHECK=$(curl -s http://localhost:8060/actuator/health)
+                  if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
+                    echo "✓ Service is healthy: $HEALTH_CHECK"
                     echo "=== Deployment completed successfully ==="
                     exit 0
+                  else
+                    echo "Health check response: $HEALTH_CHECK"
                   fi
+                else
+                  # Ekstra Eureka log bilgisi
+                  echo "Waiting for Eureka registration..."
+                  docker logs user-service 2>&1 | grep -i "eureka" | tail -10
                 fi
+              else
+                # Başlangıç loglarını kontrol et
+                echo "Waiting for application startup..."
+                docker logs user-service 2>&1 | grep -i "userservice\|error\|exception" | tail -10
               fi
               
               echo "Waiting for service to start... ($((counter + 1))/$max_attempts)"
@@ -169,8 +226,14 @@ jobs:
             echo "=== Service Failed to Start - Debug Information ==="
             echo "Docker Container Status:"
             docker ps -a | grep user-service
-            echo "Container Logs:"
-            docker logs user-service --tail 200
+            echo "Container Logs (son 500 satır):"
+            docker logs user-service --tail 500
+            echo "Hata Mesajları ve İstisnalar:"
+            docker logs user-service 2>&1 | grep -i "error\|exception\|failed" | tail -50
+            echo "Eureka Kayıt Bilgileri:"
+            docker logs user-service 2>&1 | grep -i "eureka\|discovery" | tail -30
+            echo "Redis Bağlantı Bilgileri:"
+            docker logs user-service 2>&1 | grep -i "redis" | tail -20
             echo "Network Information:"
             docker network inspect craftpilot-network
             echo "Health Check Response:"
