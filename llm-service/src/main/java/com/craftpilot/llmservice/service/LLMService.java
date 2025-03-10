@@ -71,7 +71,7 @@ public class LLMService {
         log.debug("Stream isteği gönderiliyor: {}", requestBody);
         
         return openRouterWebClient.post()
-            .uri("/chat/completions")  // URL düzeltildi
+            .uri("/chat/completions")  
             .bodyValue(requestBody)
             .headers(headers -> {
                 headers.setContentType(MediaType.APPLICATION_JSON);
@@ -171,37 +171,70 @@ public class LLMService {
         Map<String, Object> body = new HashMap<>();
         body.put("model", request.getModel());
         
-        // Eğer messages dizisi mevcutsa, doğrudan onu kullan
+        List<Map<String, Object>> messages;
+        
+        // Eğer messages dizisi mevcutsa, onu kullan
         if (request.getMessages() != null && !request.getMessages().isEmpty()) {
-            body.put("messages", request.getMessages());
+            messages = new ArrayList<>(request.getMessages());
+            
+            // Sistem mesajı var mı kontrol et
+            boolean hasSystemMessage = messages.stream()
+                .anyMatch(msg -> "system".equals(msg.get("role")));
+            
+            // Yoksa ekle
+            if (!hasSystemMessage) {
+                Map<String, Object> systemMessage = new HashMap<>();
+                systemMessage.put("role", "system");
+                systemMessage.put("content", getSystemPrompt(request.getRequestType()));
+                
+                // Sistem mesajını listenin başına ekle
+                messages.add(0, systemMessage);
+            }
         } 
         // Değilse, prompt alanından messages oluştur (geriye dönük uyumluluk)
         else if (request.getPrompt() != null && !request.getPrompt().isEmpty()) {
-            List<Map<String, Object>> messages = new ArrayList<>();
+            messages = new ArrayList<>();
             
-            // İsteğe bağlı olarak system mesajı ekle
+            // Sistem mesajını ekle
             Map<String, Object> systemMessage = new HashMap<>();
-         //   systemMessage.put("role", "system");
-           // systemMessage.put("content", "Sen yardımcı bir AI asistanısın. Kullanıcıya doğru, yararlı ve detaylı yanıtlar ver.");
-          //  messages.add(systemMessage);
+            systemMessage.put("role", "system");
+            systemMessage.put("content", getSystemPrompt(request.getRequestType()));
+            messages.add(systemMessage);
             
             // Kullanıcı mesajını ekle
             Map<String, Object> userMessage = new HashMap<>();
             userMessage.put("role", "user");
             userMessage.put("content", request.getPrompt());
             messages.add(userMessage);
-            
-            body.put("messages", messages);
         } else {
             // Her iki alan da boşsa, hata fırlat
             throw new IllegalArgumentException("Request must contain either 'prompt' or 'messages'");
         }
         
+        body.put("messages", messages);
         body.put("max_tokens", request.getMaxTokens());
         body.put("temperature", request.getTemperature());
         
         log.debug("Oluşturulan request body: {}", body);
         return body;
+    }
+
+    /**
+     * Request tipine göre özel sistem prompt'u oluşturur
+     */
+    private String getSystemPrompt(String requestType) {
+        if ("CODE".equalsIgnoreCase(requestType)) {
+            return "You are an expert coding assistant. Provide clean, efficient, and well-documented code solutions. " +
+                   "Explain your approach briefly when helpful, focusing on best practices and performance considerations. " +
+                   "When providing code, ensure it's production-ready and includes appropriate error handling.";
+        } else if ("CHAT".equalsIgnoreCase(requestType)) {
+            return "You are a helpful, accurate, and thoughtful assistant. Provide clear, concise, and relevant responses. " +
+                   "Maintain context throughout the conversation and ask clarifying questions when necessary. " +
+                   "Balance thoroughness with brevity based on the user's needs. " +
+                   "Always aim to provide factually correct information and acknowledge limitations in your knowledge.";
+        } else {
+            return "You are a helpful AI assistant. Provide accurate, relevant, and detailed responses to the user's requests.";
+        }
     }
 
     private AIResponse mapToAIResponse(Map<String, Object> openRouterResponse, AIRequest request) {
