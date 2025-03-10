@@ -88,19 +88,19 @@ public class LLMService {
             // Debugging için tüm ham yanıtları logla
             .doOnNext(chunk -> log.debug("Raw chunk received: {}", chunk))
             .filter(chunk -> chunk != null && !chunk.trim().isEmpty())
-            .map(chunk -> {
-                if (chunk.startsWith("data: ")) {
-                    chunk = chunk.substring(6).trim();
-                }
-                if (chunk.equals("[DONE]")) {
-                    log.debug("Stream completion signal received");
-                    return StreamResponse.builder()
-                        .content("")
-                        .done(true)
-                        .build();
-                }
-                
+            .mapNotNull(chunk -> {  // mapNotNull kullanarak null değerleri filtrele
                 try {
+                    if (chunk.startsWith("data: ")) {
+                        chunk = chunk.substring(6).trim();
+                    }
+                    if (chunk.equals("[DONE]")) {
+                        log.debug("Stream completion signal received");
+                        return StreamResponse.builder()
+                            .content("")
+                            .done(true)
+                            .build();
+                    }
+                    
                     Map<String, Object> response = objectMapper.readValue(chunk, new TypeReference<Map<String, Object>>() {});
                     
                     if (response.containsKey("choices")) {
@@ -112,18 +112,18 @@ public class LLMService {
                             String content = "";
                             if (delta != null && delta.containsKey("content")) {
                                 content = (String) delta.get("content");
+                                if (content != null && !content.isEmpty()) {
+                                    log.debug("Streaming content: {}", content);
+                                    return StreamResponse.builder()
+                                        .content(content)
+                                        .done(false)
+                                        .build();
+                                }
                             }
                             
-                            boolean isDone = choice.containsKey("finish_reason") && choice.get("finish_reason") != null;
-                            
-                            // Eğer içerik varsa hemen döndür
-                            if (content != null && !content.isEmpty()) {
-                                log.debug("Streaming content: {}", content);
-                                return StreamResponse.builder()
-                                    .content(content)
-                                    .done(isDone)
-                                    .build();
-                            } else if (isDone) {
+                            boolean isDone = choice.containsKey("finish_reason") && 
+                                           choice.get("finish_reason") != null;
+                            if (isDone) {
                                 return StreamResponse.builder()
                                     .content("")
                                     .done(true)
@@ -132,13 +132,19 @@ public class LLMService {
                         }
                     }
                     
+                    // Eğer buraya kadar geldiyse ve içerik yoksa, bu chunk'ı atla
+                    log.debug("Skipping empty or invalid chunk: {}", chunk);
                     return null;
+                    
                 } catch (Exception e) {
-                    log.error("Error processing chunk: {} - {}", e.getMessage(), chunk, e);
-                    return null;
+                    log.error("Error processing chunk: {} - Error: {}", chunk, e.getMessage());
+                    return StreamResponse.builder()
+                        .content("Error: " + e.getMessage())
+                        .done(true)
+                        .build();
                 }
             })
-            .filter(Objects::nonNull)
+            .filter(Objects::nonNull)  // Ekstra güvenlik için null kontrolü
             // Oluşması halinde hata durumunu istemciye bildir
             .onErrorResume(e -> {
                 log.error("Stream processing error: {}", e.getMessage(), e);
