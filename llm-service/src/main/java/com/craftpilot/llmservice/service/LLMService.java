@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -80,8 +81,11 @@ public class LLMService {
             .retrieve()
             .bodyToFlux(String.class)
             .doOnSubscribe(s -> log.debug("Stream başlatılıyor"))
+            // Her bir chunk'ı yayınlanır yayınlanmaz işleme al, tamponlama yapma
+            .publishOn(Schedulers.parallel())
             .doOnNext(chunk -> log.debug("Ham chunk alındı: {}", chunk))
             .filter(chunk -> chunk != null && !chunk.trim().isEmpty())
+            // delayElements silindi - ekstra gecikmeye neden olabilir
             .map(chunk -> {
                 if (chunk.startsWith("data: ")) {
                     chunk = chunk.substring(6).trim();
@@ -127,8 +131,15 @@ public class LLMService {
                 }
             })
             .filter(Objects::nonNull)
+            // Her yanıtı hemen iletmek için buffer işlemleri kaldırıldı
             .doOnError(e -> log.error("Stream işleminde hata: ", e))
-            .doOnComplete(() -> log.debug("Stream tamamlandı"));
+            .onErrorResume(e -> {
+                // Hata durumunda da akışı kesme, hatayı bildir
+                return Flux.just(StreamResponse.builder()
+                    .content("Hata: " + e.getMessage())
+                    .done(true)
+                    .build());
+            });
     }
 
     private Mono<Map<String, Object>> callOpenRouter(String endpoint, AIRequest request) {

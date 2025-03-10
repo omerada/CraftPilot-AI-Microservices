@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import jakarta.validation.Valid;
 
@@ -62,16 +63,26 @@ public class LLMController {
             });
     }
 
-    @PostMapping(value = "/chat/completions/stream", 
-                produces = MediaType.TEXT_EVENT_STREAM_VALUE) 
+    @PostMapping(value = "/chat/completions/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE) 
     public Flux<StreamResponse> streamChatCompletion(@RequestBody AIRequest request,
-                                                   @RequestHeader(value = "X-User-Language", defaultValue = "en") String userLanguage) {
+                                                  @RequestHeader(value = "X-User-Language", defaultValue = "en") String userLanguage) {
         log.info("Stream chat completion request received with language: {}", userLanguage);
         request.setRequestType("CHAT");
-        request.setLanguage(userLanguage); // Kullanıcı dil tercihini request'e ekle
+        request.setLanguage(userLanguage);
         
         return llmService.streamChatCompletion(request)
-            .doOnNext(response -> log.debug("Streaming response chunk received"))
+            // Her bir yanıtı hemen istemciye gönder
+            .publishOn(Schedulers.parallel())
+            // Yanıt gönderimi sırasında HTTP istemci bağlantısını açık tut
+            .doOnNext(response -> {
+                // Detaylı log sadece debug modunda
+                if (log.isDebugEnabled()) {
+                    log.debug("Streaming response chunk: {}", 
+                        response.getContent().length() > 20 
+                            ? response.getContent().substring(0, 20) + "..." 
+                            : response.getContent());
+                }
+            })
             .doOnError(error -> log.error("Stream error: {}", error.getMessage(), error))
             .doOnComplete(() -> log.info("Stream completed for request"));
     }
