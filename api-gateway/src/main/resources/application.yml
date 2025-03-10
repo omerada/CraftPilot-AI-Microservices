@@ -166,6 +166,16 @@ spring:
       caffeine:
         spec: maximumSize=500,expireAfterWrite=5s
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    consumer:
+      group-id: api-gateway-group
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
   gateway:
     default-filters:
       - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
@@ -296,3 +306,9 @@ resilience4j:
         timeoutDuration: 5s
       llmServiceTimeLimiter:
         timeoutDuration: 60s
+
+kafka:
+  topics:
+    user-preferences: user-preferences
+    user-activity: user-activity
+    system-events: system-events

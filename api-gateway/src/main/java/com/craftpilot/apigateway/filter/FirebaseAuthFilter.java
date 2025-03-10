@@ -1,16 +1,14 @@
 package com.craftpilot.apigateway.filter;
 
+import com.craftpilot.apigateway.cache.UserPreferenceCache;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
-import org.springframework.security.core.context.ReactiveSecurityContextHolder;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
@@ -21,15 +19,15 @@ import reactor.core.scheduler.Schedulers;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.Collections;
 import java.util.UUID;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class FirebaseAuthFilter implements WebFilter {
 
     private final FirebaseAuth firebaseAuth;
+    private final UserPreferenceCache userPreferenceCache;
+    
     private static final String BEARER_PREFIX = "Bearer ";
     private static final List<String> PUBLIC_PATHS = List.of(
         "/actuator",
@@ -38,6 +36,11 @@ public class FirebaseAuthFilter implements WebFilter {
         "/auth/login",
         "/auth/refresh"
     );
+
+    public FirebaseAuthFilter(FirebaseAuth firebaseAuth, UserPreferenceCache userPreferenceCache) {
+        this.firebaseAuth = firebaseAuth;
+        this.userPreferenceCache = userPreferenceCache;
+    }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
@@ -63,12 +66,10 @@ public class FirebaseAuthFilter implements WebFilter {
         // Add CSRF token to response headers
         exchange.getResponse().getHeaders().add("X-CSRF-TOKEN", generateCsrfToken());
         
-        return validateTokenAndAddHeaders(token, exchange, chain)
-            .contextWrite(context -> ReactiveSecurityContextHolder.withAuthentication(
-                new UsernamePasswordAuthenticationToken("user", null, Collections.emptyList())
-            ));
+        return validateTokenAndAddHeaders(token, exchange, chain);
     }
 
+    // Mevcut yardımcı metodlar...
     private boolean isPublicPath(String path) {
         return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
     }
@@ -98,26 +99,31 @@ public class FirebaseAuthFilter implements WebFilter {
         .subscribeOn(Schedulers.boundedElastic())
         .flatMap(decodedToken -> {
             if (decodedToken != null) {
-                log.debug("Token doğrulandı, kullanıcı: {}", decodedToken.getUid());
+                String userId = decodedToken.getUid();
+                log.debug("Token doğrulandı, kullanıcı: {}", userId);
                 
-                // Orijinal Authorization header'ını al
-                String originalAuth = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-                
-                // Yeni bir request oluştur ve auth header'larını ekle
-                ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
-                    .header("X-User-Id", decodedToken.getUid())
-                    .header("X-User-Email", decodedToken.getEmail() != null ? decodedToken.getEmail() : "")
-                    .header("X-User-Role", extractUserRole(decodedToken.getClaims()))
-                    .header("X-Auth-Processed", "true")
-                    // Orijinal Authorization header'ını AYNEN koru
-                    .header(HttpHeaders.AUTHORIZATION, originalAuth)
-                    .build();
-                
-                // Response header'larına CSRF token ve diğer bilgileri ekle
-                exchange.getResponse().getHeaders().add("X-CSRF-TOKEN", generateCsrfToken());
-                exchange.getResponse().getHeaders().remove(HttpHeaders.WWW_AUTHENTICATE);
-                
-                return chain.filter(exchange.mutate().request(mutatedRequest).build());
+                // Önbellekten dil tercihini al - reactive olarak
+                return userPreferenceCache.getUserLanguage(userId)
+                    .flatMap(language -> {
+                        // Orijinal Authorization header'ını al
+                        String originalAuth = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+                        
+                        // Yeni bir request oluştur ve header'ları ekle
+                        ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
+                            .header("X-User-Id", userId)
+                            .header("X-User-Email", decodedToken.getEmail() != null ? decodedToken.getEmail() : "")
+                            .header("X-User-Role", extractUserRole(decodedToken.getClaims()))
+                            .header("X-User-Language", language) // Önbellekten alınan dil tercihini ekle
+                            .header("X-Auth-Processed", "true")
+                            .header(HttpHeaders.AUTHORIZATION, originalAuth)
+                            .build();
+                        
+                        // Response header'larına CSRF token ve diğer bilgileri ekle
+                        exchange.getResponse().getHeaders().add("X-CSRF-TOKEN", generateCsrfToken());
+                        exchange.getResponse().getHeaders().remove(HttpHeaders.WWW_AUTHENTICATE);
+                        
+                        return chain.filter(exchange.mutate().request(mutatedRequest).build());
+                    });
             }
             
             return handleError(exchange, HttpStatus.UNAUTHORIZED, "Geçersiz token");

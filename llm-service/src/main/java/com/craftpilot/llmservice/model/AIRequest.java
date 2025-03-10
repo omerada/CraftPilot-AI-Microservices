@@ -21,4 +21,5 @@ public class AIRequest {
     private Integer maxTokens;
     private Double temperature;
     private String requestType;
+    private String language; // Kullanıcı dil tercihi
 }

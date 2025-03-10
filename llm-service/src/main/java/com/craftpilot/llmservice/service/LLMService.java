@@ -185,7 +185,7 @@ public class LLMService {
             if (!hasSystemMessage) {
                 Map<String, Object> systemMessage = new HashMap<>();
                 systemMessage.put("role", "system");
-                systemMessage.put("content", getSystemPrompt(request.getRequestType()));
+                systemMessage.put("content", getSystemPrompt(request.getRequestType(), request.getLanguage()));
                 
                 // Sistem mesajını listenin başına ekle
                 messages.add(0, systemMessage);
@@ -198,7 +198,7 @@ public class LLMService {
             // Sistem mesajını ekle
             Map<String, Object> systemMessage = new HashMap<>();
             systemMessage.put("role", "system");
-            systemMessage.put("content", getSystemPrompt(request.getRequestType()));
+            systemMessage.put("content", getSystemPrompt(request.getRequestType(), request.getLanguage()));
             messages.add(systemMessage);
             
             // Kullanıcı mesajını ekle
@@ -220,21 +220,53 @@ public class LLMService {
     }
 
     /**
-     * Request tipine göre özel sistem prompt'u oluşturur
+     * Request tipine ve dile göre özel sistem prompt'u oluşturur
      */
-    private String getSystemPrompt(String requestType) {
+    private String getSystemPrompt(String requestType, String language) {
+        String basePrompt;
+        
         if ("CODE".equalsIgnoreCase(requestType)) {
-            return "You are an expert coding assistant. Provide clean, efficient, and well-documented code solutions. " +
+            basePrompt = "You are an expert coding assistant. Provide clean, efficient, and well-documented code solutions. " +
                    "Explain your approach briefly when helpful, focusing on best practices and performance considerations. " +
                    "When providing code, ensure it's production-ready and includes appropriate error handling.";
         } else if ("CHAT".equalsIgnoreCase(requestType)) {
-            return "You are a helpful, accurate, and thoughtful assistant. Provide clear, concise, and relevant responses. " +
+            basePrompt = "You are a helpful, accurate, and thoughtful assistant. Provide clear, concise, and relevant responses. " +
                    "Maintain context throughout the conversation and ask clarifying questions when necessary. " +
                    "Balance thoroughness with brevity based on the user's needs. " +
                    "Always aim to provide factually correct information and acknowledge limitations in your knowledge.";
         } else {
-            return "You are a helpful AI assistant. Provide accurate, relevant, and detailed responses to the user's requests.";
+            basePrompt = "You are a helpful AI assistant. Provide accurate, relevant, and detailed responses to the user's requests.";
         }
+        
+        // Kullanıcının diline göre yanıt vermesi için ek talimatlar ekle
+        if (language != null && !language.equalsIgnoreCase("en")) {
+            String languageName = getLanguageName(language);
+            return basePrompt + " Always respond in " + languageName + " language unless explicitly asked to use a different language.";
+        }
+        
+        return basePrompt;
+    }
+
+    /**
+     * Dil kodundan dil ismini döndürür
+     */
+    private String getLanguageName(String languageCode) {
+        Map<String, String> languageMap = Map.of(
+            "en", "English",
+            "tr", "Turkish",
+            "es", "Spanish",
+            "fr", "French",
+            "de", "German",
+            "it", "Italian",
+            "pt", "Portuguese",
+            "ru", "Russian",
+            "ja", "Japanese",
+            "ko", "Korean",
+            "zh", "Chinese",
+            "ar", "Arabic"
+        );
+        
+        return languageMap.getOrDefault(languageCode.toLowerCase(), "the user's preferred language (" + languageCode + ")");
     }
 
     private AIResponse mapToAIResponse(Map<String, Object> openRouterResponse, AIRequest request) {

@@ -28,9 +28,11 @@ public class LLMController {
     @PostMapping(value = "/chat/completions", 
                 produces = MediaType.APPLICATION_JSON_VALUE,
                 consumes = MediaType.APPLICATION_JSON_VALUE) 
-    public Mono<ResponseEntity<AIResponse>> chatCompletion(@RequestBody AIRequest request) {
-        log.info("Chat completion request received");
+    public Mono<ResponseEntity<AIResponse>> chatCompletion(@RequestBody AIRequest request,
+                                                         @RequestHeader(value = "X-User-Language", defaultValue = "en") String userLanguage) {
+        log.info("Chat completion request received with language: {}", userLanguage);
         request.setRequestType("CHAT");
+        request.setLanguage(userLanguage); // Kullanıcı dil tercihini request'e ekle
         
         return llmService.processChatCompletion(request)
             .doOnSuccess(response -> log.debug("Chat completion success"))
@@ -62,9 +64,11 @@ public class LLMController {
 
     @PostMapping(value = "/chat/completions/stream", 
                 produces = MediaType.TEXT_EVENT_STREAM_VALUE) 
-    public Flux<StreamResponse> streamChatCompletion(@RequestBody AIRequest request) {
-        log.info("Stream chat completion request received");
+    public Flux<StreamResponse> streamChatCompletion(@RequestBody AIRequest request,
+                                                   @RequestHeader(value = "X-User-Language", defaultValue = "en") String userLanguage) {
+        log.info("Stream chat completion request received with language: {}", userLanguage);
         request.setRequestType("CHAT");
+        request.setLanguage(userLanguage); // Kullanıcı dil tercihini request'e ekle
         
         return llmService.streamChatCompletion(request)
             .doOnNext(response -> log.debug("Streaming response chunk received"))
