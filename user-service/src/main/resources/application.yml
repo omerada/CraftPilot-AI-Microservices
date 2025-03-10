@@ -112,6 +112,7 @@ resilience4j:
 
 kafka:
   topics:
+    user-preferences: user-preferences
     user-events: user-events
     user-activity: user-activity
 

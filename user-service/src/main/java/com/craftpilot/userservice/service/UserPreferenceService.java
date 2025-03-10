@@ -22,7 +22,7 @@ public class UserPreferenceService {
     private final UserPreferenceMapper mapper;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     
-    @Value("${kafka.topics.user-preferences}")
+    @Value("${kafka.topics.user-preferences:user-preferences}")
     private String userPreferencesTopic;
 
     @CircuitBreaker(name = "userPreferences", fallbackMethod = "getDefaultPreferences")
