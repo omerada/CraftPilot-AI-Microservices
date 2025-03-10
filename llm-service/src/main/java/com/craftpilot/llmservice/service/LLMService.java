@@ -251,22 +251,39 @@ public class LLMService {
      * Dil kodundan dil ismini döndürür
      */
     private String getLanguageName(String languageCode) {
-        Map<String, String> languageMap = Map.of(
-            "en", "English",
-            "tr", "Turkish",
-            "es", "Spanish",
-            "fr", "French",
-            "de", "German",
-            "it", "Italian",
-            "pt", "Portuguese",
-            "ru", "Russian",
-            "ja", "Japanese",
-            "ko", "Korean",
-            "zh", "Chinese",
-            "ar", "Arabic"
-        );
+        Map<String, String> languageMap = buildSystemPrompts();
         
         return languageMap.getOrDefault(languageCode.toLowerCase(), "the user's preferred language (" + languageCode + ")");
+    }
+
+    private Map<String, String> buildSystemPrompts() {
+        Map<String, String> prompts = new HashMap<>();
+        
+        // Ana promptları ekle
+        prompts.put("DEFAULT", "You are a helpful AI assistant.");
+        prompts.put("DEFAULT_TR", "Yardımsever bir yapay zeka asistanısın.");
+        prompts.put("CODE", "You are an expert software developer. Write clean, efficient, and well-documented code.");
+        prompts.put("CODE_TR", "Uzman bir yazılım geliştiricisisin. Temiz, verimli ve iyi dokümante edilmiş kod yaz.");
+        prompts.put("CHAT", "You are a friendly conversational AI. Be helpful and engaging.");
+        prompts.put("CHAT_TR", "Arkadaş canlısı bir sohbet yapay zekasısın. Yardımsever ve ilgi çekici ol.");
+        prompts.put("EXPLAIN", "You are a skilled teacher. Explain concepts clearly and thoroughly.");
+        prompts.put("EXPLAIN_TR", "Yetenekli bir öğretmensin. Kavramları net ve detaylı açıkla.");
+        prompts.put("ANALYZE", "You are an analytical expert. Provide detailed analysis and insights.");
+        prompts.put("ANALYZE_TR", "Analitik bir uzmanısın. Detaylı analiz ve içgörüler sun.");
+        prompts.put("BRAINSTORM", "You are a creative thinker. Generate innovative ideas and solutions.");
+        prompts.put("BRAINSTORM_TR", "Yaratıcı bir düşünürsün. Yenilikçi fikirler ve çözümler üret.");
+        prompts.put("DATA", "You are a data analyst. Process and explain data patterns effectively.");
+        prompts.put("DATA_TR", "Bir veri analistisin. Veri desenlerini etkili şekilde işle ve açıkla.");
+        prompts.put("REVIEW", "You are a thorough reviewer. Provide constructive and detailed feedback.");
+        prompts.put("REVIEW_TR", "Detaylı bir eleştirmensin. Yapıcı ve ayrıntılı geri bildirim ver.");
+        prompts.put("PLAN", "You are a strategic planner. Create organized and actionable plans.");
+        prompts.put("PLAN_TR", "Stratejik bir planlayıcısın. Organize ve uygulanabilir planlar oluştur.");
+        prompts.put("SUMMARIZE", "You are an efficient summarizer. Extract and convey key information concisely.");
+        prompts.put("SUMMARIZE_TR", "Verimli bir özetleyicisin. Önemli bilgileri özlü bir şekilde çıkar ve ilet.");
+        prompts.put("DEBUG", "You are a skilled debugger. Help identify and fix technical issues.");
+        prompts.put("DEBUG_TR", "Yetenekli bir hata ayıklayıcısın. Teknik sorunları belirleme ve çözme konusunda yardımcı ol.");
+        
+        return Map.copyOf(prompts);  // Değiştirilemez kopya dön
     }
 
     private AIResponse mapToAIResponse(Map<String, Object> openRouterResponse, AIRequest request) {
