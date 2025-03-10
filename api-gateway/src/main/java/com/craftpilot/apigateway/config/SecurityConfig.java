@@ -1,6 +1,7 @@
 package com.craftpilot.apigateway.config;
 
 import com.craftpilot.apigateway.filter.FirebaseAuthFilter;
+import com.craftpilot.apigateway.cache.UserPreferenceCache;
 import com.google.firebase.auth.FirebaseAuth;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final FirebaseAuth firebaseAuth;
+    private final UserPreferenceCache userPreferenceCache;
     
     private static final List<String> ALLOWED_ORIGINS = Arrays.asList(
         "http://localhost:5173",
@@ -55,8 +57,6 @@ public class SecurityConfig {
 
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
-        FirebaseAuthFilter firebaseFilter = new FirebaseAuthFilter(firebaseAuth);
-
         return http
             .csrf(csrf -> csrf.disable())  // Disable CSRF for API Gateway
             .cors(corsSpec -> corsSpec.configurationSource(corsConfigurationSource()))
