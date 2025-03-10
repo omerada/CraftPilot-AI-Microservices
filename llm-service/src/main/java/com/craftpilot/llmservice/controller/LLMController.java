@@ -71,13 +71,14 @@ public class LLMController {
         request.setLanguage(userLanguage);
         
         return llmService.streamChatCompletion(request)
-            // Her bir yanıtı hemen istemciye gönder
-            .publishOn(Schedulers.parallel())
-            // Yanıt gönderimi sırasında HTTP istemci bağlantısını açık tut
+            // Yanıtları hemen istemciye gönder - immediate scheduler ile
+            .publishOn(Schedulers.immediate())
+            // Backpressure stratejisi - DROP ile aşırı yük durumunda bazı yanıtları atlayabilir
+            // ama gecikme olmaz
+            .onBackpressureDrop(item -> log.warn("Dropped stream item due to backpressure"))
             .doOnNext(response -> {
-                // Detaylı log sadece debug modunda
                 if (log.isDebugEnabled()) {
-                    log.debug("Streaming response chunk: {}", 
+                    log.debug("Sending chunk immediately: {}", 
                         response.getContent().length() > 20 
                             ? response.getContent().substring(0, 20) + "..." 
                             : response.getContent());

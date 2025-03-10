@@ -82,6 +82,15 @@ spring:
       client:
         proxy:
           type: NO_PROXY
+      connection:
+        provider:
+          max-connections: 150
+          max-idle-time: 60s
+      tcp:
+        no-delay: true
+        keep-alive: true
+      socket:
+        timeout: 60s
   security:
     basic:
       enabled: false

@@ -12,7 +12,7 @@ import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
-import reactor.netty.resources.ConnectionProvider;
+import reactor.netty.tcp.TcpClient;
 
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
@@ -28,42 +28,36 @@ public class WebClientConfig {
 
     @Bean
     public WebClient openRouterWebClient() {
-        // ConnectionProvider'ı optimize edelim
-        ConnectionProvider connectionProvider = ConnectionProvider.builder("custom")
-                .maxConnections(100)
-                .maxIdleTime(Duration.ofSeconds(60))
-                .maxLifeTime(Duration.ofMinutes(5))
-                .pendingAcquireTimeout(Duration.ofSeconds(30))
+        // HttpClient yapılandırması
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
+                .option(ChannelOption.SO_KEEPALIVE, true)
+                .option(ChannelOption.TCP_NODELAY, true)
+                .responseTimeout(Duration.ofSeconds(120))
+                .doOnConnected(conn -> {
+                    conn.addHandlerLast(new ReadTimeoutHandler(180, TimeUnit.SECONDS));
+                    conn.addHandlerLast(new WriteTimeoutHandler(180, TimeUnit.SECONDS));
+                });
+
+        // Exchange strategies yapılandırması
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+                .codecs(configurer -> configurer.defaultCodecs()
+                        .maxInMemorySize(8 * 1024 * 1024))
                 .build();
 
-        // HttpClient'ı optimize edelim
-        HttpClient httpClient = HttpClient.create(connectionProvider)
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
-                .responseTimeout(Duration.ofSeconds(60))
-                .doOnConnected(conn -> 
-                    conn.addHandlerLast(new ReadTimeoutHandler(60, TimeUnit.SECONDS))
-                        .addHandlerLast(new WriteTimeoutHandler(60, TimeUnit.SECONDS)))
-                .wiretap(true);  // Debug için network operasyonlarını logla
-
-        // Buffer boyutlarını arttıralım
-        ExchangeStrategies exchangeStrategies = ExchangeStrategies.builder()
-                .codecs(configurer -> configurer
-                        .defaultCodecs()
-                        .maxInMemorySize(16 * 1024 * 1024)) // 16MB
-                .build();
-
-        // WebClient yap
+        // WebClient yapılandırması ve dönüşü
         return WebClient.builder()
                 .baseUrl(openRouterApiUrl)
                 .defaultHeader("Authorization", "Bearer " + openRouterApiKey)
                 .defaultHeader("Content-Type", "application/json")
+                .defaultHeader("Cache-Control", "no-cache")
+                .defaultHeader("Connection", "keep-alive")
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .exchangeStrategies(exchangeStrategies)
+                .exchangeStrategies(strategies)
                 .filter(logRequest())
                 .build();
     }
 
-    // İstek logları için yardımcı metot
     private ExchangeFilterFunction logRequest() {
         return ExchangeFilterFunction.ofRequestProcessor(clientRequest -> {
             if (clientRequest.url().toString().contains("stream")) {

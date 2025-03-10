@@ -69,7 +69,7 @@ public class LLMService {
         Map<String, Object> requestBody = createRequestBody(request);
         requestBody.put("stream", true);
         
-        log.debug("Stream isteği gönderiliyor: {}", requestBody);
+        log.info("Starting streaming request with model: {}", request.getModel());
         
         return openRouterWebClient.post()
             .uri("/chat/completions")  
@@ -77,20 +77,23 @@ public class LLMService {
             .headers(headers -> {
                 headers.setContentType(MediaType.APPLICATION_JSON);
                 headers.set("Accept", "text/event-stream");
+                headers.set("Connection", "keep-alive");
+                headers.set("Cache-Control", "no-cache");
             })
             .retrieve()
             .bodyToFlux(String.class)
-            .doOnSubscribe(s -> log.debug("Stream başlatılıyor"))
-            // Her bir chunk'ı yayınlanır yayınlanmaz işleme al, tamponlama yapma
-            .publishOn(Schedulers.parallel())
-            .doOnNext(chunk -> log.debug("Ham chunk alındı: {}", chunk))
+            .doOnSubscribe(s -> log.info("⚡ Stream connection established"))
+            // Hiçbir buffer olmadan her yanıtı hemen işle
+            .publishOn(Schedulers.immediate())
+            // Debugging için tüm ham yanıtları logla
+            .doOnNext(chunk -> log.debug("Raw chunk received: {}", chunk))
             .filter(chunk -> chunk != null && !chunk.trim().isEmpty())
-            // delayElements silindi - ekstra gecikmeye neden olabilir
             .map(chunk -> {
                 if (chunk.startsWith("data: ")) {
                     chunk = chunk.substring(6).trim();
                 }
                 if (chunk.equals("[DONE]")) {
+                    log.debug("Stream completion signal received");
                     return StreamResponse.builder()
                         .content("")
                         .done(true)
@@ -98,7 +101,6 @@ public class LLMService {
                 }
                 
                 try {
-                    log.debug("JSON parse ediliyor: {}", chunk);
                     Map<String, Object> response = objectMapper.readValue(chunk, new TypeReference<Map<String, Object>>() {});
                     
                     if (response.containsKey("choices")) {
@@ -112,31 +114,36 @@ public class LLMService {
                                 content = (String) delta.get("content");
                             }
                             
-                            boolean isDone = choice.containsKey("finish_reason") && 
-                                           choice.get("finish_reason") != null;
+                            boolean isDone = choice.containsKey("finish_reason") && choice.get("finish_reason") != null;
                             
-                            return StreamResponse.builder()
-                                .content(content)
-                                .done(isDone)
-                                .build();
+                            // Eğer içerik varsa hemen döndür
+                            if (content != null && !content.isEmpty()) {
+                                log.debug("Streaming content: {}", content);
+                                return StreamResponse.builder()
+                                    .content(content)
+                                    .done(isDone)
+                                    .build();
+                            } else if (isDone) {
+                                return StreamResponse.builder()
+                                    .content("")
+                                    .done(true)
+                                    .build();
+                            }
                         }
                     }
                     
-                    log.warn("Beklenmeyen yanıt formatı: {}", response);
                     return null;
-                    
                 } catch (Exception e) {
-                    log.error("Chunk işlenirken hata: {} - Chunk: {}", e.getMessage(), chunk, e);
+                    log.error("Error processing chunk: {} - {}", e.getMessage(), chunk, e);
                     return null;
                 }
             })
             .filter(Objects::nonNull)
-            // Her yanıtı hemen iletmek için buffer işlemleri kaldırıldı
-            .doOnError(e -> log.error("Stream işleminde hata: ", e))
+            // Oluşması halinde hata durumunu istemciye bildir
             .onErrorResume(e -> {
-                // Hata durumunda da akışı kesme, hatayı bildir
+                log.error("Stream processing error: {}", e.getMessage(), e);
                 return Flux.just(StreamResponse.builder()
-                    .content("Hata: " + e.getMessage())
+                    .content("Error: " + e.getMessage())
                     .done(true)
                     .build());
             });
