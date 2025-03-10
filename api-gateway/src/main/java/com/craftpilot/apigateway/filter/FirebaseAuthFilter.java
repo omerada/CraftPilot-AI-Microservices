@@ -4,6 +4,7 @@ import com.craftpilot.apigateway.cache.UserPreferenceCache;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,7 @@ import java.util.UUID;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class FirebaseAuthFilter implements WebFilter {
 
     private final FirebaseAuth firebaseAuth;
@@ -36,11 +38,6 @@ public class FirebaseAuthFilter implements WebFilter {
         "/auth/login",
         "/auth/refresh"
     );
-
-    public FirebaseAuthFilter(FirebaseAuth firebaseAuth, UserPreferenceCache userPreferenceCache) {
-        this.firebaseAuth = firebaseAuth;
-        this.userPreferenceCache = userPreferenceCache;
-    }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {

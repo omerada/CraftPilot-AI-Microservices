@@ -72,7 +72,7 @@ public class SecurityConfig {
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
                 .pathMatchers(PUBLIC_PATHS.toArray(new String[0])).permitAll()
                 .anyExchange().permitAll())
-            .addFilterBefore(firebaseFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+            .addFilterAt(new FirebaseAuthFilter(firebaseAuth, userPreferenceCache), SecurityWebFiltersOrder.AUTHENTICATION)
             .exceptionHandling(exceptionHandling -> exceptionHandling
                 .authenticationEntryPoint(new HttpStatusServerEntryPoint(HttpStatus.UNAUTHORIZED))
                 .accessDeniedHandler((exchange, denied) -> {

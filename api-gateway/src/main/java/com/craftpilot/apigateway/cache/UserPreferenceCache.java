@@ -28,20 +28,19 @@ public class UserPreferenceCache {
         
         this.cacheExecutor = Executors.newFixedThreadPool(2);
         
-        // Asenkron önbellek oluşturma
         this.languageCache = Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofHours(1))
             .maximumSize(10000)
             .executor(cacheExecutor)
-            .buildAsync(this::loadUserLanguageAsync);
+            .buildAsync((key, executor) -> loadUserLanguageAsync(key));
     }
     
     public Mono<String> getUserLanguage(String userId) {
         if (userId == null || userId.trim().isEmpty()) {
-            return Mono.just("en"); // Kullanıcı kimliği yoksa varsayılan dil
+            return Mono.just("en");
         }
         
-        return Mono.fromFuture(languageCache.get(userId))
+        return Mono.fromFuture(() -> languageCache.get(userId))
             .onErrorResume(e -> {
                 log.warn("Dil tercihi alınamadı: {}, varsayılan 'en' kullanılıyor", e.getMessage());
                 return Mono.just("en");
@@ -63,7 +62,6 @@ public class UserPreferenceCache {
                 log.warn("Kullanıcı tercihi alınamadı {}: {}", userId, e.getMessage());
                 return Mono.just("en");
             })
-            .subscribeOn(Schedulers.boundedElastic())
             .toFuture();
     }
     
@@ -73,7 +71,7 @@ public class UserPreferenceCache {
     }
     
     public void refreshCache(String userId) {
-        languageCache.refresh(userId);
+        languageCache.synchronous().refresh(userId);
         log.debug("Kullanıcı {} için dil önbelleği yenileniyor", userId);
     }
 }
