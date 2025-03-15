@@ -56,7 +56,7 @@ public class LLMService {
     private static final int DEFAULT_TOKEN_LIMIT = 4000;
 
     public Mono<AIResponse> processChatCompletion(AIRequest request) {
-        return callOpenRouter("chat/completions", request)  // URL düzeltildi
+        return callOpenRouter("/chat/completions", request)
             .doOnNext(response -> log.debug("OpenRouter yanıtı: {}", response))
             .map(response -> {
                 try {
@@ -211,7 +211,7 @@ public class LLMService {
         request.setModel("qwen/qwq-32b:free"); // Varsayılan model
         
         // Chat completion API'sini kullanarak istek gönder
-        return callOpenRouter("chat/completions", request)
+        return callOpenRouter("/chat/completions", request)
             .map(response -> mapToAIResponse(response, request))
             .timeout(Duration.ofSeconds(30))
             .doOnError(e -> log.error("Prompt iyileştirme hatası: {}", e.getMessage(), e))
