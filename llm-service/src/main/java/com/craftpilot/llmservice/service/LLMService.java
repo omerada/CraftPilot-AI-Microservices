@@ -211,7 +211,7 @@ public class LLMService {
         request.setModel("google/gemma-3-27b-it:free"); 
         
         // Chat completion API'sini kullanarak istek gönder
-        return callOpenRouter("/enhance-prompt", request)
+        return callOpenRouter("/chat/completions", request)
             .map(response -> {
                 // Sadece enhance-prompt için model ve token bilgilerini çıkararak özel yanıt oluştur
                 String responseText = extractResponseText(response);
