@@ -293,21 +293,56 @@ public class LLMService {
             .bodyValue(requestBody)
             .headers(headers -> {
                 headers.setContentType(MediaType.APPLICATION_JSON);
-                headers.set("Accept", MediaType.APPLICATION_JSON_VALUE);
+                // Birden fazla kabul edilebilir içerik türü belirtiyoruz
+                headers.set("Accept", "application/json, text/plain, text/html, */*");
             })
             .exchangeToMono(response -> {
                 if (response.statusCode().is2xxSuccessful()) {
-                    return response.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {});
+                    // İçerik türünü kontrol et
+                    MediaType contentType = response.headers().contentType().orElse(MediaType.APPLICATION_JSON);
+                    
+                    if (contentType.includes(MediaType.APPLICATION_JSON)) {
+                        // JSON yanıtı - normal işleme
+                        return response.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {});
+                    } else if (contentType.includes(MediaType.TEXT_HTML) || 
+                               contentType.includes(MediaType.TEXT_PLAIN)) {
+                        // HTML veya düz metin yanıtı - metni al ve bir hata mesajı oluştur
+                        return response.bodyToMono(String.class)
+                                .flatMap(htmlContent -> {
+                                    log.error("HTML yanıtı alındı: {} karakterlik içerik", 
+                                        htmlContent != null ? htmlContent.length() : 0);
+                                    Map<String, Object> errorMap = new HashMap<>();
+                                    errorMap.put("error", "API HTML yanıtı döndü. Servis geçici olarak kullanılamıyor olabilir.");
+                                    return Mono.just(errorMap);
+                                });
+                    } else {
+                        // Diğer içerik türleri - bilgi veren bir hata yanıtı döndür
+                        log.warn("Beklenmeyen içerik türü: {}", contentType);
+                        Map<String, Object> errorMap = new HashMap<>();
+                        errorMap.put("error", "Beklenmeyen içerik türü: " + contentType);
+                        return Mono.just(errorMap);
+                    }
                 } else {
-                    return response.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                    // Hata durumları için
+                    return response.bodyToMono(String.class)
                         .flatMap(errorBody -> {
-                            log.error("API hatası: {} - {}", response.statusCode(), errorBody);
-                            return Mono.just(errorBody); // Hata yanıtını işleyebilmek için doğru formatta dön
+                            String errorMessage = "API hatası: " + response.statusCode() + 
+                                " - Yanıt: " + (errorBody != null ? errorBody : "Boş yanıt");
+                            log.error(errorMessage);
+                            Map<String, Object> errorMap = new HashMap<>();
+                            errorMap.put("error", errorMessage);
+                            return Mono.just(errorMap);
+                        })
+                        .onErrorResume(e -> {
+                            log.error("API yanıtı okunurken hata: {}", e.getMessage());
+                            Map<String, Object> errorMap = new HashMap<>();
+                            errorMap.put("error", "API yanıtı işlenirken hata: " + e.getMessage());
+                            return Mono.just(errorMap);
                         });
                 }
             })
             .timeout(Duration.ofSeconds(30))
-            .doOnError(e -> log.error("OpenRouter API error: ", e));
+            .doOnError(e -> log.error("OpenRouter API isteği sırasında hata: {}", e.getMessage(), e));
     }
 
     private Mono<? extends Throwable> handleError(ClientResponse response) {
