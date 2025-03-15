@@ -113,4 +113,38 @@ public class LLMController {
             .doOnError(error -> log.error("Code completion error: ", error))
             .doOnSuccess(response -> log.debug("Code completion success: {}", response));
     }
+
+    @PostMapping(value = "/enhance-prompt", 
+                produces = MediaType.APPLICATION_JSON_VALUE,
+                consumes = MediaType.APPLICATION_JSON_VALUE) 
+    public Mono<ResponseEntity<AIResponse>> enhancePrompt(@RequestBody AIRequest request,
+                                                        @RequestHeader(value = "X-User-Language", defaultValue = "en") String userLanguage) {
+        log.info("Prompt enhancement request received with language: {}", userLanguage);
+        request.setRequestType("ENHANCE");
+        request.setLanguage(userLanguage);
+        
+        return llmService.enhancePrompt(request)
+            .doOnSuccess(response -> log.debug("Prompt enhancement success"))
+            .map(response -> ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(response))
+            .doOnError(error -> {
+                log.error("Prompt enhancement error: {}", error.getMessage(), error);
+                if (error.getCause() != null) {
+                    log.error("Root cause: {}", error.getCause().getMessage());
+                }
+            })
+            .onErrorResume(error -> {
+                String errorMessage = error.getMessage();
+                if (errorMessage != null && errorMessage.contains("API hatası:")) {
+                    return Mono.just(ResponseEntity
+                        .status(HttpStatus.BAD_GATEWAY)
+                        .body(AIResponse.error("Prompt iyileştirilemedi: " + errorMessage)));
+                } else {
+                    return Mono.just(ResponseEntity
+                        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(AIResponse.error("Prompt iyileştirilemedi: " + errorMessage)));
+                }
+            });
+    }
 }

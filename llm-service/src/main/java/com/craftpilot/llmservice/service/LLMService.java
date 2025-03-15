@@ -32,6 +32,28 @@ import java.util.Objects;
 public class LLMService {
     private final WebClient openRouterWebClient; 
     private final ObjectMapper objectMapper;
+    
+    // Model başına maksimum token limitleri
+    private static final Map<String, Integer> MODEL_TOKEN_LIMITS = Map.of(
+        "google/gemini-2.0-flash-lite-preview-02-05:free", 30000,
+        "google/gemini-pro", 30000,
+        "google/palm-2-codechat-bison", 8000,
+        "google/palm-2-chat-bison", 8000,
+        "anthropic/claude-3-haiku", 48000,
+        "anthropic/claude-3-sonnet", 180000,
+        "anthropic/claude-3-opus", 180000,
+        "anthropic/claude-2", 100000,
+        "openai/gpt-4", 8000,
+        "openai/gpt-4-turbo", 128000,
+        "openai/gpt-3.5-turbo", 16000,
+        "meta-llama/llama-3-70b-instruct", 8000,
+        "meta-llama/llama-3-8b-instruct", 8000,
+        "mistral/mistral-large", 32000,
+        "mistral/mistral-medium", 32000,
+        "mistral/mistral-small", 32000
+    );
+    // Varsayılan token limiti
+    private static final int DEFAULT_TOKEN_LIMIT = 4000;
 
     public Mono<AIResponse> processChatCompletion(AIRequest request) {
         return callOpenRouter("chat/completions", request)  // URL düzeltildi
@@ -153,6 +175,113 @@ public class LLMService {
                     .done(true)
                     .build());
             });
+    }
+
+    public Mono<AIResponse> enhancePrompt(AIRequest request) {
+        // Varsayılan değerler için sıcaklık ve maksimum token değerlerini ayarla
+        if (request.getTemperature() == null) {
+            request.setTemperature(0.3); // Daha kararlı sonuçlar için düşük sıcaklık
+        }
+        
+        // Sabit model kullan
+        String modelName = "google/gemini-2.0-flash-lite-preview-02-05:free";
+        
+        // İstek içerisinde maxTokens belirtilmemişse, modele göre uygun değeri kullan
+        if (request.getMaxTokens() == null) {
+            int tokenLimit = MODEL_TOKEN_LIMITS.getOrDefault(modelName, DEFAULT_TOKEN_LIMIT);
+            request.setMaxTokens(tokenLimit);
+            log.debug("Model {} için maksimum token limiti {} olarak ayarlandı", modelName, tokenLimit);
+        }
+        
+        // Özel prompt geliştirme sistem promptu ile mesajları oluştur
+        List<Map<String, Object>> messages = new ArrayList<>();
+        
+        // Sistem mesajını ekle
+        Map<String, Object> systemMessage = new HashMap<>();
+        systemMessage.put("role", "system");
+        systemMessage.put("content", getPromptEnhancementSystemPrompt(request.getLanguage()));
+        messages.add(systemMessage);
+        
+        // Kullanıcı mesajını ekle
+        Map<String, Object> userMessage = new HashMap<>();
+        userMessage.put("role", "user");
+        userMessage.put("content", request.getPrompt());
+        messages.add(userMessage);
+        
+        // Mesajları kullanarak yeni bir AIRequest oluştur
+        AIRequest enhancementRequest = AIRequest.builder()
+            .userId(request.getUserId())
+            .requestId(request.getRequestId())
+            .model(modelName) // Frontend'den gelen model yerine sabit model kullan
+            .messages(messages)
+            .temperature(request.getTemperature())
+            .maxTokens(request.getMaxTokens())
+            .requestType("ENHANCE")
+            .language(request.getLanguage())
+            .build();
+        
+        return callOpenRouter("chat/completions", enhancementRequest)
+            .doOnNext(response -> log.debug("Prompt geliştirme yanıtı: {}", response))
+            .map(response -> {
+                try {
+                    return mapToAIResponse(response, request);
+                } catch (Exception e) {
+                    log.error("Prompt geliştirme yanıtı işlenirken hata: {}", e.getMessage(), e);
+                    throw new RuntimeException("Prompt geliştirme yanıtı haritalanırken hata: " + e.getMessage(), e);
+                }
+            })
+            .timeout(Duration.ofSeconds(30))
+            .doOnError(e -> log.error("Prompt geliştirme hatası: {}", e.getMessage(), e))
+            .onErrorResume(e -> {
+                log.error("Prompt geliştirme hatası yakalandı ve işlendi: {}", e.getMessage());
+                return Mono.just(AIResponse.error("Prompt iyileştirilemedi: " + e.getMessage()));
+            });
+    }
+
+    /**
+     * Prompt geliştirme için özel sistem promptunu döndürür
+     */
+    private String getPromptEnhancementSystemPrompt(String language) {
+        // İngilizce sistem promptu
+        String englishSystemPrompt = "You are an expert prompt engineer. Your task is to transform the user's text into a more effective prompt that will be directed to an AI chat model.\n\n" +
+            "Follow these steps:\n" +
+            "1. Create a clearer and more detailed expression\n" +
+            "2. Clarify context and objectives\n" +
+            "3. Remove unnecessary words\n" +
+            "4. Use more specific and descriptive language\n" +
+            "5. Emphasize important details\n" +
+            "6. Structure and organize the prompt well\n" +
+            "7. Specify the response format if necessary\n\n" +
+            "Important rules:\n" +
+            "- Preserve the user's original language\n" +
+            "- Only create a better prompt, don't do anything else\n" +
+            "- If small changes are sufficient, don't modify the original too much\n" +
+            "- Don't add additional explanations, ONLY return the improved prompt text\n\n" +
+            "User text to improve:\n" +
+            "\"{prompt}\"";
+        
+        // Türkçe sistem promptu
+        String turkishSystemPrompt = "Sen uzman bir prompt mühendisisin. Kullanıcının verdiği metni bir AI sohbet modeline yöneltilecek daha etkili bir prompt'a dönüştürmekle görevlisin.\n\n" +
+            "Aşağıdaki adımları izle:\n" +
+            "1. Daha net ve detaylı bir ifade oluştur\n" +
+            "2. Bağlam ve hedefleri netleştir\n" +
+            "3. Gereksiz kelimelerden arındır\n" +
+            "4. Daha spesifik ve açıklayıcı bir dil kullan\n" +
+            "5. Önemli detayları vurgula\n" +
+            "6. Yapılandırılmış ve iyi organize edilmiş bir prompt format\n" +
+            "7. Gerektiğinde yanıt formatını belirt\n\n" +
+            "Önemli kurallar:\n" +
+            "- Kullanıcının orijinal dilini koru\n" +
+            "- Sadece daha iyi bir prompt oluştur, farklı bir şey yapma\n" +
+            "- Küçük değişiklikler yeterli ise orijinali fazla değiştirme\n" +
+            "- Ek açıklamalar ekleme, SADECE iyileştirilmiş prompt metnini döndür";
+        
+        // Dil tercihine göre uygun sistem promptunu döndür
+        if (language != null && language.equalsIgnoreCase("tr")) {
+            return turkishSystemPrompt;
+        }
+        
+        return englishSystemPrompt;
     }
 
     private Mono<Map<String, Object>> callOpenRouter(String endpoint, AIRequest request) {
