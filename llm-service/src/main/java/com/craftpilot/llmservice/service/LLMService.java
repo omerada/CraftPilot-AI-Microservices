@@ -303,7 +303,7 @@ public class LLMService {
             .response(enhancedPrompt)
             .model("local-enhancement")
             .success(true)
-            .tokenCount(0)
+            .tokensUsed(0) 
             .requestId(request.getRequestId())
             .build();
     }

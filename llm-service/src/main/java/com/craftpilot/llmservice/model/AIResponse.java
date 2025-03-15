@@ -17,6 +17,7 @@ public class AIResponse {
     private String response;
     private String model;
     private Integer tokensUsed;
+    private String requestId; // Added missing field
     private Boolean success; 
 
     public static AIResponse error(String errorMessage) {
@@ -33,7 +34,7 @@ public class AIResponse {
         return AIResponse.builder()
             .response(response)
             .model(model)
-            .tokenCount(tokenCount)
+            .tokensUsed(tokenCount) // Changed to match field name
             .requestId(requestId)
             .success(true)
             .build();
