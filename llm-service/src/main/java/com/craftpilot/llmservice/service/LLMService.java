@@ -208,10 +208,10 @@ public class LLMService {
         
         // İstek özelliklerini ayarla
         request.setMessages(messages);
-        request.setModel("qwen/qwq-32b:free"); // Varsayılan model
+        request.setModel("rekaai/reka-flash-3:free"); 
         
         // Chat completion API'sini kullanarak istek gönder
-        return callOpenRouter("/chat/completions", request)
+        return callOpenRouter("/enhance-prompt", request)
             .map(response -> mapToAIResponse(response, request))
             .timeout(Duration.ofSeconds(30))
             .doOnError(e -> log.error("Prompt iyileştirme hatası: {}", e.getMessage(), e))
