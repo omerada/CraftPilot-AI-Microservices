@@ -208,11 +208,19 @@ public class LLMService {
         
         // İstek özelliklerini ayarla
         request.setMessages(messages);
-        request.setModel("rekaai/reka-flash-3:free"); 
+        request.setModel("google/gemma-3-27b-it:free"); 
         
         // Chat completion API'sini kullanarak istek gönder
         return callOpenRouter("/enhance-prompt", request)
-            .map(response -> mapToAIResponse(response, request))
+            .map(response -> {
+                // Sadece enhance-prompt için model ve token bilgilerini çıkararak özel yanıt oluştur
+                String responseText = extractResponseText(response);
+                return AIResponse.builder()
+                    .response(responseText)
+                    .requestId(request.getRequestId())
+                    .success(true)
+                    .build();
+            })
             .timeout(Duration.ofSeconds(30))
             .doOnError(e -> log.error("Prompt iyileştirme hatası: {}", e.getMessage(), e))
             .onErrorResume(e -> {
