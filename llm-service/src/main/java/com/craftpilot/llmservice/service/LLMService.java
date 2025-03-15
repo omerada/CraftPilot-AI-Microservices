@@ -208,7 +208,7 @@ public class LLMService {
         
         // İstek özelliklerini ayarla
         request.setMessages(messages);
-        request.setModel(request.getModel() != null ? request.getModel() : "google/gemini-pro"); // Varsayılan model
+        request.setModel("qwen/qwq-32b:free"); // Varsayılan model
         
         // Chat completion API'sini kullanarak istek gönder
         return callOpenRouter("chat/completions", request)
