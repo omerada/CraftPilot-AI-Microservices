@@ -183,53 +183,44 @@ public class LLMService {
             request.setTemperature(0.3); // Daha kararlı sonuçlar için düşük sıcaklık
         }
         
-        // Sabit model kullan
-        String modelName = "google/gemini-2.0-flash-lite-preview-02-05:free";
-        
-        // İstek içerisinde maxTokens belirtilmemişse, modele göre uygun değeri kullan
+        // Token limitini ayarla
         if (request.getMaxTokens() == null) {
-            int tokenLimit = MODEL_TOKEN_LIMITS.getOrDefault(modelName, DEFAULT_TOKEN_LIMIT);
-            request.setMaxTokens(tokenLimit);
-            log.debug("Model {} için maksimum token limiti {} olarak ayarlandı", modelName, tokenLimit);
+            request.setMaxTokens(32000); // Makul bir varsayılan değer
         }
         
-        // Özel prompt geliştirme sistem promptu ile mesajları oluştur
-        List<Map<String, Object>> messages = new ArrayList<>();
+        // Sistem promptunu hazırla
+        String systemPrompt = getPromptEnhancementSystemPrompt(request.getLanguage());
         
-        // Sistem mesajını ekle
+        // Basit bir istek oluştur - chat/completions gibi çalışacak şekilde
+        AIRequest enhancementRequest = AIRequest.builder()
+            .userId(request.getUserId())
+            .requestId(request.getRequestId())
+            .model("google/gemini-2.0-flash-lite-preview-02-05:free") // Daha güvenilir bir model seç
+            .prompt(request.getPrompt()) // Kullanıcı promptunu direkt kullan
+            .temperature(request.getTemperature())
+            .maxTokens(request.getMaxTokens())
+            .requestType("CHAT") // CHAT tipi olarak işaretle - bu iyi çalışan akışı kullanacak
+            .language(request.getLanguage())
+            .build();
+        
+        // Sistem mesajını ve kullanıcı mesajını ekle
+        List<Map<String, Object>> messages = new ArrayList<>();
         Map<String, Object> systemMessage = new HashMap<>();
         systemMessage.put("role", "system");
-        systemMessage.put("content", getPromptEnhancementSystemPrompt(request.getLanguage()));
+        systemMessage.put("content", systemPrompt);
         messages.add(systemMessage);
         
-        // Kullanıcı mesajını ekle
         Map<String, Object> userMessage = new HashMap<>();
         userMessage.put("role", "user");
         userMessage.put("content", request.getPrompt());
         messages.add(userMessage);
         
-        // Mesajları kullanarak yeni bir AIRequest oluştur
-        AIRequest enhancementRequest = AIRequest.builder()
-            .userId(request.getUserId())
-            .requestId(request.getRequestId())
-            .model(modelName) // Frontend'den gelen model yerine sabit model kullan
-            .messages(messages)
-            .temperature(request.getTemperature())
-            .maxTokens(request.getMaxTokens())
-            .requestType("ENHANCE")
-            .language(request.getLanguage())
-            .build();
+        enhancementRequest.setMessages(messages);
         
+        // Chat completion metodunu kullanarak isteği işle - bu düzgün çalışıyor
         return callOpenRouter("chat/completions", enhancementRequest)
-            .doOnNext(response -> log.debug("Prompt geliştirme yanıtı: {}", response))
-            .map(response -> {
-                try {
-                    return mapToAIResponse(response, request);
-                } catch (Exception e) {
-                    log.error("Prompt geliştirme yanıtı işlenirken hata: {}", e.getMessage(), e);
-                    throw new RuntimeException("Prompt geliştirme yanıtı haritalanırken hata: " + e.getMessage(), e);
-                }
-            })
+            .doOnNext(response -> log.debug("Prompt geliştirme yanıtı alındı"))
+            .map(response -> mapToAIResponse(response, request))
             .timeout(Duration.ofSeconds(30))
             .doOnError(e -> log.error("Prompt geliştirme hatası: {}", e.getMessage(), e))
             .onErrorResume(e -> {
@@ -325,9 +316,9 @@ public class LLMService {
                 } else {
                     // Hata durumları için
                     return response.bodyToMono(String.class)
-                        .flatMap(errorBody -> {
+                        .flatMap(error -> {
                             String errorMessage = "API hatası: " + response.statusCode() + 
-                                " - Yanıt: " + (errorBody != null ? errorBody : "Boş yanıt");
+                                " - Yanıt: " + (error != null ? error : "Boş yanıt");
                             log.error(errorMessage);
                             Map<String, Object> errorMap = new HashMap<>();
                             errorMap.put("error", errorMessage);
