@@ -34,23 +34,23 @@ public class LLMService {
     private final ObjectMapper objectMapper;
     
     // Model başına maksimum token limitleri
-    private static final Map<String, Integer> MODEL_TOKEN_LIMITS = Map.of(
-        "google/gemini-2.0-flash-lite-preview-02-05:free", 30000,
-        "google/gemini-pro", 30000,
-        "google/palm-2-codechat-bison", 8000,
-        "google/palm-2-chat-bison", 8000,
-        "anthropic/claude-3-haiku", 48000,
-        "anthropic/claude-3-sonnet", 180000,
-        "anthropic/claude-3-opus", 180000,
-        "anthropic/claude-2", 100000,
-        "openai/gpt-4", 8000,
-        "openai/gpt-4-turbo", 128000,
-        "openai/gpt-3.5-turbo", 16000,
-        "meta-llama/llama-3-70b-instruct", 8000,
-        "meta-llama/llama-3-8b-instruct", 8000,
-        "mistral/mistral-large", 32000,
-        "mistral/mistral-medium", 32000,
-        "mistral/mistral-small", 32000
+    private static final Map<String, Integer> MODEL_TOKEN_LIMITS = Map.ofEntries(
+        Map.entry("google/gemini-2.0-flash-lite-preview-02-05:free", 30000),
+        Map.entry("google/gemini-pro", 30000),
+        Map.entry("google/palm-2-codechat-bison", 8000),
+        Map.entry("google/palm-2-chat-bison", 8000),
+        Map.entry("anthropic/claude-3-haiku", 48000),
+        Map.entry("anthropic/claude-3-sonnet", 180000),
+        Map.entry("anthropic/claude-3-opus", 180000),
+        Map.entry("anthropic/claude-2", 100000),
+        Map.entry("openai/gpt-4", 8000),
+        Map.entry("openai/gpt-4-turbo", 128000),
+        Map.entry("openai/gpt-3.5-turbo", 16000),
+        Map.entry("meta-llama/llama-3-70b-instruct", 8000),
+        Map.entry("meta-llama/llama-3-8b-instruct", 8000),
+        Map.entry("mistral/mistral-large", 32000),
+        Map.entry("mistral/mistral-medium", 32000),
+        Map.entry("mistral/mistral-small", 32000)
     );
     // Varsayılan token limiti
     private static final int DEFAULT_TOKEN_LIMIT = 4000;
