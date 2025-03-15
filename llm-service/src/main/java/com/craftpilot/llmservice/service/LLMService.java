@@ -217,7 +217,6 @@ public class LLMService {
         
         enhancementRequest.setMessages(messages);
         
-        // Chat completion metodunu kullanarak isteği işle - bu düzgün çalışıyor
         return callOpenRouter("chat/completions", enhancementRequest)
             .doOnNext(response -> log.debug("Prompt geliştirme yanıtı alındı"))
             .map(response -> mapToAIResponse(response, request))
@@ -225,8 +224,88 @@ public class LLMService {
             .doOnError(e -> log.error("Prompt geliştirme hatası: {}", e.getMessage(), e))
             .onErrorResume(e -> {
                 log.error("Prompt geliştirme hatası yakalandı ve işlendi: {}", e.getMessage());
+                // HTML yanıtı veya API hatası durumunda yerel prompt iyileştirici kullan
+                if (e.getMessage() != null && 
+                    (e.getMessage().contains("API HTML yanıtı döndü") || 
+                     e.getMessage().contains("API hatası"))) {
+                    log.info("API hata verdi, yerel prompt iyileştirici kullanılıyor");
+                    return Mono.just(performLocalPromptEnhancement(request));
+                }
                 return Mono.just(AIResponse.error("Prompt iyileştirilemedi: " + e.getMessage()));
             });
+    }
+
+    /**
+     * API çalışmadığında kullanılacak basit yerel prompt iyileştirici
+     * @param request Orijinal prompt isteği
+     * @return İyileştirilmiş prompt yanıtı
+     */
+    private AIResponse performLocalPromptEnhancement(AIRequest request) {
+        String originalPrompt = request.getPrompt();
+        if (originalPrompt == null || originalPrompt.trim().isEmpty()) {
+            return AIResponse.error("Boş prompt iyileştirilemez");
+        }
+        
+        log.debug("Yerel prompt iyileştirici çalışıyor: {}", originalPrompt);
+        
+        // Temel prompt iyileştirmeleri uygula
+        String enhancedPrompt = originalPrompt;
+        
+        // 1. Gereksiz selamlaşmaları kaldır
+        enhancedPrompt = enhancedPrompt.replaceAll("(?i)^(merhaba|selam|hi|hello)\\s+", "");
+        
+        // 2. Soru ifadelerini daha direkt komutlara çevir
+        enhancedPrompt = enhancedPrompt.replaceAll("(?i)(nasılsın|how are you)\\s+", "");
+        
+        // 3. Prompt sonunda soru işareti varsa kaldır ve bir direktife çevir
+        enhancedPrompt = enhancedPrompt.replaceAll("\\?$", "");
+        
+        // 4. "...hakkında" vs. ifadelerini daha net yapılandır
+        if (enhancedPrompt.matches("(?i).*hakkında.*")) {
+            enhancedPrompt = enhancedPrompt.replaceAll("(?i)(.+)\\s+hakkında", "Detaylı ve kapsamlı bir şekilde $1 konusunu anlat");
+        }
+        
+        // 5. "anlat" gibi ifadeleri daha etkili komutlara çevir
+        enhancedPrompt = enhancedPrompt.replaceAll("(?i)anlat$", "hakkında ayrıntılı bir açıklama yap");
+        
+        // 6. "Bir X Y'dir" formatına çevir (tanımlar için)
+        if (enhancedPrompt.matches("(?i).*nedir.*") || 
+            enhancedPrompt.matches("(?i).*nelerdir.*") ||
+            enhancedPrompt.matches("(?i).*edir.*")) {
+            enhancedPrompt = enhancedPrompt.replaceAll("(?i)(.*?)\\s+(nedir|nelerdir)", "$1 kavramını tanımla ve özelliklerini açıkla");
+        }
+        
+        // 7. Komut tonunu güçlendir
+        if (!enhancedPrompt.contains("detaylı") && !enhancedPrompt.contains("kapsamlı")) {
+            enhancedPrompt = "Detaylı bir şekilde " + enhancedPrompt;
+        }
+        
+        // Türkçe ve İngilizce ifadeleri kontrol et
+        String language = request.getLanguage();
+        boolean isTurkish = (language != null && language.equalsIgnoreCase("tr")) || 
+                            enhancedPrompt.matches(".*[çğıöşüÇĞİÖŞÜ].*");
+        
+        // Dil düzeltmeleri
+        if (isTurkish) {
+            if (!enhancedPrompt.contains("açıkla") && !enhancedPrompt.contains("anlat")) {
+                enhancedPrompt += " konusunu kapsamlı bir şekilde açıkla";
+            }
+        } else {
+            // İngilizce için düzeltmeler
+            enhancedPrompt = enhancedPrompt.replaceAll("(?i)tell me about", "provide a comprehensive explanation of");
+            if (!enhancedPrompt.contains("explain") && !enhancedPrompt.contains("describe")) {
+                enhancedPrompt += " - provide a detailed explanation";
+            }
+        }
+        
+        // Başarılı yanıt döndür
+        return AIResponse.builder()
+            .response(enhancedPrompt)
+            .model("local-enhancement")
+            .success(true)
+            .tokenCount(0)
+            .requestId(request.getRequestId())
+            .build();
     }
 
     /**

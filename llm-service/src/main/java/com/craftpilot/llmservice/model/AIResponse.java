@@ -26,11 +26,15 @@ public class AIResponse {
             .build();
     }
 
-    public static AIResponse success(String response, String model, Integer tokensUsed, String requestId) {
+    /**
+     * Başarılı bir yanıt oluşturmak için builder metodunu kullandıran yardımcı statik metot
+     */
+    public static AIResponse success(String response, String model, Integer tokenCount, String requestId) {
         return AIResponse.builder()
             .response(response)
             .model(model)
-            .tokensUsed(tokensUsed)
+            .tokenCount(tokenCount)
+            .requestId(requestId)
             .success(true)
             .build();
     }
