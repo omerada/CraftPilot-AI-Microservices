@@ -213,7 +213,7 @@ public class LLMService {
         }, FluxSink.OverflowStrategy.BUFFER) // Taşma stratejisini belirt
         .doOnRequest(n -> log.debug("Requested {} items from stream", n))
         .onBackpressureBuffer(256) // Backpressure stratejisi
-        .timeout(Duration.ofSeconds(90), Flux.just(StreamResponse.builder()
+        .timeout(Duration.ofSeconds(90), Flux.<StreamResponse>just(StreamResponse.builder()
             .content("Stream timeout occurred after 90 seconds")
             .done(true)
             .error(true)
