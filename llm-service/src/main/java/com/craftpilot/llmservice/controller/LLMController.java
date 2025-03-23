@@ -82,73 +82,76 @@ public class LLMController {
         request.setRequestType("CHAT");
         request.setLanguage(userLanguage);
         
-        // Response header'larını ayarla
+        // Response header'larını ayarla - bu header'lar bağlantının kesilmemesi için kritik
         exchange.getResponse().getHeaders().setContentType(MediaType.TEXT_EVENT_STREAM);
-        exchange.getResponse().getHeaders().setCacheControl("no-cache");
+        exchange.getResponse().getHeaders().setCacheControl("no-cache, no-transform");
         exchange.getResponse().getHeaders().setConnection("keep-alive");
+        exchange.getResponse().getHeaders().add("X-Accel-Buffering", "no"); // Nginx proxy için buffering kapatma
         
-        // Erken client bağlantı kopması tespiti için doğru tip dönüşümü
+        // İstemci tarafı bağlantı kopması için daha güvenilir tespit
+        exchange.getResponse().beforeCommit(() -> {
+            log.debug("Response commit starting for request: {}", trackingId);
+            return Mono.empty();
+        });
+        
+        // Erken client bağlantı kopması tespiti - kullanıcı tarayıcı sayfasını kapatırsa vs.
         Mono<Void> cancelSignal = Mono.fromRunnable(() -> {})
                 .doOnCancel(() -> log.info("Client cancelled the stream for request: {}", trackingId))
-                .then(); // then() metodu ile Mono<Object>'i Mono<Void>'e dönüştür
+                .then();
         
-        return llmService.streamChatCompletion(request)
-            // Yanıtları hemen istemciye gönder - immediate scheduler ile
-            .publishOn(Schedulers.immediate())
-            // İşlem iptalini (client disconnect) tespit et
-            .doOnCancel(() -> log.warn("Stream was cancelled for request: {}", trackingId))
-            // Akışı SSE formatına dönüştür
-            .map(chunk -> {
-                // Her yanıt parçası için detaylı loglama
-                if (log.isDebugEnabled()) {
-                    log.debug("Received chunk from service: {}", 
-                        chunk.getContent() != null && chunk.getContent().length() > 50 
-                            ? chunk.getContent().substring(0, 50) + "..." 
-                            : chunk.getContent());
-                }
-                
-                return ServerSentEvent.<StreamResponse>builder()
-                    .id(trackingId)
-                    .event("message") 
-                    .data(chunk)
-                    .build();
-            })
-            // İstemci bağlantıyı keserse erken bitir
-            .takeUntilOther(cancelSignal)
-            // SSE biçimi için özel boş yanıt ekle - OpenRouter SSE imzalama
-            .startWith(
-                // İlk mesaj olarak OpenRouter bekleme durumu belirtisi
-                ServerSentEvent.<StreamResponse>builder()
-                    .comment("OPENROUTER PROCESSING")
-                    .id(trackingId)
-                    .build(),
-                // Boş bir yanıt ile bağlantının başladığını belirt
-                ServerSentEvent.<StreamResponse>builder()
-                    .id(trackingId)
-                    .event("ping")  
-                    .data(StreamResponse.builder()
-                            .content("")
-                            .done(false)
-                            .build())
-                    .build()
-            )
-            // Herhangi bir backpressure durumunda buffer kullan
-            .onBackpressureBuffer(256, drop -> {
-                log.warn("Dropped stream chunk due to backpressure: {}", drop);
-            })
-            .doOnError(error -> log.error("Stream error: {}", error.getMessage(), error))
-            .doOnComplete(() -> log.info("Stream completed for request: {}", trackingId))
-            .onErrorResume(error -> {
-                log.error("Stream error occurred: {}", error.getMessage(), error);
-                return Flux.just(ServerSentEvent.<StreamResponse>builder()
+        // Client'a yanıt göndermeye başlayalım
+        return Flux.<ServerSentEvent<StreamResponse>>create(sink -> {
+            // İlk olarak boş bir yorum gönder - bağlantıyı başlatmak için
+            sink.next(ServerSentEvent.<StreamResponse>builder()
+                .comment("OPENROUTER PROCESSING")
+                .id(trackingId)
+                .build());
+            
+            // Hemen ardından bir ping mesajı gönder
+            sink.next(ServerSentEvent.<StreamResponse>builder()
+                .id(trackingId)
+                .event("ping")
+                .data(StreamResponse.builder().content("").done(false).build())
+                .build());
+            
+            // LLM servisi ile gerçek akışı başlat
+            llmService.streamChatCompletion(request)
+                .doOnNext(chunk -> {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Sending chunk: {}", 
+                            chunk.getContent() != null && chunk.getContent().length() > 50 
+                                ? chunk.getContent().substring(0, 50) + "..." 
+                                : chunk.getContent());
+                    }
+                    
+                    sink.next(ServerSentEvent.<StreamResponse>builder()
+                        .id(trackingId)
+                        .event("message")
+                        .data(chunk)
+                        .build());
+                })
+                .doOnComplete(() -> {
+                    log.info("LLM stream completed for request: {}", trackingId);
+                    sink.complete();
+                })
+                .doOnError(error -> {
+                    log.error("LLM stream error: {}", error.getMessage(), error);
+                    sink.next(ServerSentEvent.<StreamResponse>builder()
                         .id(trackingId)
                         .event("error")
                         .data(StreamResponse.builder()
-                                .content("Hata: " + error.getMessage())
-                                .done(true)
-                                .build())
+                            .content("Hata: " + error.getMessage())
+                            .done(true)
+                            .build())
                         .build());
-            });
+                    sink.complete();
+                })
+                .subscribe();
+        })
+        .onBackpressureBuffer(256)
+        .doOnCancel(() -> log.warn("Stream response was cancelled for request: {}", trackingId))
+        .doOnComplete(() -> log.info("Stream response completed for request: {}", trackingId))
+        .doOnError(error -> log.error("Stream response error: {}", error.getMessage(), error));
     }
 
     @PostMapping(value = "/images/generate", 
