@@ -97,141 +97,126 @@ public class LLMService {
         
         log.info("Starting streaming request for model: {}", request.getModel());
         
-        return openRouterWebClient.post()
-            .uri("/chat/completions")  
-            .bodyValue(requestBody)
-            .headers(headers -> {
-                headers.setContentType(MediaType.APPLICATION_JSON);
-                headers.set("Accept", "text/event-stream");
-            })
-            .exchangeToMono(response -> {
-                // Başlık ve içerik türü incelemesi
-                MediaType contentType = response.headers().contentType().orElse(MediaType.APPLICATION_JSON);
-                log.debug("Yanıt içerik türü: {}", contentType);
-                
-                if (contentType.includes(MediaType.TEXT_HTML)) {
-                    // HTML yanıtı geldi, büyük olasılıkla hata sayfası
-                    log.error("HTML yanıtı alındı - muhtemelen model kullanılamıyor veya servis hatası mevcut");
-                    return response.bodyToMono(String.class)
-                            .map(htmlContent -> {
-                                // HTML içeriğinden hata mesajını çıkarmaya çalış
-                                String errorMessage = extractErrorFromHtml(htmlContent);
-                                return StreamResponse.builder()
-                                        .content("Hata: " + errorMessage)
-                                        .done(true)
-                                        .build();
-                            });
-                } else if (response.statusCode().isError()) {
-                    // HTTP hata durumu geldi
-                    return response.bodyToMono(String.class)
-                            .map(errorBody -> {
-                                log.error("API hata döndürdü [{}]: {}", response.statusCode(), errorBody);
-                                return StreamResponse.builder()
-                                        .content("API Hatası: " + response.statusCode() + " - " + errorBody)
-                                        .done(true)
-                                        .build();
-                            });
-                } else if (contentType.includes(MediaType.TEXT_EVENT_STREAM) || 
-                          contentType.includes(MediaType.APPLICATION_STREAM_JSON)) {
-                    // Normal stream yanıtı, event-stream işlemeye devam et
-                    return response.bodyToFlux(String.class)
-                            .collectList()
-                            .map(chunks -> {
-                                if (chunks.isEmpty()) {
-                                    return StreamResponse.builder()
-                                            .content("Boş yanıt alındı")
-                                            .done(true)
-                                            .build();
-                                }
-                                // DÜZELTİLDİ: Burada null yerine geçerli bir yanıt dönecek,
-                                // boş liste durumunu yukarıda ele aldık
-                                return StreamResponse.builder()
-                                        .content("")
-                                        .done(false)
-                                        .build();
-                            });
-                } else {
-                    // Desteklenmeyen içerik türü
-                    return Mono.just(StreamResponse.builder()
-                            .content("Desteklenmeyen yanıt türü: " + contentType)
-                            .done(true)
-                            .build());
-                }
-            })
-            .flatMapMany(initialResponse -> {
-                if (initialResponse != null) {
-                    // Hata durumu için tekli yanıt döndür
-                    return Flux.just(initialResponse);
-                }
-                
-                // Normal stream işleme - body'i flux olarak al
-                return openRouterWebClient.post()
-                    .uri("/chat/completions")
-                    .bodyValue(requestBody)
-                    .headers(headers -> {
-                        headers.setContentType(MediaType.APPLICATION_JSON);
-                        headers.set("Accept", "text/event-stream");
-                    })
-                    .retrieve()
-                    .bodyToFlux(String.class)
-                    .doOnSubscribe(s -> log.debug("Stream bağlantısı kuruldu"))
-                    .flatMap(chunk -> {
-                        log.debug("Chunk alındı: {}", chunk);
-                        if (chunk.isEmpty()) {
-                            return Flux.empty();
+        // OpenRouter API zaman aşımı süresini artır
+        Duration requestTimeout = Duration.ofSeconds(60);
+        Duration keepAliveInterval = Duration.ofSeconds(5);
+        
+        return Flux.create(sink -> {
+            log.debug("Creating stream flux for model: {}", request.getModel());
+            
+            // İstemciye periyodik ping göndermek için timer başlat
+            Disposable keepAliveTicker = Flux.interval(keepAliveInterval)
+                .doOnNext(tick -> {
+                    log.debug("Sending keep-alive ping, tick: {}", tick);
+                    sink.next(StreamResponse.builder()
+                        .content("")
+                        .done(false)
+                        .ping(true)  // Ping olduğunu belirt
+                        .build());
+                })
+                .subscribe();
+            
+            // Asıl API isteğini başlat
+            openRouterWebClient.post()
+                .uri("/chat/completions")
+                .bodyValue(requestBody)
+                .headers(headers -> {
+                    headers.setContentType(MediaType.APPLICATION_JSON);
+                    headers.set("Accept", "text/event-stream");
+                })
+                .retrieve()
+                .bodyToFlux(String.class)
+                .timeout(requestTimeout)
+                .doOnSubscribe(s -> log.debug("Subscribed to OpenRouter stream"))
+                .doOnComplete(() -> {
+                    log.info("OpenRouter stream completed successfully");
+                    keepAliveTicker.dispose();
+                    sink.next(StreamResponse.builder()
+                        .content("")
+                        .done(true)
+                        .build());
+                    sink.complete();
+                })
+                .doOnCancel(() -> {
+                    log.warn("OpenRouter stream was cancelled");
+                    keepAliveTicker.dispose();
+                    sink.complete();
+                })
+                .doOnError(e -> {
+                    log.error("OpenRouter stream error: {}", e.getMessage(), e);
+                    keepAliveTicker.dispose();
+                    sink.next(StreamResponse.builder()
+                        .content("Error: " + e.getMessage())
+                        .done(true)
+                        .error(true)
+                        .build());
+                    sink.complete();
+                })
+                .subscribe(chunk -> {
+                    // Chunk işleme - ayrıntılı loglama
+                    if (log.isDebugEnabled()) {
+                        log.debug("Received chunk from OpenRouter: {}", 
+                            chunk != null ? (chunk.length() > 100 ? chunk.substring(0, 100) + "..." : chunk) : "null");
+                    }
+                    
+                    if (chunk == null || chunk.isEmpty()) {
+                        log.debug("Empty chunk received, skipping");
+                        return;
+                    }
+                    
+                    // SSE veri formatını işle
+                    if (chunk.startsWith("data:")) {
+                        String data = chunk.substring(5).trim();
+                        
+                        if ("[DONE]".equals(data)) {
+                            log.debug("Received completion marker [DONE]");
+                            sink.next(StreamResponse.builder()
+                                .content("")
+                                .done(true)
+                                .build());
+                            return;
                         }
                         
-                        if (chunk.startsWith(":")) {
-                            log.debug("İşlem mesajı alındı: {}", chunk);
-                            return Flux.empty();
-                        }
-                        
-                        if (chunk.startsWith("data:")) {
-                            String data = chunk.substring(5).trim();
-                            
-                            if ("[DONE]".equals(data)) {
-                                return Flux.just(StreamResponse.builder()
-                                    .content("")
-                                    .done(true)
-                                    .build());
-                            }
-                            
-                            try {
-                                JsonNode parsed = objectMapper.readTree(data);
-                                JsonNode choices = parsed.path("choices");
-                                if (!choices.isEmpty() && choices.isArray()) {
-                                    JsonNode choice = choices.get(0);
-                                    JsonNode delta = choice.path("delta");
-                                    
-                                    if (delta.has("content")) {
-                                        String content = delta.get("content").asText();
-                                        if (content != null && !content.isEmpty()) {
-                                            return Flux.just(StreamResponse.builder()
-                                                .content(content)
-                                                .done(false)
-                                                .build());
-                                        }
+                        try {
+                            JsonNode parsed = objectMapper.readTree(data);
+                            JsonNode choices = parsed.path("choices");
+                            if (!choices.isEmpty() && choices.isArray()) {
+                                JsonNode choice = choices.get(0);
+                                JsonNode delta = choice.path("delta");
+                                
+                                if (delta.has("content")) {
+                                    String content = delta.get("content").asText();
+                                    if (content != null && !content.isEmpty()) {
+                                        log.debug("Extracted content: {}", content.length() > 20 ? content.substring(0, 20) + "..." : content);
+                                        sink.next(StreamResponse.builder()
+                                            .content(content)
+                                            .done(false)
+                                            .build());
                                     }
                                 }
-                            } catch (Exception e) {
-                                log.warn("Chunk ayrıştırılamadı: {}", data, e);
+                            } else {
+                                log.debug("No choices or empty choices array in response");
                             }
+                        } catch (Exception e) {
+                            log.warn("Failed to parse chunk: {}", data, e);
                         }
-                        
-                        return Flux.empty();
-                    });
-            })
-            .filter(response -> response != null && (response.getContent() != null || response.isDone()))
-            .onBackpressureBuffer(128)
-            .timeout(Duration.ofSeconds(30))
-            .doOnComplete(() -> log.info("Stream tamamlandı"))
-            .onErrorResume(error -> {
-                log.error("Stream hatası: {}", error.getMessage(), error);
-                return Flux.just(StreamResponse.builder()
-                    .content("Hata: " + error.getMessage())
-                    .done(true)
-                    .build());
-            });
+                    } else if (chunk.startsWith(":")) {
+                        // Yorum veya keep-alive, görmezden gel
+                        log.debug("Comment line received: {}", chunk);
+                    } else {
+                        // Bilinmeyen format, logla
+                        log.debug("Unknown format received: {}", chunk);
+                    }
+                });
+        }, FluxSink.OverflowStrategy.BUFFER) // Taşma stratejisini belirt
+        .doOnRequest(n -> log.debug("Requested {} items from stream", n))
+        .onBackpressureBuffer(256) // Backpressure stratejisi
+        .timeout(Duration.ofSeconds(90), Flux.just(StreamResponse.builder()
+            .content("Stream timeout occurred after 90 seconds")
+            .done(true)
+            .error(true)
+            .build()))
+        .doOnTerminate(() -> log.info("Stream terminated"));
     }
     
     /**
