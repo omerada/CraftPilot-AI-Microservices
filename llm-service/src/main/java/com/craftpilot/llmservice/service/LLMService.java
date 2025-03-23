@@ -115,7 +115,8 @@ public class LLMService {
         List<StreamResponse> timeoutList = Collections.singletonList(timeoutResponse);
         Flux<StreamResponse> timeoutFlux = Flux.fromIterable(timeoutList);
         
-        return Flux.create(sink -> {
+        // Explicit generic type parameter to inform Java compiler about the type we're creating
+        return Flux.<StreamResponse>create(sink -> {
             log.debug("Creating stream flux for model: {}", request.getModel());
             
             // İstemciye periyodik ping göndermek için timer başlat
