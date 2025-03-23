@@ -73,48 +73,75 @@ public class LLMController {
             @RequestHeader(value = "X-Request-ID", required = false) String requestId,
             ServerWebExchange exchange) {
         
+        // RequestID yoksa bir tane oluştur (loglamada null görmemek için)
+        final String trackingId = requestId != null ? requestId : UUID.randomUUID().toString();
+        
         log.info("Stream chat completion request received with language: {}, requestId: {}", 
-                userLanguage, requestId != null ? requestId : "not provided");
+                userLanguage, trackingId);
         
         request.setRequestType("CHAT");
         request.setLanguage(userLanguage);
         
-        // İstemci bağlantıyı keserse işlemi iptal etmek için
-        Mono<Void> cancelSignal = exchange.getResponse().setComplete()
-                .then(Mono.fromRunnable(() -> 
-                    log.info("Client disconnected, cancelling stream for request: {}", requestId)));
+        // Response header'larını ayarla
+        exchange.getResponse().getHeaders().setContentType(MediaType.TEXT_EVENT_STREAM);
+        exchange.getResponse().getHeaders().setCacheControl("no-cache");
+        exchange.getResponse().getHeaders().setConnection("keep-alive");
+        
+        // Erken client bağlantı kopması tespiti için sinyal
+        // NOT: İstemci bağlantıyı keserse bu mono tamamlanır
+        Mono<Void> cancelSignal = exchange.getResponse()
+                .getBody()
+                .doOnCancel(() -> log.info("Client cancelled the stream for request: {}", trackingId))
+                .then();
         
         return llmService.streamChatCompletion(request)
             // Yanıtları hemen istemciye gönder - immediate scheduler ile
             .publishOn(Schedulers.immediate())
             // Akışı SSE formatına dönüştür
-            .map(chunk -> ServerSentEvent.<StreamResponse>builder()
-                    .id(requestId != null ? requestId : UUID.randomUUID().toString())
-                    .event("message")
-                    .data(chunk)
-                    .build())
-            // İstemci bağlantıyı keserse akışı iptal et
-            .takeUntilOther(cancelSignal)
-            // Backpressure stratejisi - DROP ile aşırı yük durumunda bazı yanıtları atlayabilir
-            .onBackpressureDrop(item -> log.warn("Dropped stream item due to backpressure"))
-            .doOnNext(response -> {
+            .map(chunk -> {
+                // Her yanıt parçası için detaylı loglama
                 if (log.isDebugEnabled()) {
-                    String content = response.data().getContent();
-                    log.debug("Sending chunk: {}", 
-                        content != null && content.length() > 20 
-                            ? content.substring(0, 20) + "..." 
-                            : content);
+                    log.debug("Received chunk from service: {}", 
+                        chunk.getContent() != null && chunk.getContent().length() > 50 
+                            ? chunk.getContent().substring(0, 50) + "..." 
+                            : chunk.getContent());
                 }
+                
+                return ServerSentEvent.<StreamResponse>builder()
+                    .id(trackingId)
+                    .event("message") 
+                    .data(chunk)
+                    .build();
             })
-            // OpenRouter processing mesajı için özel SSE yorumu ekle
-            .startWith(ServerSentEvent.<StreamResponse>builder()
+            // İstemci bağlantıyı keserse erken bitir
+            .takeUntilOther(cancelSignal)
+            // SSE biçimi için özel boş yanıt ekle - OpenRouter SSE imzalama
+            .startWith(
+                // İlk mesaj olarak OpenRouter bekleme durumu belirtisi
+                ServerSentEvent.<StreamResponse>builder()
                     .comment("OPENROUTER PROCESSING")
-                    .build())
+                    .id(trackingId)
+                    .build(),
+                // Boş bir yanıt ile bağlantının başladığını belirt
+                ServerSentEvent.<StreamResponse>builder()
+                    .id(trackingId)
+                    .event("ping")  
+                    .data(StreamResponse.builder()
+                            .content("")
+                            .done(false)
+                            .build())
+                    .build()
+            )
+            // Herhangi bir backpressure durumunda buffer kullan
+            .onBackpressureBuffer(256, drop -> {
+                log.warn("Dropped stream chunk due to backpressure: {}", drop);
+            })
             .doOnError(error -> log.error("Stream error: {}", error.getMessage(), error))
-            .doOnComplete(() -> log.info("Stream completed for request: {}", requestId))
+            .doOnComplete(() -> log.info("Stream completed for request: {}", trackingId))
             .onErrorResume(error -> {
                 log.error("Stream error occurred: {}", error.getMessage(), error);
                 return Flux.just(ServerSentEvent.<StreamResponse>builder()
+                        .id(trackingId)
                         .event("error")
                         .data(StreamResponse.builder()
                                 .content("Hata: " + error.getMessage())
