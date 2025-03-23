@@ -2,13 +2,13 @@ server:
   port: 8062
   compression:
     enabled: true
-    mime-types: application/json,text/plain
+    mime-types: text/event-stream,application/json,text/plain
     min-response-size: 1024
   shutdown: graceful
   netty:
-    connection-timeout: 5000
-    idle-timeout: 30000
-    max-keep-alive-requests: 1000
+    connection-timeout: 60000 # 1 dakika (daha makul bir değer)
+    idle-timeout: 60000 # 1 dakika
+    max-keep-alive-requests: 1000 # Daha makul bir değer
     threads:
       worker: 4
       boss: 1
@@ -21,40 +21,24 @@ server:
     include-binding-errors: always
     include-stacktrace: never
     include-exception: false
+  http2:
+    enabled: true
 
 spring:
   application:
     name: llm-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
-    include: kafka-base
+    # Kafka profilini isteğe bağlı hale getir
+    include: ${KAFKA_ENABLED:false} ? kafka-base
   main:
     web-application-type: reactive
     allow-bean-definition-overriding: true
-  webflux:
-    base-path: /
-    format:
-      date: yyyy-MM-dd
-      date-time: yyyy-MM-dd HH:mm:ss
-      time: HH:mm:ss
-    log-request-details: true
+    # Kafka olmazsa hata vermemesi için ekleyin
+    allow-circular-references: true
   codec:
     max-in-memory-size: 16MB
-    log-request-details: true
-  kafka:
-    properties:
-      security.protocol: PLAINTEXT
-      reconnect.backoff.ms: 1000
-      reconnect.backoff.max.ms: 5000
-    consumer:
-      auto-offset-reset: earliest
-      group-id: llm-service-group
-    producer:
-      retries: 3
-      acks: all
-  cloud:
-    discovery:
-      enabled: true
+  # Redis ayarları
   data:
     redis:
       host: ${REDIS_HOST:redis}
@@ -67,34 +51,22 @@ spring:
           max-idle: 8
           min-idle: 2
           max-wait: 1000ms
+  # Cache ayarları
   cache:
     type: redis
     redis:
       time-to-live: 3600000
       cache-null-values: false
       use-key-prefix: true
-  reactor:
-    netty:
-      pool:
-        type: elastic
-        maxConnections: 500
-        acquireTimeout: 5000
-      client:
-        proxy:
-          type: NO_PROXY
-      connection:
-        provider:
-          max-connections: 150
-          max-idle-time: 60s
-      tcp:
-        no-delay: true
-        keep-alive: true
-      socket:
-        timeout: 60s
-  security:
-    basic:
-      enabled: false
 
+# Kafka yapılandırması için koşullu başlatma
+kafka:
+  enabled: ${KAFKA_ENABLED:false}
+  topics:
+    ai-events: ai-events
+    llm-completions: llm-completions
+
+# Eureka ayarları
 eureka:
   client:
     serviceUrl:
@@ -112,6 +84,7 @@ eureka:
     home-page-url: http://${eureka.instance.hostname}:${server.port}/
     instance-id: ${spring.application.name}:${server.port}:${random.uuid}
 
+# Actuator ayarları
 management:
   endpoints:
     web:
@@ -134,6 +107,7 @@ management:
     readinessstate:
       enabled: true
 
+# OpenRouter API ayarları
 openrouter:
   api:
     key: ${OPENROUTER_API_KEY}
@@ -145,21 +119,16 @@ openrouter:
     retryDelay: 1000
     http-referer: https://craftpilot.io
 
-kafka:
-  topics:
-    ai-events: ai-events
-    llm-completions: llm-completions
-
+# Logging ayarları
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
   level:
     root: INFO
     com.craftpilot: DEBUG
-    org.springframework.web: DEBUG
-    org.springframework.cloud: DEBUG
-    reactor.netty: DEBUG
-    io.netty: DEBUG
+    org.springframework.web: INFO
+    reactor.netty: INFO
+    io.netty: INFO
     com.craftpilot.llmservice: DEBUG
 
 netty:
@@ -171,21 +140,16 @@ netty:
   use-native-transport: true
   workdir: /tmp/netty
 
+# Resilience4j ayarları
 resilience4j:
   circuitbreaker:
     instances:
       llmService:
-        slidingWindowSize: 100
+        slidingWindowSize: 50
         failureRateThreshold: 50
-        waitDurationInOpenState: 20s
-        permittedNumberOfCallsInHalfOpenState: 10
+        waitDurationInOpenState: 10s
   ratelimiter:
     instances:
       llmService:
-        limitForPeriod: 100
+        limitForPeriod: 50
         limitRefreshPeriod: 1s
-        timeoutDuration: 5s
-  bulkhead:
-    instances:
-      llmService:
-        maxConcurrentCalls: 50

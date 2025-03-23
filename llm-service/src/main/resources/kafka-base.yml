@@ -26,7 +26,8 @@ spring:
       auto-create: true
       fail-fast: false
 
+# Kafka topic yapılandırması - application.yml'de olmaması durumunda kullanılır
 kafka:
-  topic:
-    partitions: 3
-    replicas: 1
+  topics:
+    ai-events: ai-events
+    llm-completions: llm-completions

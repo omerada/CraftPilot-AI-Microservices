@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
@@ -19,13 +20,14 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "kafka.enabled", havingValue = "true", matchIfMissing = false)
 public class OpenRouterService {
     private final WebClient webClient;
     private final OpenRouterConfig config;
     private final ReactiveCircuitBreaker circuitBreaker;
     private final KafkaTemplate<String, AIEvent> kafkaTemplate;
 
-    @Value("${kafka.topics.ai-events}")
+    @Value("${kafka.topics.ai-events:ai-events}")
     private String aiEventsTopic;
 
     public Mono<AIResponse> processRequest(AIRequest request) {

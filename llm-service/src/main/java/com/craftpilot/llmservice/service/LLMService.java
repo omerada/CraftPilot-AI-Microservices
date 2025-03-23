@@ -2,7 +2,8 @@ package com.craftpilot.llmservice.service;
 
 import com.craftpilot.llmservice.model.AIRequest;
 import com.craftpilot.llmservice.model.AIResponse;
-import com.craftpilot.llmservice.model.StreamResponse;  // Yeni import
+import com.craftpilot.llmservice.model.StreamResponse;
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -15,16 +16,20 @@ import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.time.Duration;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import com.craftpilot.llmservice.exception.APIException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Objects;
+import java.util.Set;
+import com.craftpilot.llmservice.exception.ValidationException; // ValidationException import'u ekle
 
 @Service
 @Slf4j
@@ -35,7 +40,7 @@ public class LLMService {
     
     // Model başına maksimum token limitleri
     private static final Map<String, Integer> MODEL_TOKEN_LIMITS = Map.ofEntries(
-        Map.entry("google/gemini-2.0-flash-lite-preview-02-05:free", 30000),
+        Map.entry("google/gemini-2.0-flash-lite-001", 30000),
         Map.entry("google/gemini-pro", 30000),
         Map.entry("google/palm-2-codechat-bison", 8000),
         Map.entry("google/palm-2-chat-bison", 8000),
@@ -76,8 +81,7 @@ public class LLMService {
 
     public Mono<AIResponse> processCodeCompletion(AIRequest request) {
         // Code completion için özel model seçimi
-        // request.setModel("anthropic/claude-2");
-        return callOpenRouter("/v1/chat/completions", request)
+        return callOpenRouter("chat/completions", request)  // Başlangıçtaki slash kaldırıldı
             .map(response -> mapToAIResponse(response, request));
     }
 
@@ -91,7 +95,7 @@ public class LLMService {
         Map<String, Object> requestBody = createRequestBody(request);
         requestBody.put("stream", true);
         
-        log.info("Starting streaming request with model: {}", request.getModel());
+        log.info("Starting streaming request for model: {}", request.getModel());
         
         return openRouterWebClient.post()
             .uri("/chat/completions")  
@@ -99,82 +103,200 @@ public class LLMService {
             .headers(headers -> {
                 headers.setContentType(MediaType.APPLICATION_JSON);
                 headers.set("Accept", "text/event-stream");
-                headers.set("Connection", "keep-alive");
-                headers.set("Cache-Control", "no-cache");
             })
-            .retrieve()
-            .bodyToFlux(String.class)
-            .doOnSubscribe(s -> log.info("⚡ Stream connection established"))
-            // Hiçbir buffer olmadan her yanıtı hemen işle
-            .publishOn(Schedulers.immediate())
-            // Debugging için tüm ham yanıtları logla
-            .doOnNext(chunk -> log.debug("Raw chunk received: {}", chunk))
-            .filter(chunk -> chunk != null && !chunk.trim().isEmpty())
-            .mapNotNull(chunk -> {  // mapNotNull kullanarak null değerleri filtrele
-                try {
-                    if (chunk.startsWith("data: ")) {
-                        chunk = chunk.substring(6).trim();
-                    }
-                    if (chunk.equals("[DONE]")) {
-                        log.debug("Stream completion signal received");
-                        return StreamResponse.builder()
-                            .content("")
-                            .done(true)
-                            .build();
-                    }
-                    
-                    Map<String, Object> response = objectMapper.readValue(chunk, new TypeReference<Map<String, Object>>() {});
-                    
-                    if (response.containsKey("choices")) {
-                        List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
-                        if (!choices.isEmpty()) {
-                            Map<String, Object> choice = choices.get(0);
-                            Map<String, Object> delta = (Map<String, Object>) choice.get("delta");
-                            
-                            String content = "";
-                            if (delta != null && delta.containsKey("content")) {
-                                content = (String) delta.get("content");
-                                if (content != null && !content.isEmpty()) {
-                                    log.debug("Streaming content: {}", content);
+            .exchangeToMono(response -> {
+                // Başlık ve içerik türü incelemesi
+                MediaType contentType = response.headers().contentType().orElse(MediaType.APPLICATION_JSON);
+                log.debug("Yanıt içerik türü: {}", contentType);
+                
+                if (contentType.includes(MediaType.TEXT_HTML)) {
+                    // HTML yanıtı geldi, büyük olasılıkla hata sayfası
+                    log.error("HTML yanıtı alındı - muhtemelen model kullanılamıyor veya servis hatası mevcut");
+                    return response.bodyToMono(String.class)
+                            .map(htmlContent -> {
+                                // HTML içeriğinden hata mesajını çıkarmaya çalış
+                                String errorMessage = extractErrorFromHtml(htmlContent);
+                                return StreamResponse.builder()
+                                        .content("Hata: " + errorMessage)
+                                        .done(true)
+                                        .build();
+                            });
+                } else if (response.statusCode().isError()) {
+                    // HTTP hata durumu geldi
+                    return response.bodyToMono(String.class)
+                            .map(errorBody -> {
+                                log.error("API hata döndürdü [{}]: {}", response.statusCode(), errorBody);
+                                return StreamResponse.builder()
+                                        .content("API Hatası: " + response.statusCode() + " - " + errorBody)
+                                        .done(true)
+                                        .build();
+                            });
+                } else if (contentType.includes(MediaType.TEXT_EVENT_STREAM) || 
+                          contentType.includes(MediaType.APPLICATION_STREAM_JSON)) {
+                    // Normal stream yanıtı, event-stream işlemeye devam et
+                    return response.bodyToFlux(String.class)
+                            .collectList()
+                            .map(chunks -> {
+                                if (chunks.isEmpty()) {
                                     return StreamResponse.builder()
-                                        .content(content)
+                                            .content("Boş yanıt alındı")
+                                            .done(true)
+                                            .build();
+                                }
+                                // DÜZELTİLDİ: Burada null yerine geçerli bir yanıt dönecek,
+                                // boş liste durumunu yukarıda ele aldık
+                                return StreamResponse.builder()
+                                        .content("")
                                         .done(false)
                                         .build();
-                                }
-                            }
-                            
-                            boolean isDone = choice.containsKey("finish_reason") && 
-                                           choice.get("finish_reason") != null;
-                            if (isDone) {
-                                return StreamResponse.builder()
-                                    .content("")
-                                    .done(true)
-                                    .build();
-                            }
-                        }
-                    }
-                    
-                    // Eğer buraya kadar geldiyse ve içerik yoksa, bu chunk'ı atla
-                    log.debug("Skipping empty or invalid chunk: {}", chunk);
-                    return null;
-                    
-                } catch (Exception e) {
-                    log.error("Error processing chunk: {} - Error: {}", chunk, e.getMessage());
-                    return StreamResponse.builder()
-                        .content("Error: " + e.getMessage())
-                        .done(true)
-                        .build();
+                            });
+                } else {
+                    // Desteklenmeyen içerik türü
+                    return Mono.just(StreamResponse.builder()
+                            .content("Desteklenmeyen yanıt türü: " + contentType)
+                            .done(true)
+                            .build());
                 }
             })
-            .filter(Objects::nonNull)  // Ekstra güvenlik için null kontrolü
-            // Oluşması halinde hata durumunu istemciye bildir
-            .onErrorResume(e -> {
-                log.error("Stream processing error: {}", e.getMessage(), e);
+            .flatMapMany(initialResponse -> {
+                if (initialResponse != null) {
+                    // Hata durumu için tekli yanıt döndür
+                    return Flux.just(initialResponse);
+                }
+                
+                // Normal stream işleme - body'i flux olarak al
+                return openRouterWebClient.post()
+                    .uri("/chat/completions")
+                    .bodyValue(requestBody)
+                    .headers(headers -> {
+                        headers.setContentType(MediaType.APPLICATION_JSON);
+                        headers.set("Accept", "text/event-stream");
+                    })
+                    .retrieve()
+                    .bodyToFlux(String.class)
+                    .doOnSubscribe(s -> log.debug("Stream bağlantısı kuruldu"))
+                    .flatMap(chunk -> {
+                        log.debug("Chunk alındı: {}", chunk);
+                        if (chunk.isEmpty()) {
+                            return Flux.empty();
+                        }
+                        
+                        if (chunk.startsWith(":")) {
+                            log.debug("İşlem mesajı alındı: {}", chunk);
+                            return Flux.empty();
+                        }
+                        
+                        if (chunk.startsWith("data:")) {
+                            String data = chunk.substring(5).trim();
+                            
+                            if ("[DONE]".equals(data)) {
+                                return Flux.just(StreamResponse.builder()
+                                    .content("")
+                                    .done(true)
+                                    .build());
+                            }
+                            
+                            try {
+                                JsonNode parsed = objectMapper.readTree(data);
+                                JsonNode choices = parsed.path("choices");
+                                if (!choices.isEmpty() && choices.isArray()) {
+                                    JsonNode choice = choices.get(0);
+                                    JsonNode delta = choice.path("delta");
+                                    
+                                    if (delta.has("content")) {
+                                        String content = delta.get("content").asText();
+                                        if (content != null && !content.isEmpty()) {
+                                            return Flux.just(StreamResponse.builder()
+                                                .content(content)
+                                                .done(false)
+                                                .build());
+                                        }
+                                    }
+                                }
+                            } catch (Exception e) {
+                                log.warn("Chunk ayrıştırılamadı: {}", data, e);
+                            }
+                        }
+                        
+                        return Flux.empty();
+                    });
+            })
+            .filter(response -> response != null && (response.getContent() != null || response.isDone()))
+            .onBackpressureBuffer(128)
+            .timeout(Duration.ofSeconds(30))
+            .doOnComplete(() -> log.info("Stream tamamlandı"))
+            .onErrorResume(error -> {
+                log.error("Stream hatası: {}", error.getMessage(), error);
                 return Flux.just(StreamResponse.builder()
-                    .content("Error: " + e.getMessage())
+                    .content("Hata: " + error.getMessage())
                     .done(true)
                     .build());
             });
+    }
+    
+    /**
+     * HTML içeriğinden hata mesajını çıkaran yardımcı metod
+     */
+    private String extractErrorFromHtml(String htmlContent) {
+        if (htmlContent == null || htmlContent.isEmpty()) {
+            return "Boş HTML yanıtı alındı";
+        }
+        
+        // Model kullanılamıyor hatası için kontrol
+        if (htmlContent.contains("The model") && htmlContent.contains("is not available")) {
+            int startIndex = htmlContent.indexOf("The model");
+            if (startIndex >= 0) {
+                int endIndex = htmlContent.indexOf("</", startIndex);
+                if (endIndex > startIndex) {
+                    return htmlContent.substring(startIndex, endIndex)
+                        .replaceAll("<[^>]*>", "")  // HTML etiketlerini kaldır
+                        .trim();
+                }
+            }
+            return "Model kullanılamıyor";
+        }
+        
+        // Title içinden hata mesajını çıkar
+        int titleStart = htmlContent.indexOf("<title>");
+        if (titleStart >= 0) {
+            int titleEnd = htmlContent.indexOf("</title>", titleStart);
+            if (titleEnd > titleStart) {
+                String title = htmlContent.substring(titleStart + 7, titleEnd).trim();
+                if (!title.isEmpty() && !title.equalsIgnoreCase("OpenRouter")) {
+                    return title;
+                }
+            }
+        }
+        
+        // H1 içinden hata mesajını çıkar
+        int h1Start = htmlContent.indexOf("<h1");
+        if (h1Start >= 0) {
+            int h1ContentStart = htmlContent.indexOf(">", h1Start) + 1;
+            int h1End = htmlContent.indexOf("</h1>", h1ContentStart);
+            if (h1End > h1ContentStart) {
+                String h1Content = htmlContent.substring(h1ContentStart, h1End).trim();
+                if (!h1Content.isEmpty()) {
+                    return h1Content.replaceAll("<[^>]*>", "").trim();
+                }
+            }
+        }
+        
+        // Genel hata mesajı
+        return "HTML yanıtı alındı. Model kullanılamıyor veya servis hatası mevcut.";
+    }
+
+    // API bağlantı durumunu kontrol eden yeni metot
+    private Mono<Boolean> checkApiConnection() {
+        return openRouterWebClient.get()
+            .uri("/models")  // OpenRouter'ın sağlık kontrolü için model listesini kullan
+            .retrieve()
+            .bodyToMono(String.class)
+            .map(response -> true)  // herhangi bir yanıt alınırsa, API erişilebilir demektir
+            .onErrorResume(e -> {
+                log.error("API bağlantı kontrolü başarısız: {}", e.getMessage());
+                return Mono.just(false);  // hata durumunda API erişilemez kabul et
+            })
+            .timeout(Duration.ofSeconds(5), Mono.just(false));  // 5 saniye yanıt gelmezse bağlantı yok kabul et
     }
 
     public Mono<AIResponse> enhancePrompt(AIRequest request) {
@@ -187,6 +309,8 @@ public class LLMService {
         if (request.getMaxTokens() == null) {
             request.setMaxTokens(32000); // Prompt iyileştirme için daha küçük token limiti yeterli
         }
+
+        request.setLanguage("tr"); // Varsayılan dil İngilizce
         
         // Sistem promptunu hazırla
         String systemPrompt = getPromptEnhancementSystemPrompt(request.getLanguage());
@@ -208,7 +332,7 @@ public class LLMService {
         
         // İstek özelliklerini ayarla
         request.setMessages(messages);
-        request.setModel("google/gemma-3-27b-it:free"); 
+        request.setModel("google/gemini-2.0-flash-lite-001"); 
         
         // Chat completion API'sini kullanarak istek gönder
         return callOpenRouter("/chat/completions", request)
@@ -277,10 +401,24 @@ public class LLMService {
 
     private Mono<Map<String, Object>> callOpenRouter(String endpoint, AIRequest request) {
         Map<String, Object> requestBody = createRequestBody(request);
-        log.debug("OpenRouter isteği: {} - Body: {}", endpoint, requestBody);
+        
+        // Endpoint normalizasyonu
+        if (endpoint.startsWith("/")) {
+            endpoint = endpoint.substring(1);  // Başlangıçtaki slash'ı kaldır
+        }
+        
+        // Duplicate /api/v1 önlemek için kontrol
+        String uri;
+        if (endpoint.startsWith("api/v1") || endpoint.startsWith("api/v1/")) {
+            uri = "/" + endpoint;  // Endpoint zaten api/v1 içeriyor
+        } else {
+            uri = "/api/v1/" + endpoint;  // api/v1 prefixi ekle
+        }
+        
+        log.debug("OpenRouter isteği: {} - Body: {}", uri, requestBody);
         
         return openRouterWebClient.post()
-            .uri(endpoint)
+            .uri(uri)  // Düzeltilmiş endpoint
             .bodyValue(requestBody)
             .headers(headers -> {
                 headers.setContentType(MediaType.APPLICATION_JSON);
@@ -441,7 +579,7 @@ public class LLMService {
         // Ana promptları ekle
         prompts.put("DEFAULT", "You are a helpful AI assistant.");
         prompts.put("DEFAULT_TR", "Yardımsever bir yapay zeka asistanısın.");
-        prompts.put("CODE", "You are an expert software developer. Write clean, efficient, and well-documented code.");
+        prompts.put("CODE", "You are an expert software developer. Write clean, efficient, and well-dokümante edilmiş kod yaz.");
         prompts.put("CODE_TR", "Uzman bir yazılım geliştiricisisin. Temiz, verimli ve iyi dokümante edilmiş kod yaz.");
         prompts.put("CHAT", "You are a friendly conversational AI. Be helpful and engaging.");
         prompts.put("CHAT_TR", "Arkadaş canlısı bir sohbet yapay zekasısın. Yardımsever ve ilgi çekici ol.");
@@ -508,15 +646,18 @@ public class LLMService {
             log.debug("Response keys: {}", response.keySet());
             
             if (response.containsKey("choices")) {
+                @SuppressWarnings("unchecked")
                 List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
                 log.debug("Choices size: {}", choices.size());
                 
                 if (!choices.isEmpty()) {
+                    @SuppressWarnings("unchecked")
                     Map<String, Object> choice = choices.get(0);
                     log.debug("Choice keys: {}", choice.keySet());
                     
                     // Choice içinde message veya text olabilir
                     if (choice.containsKey("message")) {
+                        @SuppressWarnings("unchecked")
                         Map<String, Object> message = (Map<String, Object>) choice.get("message");
                         log.debug("Message keys: {}", message.keySet());
                         
@@ -527,6 +668,7 @@ public class LLMService {
                             if (content instanceof String) {
                                 return (String) content;
                             } else if (content instanceof List) {
+                                @SuppressWarnings("unchecked")
                                 List<Map<String, Object>> contents = (List<Map<String, Object>>) content;
                                 return contents.stream()
                                     .filter(item -> "text".equals(item.get("type")))
@@ -542,6 +684,7 @@ public class LLMService {
                     }
                     // Ayrıca delta içinde de olabilir (özellikle stream yanıtlarında)
                     else if (choice.containsKey("delta")) {
+                        @SuppressWarnings("unchecked")
                         Map<String, Object> delta = (Map<String, Object>) choice.get("delta");
                         if (delta.containsKey("content")) {
                             return (String) delta.get("content");
@@ -599,7 +742,18 @@ public class LLMService {
     }
 
     private Integer extractTokenCount(Map<String, Object> response) {
+        @SuppressWarnings("unchecked")
         Map<String, Object> usage = (Map<String, Object>) response.getOrDefault("usage", Map.of());
         return ((Number) usage.getOrDefault("total_tokens", 0)).intValue();
+    }
+
+    // Model adından sağlayıcı adını çıkarır
+    private boolean isStreamingSupported(String model) {
+        if (model == null || model.isEmpty()) {
+            return true; // Varsayılan olarak destekleniyor kabul et
+        }
+        
+        String provider = model.split("/")[0].toLowerCase();
+        return true;
     }
 }
