@@ -13,12 +13,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;  // Added missing import
-import reactor.core.Disposable;          // Added missing import
+import reactor.core.publisher.FluxSink;
+import reactor.core.Disposable;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Objects;
 import java.util.Set;
-import com.craftpilot.llmservice.exception.ValidationException; // ValidationException import'u ekle
+import com.craftpilot.llmservice.exception.ValidationException;
 
 @Service
 @Slf4j
@@ -109,6 +110,10 @@ public class LLMService {
             .done(true)
             .error(true)
             .build();
+        
+        // Liste oluşturarak tam tür bilgisini koruyoruz
+        List<StreamResponse> timeoutList = Collections.singletonList(timeoutResponse);
+        Flux<StreamResponse> timeoutFlux = Flux.fromIterable(timeoutList);
         
         return Flux.create(sink -> {
             log.debug("Creating stream flux for model: {}", request.getModel());
@@ -220,18 +225,15 @@ public class LLMService {
         }, FluxSink.OverflowStrategy.BUFFER) // Taşma stratejisini belirt
         .doOnRequest(n -> log.debug("Requested {} items from stream", n))
         .onBackpressureBuffer(256) // Backpressure stratejisi
-        .timeout(Duration.ofSeconds(90), Flux.just(timeoutResponse))
+        .timeout(Duration.ofSeconds(90), timeoutFlux)
         .doOnTerminate(() -> log.info("Stream terminated"));
     }
     
-    /**
-     * HTML içeriğinden hata mesajını çıkaran yardımcı metod
-     */
+    // HTML içeriğinden hata mesajını çıkaran yardımcı metod
     private String extractErrorFromHtml(String htmlContent) {
         if (htmlContent == null || htmlContent.isEmpty()) {
             return "Boş HTML yanıtı alındı";
         }
-        
         // Model kullanılamıyor hatası için kontrol
         if (htmlContent.contains("The model") && htmlContent.contains("is not available")) {
             int startIndex = htmlContent.indexOf("The model");
@@ -245,7 +247,6 @@ public class LLMService {
             }
             return "Model kullanılamıyor";
         }
-        
         // Title içinden hata mesajını çıkar
         int titleStart = htmlContent.indexOf("<title>");
         if (titleStart >= 0) {
@@ -257,7 +258,6 @@ public class LLMService {
                 }
             }
         }
-        
         // H1 içinden hata mesajını çıkar
         int h1Start = htmlContent.indexOf("<h1");
         if (h1Start >= 0) {
@@ -270,7 +270,6 @@ public class LLMService {
                 }
             }
         }
-        
         // Genel hata mesajı
         return "HTML yanıtı alındı. Model kullanılamıyor veya servis hatası mevcut.";
     }
@@ -294,36 +293,28 @@ public class LLMService {
         if (request.getTemperature() == null) {
             request.setTemperature(0.3); // Daha kararlı sonuçlar için düşük sıcaklık
         }
-        
         // Token limitini ayarla
         if (request.getMaxTokens() == null) {
             request.setMaxTokens(32000); // Prompt iyileştirme için daha küçük token limiti yeterli
         }
-
         request.setLanguage("tr"); // Varsayılan dil İngilizce
-        
         // Sistem promptunu hazırla
         String systemPrompt = getPromptEnhancementSystemPrompt(request.getLanguage());
-        
         // Mesajları oluştur
         List<Map<String, Object>> messages = new ArrayList<>();
-        
         // Sistem mesajını ekle
         Map<String, Object> systemMessage = new HashMap<>();
         systemMessage.put("role", "system");
         systemMessage.put("content", systemPrompt);
         messages.add(systemMessage);
-        
         // Kullanıcı mesajını ekle
         Map<String, Object> userMessage = new HashMap<>();
         userMessage.put("role", "user");
         userMessage.put("content", request.getPrompt());
         messages.add(userMessage);
-        
         // İstek özelliklerini ayarla
         request.setMessages(messages);
         request.setModel("google/gemini-2.0-flash-lite-001"); 
-        
         // Chat completion API'sini kullanarak istek gönder
         return callOpenRouter("/chat/completions", request)
             .map(response -> {
@@ -343,9 +334,6 @@ public class LLMService {
             });
     }
 
-    /**
-     * Prompt geliştirme için özel sistem promptunu döndürür
-     */
     private String getPromptEnhancementSystemPrompt(String language) {
         // İngilizce sistem promptu
         String englishSystemPrompt = "You are an expert prompt engineer. Your task is to transform the user's text into a more effective prompt that will be directed to an AI chat model.\n\n" +
@@ -364,7 +352,6 @@ public class LLMService {
             "- Don't add additional explanations, ONLY return the improved prompt text\n\n" +
             "User text to improve:\n" +
             "\"{prompt}\"";
-        
         // Türkçe sistem promptu
         String turkishSystemPrompt = "Sen uzman bir prompt mühendisisin. Kullanıcının verdiği metni bir AI sohbet modeline yöneltilecek daha etkili bir prompt'a dönüştürmekle görevlisin.\n\n" +
             "Aşağıdaki adımları izle:\n" +
@@ -380,23 +367,19 @@ public class LLMService {
             "- Sadece daha iyi bir prompt oluştur, farklı bir şey yapma\n" +
             "- Küçük değişiklikler yeterli ise orijinali fazla değiştirme\n" +
             "- Ek açıklamalar ekleme, SADECE iyileştirilmiş prompt metnini döndür";
-        
         // Dil tercihine göre uygun sistem promptunu döndür
         if (language != null && language.equalsIgnoreCase("tr")) {
             return turkishSystemPrompt;
         }
-        
         return englishSystemPrompt;
     }
 
     private Mono<Map<String, Object>> callOpenRouter(String endpoint, AIRequest request) {
         Map<String, Object> requestBody = createRequestBody(request);
-        
         // Endpoint normalizasyonu
         if (endpoint.startsWith("/")) {
             endpoint = endpoint.substring(1);  // Başlangıçtaki slash'ı kaldır
         }
-        
         // Duplicate /api/v1 önlemek için kontrol
         String uri;
         if (endpoint.startsWith("api/v1") || endpoint.startsWith("api/v1/")) {
@@ -404,9 +387,7 @@ public class LLMService {
         } else {
             uri = "/api/v1/" + endpoint;  // api/v1 prefixi ekle
         }
-        
         log.debug("OpenRouter isteği: {} - Body: {}", uri, requestBody);
-        
         return openRouterWebClient.post()
             .uri(uri)  // Düzeltilmiş endpoint
             .bodyValue(requestBody)
@@ -419,7 +400,6 @@ public class LLMService {
                 if (response.statusCode().is2xxSuccessful()) {
                     // İçerik türünü kontrol et
                     MediaType contentType = response.headers().contentType().orElse(MediaType.APPLICATION_JSON);
-                    
                     if (contentType.includes(MediaType.APPLICATION_JSON)) {
                         // JSON yanıtı - normal işleme
                         return response.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {});
@@ -477,37 +457,30 @@ public class LLMService {
     private Map<String, Object> createRequestBody(AIRequest request) {
         Map<String, Object> body = new HashMap<>();
         body.put("model", request.getModel());
-        
         List<Map<String, Object>> messages;
-        
         // Eğer messages dizisi mevcutsa, onu kullan
         if (request.getMessages() != null && !request.getMessages().isEmpty()) {
             messages = new ArrayList<>(request.getMessages());
-            
             // Sistem mesajı var mı kontrol et
             boolean hasSystemMessage = messages.stream()
                 .anyMatch(msg -> "system".equals(msg.get("role")));
-            
             // Yoksa ekle
             if (!hasSystemMessage) {
                 Map<String, Object> systemMessage = new HashMap<>();
                 systemMessage.put("role", "system");
                 systemMessage.put("content", getSystemPrompt(request.getRequestType(), request.getLanguage()));
-                
                 // Sistem mesajını listenin başına ekle
                 messages.add(0, systemMessage);
             }
-        } 
+        }
         // Değilse, prompt alanından messages oluştur (geriye dönük uyumluluk)
         else if (request.getPrompt() != null && !request.getPrompt().isEmpty()) {
             messages = new ArrayList<>();
-            
             // Sistem mesajını ekle
             Map<String, Object> systemMessage = new HashMap<>();
             systemMessage.put("role", "system");
             systemMessage.put("content", getSystemPrompt(request.getRequestType(), request.getLanguage()));
             messages.add(systemMessage);
-            
             // Kullanıcı mesajını ekle
             Map<String, Object> userMessage = new HashMap<>();
             userMessage.put("role", "user");
@@ -517,21 +490,15 @@ public class LLMService {
             // Her iki alan da boşsa, hata fırlat
             throw new IllegalArgumentException("Request must contain either 'prompt' or 'messages'");
         }
-        
         body.put("messages", messages);
         body.put("max_tokens", request.getMaxTokens());
         body.put("temperature", request.getTemperature());
-        
         log.debug("Oluşturulan request body: {}", body);
         return body;
     }
 
-    /**
-     * Request tipine ve dile göre özel sistem prompt'u oluşturur
-     */
     private String getSystemPrompt(String requestType, String language) {
         String basePrompt;
-        
         if ("CODE".equalsIgnoreCase(requestType)) {
             basePrompt = "You are an expert coding assistant. Provide clean, efficient, and well-documented code solutions. " +
                    "Explain your approach briefly when helpful, focusing on best practices and performance considerations. " +
@@ -544,28 +511,21 @@ public class LLMService {
         } else {
             basePrompt = "You are a helpful AI assistant. Provide accurate, relevant, and detailed responses to the user's requests.";
         }
-        
         // Kullanıcının diline göre yanıt vermesi için ek talimatlar ekle
         if (language != null && !language.equalsIgnoreCase("en")) {
             String languageName = getLanguageName(language);
             return basePrompt + " Always respond in " + languageName + " language unless explicitly asked to use a different language.";
         }
-        
         return basePrompt;
     }
 
-    /**
-     * Dil kodundan dil ismini döndürür
-     */
     private String getLanguageName(String languageCode) {
         Map<String, String> languageMap = buildSystemPrompts();
-        
         return languageMap.getOrDefault(languageCode.toLowerCase(), "the user's preferred language (" + languageCode + ")");
     }
 
     private Map<String, String> buildSystemPrompts() {
         Map<String, String> prompts = new HashMap<>();
-        
         // Ana promptları ekle
         prompts.put("DEFAULT", "You are a helpful AI assistant.");
         prompts.put("DEFAULT_TR", "Yardımsever bir yapay zeka asistanısın.");
@@ -589,26 +549,22 @@ public class LLMService {
         prompts.put("SUMMARIZE_TR", "Verimli bir özetleyicisin. Önemli bilgileri özlü bir şekilde çıkar ve ilet.");
         prompts.put("DEBUG", "You are a skilled debugger. Help identify and fix technical issues.");
         prompts.put("DEBUG_TR", "Yetenekli bir hata ayıklayıcısın. Teknik sorunları belirleme ve çözme konusunda yardımcı ol.");
-        
         return Map.copyOf(prompts);  // Değiştirilemez kopya dön
     }
 
     private AIResponse mapToAIResponse(Map<String, Object> openRouterResponse, AIRequest request) {
         log.debug("OpenRouter yanıtı haritalanıyor: {}", openRouterResponse);
-        
         String responseText = extractResponseText(openRouterResponse);
         if (responseText == null || responseText.trim().isEmpty()) {
             log.warn("OpenRouter'dan boş yanıt alındı");
             throw new RuntimeException("AI servisinden boş yanıt alındı");
         }
-
         AIResponse response = AIResponse.success(
             responseText,
             request.getModel(),
             extractTokenCount(openRouterResponse),
             request.getRequestId()
         );
-
         log.debug("Haritalanan yanıt: {}", response);
         return response;
     }
@@ -616,7 +572,6 @@ public class LLMService {
     private String extractResponseText(Map<String, Object> response) {
         try {
             log.debug("Yanıt içeriği: {}", response);
-            
             // API hata mesajlarını kontrol et
             if (response.containsKey("error")) {
                 Object errorObj = response.get("error");
@@ -631,30 +586,24 @@ public class LLMService {
                 }
                 throw new RuntimeException("API hatası: " + errorObj);
             }
-
             // Daha ayrıntılı debugging ekleyelim
             log.debug("Response keys: {}", response.keySet());
-            
             if (response.containsKey("choices")) {
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
                 log.debug("Choices size: {}", choices.size());
-                
                 if (!choices.isEmpty()) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> choice = choices.get(0);
                     log.debug("Choice keys: {}", choice.keySet());
-                    
                     // Choice içinde message veya text olabilir
                     if (choice.containsKey("message")) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> message = (Map<String, Object>) choice.get("message");
                         log.debug("Message keys: {}", message.keySet());
-                        
                         if (message.containsKey("content")) {
                             Object content = message.get("content");
                             log.debug("Content type: {}", content != null ? content.getClass().getName() : "null");
-                            
                             if (content instanceof String) {
                                 return (String) content;
                             } else if (content instanceof List) {
@@ -682,25 +631,20 @@ public class LLMService {
                     }
                 }
             }
-            
             // Farklı yanıt formatlarını işle
             if (response.containsKey("output") && response.get("output") instanceof String) {
                 return (String) response.get("output");
             }
-            
             if (response.containsKey("completion") && response.get("completion") instanceof String) {
                 return (String) response.get("completion");
             }
-            
             if (response.containsKey("generated_text") && response.get("generated_text") instanceof String) {
                 return (String) response.get("generated_text");
             }
-            
             // Eğer response'un kendisi String ise direkt döndür (bazı LLM API'leri için)
             if (response.size() == 1 && response.values().iterator().next() instanceof String) {
                 return (String) response.values().iterator().next();
             }
-            
             // Hata durumunda anlamlı bir hata mesajı oluştur
             StringBuilder detailBuilder = new StringBuilder("API yanıt anahtarları: ");
             for (String key : response.keySet()) {
@@ -716,14 +660,12 @@ public class LLMService {
                 }
                 detailBuilder.append(", ");
             }
-            
             // Yanıt formatını JSON olarak logla
             try {
                 log.error("Bilinmeyen yanıt formatı: {}", new ObjectMapper().writeValueAsString(response));
             } catch (Exception e) {
                 log.error("Yanıt JSON dönüştürme hatası", e);
             }
-            
             throw new RuntimeException("Geçersiz API yanıt formatı: " + detailBuilder.toString());
         } catch (Exception e) {
             log.error("Yanıt işlenirken hata oluştu: {}", e.getMessage(), e);
@@ -742,7 +684,6 @@ public class LLMService {
         if (model == null || model.isEmpty()) {
             return true; // Varsayılan olarak destekleniyor kabul et
         }
-        
         String provider = model.split("/")[0].toLowerCase();
         return true;
     }
