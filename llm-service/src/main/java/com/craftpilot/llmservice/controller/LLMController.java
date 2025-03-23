@@ -87,10 +87,10 @@ public class LLMController {
         exchange.getResponse().getHeaders().setCacheControl("no-cache");
         exchange.getResponse().getHeaders().setConnection("keep-alive");
         
-        // Erken client bağlantı kopması tespiti 
-        // NOT: ServerHttpResponse doesn't have getBody() method
+        // Erken client bağlantı kopması tespiti için doğru tip dönüşümü
         Mono<Void> cancelSignal = Mono.fromRunnable(() -> {})
-                .doOnCancel(() -> log.info("Client cancelled the stream for request: {}", trackingId));
+                .doOnCancel(() -> log.info("Client cancelled the stream for request: {}", trackingId))
+                .then(); // then() metodu ile Mono<Object>'i Mono<Void>'e dönüştür
         
         return llmService.streamChatCompletion(request)
             // Yanıtları hemen istemciye gönder - immediate scheduler ile
