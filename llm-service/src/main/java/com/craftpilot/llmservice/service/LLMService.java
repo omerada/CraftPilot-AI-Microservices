@@ -482,7 +482,7 @@ public class LLMService {
         
         // İstek özelliklerini ayarla
         request.setMessages(messages);
-        request.setModel("google/gemma-3-27b-it"); // Daha hızlı ve güncel model kullanımı
+        request.setModel("google/gemini-2.0-flash-lite-001"); // Daha hızlı ve güncel model kullanımı
         
         // API isteği body'sini hazırla
         Map<String, Object> requestBody = createRequestBody(request);
