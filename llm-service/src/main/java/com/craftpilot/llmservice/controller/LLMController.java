@@ -36,33 +36,50 @@ public class LLMController {
                                                          @RequestHeader(value = "X-User-Language", defaultValue = "en") String userLanguage) {
         log.info("Chat completion request received with language: {}", userLanguage);
         request.setRequestType("CHAT");
-        request.setLanguage(userLanguage); // Kullanıcı dil tercihini request'e ekle
+        request.setLanguage(userLanguage);
+        
+        // Model belirtilmemişse varsayılan bir model ata
+        if (request.getModel() == null || request.getModel().isEmpty()) {
+            request.setModel("google/gemini-pro");
+        }
         
         return llmService.processChatCompletion(request)
-            .doOnSuccess(response -> log.debug("Chat completion success"))
-            .map(response -> ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(response))
-            .doOnError(error -> {
-                log.error("Chat completion error: {}", error.getMessage(), error);
-                // Detaylı hata logu
-                if (error.getCause() != null) {
-                    log.error("Root cause: {}", error.getCause().getMessage());
+            .doOnSuccess(response -> {
+                if (response == null) {
+                    log.warn("Chat completion returned null response");
+                } else {
+                    log.debug("Chat completion success with response length: {}", 
+                        response.getResponse() != null ? response.getResponse().length() : 0);
                 }
             })
-            .onErrorResume(error -> {
-                String errorMessage = error.getMessage();
-                if (errorMessage != null && errorMessage.contains("API hatası:")) {
-                    // API hatasını doğrudan ilet
-                    return Mono.just(ResponseEntity
-                        .status(HttpStatus.BAD_GATEWAY)
-                        .body(AIResponse.error(errorMessage)));
-                } else {
-                    // Genel hata mesajı
-                    return Mono.just(ResponseEntity
-                        .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(AIResponse.error("LLM servisinde bir hata oluştu: " + errorMessage)));
+            .map(response -> {
+                // Null kontrolü ve varsayılan değer atama
+                if (response == null) {
+                    response = AIResponse.builder()
+                        .response("Servis yanıtı alınamadı. Lütfen daha sonra tekrar deneyin.")
+                        .requestId(request.getRequestId())
+                        .success(false)
+                        .build();
                 }
+                
+                return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(response);
+            })
+            .doOnError(error -> log.error("Chat completion error: {}", error.getMessage(), error))
+            .onErrorResume(error -> {
+                AIResponse errorResponse = AIResponse.builder()
+                    .response("İşlem sırasında bir hata oluştu: " + error.getMessage())
+                    .requestId(request.getRequestId())
+                    .success(false)
+                    .build();
+                
+                HttpStatus status = (error instanceof APIException) ? 
+                    HttpStatus.BAD_GATEWAY : HttpStatus.INTERNAL_SERVER_ERROR;
+                
+                return Mono.just(ResponseEntity
+                    .status(status)
+                    .body(errorResponse));
             });
     }
 
@@ -195,28 +212,55 @@ public class LLMController {
         request.setRequestType("ENHANCE");
         request.setLanguage(userLanguage);
         
+        // Prompt kontrolü
+        if (request.getPrompt() == null || request.getPrompt().trim().isEmpty()) {
+            AIResponse errorResponse = AIResponse.builder()
+                .response("İyileştirilecek bir prompt göndermelisiniz.")
+                .success(false)
+                .build();
+            
+            return Mono.just(ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(errorResponse));
+        }
+        
         return llmService.enhancePrompt(request)
-            .doOnSuccess(response -> log.debug("Prompt enhancement success"))
-            .map(response -> ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(response))
-            .doOnError(error -> {
-                log.error("Prompt enhancement error: {}", error.getMessage(), error);
-                if (error.getCause() != null) {
-                    log.error("Root cause: {}", error.getCause().getMessage());
+            .doOnSuccess(response -> {
+                if (response == null) {
+                    log.warn("Prompt enhancement returned null response");
+                } else {
+                    log.debug("Prompt enhancement success with response length: {}", 
+                        response.getResponse() != null ? response.getResponse().length() : 0);
                 }
             })
-            .onErrorResume(error -> {
-                String errorMessage = error.getMessage();
-                if (errorMessage != null && errorMessage.contains("API hatası:")) {
-                    return Mono.just(ResponseEntity
-                        .status(HttpStatus.BAD_GATEWAY)
-                        .body(AIResponse.error("Prompt iyileştirilemedi: " + errorMessage)));
-                } else {
-                    return Mono.just(ResponseEntity
-                        .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(AIResponse.error("Prompt iyileştirilemedi: " + errorMessage)));
+            .map(response -> {
+                // Null kontrolü ve varsayılan değer atama
+                if (response == null) {
+                    response = AIResponse.builder()
+                        .response("Prompt iyileştirme yanıtı alınamadı. Lütfen daha sonra tekrar deneyin.")
+                        .requestId(request.getRequestId())
+                        .success(false)
+                        .build();
                 }
+                
+                return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(response);
+            })
+            .doOnError(error -> log.error("Prompt enhancement error: {}", error.getMessage(), error))
+            .onErrorResume(error -> {
+                AIResponse errorResponse = AIResponse.builder()
+                    .response("Prompt iyileştirme sırasında bir hata oluştu: " + error.getMessage())
+                    .requestId(request.getRequestId())
+                    .success(false)
+                    .build();
+                
+                HttpStatus status = (error instanceof APIException) ? 
+                    HttpStatus.BAD_GATEWAY : HttpStatus.INTERNAL_SERVER_ERROR;
+                
+                return Mono.just(ResponseEntity
+                    .status(status)
+                    .body(errorResponse));
             });
     }
 }

@@ -64,20 +64,35 @@ public class LLMService {
     private static final int DEFAULT_TOKEN_LIMIT = 4000;
 
     public Mono<AIResponse> processChatCompletion(AIRequest request) {
-        return callOpenRouter("/chat/completions", request)
-            .doOnNext(response -> log.debug("OpenRouter yanıtı: {}", response))
-            .map(response -> {
-                try {
-                    return mapToAIResponse(response, request);
-                } catch (Exception e) {
-                    log.error("AI yanıtı işlenirken hata: {}", e.getMessage(), e);
-                    throw new RuntimeException("AI yanıtı haritalanırken hata: " + e.getMessage(), e);
-                }
+        // Request validasyonu
+        if (request.getRequestId() == null) {
+            request.setRequestId(UUID.randomUUID().toString());
+        }
+        
+        Map<String, Object> requestBody = createRequestBody(request);
+        log.debug("Chat tamamlama isteği gönderiliyor: {}", requestBody);
+        
+        return openRouterWebClient.post()
+            .uri("/chat/completions")
+            .bodyValue(requestBody)
+            .headers(headers -> {
+                headers.setContentType(MediaType.APPLICATION_JSON);
+                headers.set("Accept", "application/json");
             })
+            .retrieve()
+            .onStatus(HttpStatusCode::is4xxClientError, response -> 
+                response.bodyToMono(String.class)
+                    .flatMap(error -> Mono.error(new APIException("Client error: " + error))))
+            .onStatus(HttpStatusCode::is5xxServerError, response -> 
+                response.bodyToMono(String.class)
+                    .flatMap(error -> Mono.error(new APIException("Server error: " + error))))
+            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+            .doOnNext(response -> log.debug("OpenRouter yanıtı alındı: {}", response))
+            .map(response -> mapToAIResponse(response, request))
             .timeout(Duration.ofSeconds(60))
             .doOnError(e -> log.error("Chat completion error: {}", e.getMessage(), e))
             .onErrorResume(e -> {
-                log.error("Hata yakalandı ve işlendi: {}", e.getMessage());
+                log.error("Hata yakalandı: {}", e.getMessage());
                 return Mono.just(AIResponse.error("AI servisi hatası: " + e.getMessage()));
             });
     }
@@ -436,32 +451,60 @@ public class LLMService {
         if (request.getTemperature() == null) {
             request.setTemperature(0.3); // Daha kararlı sonuçlar için düşük sıcaklık
         }
+        
         // Token limitini ayarla
         if (request.getMaxTokens() == null) {
-            request.setMaxTokens(32000); // Prompt iyileştirme için daha küçük token limiti yeterli
+            request.setMaxTokens(2000); // Prompt iyileştirme için daha küçük token limiti yeterli
         }
-        request.setLanguage("tr"); // Varsayılan dil İngilizce
+        
+        if (request.getRequestId() == null) {
+            request.setRequestId(UUID.randomUUID().toString());
+        }
+        
         // Sistem promptunu hazırla
         String systemPrompt = getPromptEnhancementSystemPrompt(request.getLanguage());
+        
         // Mesajları oluştur
         List<Map<String, Object>> messages = new ArrayList<>();
+        
         // Sistem mesajını ekle
         Map<String, Object> systemMessage = new HashMap<>();
         systemMessage.put("role", "system");
         systemMessage.put("content", systemPrompt);
         messages.add(systemMessage);
+        
         // Kullanıcı mesajını ekle
         Map<String, Object> userMessage = new HashMap<>();
         userMessage.put("role", "user");
         userMessage.put("content", request.getPrompt());
         messages.add(userMessage);
+        
         // İstek özelliklerini ayarla
         request.setMessages(messages);
-        request.setModel("google/gemini-2.0-flash-lite-001"); 
-        // Chat completion API'sini kullanarak istek gönder
-        return callOpenRouter("/chat/completions", request)
+        request.setModel("google/gemini-pro"); // Daha hızlı ve güncel model kullanımı
+        
+        // API isteği body'sini hazırla
+        Map<String, Object> requestBody = createRequestBody(request);
+        log.debug("Prompt iyileştirme isteği: {}", requestBody);
+        
+        return openRouterWebClient.post()
+            .uri("/chat/completions")
+            .bodyValue(requestBody)
+            .headers(headers -> {
+                headers.setContentType(MediaType.APPLICATION_JSON);
+                headers.set("Accept", "application/json");
+            })
+            .retrieve()
+            .onStatus(HttpStatusCode::is4xxClientError, response -> 
+                response.bodyToMono(String.class)
+                    .flatMap(error -> Mono.error(new APIException("Client error: " + error))))
+            .onStatus(HttpStatusCode::is5xxServerError, response -> 
+                response.bodyToMono(String.class)
+                    .flatMap(error -> Mono.error(new APIException("Server error: " + error))))
+            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+            .doOnNext(response -> log.debug("Prompt iyileştirme yanıtı alındı: {}", response))
             .map(response -> {
-                // Sadece enhance-prompt için model ve token bilgilerini çıkararak özel yanıt oluştur
+                // Yanıt metnini çıkar
                 String responseText = extractResponseText(response);
                 return AIResponse.builder()
                     .response(responseText)
@@ -713,106 +756,51 @@ public class LLMService {
     }
 
     private String extractResponseText(Map<String, Object> response) {
+        if (response == null) {
+            log.warn("extractResponseText: Yanıt null");
+            return null;
+        }
+        
+        log.debug("extractResponseText işleniyor: {}", response);
+        
         try {
-            log.debug("Yanıt içeriği: {}", response);
-            // API hata mesajlarını kontrol et
-            if (response.containsKey("error")) {
-                Object errorObj = response.get("error");
-                if (errorObj instanceof String) {
-                    throw new RuntimeException("API hatası: " + errorObj);
-                } else if (errorObj instanceof Map) {
-                    Map<String, Object> errorMap = (Map<String, Object>) errorObj;
-                    String errorMessage = errorMap.containsKey("message") 
-                        ? errorMap.get("message").toString() 
-                        : "Bilinmeyen API hatası";
-                    throw new RuntimeException("API hatası: " + errorMessage);
-                }
-                throw new RuntimeException("API hatası: " + errorObj);
-            }
-            // Daha ayrıntılı debugging ekleyelim
-            log.debug("Response keys: {}", response.keySet());
-            if (response.containsKey("choices")) {
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
-                log.debug("Choices size: {}", choices.size());
-                if (!choices.isEmpty()) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> choice = choices.get(0);
-                    log.debug("Choice keys: {}", choice.keySet());
-                    // Choice içinde message veya text olabilir
-                    if (choice.containsKey("message")) {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> message = (Map<String, Object>) choice.get("message");
-                        log.debug("Message keys: {}", message.keySet());
+            // choices[0].message.content alanını kontrol et
+            if (response.containsKey("choices") && response.get("choices") instanceof List) {
+                List<?> choices = (List<?>) response.get("choices");
+                if (!choices.isEmpty() && choices.get(0) instanceof Map) {
+                    Map<?, ?> choice = (Map<?, ?>) choices.get(0);
+                    if (choice.containsKey("message") && choice.get("message") instanceof Map) {
+                        Map<?, ?> message = (Map<?, ?>) choice.get("message");
                         if (message.containsKey("content")) {
-                            Object content = message.get("content");
-                            log.debug("Content type: {}", content != null ? content.getClass().getName() : "null");
-                            if (content instanceof String) {
-                                return (String) content;
-                            } else if (content instanceof List) {
-                                @SuppressWarnings("unchecked")
-                                List<Map<String, Object>> contents = (List<Map<String, Object>>) content;
-                                return contents.stream()
-                                    .filter(item -> "text".equals(item.get("type")))
-                                    .map(item -> (String) item.get("text"))
-                                    .findFirst()
-                                    .orElse("");
-                            }
+                            String content = String.valueOf(message.get("content"));
+                            log.debug("Content bulundu: {}", content.length() > 100 ? content.substring(0, 100) + "..." : content);
+                            return content;
                         }
                     }
-                    // GPT türü modeller için text alanını kontrol et
-                    else if (choice.containsKey("text")) {
-                        return (String) choice.get("text");
-                    }
-                    // Ayrıca delta içinde de olabilir (özellikle stream yanıtlarında)
-                    else if (choice.containsKey("delta")) {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> delta = (Map<String, Object>) choice.get("delta");
-                        if (delta.containsKey("content")) {
-                            return (String) delta.get("content");
-                        }
+                    
+                    // Alternatif: doğrudan "text" alanı var mı kontrol et
+                    if (choice.containsKey("text")) {
+                        String text = String.valueOf(choice.get("text"));
+                        log.debug("Text bulundu: {}", text.length() > 100 ? text.substring(0, 100) + "..." : text);
+                        return text;
                     }
                 }
             }
-            // Farklı yanıt formatlarını işle
-            if (response.containsKey("output") && response.get("output") instanceof String) {
-                return (String) response.get("output");
+            
+            // En üst seviyede content var mı kontrol et
+            if (response.containsKey("content")) {
+                String content = String.valueOf(response.get("content"));
+                log.debug("Üst seviye content bulundu: {}", content.length() > 100 ? content.substring(0, 100) + "..." : content);
+                return content;
             }
-            if (response.containsKey("completion") && response.get("completion") instanceof String) {
-                return (String) response.get("completion");
-            }
-            if (response.containsKey("generated_text") && response.get("generated_text") instanceof String) {
-                return (String) response.get("generated_text");
-            }
-            // Eğer response'un kendisi String ise direkt döndür (bazı LLM API'leri için)
-            if (response.size() == 1 && response.values().iterator().next() instanceof String) {
-                return (String) response.values().iterator().next();
-            }
-            // Hata durumunda anlamlı bir hata mesajı oluştur
-            StringBuilder detailBuilder = new StringBuilder("API yanıt anahtarları: ");
-            for (String key : response.keySet()) {
-                Object value = response.get(key);
-                detailBuilder.append(key).append("=");
-                if (value == null) {
-                    detailBuilder.append("null");
-                } else if (value instanceof String) {
-                    String strVal = (String)value;
-                    detailBuilder.append(strVal.length() > 50 ? strVal.substring(0, 50) + "..." : strVal);
-                } else {
-                    detailBuilder.append(value.getClass().getSimpleName());
-                }
-                detailBuilder.append(", ");
-            }
-            // Yanıt formatını JSON olarak logla
-            try {
-                log.error("Bilinmeyen yanıt formatı: {}", new ObjectMapper().writeValueAsString(response));
-            } catch (Exception e) {
-                log.error("Yanıt JSON dönüştürme hatası", e);
-            }
-            throw new RuntimeException("Geçersiz API yanıt formatı: " + detailBuilder.toString());
+            
+            // Yanıtı okunamadığında JSON'ı string olarak döndür (tanılama için)
+            log.warn("Yanıttan mesaj içeriği çıkarılamadı, yanıt yapısı: {}", response.keySet());
+            return "Yanıt içeriği okunamadı. Teknik detay: " + response.keySet();
+            
         } catch (Exception e) {
-            log.error("Yanıt işlenirken hata oluştu: {}", e.getMessage(), e);
-            throw new RuntimeException("AI yanıtı işlenemedi: " + e.getMessage(), e);
+            log.error("Yanıt metni çıkarılırken hata: {}", e.getMessage(), e);
+            return "Yanıt işlenemedi: " + e.getMessage();
         }
     }
 
