@@ -190,10 +190,90 @@ public class LLMService {
                         }
                         
                         try {
-                            // Try to parse JSON data
+                            // Try to parse first level JSON
                             JsonNode parsed = objectMapper.readTree(data);
-                            log.debug("Parsed JSON data: {}", parsed);
+                            log.debug("Parsed first level JSON data: {}", parsed);
                             
+                            // Check for nested content format 
+                            if (parsed.has("content") && parsed.get("content").isTextual()) {
+                                String nestedContent = parsed.get("content").asText();
+                                
+                                // If content looks like another JSON string, try to parse it
+                                if (nestedContent.startsWith("{") && nestedContent.endsWith("}")) {
+                                    try {
+                                        JsonNode nestedJson = objectMapper.readTree(nestedContent);
+                                        log.debug("Parsed nested JSON content: {}", nestedJson);
+                                        
+                                        // Process nested JSON (OpenRouter specific format)
+                                        // Format: {"id":"...","choices":[{"index":0,"delta":{"content":"..."}}]}
+                                        if (nestedJson.has("choices") && nestedJson.get("choices").isArray()) {
+                                            JsonNode choices = nestedJson.get("choices");
+                                            if (choices.size() > 0) {
+                                                JsonNode choice = choices.get(0);
+                                                
+                                                // Check for delta format
+                                                if (choice.has("delta") && choice.get("delta").has("content")) {
+                                                    String content = choice.get("delta").get("content").asText();
+                                                    log.debug("Extracted content from nested delta: {}", content);
+                                                    sink.next(StreamResponse.builder()
+                                                        .content(content)
+                                                        .done(false)
+                                                        .build());
+                                                    return;
+                                                }
+                                                
+                                                // Check for text format 
+                                                if (choice.has("text")) {
+                                                    String content = choice.get("text").asText();
+                                                    log.debug("Extracted content from nested text: {}", content);
+                                                    sink.next(StreamResponse.builder()
+                                                        .content(content)
+                                                        .done(false)
+                                                        .build());
+                                                    return;
+                                                }
+                                                
+                                                // Check for message.content format
+                                                if (choice.has("message") && choice.get("message").has("content")) {
+                                                    String content = choice.get("message").get("content").asText();
+                                                    log.debug("Extracted content from nested message: {}", content);
+                                                    sink.next(StreamResponse.builder()
+                                                        .content(content)
+                                                        .done(false)
+                                                        .build());
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                        
+                                        // If couldn't extract from standard paths, send the content as is
+                                        if (!nestedContent.isEmpty()) {
+                                            sink.next(StreamResponse.builder()
+                                                .content(nestedContent)
+                                                .done(false)
+                                                .build());
+                                            return;
+                                        }
+                                    } catch (Exception e) {
+                                        log.debug("Nested content is not valid JSON, using as raw text: {}", nestedContent);
+                                        sink.next(StreamResponse.builder()
+                                            .content(nestedContent)
+                                            .done(false)
+                                            .build());
+                                        return;
+                                    }
+                                } else {
+                                    // Content is not nested JSON, use it directly
+                                    log.debug("Using direct content (not nested JSON): {}", nestedContent);
+                                    sink.next(StreamResponse.builder()
+                                        .content(nestedContent)
+                                        .done(false)
+                                        .build());
+                                    return;
+                                }
+                            }
+                            
+                            // Continue with existing format handling if no nested content found
                             // Handle different streaming formats that OpenRouter might use
                             
                             // Format 1: OpenAI-style with choices[0].delta.content

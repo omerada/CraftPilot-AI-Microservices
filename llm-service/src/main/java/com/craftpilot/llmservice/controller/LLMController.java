@@ -122,11 +122,12 @@ public class LLMController {
                         chunk.isPing() ? "ping" : (chunk.isError() ? "error" : "content"),
                         chunk.isDone(),
                         chunk.getContent() != null ? 
-                            (chunk.getContent().length() > 50 ? chunk.getContent().substring(0, 50) + "..." : chunk.getContent())
+                            (chunk.getContent().length() > 100 ? chunk.getContent().substring(0, 100) + "..." : chunk.getContent())
                             : "<null>");
                     
                     // Only forward non-ping chunks to the client (pings are for internal connection health)
                     if (!chunk.isPing()) {
+                        // İçerikte JSON veriyorsa güzelce formatla
                         sink.next(ServerSentEvent.<StreamResponse>builder()
                             .id(trackingId)
                             .event(chunk.isError() ? "error" : "message")
