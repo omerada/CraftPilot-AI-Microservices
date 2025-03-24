@@ -98,7 +98,7 @@ public class LLMService {
         Map<String, Object> requestBody = createRequestBody(request);
         requestBody.put("stream", true);
         
-        log.info("Starting streaming request for model: {}", request.getModel());
+        log.info("Starting streaming request for model: {}, requestBody: {}", request.getModel(), requestBody);
         
         // OpenRouter API zaman aşımı süresini artır
         Duration requestTimeout = Duration.ofSeconds(60);
@@ -168,11 +168,8 @@ public class LLMService {
                     sink.complete();
                 })
                 .subscribe(chunk -> {
-                    // Chunk işleme - ayrıntılı loglama
-                    if (log.isDebugEnabled()) {
-                        log.debug("Received chunk from OpenRouter: {}", 
-                            chunk != null ? (chunk.length() > 100 ? chunk.substring(0, 100) + "..." : chunk) : "null");
-                    }
+                    // Always log the raw chunk for debugging
+                    log.info("Raw OpenRouter chunk: {}", chunk);
                     
                     if (chunk == null || chunk.isEmpty()) {
                         log.debug("Empty chunk received, skipping");
@@ -193,39 +190,120 @@ public class LLMService {
                         }
                         
                         try {
+                            // Try to parse JSON data
                             JsonNode parsed = objectMapper.readTree(data);
+                            log.debug("Parsed JSON data: {}", parsed);
+                            
+                            // Handle different streaming formats that OpenRouter might use
+                            
+                            // Format 1: OpenAI-style with choices[0].delta.content
                             JsonNode choices = parsed.path("choices");
                             if (!choices.isEmpty() && choices.isArray()) {
                                 JsonNode choice = choices.get(0);
-                                JsonNode delta = choice.path("delta");
                                 
-                                if (delta.has("content")) {
+                                // Check for delta format (OpenAI streaming)
+                                JsonNode delta = choice.path("delta");
+                                if (!delta.isMissingNode() && delta.has("content")) {
                                     String content = delta.get("content").asText();
                                     if (content != null && !content.isEmpty()) {
-                                        log.debug("Extracted content: {}", content.length() > 20 ? content.substring(0, 20) + "..." : content);
+                                        log.debug("Extracted content from delta: {}", 
+                                            content.length() > 20 ? content.substring(0, 20) + "..." : content);
                                         sink.next(StreamResponse.builder()
                                             .content(content)
                                             .done(false)
                                             .build());
+                                        return;
                                     }
                                 }
-                            } else {
-                                log.debug("No choices or empty choices array in response");
+                                
+                                // Check for text format (some models)
+                                if (choice.has("text")) {
+                                    String content = choice.get("text").asText();
+                                    if (content != null && !content.isEmpty()) {
+                                        log.debug("Extracted content from text: {}", 
+                                            content.length() > 20 ? content.substring(0, 20) + "..." : content);
+                                        sink.next(StreamResponse.builder()
+                                            .content(content)
+                                            .done(false)
+                                            .build());
+                                        return;
+                                    }
+                                }
                             }
+                            
+                            // Format 2: Simple text output with "content" field directly
+                            if (parsed.has("content")) {
+                                String content = parsed.get("content").asText();
+                                if (content != null && !content.isEmpty()) {
+                                    log.debug("Extracted direct content: {}", 
+                                        content.length() > 20 ? content.substring(0, 20) + "..." : content);
+                                    sink.next(StreamResponse.builder()
+                                        .content(content)
+                                        .done(false)
+                                        .build());
+                                    return;
+                                }
+                            }
+                            
+                            // Format 3: Output in a different field
+                            String[] possibleContentFields = {"generated_text", "completion", "output", "message"};
+                            for (String field : possibleContentFields) {
+                                if (parsed.has(field)) {
+                                    String content;
+                                    JsonNode fieldNode = parsed.get(field);
+                                    if (fieldNode.isTextual()) {
+                                        content = fieldNode.asText();
+                                    } else if (fieldNode.isObject() && fieldNode.has("content")) {
+                                        content = fieldNode.get("content").asText();
+                                    } else {
+                                        continue;
+                                    }
+                                    
+                                    if (content != null && !content.isEmpty()) {
+                                        log.debug("Extracted content from '{}': {}", field,
+                                            content.length() > 20 ? content.substring(0, 20) + "..." : content);
+                                        sink.next(StreamResponse.builder()
+                                            .content(content)
+                                            .done(false)
+                                            .build());
+                                        return;
+                                    }
+                                }
+                            }
+                            
+                            // If we can't parse it in any expected format, log the structure
+                            log.warn("Cannot extract content from JSON structure: {}", data);
+                            
                         } catch (Exception e) {
+                            // If not valid JSON, check if it's plain text content
+                            if (!data.startsWith("{") && !data.startsWith("[")) {
+                                log.debug("Treating as plain text: {}", 
+                                    data.length() > 50 ? data.substring(0, 50) + "..." : data);
+                                sink.next(StreamResponse.builder()
+                                    .content(data)
+                                    .done(false)
+                                    .build());
+                                return;
+                            }
+                            
                             log.warn("Failed to parse chunk: {}", data, e);
                         }
                     } else if (chunk.startsWith(":")) {
                         // Yorum veya keep-alive, görmezden gel
                         log.debug("Comment line received: {}", chunk);
                     } else {
-                        // Bilinmeyen format, logla
-                        log.debug("Unknown format received: {}", chunk);
+                        // Non-SSE format, may be direct content
+                        log.debug("Non-SSE format received, treating as direct content: {}", 
+                            chunk.length() > 100 ? chunk.substring(0, 100) + "..." : chunk);
+                        sink.next(StreamResponse.builder()
+                            .content(chunk)
+                            .done(false)
+                            .build());
                     }
                 });
-        }, FluxSink.OverflowStrategy.BUFFER) // Taşma stratejisini belirt
+        }, FluxSink.OverflowStrategy.BUFFER)
         .doOnRequest(n -> log.debug("Requested {} items from stream", n))
-        .onBackpressureBuffer(256) // Backpressure stratejisi
+        .onBackpressureBuffer(256)
         .timeout(Duration.ofSeconds(90), timeoutFlux)
         .doOnTerminate(() -> log.info("Stream terminated"));
     }

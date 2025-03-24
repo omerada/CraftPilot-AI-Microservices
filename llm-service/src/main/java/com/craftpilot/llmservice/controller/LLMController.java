@@ -76,11 +76,16 @@ public class LLMController {
         // RequestID yoksa bir tane oluştur (loglamada null görmemek için)
         final String trackingId = requestId != null ? requestId : UUID.randomUUID().toString();
         
-        log.info("Stream chat completion request received with language: {}, requestId: {}", 
-                userLanguage, trackingId);
+        log.info("Stream chat completion request received with language: {}, requestId: {}, model: {}", 
+                userLanguage, trackingId, request.getModel());
         
         request.setRequestType("CHAT");
         request.setLanguage(userLanguage);
+        
+        // Ensure requestId is set for tracking
+        if (request.getRequestId() == null) {
+            request.setRequestId(trackingId);
+        }
         
         // Response header'larını ayarla - bu header'lar bağlantının kesilmemesi için kritik
         exchange.getResponse().getHeaders().setContentType(MediaType.TEXT_EVENT_STREAM);
@@ -93,11 +98,6 @@ public class LLMController {
             log.debug("Response commit starting for request: {}", trackingId);
             return Mono.empty();
         });
-        
-        // Erken client bağlantı kopması tespiti - kullanıcı tarayıcı sayfasını kapatırsa vs.
-        Mono<Void> cancelSignal = Mono.fromRunnable(() -> {})
-                .doOnCancel(() -> log.info("Client cancelled the stream for request: {}", trackingId))
-                .then();
         
         // Client'a yanıt göndermeye başlayalım
         return Flux.<ServerSentEvent<StreamResponse>>create(sink -> {
@@ -117,18 +117,22 @@ public class LLMController {
             // LLM servisi ile gerçek akışı başlat
             llmService.streamChatCompletion(request)
                 .doOnNext(chunk -> {
-                    if (log.isDebugEnabled()) {
-                        log.debug("Sending chunk: {}", 
-                            chunk.getContent() != null && chunk.getContent().length() > 50 
-                                ? chunk.getContent().substring(0, 50) + "..." 
-                                : chunk.getContent());
-                    }
+                    // Log every chunk to track what we're getting from the service
+                    log.debug("Stream chunk received from service: type={}, done={}, content={}",
+                        chunk.isPing() ? "ping" : (chunk.isError() ? "error" : "content"),
+                        chunk.isDone(),
+                        chunk.getContent() != null ? 
+                            (chunk.getContent().length() > 50 ? chunk.getContent().substring(0, 50) + "..." : chunk.getContent())
+                            : "<null>");
                     
-                    sink.next(ServerSentEvent.<StreamResponse>builder()
-                        .id(trackingId)
-                        .event("message")
-                        .data(chunk)
-                        .build());
+                    // Only forward non-ping chunks to the client (pings are for internal connection health)
+                    if (!chunk.isPing()) {
+                        sink.next(ServerSentEvent.<StreamResponse>builder()
+                            .id(trackingId)
+                            .event(chunk.isError() ? "error" : "message")
+                            .data(chunk)
+                            .build());
+                    }
                 })
                 .doOnComplete(() -> {
                     log.info("LLM stream completed for request: {}", trackingId);
@@ -142,6 +146,7 @@ public class LLMController {
                         .data(StreamResponse.builder()
                             .content("Hata: " + error.getMessage())
                             .done(true)
+                            .error(true)
                             .build())
                         .build());
                     sink.complete();
