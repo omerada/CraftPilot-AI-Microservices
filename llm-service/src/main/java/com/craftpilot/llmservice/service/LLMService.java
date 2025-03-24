@@ -115,10 +115,7 @@ public class LLMService {
         List<StreamResponse> timeoutList = Collections.singletonList(timeoutResponse);
         Flux<StreamResponse> timeoutFlux = Flux.fromIterable(timeoutList);
         
-        // OpenRouter'dan gelen JSON parçalarını birleştirmek için
-        StringBuilder jsonBuffer = new StringBuilder();
-        
-        // Explicit generic type parameter to inform Java compiler about the type we're creating
+        // Her gelen parçayı anında işle, parçaları biriktirme
         return Flux.<StreamResponse>create(sink -> {
             log.debug("Creating stream flux for model: {}", request.getModel());
             
@@ -149,18 +146,6 @@ public class LLMService {
                 .doOnComplete(() -> {
                     log.info("OpenRouter stream completed successfully");
                     keepAliveTicker.dispose();
-                    
-                    // Eğer biriken JSON varsa, son bir işleme deneyin
-                    if (jsonBuffer.length() > 0) {
-                        try {
-                            String finalJson = jsonBuffer.toString();
-                            extractAndSendContent(finalJson, sink);
-                            jsonBuffer.setLength(0);
-                        } catch (Exception e) {
-                            log.warn("Could not process final buffer: {}", e.getMessage());
-                        }
-                    }
-                    
                     sink.next(StreamResponse.builder()
                         .content("")
                         .done(true)
@@ -204,63 +189,102 @@ public class LLMService {
                             return;
                         }
 
-                        // Chunk'ın içeriğini JSON buffer'a ekle
                         try {
-                            // Önce "content" içindeki JSON string'i çıkarmaya çalış
-                            JsonNode outerNode = objectMapper.readTree(data);
-                            if (outerNode.has("content")) {
-                                // Dış JSON'dan content string'ini çıkar
-                                String content = outerNode.get("content").asText();
+                            // Parse dış JSON yapısını
+                            JsonNode outerJson = null;
+                            try {
+                                outerJson = objectMapper.readTree(data);
+                            } catch (Exception e) {
+                                log.debug("Cannot parse outer JSON: {}", e.getMessage());
+                            }
+                            
+                            // Dış JSON uygun formatta mı kontrol et
+                            if (outerJson != null && outerJson.has("content")) {
+                                String innerContent = outerJson.get("content").asText();
                                 
-                                // Content boş değilse işle
-                                if (content != null && !content.isEmpty()) {
-                                    // Buffer'a ekle
-                                    jsonBuffer.append(content);
-                                    
+                                // İç içe JSON formatı kontrolü
+                                if (innerContent.startsWith("{") && innerContent.contains("\"choices\"")) {
                                     try {
-                                        // Tam bir JSON oluştu mu deneyin
-                                        extractAndSendContent(jsonBuffer.toString(), sink);
-                                        // Başarılı ise buffer'ı temizle
-                                        jsonBuffer.setLength(0);
+                                        // İç JSON'ı parse et
+                                        JsonNode innerJson = objectMapper.readTree(innerContent);
+                                        
+                                        // İçeriği çıkar ve hemen gönder
+                                        String extractedContent = extractContentFromOpenRouterJson(innerJson);
+                                        if (extractedContent != null && !extractedContent.isEmpty()) {
+                                            log.debug("Extracted immediate content: {}", extractedContent);
+                                            sink.next(StreamResponse.builder()
+                                                .content(extractedContent)
+                                                .done(false)
+                                                .build());
+                                            return;
+                                        }
                                     } catch (Exception e) {
-                                        // JSON eksik olabilir, buffer'a eklemeye devam
-                                        log.debug("Current buffer is incomplete JSON, continuing collection...");
+                                        // Eksik JSON, content'i olduğu gibi gönder
+                                        if (innerContent.contains("\"delta\":{\"content\":\"")) {
+                                            // Delta içeriğini düzenli ifadeyle çıkar
+                                            String content = extractContentWithRegex(innerContent);
+                                            if (content != null && !content.isEmpty()) {
+                                                log.debug("Extracted content with regex: {}", content);
+                                                sink.next(StreamResponse.builder()
+                                                    .content(content)
+                                                    .done(false)
+                                                    .build());
+                                                return;
+                                            }
+                                        }
+                                        
+                                        // Doğrudan dış içeriği gönder
+                                        log.debug("Sending outer content directly: {}", innerContent);
+                                        sink.next(StreamResponse.builder()
+                                            .content(innerContent)
+                                            .done(false)
+                                            .build());
+                                    }
+                                } else {
+                                    // İç içe JSON formatında değil, doğrudan içeriği gönder
+                                    if (!innerContent.isEmpty()) {
+                                        log.debug("Sending direct inner content: {}", innerContent);
+                                        sink.next(StreamResponse.builder()
+                                            .content(innerContent)
+                                            .done(false)
+                                            .build());
                                     }
                                 }
                             } else {
-                                // Content yoksa diğer formatlara bak
-                                checkAndSendStandardFormats(outerNode, sink);
+                                // Standart formatlara bak ve içeriği çıkar
+                                String extractedContent = extractContentFromJson(data);
+                                if (extractedContent != null && !extractedContent.isEmpty()) {
+                                    log.debug("Extracted standard content: {}", extractedContent);
+                                    sink.next(StreamResponse.builder()
+                                        .content(extractedContent)
+                                        .done(false)
+                                        .build());
+                                } else {
+                                    log.debug("Could not extract content, sending raw data");
+                                    sink.next(StreamResponse.builder()
+                                        .content(data)
+                                        .done(false)
+                                        .build());
+                                }
                             }
                         } catch (Exception e) {
-                            log.debug("Failed to parse JSON, collecting as raw: {}", e.getMessage());
-                            
-                            // JSON parsing hatası, belki de parçalı JSON
-                            jsonBuffer.append(data);
-                            
-                            try {
-                                // Tamam mı kontrol et
-                                extractAndSendContent(jsonBuffer.toString(), sink);
-                                jsonBuffer.setLength(0); // Başarılıysa temizle
-                            } catch (Exception e2) {
-                                // Hala eksik
-                                log.debug("Buffer still incomplete");
-                            }
+                            log.warn("Error processing chunk, sending raw: {}", e.getMessage());
+                            // Hata durumunda bile içeriği göndererek kesintisiz akış sağla
+                            sink.next(StreamResponse.builder()
+                                .content(data)
+                                .done(false)
+                                .build());
                         }
                     } else if (chunk.startsWith(":")) {
-                        // Yorum veya keep-alive, görmezden gel
+                        // Yorum satırları, işlem yok
                         log.debug("Comment line received: {}", chunk);
                     } else {
-                        // Non-SSE format, may be direct content
-                        jsonBuffer.append(chunk);
-                        
-                        try {
-                            // Topladığımız verileri işlemeyi dene
-                            String bufferContent = jsonBuffer.toString();
-                            extractAndSendContent(bufferContent, sink);
-                            jsonBuffer.setLength(0);
-                        } catch (Exception e) {
-                            log.debug("Buffer not yet complete: {}", e.getMessage());
-                        }
+                        // SSE formatında olmayan içerik, doğrudan gönder
+                        log.debug("Non-SSE content received, sending directly");
+                        sink.next(StreamResponse.builder()
+                            .content(chunk)
+                            .done(false)
+                            .build());
                     }
                 });
         }, FluxSink.OverflowStrategy.BUFFER)
@@ -271,105 +295,96 @@ public class LLMService {
     }
     
     /**
-     * JSON verisinden içerik çıkarıp sink'e gönderir
+     * OpenRouter JSON'dan içerik çıkarır
      */
-    private void extractAndSendContent(String jsonText, FluxSink<StreamResponse> sink) throws Exception {
-        // JSON'ı parse et
-        JsonNode jsonNode = objectMapper.readTree(jsonText);
-        
-        // İçeriği çıkar ve gönder
-        checkAndSendStandardFormats(jsonNode, sink);
-    }
-    
-    /**
-     * Standart OpenAI ve diğer formatları kontrol edip içeriği çıkarır
-     */
-    private void checkAndSendStandardFormats(JsonNode jsonNode, FluxSink<StreamResponse> sink) {
-        boolean contentSent = false;
-
-        // OpenAI format: choices[0].delta.content
-        if (jsonNode.has("choices") && jsonNode.get("choices").isArray()) {
-            JsonNode choices = jsonNode.get("choices");
+    private String extractContentFromOpenRouterJson(JsonNode json) {
+        if (json.has("choices") && json.get("choices").isArray()) {
+            JsonNode choices = json.get("choices");
             if (choices.size() > 0) {
                 JsonNode choice = choices.get(0);
                 
-                // Delta format
+                // Delta içeriği (OpenAI formatı)
                 if (choice.has("delta") && choice.get("delta").has("content")) {
-                    String content = choice.get("delta").get("content").asText();
-                    if (content != null && !content.isEmpty()) {
-                        log.debug("Extracted delta.content: {}", 
-                            content.length() > 30 ? content.substring(0, 30) + "..." : content);
-                        sink.next(StreamResponse.builder()
-                            .content(content)
-                            .done(false)
-                            .build());
-                        contentSent = true;
-                    }
+                    return choice.get("delta").get("content").asText();
                 }
                 
-                // Text format
-                if (!contentSent && choice.has("text")) {
-                    String content = choice.get("text").asText();
-                    if (content != null && !content.isEmpty()) {
-                        log.debug("Extracted text: {}", content);
-                        sink.next(StreamResponse.builder()
-                            .content(content)
-                            .done(false)
-                            .build());
-                        contentSent = true;
-                    }
+                // Text içeriği
+                if (choice.has("text")) {
+                    return choice.get("text").asText();
                 }
                 
-                // Message format
-                if (!contentSent && choice.has("message") && choice.get("message").has("content")) {
-                    String content = choice.get("message").get("content").asText();
-                    if (content != null && !content.isEmpty()) {
-                        log.debug("Extracted message.content: {}", content);
-                        sink.next(StreamResponse.builder()
-                            .content(content)
-                            .done(false)
-                            .build());
-                        contentSent = true;
-                    }
+                // Message içeriği
+                if (choice.has("message") && choice.get("message").has("content")) {
+                    return choice.get("message").get("content").asText();
                 }
             }
         }
-        
-        // Diğer formatlar
-        if (!contentSent) {
-            // Direct content field
-            if (jsonNode.has("content") && jsonNode.get("content").isTextual()) {
-                String content = jsonNode.get("content").asText();
-                if (content != null && !content.isEmpty()) {
-                    if (content.startsWith("{") && content.endsWith("}")) {
-                        // Bu durumda content alanı başka bir JSON - bunu parse etmeye çalışalım
-                        try {
-                            JsonNode innerNode = objectMapper.readTree(content);
-                            // İç JSON'ı da kontrol et
-                            checkAndSendStandardFormats(innerNode, sink);
-                            contentSent = true;
-                        } catch (Exception e) {
-                            log.debug("Could not parse inner content as JSON, sending as text");
-                        }
+        return null;
+    }
+    
+    /**
+     * Düzenli ifade kullanarak eksik JSON'dan içerik çıkarır
+     */
+    private String extractContentWithRegex(String jsonText) {
+        try {
+            // Delta içeriği düzenli ifadeyle çıkar
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\"delta\":\\s*\\{\"content\":\\s*\"([^\"]*)\"");
+            java.util.regex.Matcher matcher = pattern.matcher(jsonText);
+            if (matcher.find()) {
+                String content = matcher.group(1);
+                // Kaçış karakterlerini düzelt
+                return content.replace("\\n", "\n").replace("\\\"", "\"").replace("\\\\", "\\");
+            }
+        } catch (Exception e) {
+            log.debug("Regex extraction failed: {}", e.getMessage());
+        }
+        return null;
+    }
+    
+    /**
+     * Standart JSON formatlarından içerik çıkarır
+     */
+    private String extractContentFromJson(String jsonText) {
+        try {
+            JsonNode json = objectMapper.readTree(jsonText);
+            
+            // Standart formatlar
+            if (json.has("choices") && json.get("choices").isArray()) {
+                JsonNode choices = json.get("choices");
+                if (choices.size() > 0) {
+                    JsonNode choice = choices.get(0);
+                    
+                    // Delta formatı
+                    if (choice.has("delta") && choice.get("delta").has("content")) {
+                        return choice.get("delta").get("content").asText();
                     }
                     
-                    if (!contentSent) {
-                        log.debug("Using direct content: {}", 
-                            content.length() > 30 ? content.substring(0, 30) + "..." : content);
-                        sink.next(StreamResponse.builder()
-                            .content(content)
-                            .done(false)
-                            .build());
-                        contentSent = true;
+                    // Text formatı
+                    if (choice.has("text")) {
+                        return choice.get("text").asText();
                     }
                 }
             }
             
-            // Hiçbir şekilde içerik çıkaramadıysak...
-            if (!contentSent) {
-                log.warn("Could not extract content from JSON: {}", jsonNode);
+            // Diğer formatlar
+            if (json.has("content") && json.get("content").isTextual()) {
+                return json.get("content").asText();
             }
+            
+            if (json.has("message") && json.get("message").has("content")) {
+                return json.get("message").get("content").asText();
+            }
+            
+            String[] possibleFields = {"text", "generated_text", "completion", "output"};
+            for (String field : possibleFields) {
+                if (json.has(field)) {
+                    return json.get(field).asText();
+                }
+            }
+        } catch (Exception e) {
+            log.debug("JSON extraction failed: {}", e.getMessage());
         }
+        return null;
     }
 
     // HTML içeriğinden hata mesajını çıkaran yardımcı metod
