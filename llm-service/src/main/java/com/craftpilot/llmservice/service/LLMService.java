@@ -115,6 +115,9 @@ public class LLMService {
         List<StreamResponse> timeoutList = Collections.singletonList(timeoutResponse);
         Flux<StreamResponse> timeoutFlux = Flux.fromIterable(timeoutList);
         
+        // OpenRouter'dan gelen JSON parçalarını birleştirmek için
+        StringBuilder jsonBuffer = new StringBuilder();
+        
         // Explicit generic type parameter to inform Java compiler about the type we're creating
         return Flux.<StreamResponse>create(sink -> {
             log.debug("Creating stream flux for model: {}", request.getModel());
@@ -146,6 +149,18 @@ public class LLMService {
                 .doOnComplete(() -> {
                     log.info("OpenRouter stream completed successfully");
                     keepAliveTicker.dispose();
+                    
+                    // Eğer biriken JSON varsa, son bir işleme deneyin
+                    if (jsonBuffer.length() > 0) {
+                        try {
+                            String finalJson = jsonBuffer.toString();
+                            extractAndSendContent(finalJson, sink);
+                            jsonBuffer.setLength(0);
+                        } catch (Exception e) {
+                            log.warn("Could not process final buffer: {}", e.getMessage());
+                        }
+                    }
+                    
                     sink.next(StreamResponse.builder()
                         .content("")
                         .done(true)
@@ -188,197 +203,64 @@ public class LLMService {
                                 .build());
                             return;
                         }
-                        
+
+                        // Chunk'ın içeriğini JSON buffer'a ekle
                         try {
-                            // Try to parse first level JSON
-                            JsonNode parsed = objectMapper.readTree(data);
-                            log.debug("Parsed first level JSON data: {}", parsed);
-                            
-                            // Check for nested content format 
-                            if (parsed.has("content") && parsed.get("content").isTextual()) {
-                                String nestedContent = parsed.get("content").asText();
+                            // Önce "content" içindeki JSON string'i çıkarmaya çalış
+                            JsonNode outerNode = objectMapper.readTree(data);
+                            if (outerNode.has("content")) {
+                                // Dış JSON'dan content string'ini çıkar
+                                String content = outerNode.get("content").asText();
                                 
-                                // If content looks like another JSON string, try to parse it
-                                if (nestedContent.startsWith("{") && nestedContent.endsWith("}")) {
-                                    try {
-                                        JsonNode nestedJson = objectMapper.readTree(nestedContent);
-                                        log.debug("Parsed nested JSON content: {}", nestedJson);
-                                        
-                                        // Process nested JSON (OpenRouter specific format)
-                                        // Format: {"id":"...","choices":[{"index":0,"delta":{"content":"..."}}]}
-                                        if (nestedJson.has("choices") && nestedJson.get("choices").isArray()) {
-                                            JsonNode choices = nestedJson.get("choices");
-                                            if (choices.size() > 0) {
-                                                JsonNode choice = choices.get(0);
-                                                
-                                                // Check for delta format
-                                                if (choice.has("delta") && choice.get("delta").has("content")) {
-                                                    String content = choice.get("delta").get("content").asText();
-                                                    log.debug("Extracted content from nested delta: {}", content);
-                                                    sink.next(StreamResponse.builder()
-                                                        .content(content)
-                                                        .done(false)
-                                                        .build());
-                                                    return;
-                                                }
-                                                
-                                                // Check for text format 
-                                                if (choice.has("text")) {
-                                                    String content = choice.get("text").asText();
-                                                    log.debug("Extracted content from nested text: {}", content);
-                                                    sink.next(StreamResponse.builder()
-                                                        .content(content)
-                                                        .done(false)
-                                                        .build());
-                                                    return;
-                                                }
-                                                
-                                                // Check for message.content format
-                                                if (choice.has("message") && choice.get("message").has("content")) {
-                                                    String content = choice.get("message").get("content").asText();
-                                                    log.debug("Extracted content from nested message: {}", content);
-                                                    sink.next(StreamResponse.builder()
-                                                        .content(content)
-                                                        .done(false)
-                                                        .build());
-                                                    return;
-                                                }
-                                            }
-                                        }
-                                        
-                                        // If couldn't extract from standard paths, send the content as is
-                                        if (!nestedContent.isEmpty()) {
-                                            sink.next(StreamResponse.builder()
-                                                .content(nestedContent)
-                                                .done(false)
-                                                .build());
-                                            return;
-                                        }
-                                    } catch (Exception e) {
-                                        log.debug("Nested content is not valid JSON, using as raw text: {}", nestedContent);
-                                        sink.next(StreamResponse.builder()
-                                            .content(nestedContent)
-                                            .done(false)
-                                            .build());
-                                        return;
-                                    }
-                                } else {
-                                    // Content is not nested JSON, use it directly
-                                    log.debug("Using direct content (not nested JSON): {}", nestedContent);
-                                    sink.next(StreamResponse.builder()
-                                        .content(nestedContent)
-                                        .done(false)
-                                        .build());
-                                    return;
-                                }
-                            }
-                            
-                            // Continue with existing format handling if no nested content found
-                            // Handle different streaming formats that OpenRouter might use
-                            
-                            // Format 1: OpenAI-style with choices[0].delta.content
-                            JsonNode choices = parsed.path("choices");
-                            if (!choices.isEmpty() && choices.isArray()) {
-                                JsonNode choice = choices.get(0);
-                                
-                                // Check for delta format (OpenAI streaming)
-                                JsonNode delta = choice.path("delta");
-                                if (!delta.isMissingNode() && delta.has("content")) {
-                                    String content = delta.get("content").asText();
-                                    if (content != null && !content.isEmpty()) {
-                                        log.debug("Extracted content from delta: {}", 
-                                            content.length() > 20 ? content.substring(0, 20) + "..." : content);
-                                        sink.next(StreamResponse.builder()
-                                            .content(content)
-                                            .done(false)
-                                            .build());
-                                        return;
-                                    }
-                                }
-                                
-                                // Check for text format (some models)
-                                if (choice.has("text")) {
-                                    String content = choice.get("text").asText();
-                                    if (content != null && !content.isEmpty()) {
-                                        log.debug("Extracted content from text: {}", 
-                                            content.length() > 20 ? content.substring(0, 20) + "..." : content);
-                                        sink.next(StreamResponse.builder()
-                                            .content(content)
-                                            .done(false)
-                                            .build());
-                                        return;
-                                    }
-                                }
-                            }
-                            
-                            // Format 2: Simple text output with "content" field directly
-                            if (parsed.has("content")) {
-                                String content = parsed.get("content").asText();
+                                // Content boş değilse işle
                                 if (content != null && !content.isEmpty()) {
-                                    log.debug("Extracted direct content: {}", 
-                                        content.length() > 20 ? content.substring(0, 20) + "..." : content);
-                                    sink.next(StreamResponse.builder()
-                                        .content(content)
-                                        .done(false)
-                                        .build());
-                                    return;
-                                }
-                            }
-                            
-                            // Format 3: Output in a different field
-                            String[] possibleContentFields = {"generated_text", "completion", "output", "message"};
-                            for (String field : possibleContentFields) {
-                                if (parsed.has(field)) {
-                                    String content;
-                                    JsonNode fieldNode = parsed.get(field);
-                                    if (fieldNode.isTextual()) {
-                                        content = fieldNode.asText();
-                                    } else if (fieldNode.isObject() && fieldNode.has("content")) {
-                                        content = fieldNode.get("content").asText();
-                                    } else {
-                                        continue;
-                                    }
+                                    // Buffer'a ekle
+                                    jsonBuffer.append(content);
                                     
-                                    if (content != null && !content.isEmpty()) {
-                                        log.debug("Extracted content from '{}': {}", field,
-                                            content.length() > 20 ? content.substring(0, 20) + "..." : content);
-                                        sink.next(StreamResponse.builder()
-                                            .content(content)
-                                            .done(false)
-                                            .build());
-                                        return;
+                                    try {
+                                        // Tam bir JSON oluştu mu deneyin
+                                        extractAndSendContent(jsonBuffer.toString(), sink);
+                                        // Başarılı ise buffer'ı temizle
+                                        jsonBuffer.setLength(0);
+                                    } catch (Exception e) {
+                                        // JSON eksik olabilir, buffer'a eklemeye devam
+                                        log.debug("Current buffer is incomplete JSON, continuing collection...");
                                     }
                                 }
+                            } else {
+                                // Content yoksa diğer formatlara bak
+                                checkAndSendStandardFormats(outerNode, sink);
                             }
-                            
-                            // If we can't parse it in any expected format, log the structure
-                            log.warn("Cannot extract content from JSON structure: {}", data);
-                            
                         } catch (Exception e) {
-                            // If not valid JSON, check if it's plain text content
-                            if (!data.startsWith("{") && !data.startsWith("[")) {
-                                log.debug("Treating as plain text: {}", 
-                                    data.length() > 50 ? data.substring(0, 50) + "..." : data);
-                                sink.next(StreamResponse.builder()
-                                    .content(data)
-                                    .done(false)
-                                    .build());
-                                return;
-                            }
+                            log.debug("Failed to parse JSON, collecting as raw: {}", e.getMessage());
                             
-                            log.warn("Failed to parse chunk: {}", data, e);
+                            // JSON parsing hatası, belki de parçalı JSON
+                            jsonBuffer.append(data);
+                            
+                            try {
+                                // Tamam mı kontrol et
+                                extractAndSendContent(jsonBuffer.toString(), sink);
+                                jsonBuffer.setLength(0); // Başarılıysa temizle
+                            } catch (Exception e2) {
+                                // Hala eksik
+                                log.debug("Buffer still incomplete");
+                            }
                         }
                     } else if (chunk.startsWith(":")) {
                         // Yorum veya keep-alive, görmezden gel
                         log.debug("Comment line received: {}", chunk);
                     } else {
                         // Non-SSE format, may be direct content
-                        log.debug("Non-SSE format received, treating as direct content: {}", 
-                            chunk.length() > 100 ? chunk.substring(0, 100) + "..." : chunk);
-                        sink.next(StreamResponse.builder()
-                            .content(chunk)
-                            .done(false)
-                            .build());
+                        jsonBuffer.append(chunk);
+                        
+                        try {
+                            // Topladığımız verileri işlemeyi dene
+                            String bufferContent = jsonBuffer.toString();
+                            extractAndSendContent(bufferContent, sink);
+                            jsonBuffer.setLength(0);
+                        } catch (Exception e) {
+                            log.debug("Buffer not yet complete: {}", e.getMessage());
+                        }
                     }
                 });
         }, FluxSink.OverflowStrategy.BUFFER)
@@ -388,6 +270,108 @@ public class LLMService {
         .doOnTerminate(() -> log.info("Stream terminated"));
     }
     
+    /**
+     * JSON verisinden içerik çıkarıp sink'e gönderir
+     */
+    private void extractAndSendContent(String jsonText, FluxSink<StreamResponse> sink) throws Exception {
+        // JSON'ı parse et
+        JsonNode jsonNode = objectMapper.readTree(jsonText);
+        
+        // İçeriği çıkar ve gönder
+        checkAndSendStandardFormats(jsonNode, sink);
+    }
+    
+    /**
+     * Standart OpenAI ve diğer formatları kontrol edip içeriği çıkarır
+     */
+    private void checkAndSendStandardFormats(JsonNode jsonNode, FluxSink<StreamResponse> sink) {
+        boolean contentSent = false;
+
+        // OpenAI format: choices[0].delta.content
+        if (jsonNode.has("choices") && jsonNode.get("choices").isArray()) {
+            JsonNode choices = jsonNode.get("choices");
+            if (choices.size() > 0) {
+                JsonNode choice = choices.get(0);
+                
+                // Delta format
+                if (choice.has("delta") && choice.get("delta").has("content")) {
+                    String content = choice.get("delta").get("content").asText();
+                    if (content != null && !content.isEmpty()) {
+                        log.debug("Extracted delta.content: {}", 
+                            content.length() > 30 ? content.substring(0, 30) + "..." : content);
+                        sink.next(StreamResponse.builder()
+                            .content(content)
+                            .done(false)
+                            .build());
+                        contentSent = true;
+                    }
+                }
+                
+                // Text format
+                if (!contentSent && choice.has("text")) {
+                    String content = choice.get("text").asText();
+                    if (content != null && !content.isEmpty()) {
+                        log.debug("Extracted text: {}", content);
+                        sink.next(StreamResponse.builder()
+                            .content(content)
+                            .done(false)
+                            .build());
+                        contentSent = true;
+                    }
+                }
+                
+                // Message format
+                if (!contentSent && choice.has("message") && choice.get("message").has("content")) {
+                    String content = choice.get("message").get("content").asText();
+                    if (content != null && !content.isEmpty()) {
+                        log.debug("Extracted message.content: {}", content);
+                        sink.next(StreamResponse.builder()
+                            .content(content)
+                            .done(false)
+                            .build());
+                        contentSent = true;
+                    }
+                }
+            }
+        }
+        
+        // Diğer formatlar
+        if (!contentSent) {
+            // Direct content field
+            if (jsonNode.has("content") && jsonNode.get("content").isTextual()) {
+                String content = jsonNode.get("content").asText();
+                if (content != null && !content.isEmpty()) {
+                    if (content.startsWith("{") && content.endsWith("}")) {
+                        // Bu durumda content alanı başka bir JSON - bunu parse etmeye çalışalım
+                        try {
+                            JsonNode innerNode = objectMapper.readTree(content);
+                            // İç JSON'ı da kontrol et
+                            checkAndSendStandardFormats(innerNode, sink);
+                            contentSent = true;
+                        } catch (Exception e) {
+                            log.debug("Could not parse inner content as JSON, sending as text");
+                        }
+                    }
+                    
+                    if (!contentSent) {
+                        log.debug("Using direct content: {}", 
+                            content.length() > 30 ? content.substring(0, 30) + "..." : content);
+                        sink.next(StreamResponse.builder()
+                            .content(content)
+                            .done(false)
+                            .build());
+                        contentSent = true;
+                    }
+                }
+            }
+            
+            // Hiçbir şekilde içerik çıkaramadıysak...
+            if (!contentSent) {
+                log.warn("Could not extract content from JSON: {}", jsonNode);
+            }
+        }
+    }
+
     // HTML içeriğinden hata mesajını çıkaran yardımcı metod
     private String extractErrorFromHtml(String htmlContent) {
         if (htmlContent == null || htmlContent.isEmpty()) {
