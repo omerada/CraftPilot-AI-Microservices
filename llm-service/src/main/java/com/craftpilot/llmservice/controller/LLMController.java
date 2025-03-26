@@ -189,13 +189,16 @@ public class LLMController {
                         
                         // Tamamlanma sinyali geldiğinde son bir kontrol
                         if (chunk.isDone()) {
+                            String finalContent = contentBuffer.toString();
+                            
                             // Eğer sorunlu tablo algılandıysa düzeltme için yeni istek gönder
-                            if (tableDetected[0] && tableIssueDetected[0]) {
-                                String originalContent = contentBuffer.toString();
+                            if (tableDetected[0] && (tableIssueDetected[0] || isIncompleteTable(finalContent))) {
+                                log.info("Incomplete or broken table detected in response. Sending correction request.");
+                                String originalContent = finalContent;
                                 
                                 // Düzeltme için yeni istek oluştur
                                 StreamResponse fixRequest = StreamResponse.builder()
-                                    .content("\n\n_Not: Tablo formatı sorunlu görünüyor. Düzeltilmiş bir tablo formatı gönderiliyor..._")
+                                    .content("\n\n_Not: Tablo yapısı tamamlanmadı. Düzeltilmiş bir tablo formatı oluşturuluyor..._")
                                     .done(false)
                                     .error(false)
                                     .build();
@@ -301,6 +304,69 @@ public class LLMController {
     }
 
     /**
+     * Eksik tablo yapısını tespit eder
+     * @param content İncelenecek içerik
+     * @return Tablo eksikse true, değilse false
+     */
+    private boolean isIncompleteTable(String content) {
+        // İçerik boşsa veya tablo işaretleri yoksa
+        if (content == null || content.isEmpty() || !content.contains("|")) {
+            return false;
+        }
+        
+        // Satırları ayır
+        String[] lines = content.split("\n");
+        
+        // Minimum tablo yapısı kontrolü: En az bir başlık satırı, bir ayırıcı satır, bir veri satırı olmalı
+        if (lines.length < 3) {
+            return true;
+        }
+        
+        // Tablo başlığı bulundu mu?
+        boolean hasTableHeader = false;
+        // Düzgün hücre sayısı
+        int expectedColumnCount = 0;
+        
+        for (String line : lines) {
+            line = line.trim();
+            if (line.isEmpty()) continue;
+            
+            if (line.contains("|")) {
+                // İlk başlık satırı bulunduğunda beklenen sütun sayısını al
+                if (!hasTableHeader) {
+                    hasTableHeader = true;
+                    // Sütun sayısını belirle (| karakterleri arasındaki hücre sayısı)
+                    expectedColumnCount = line.split("\\|").length - 1;
+                    if (expectedColumnCount <= 1) {
+                        // Tek sütunlu tablo olmaz, bu bir hata durumu
+                        return true;
+                    }
+                    continue;
+                }
+                
+                // Diğer satırlar için sütun sayısını kontrol et
+                int columnCount = line.split("\\|").length - 1;
+                if (columnCount != expectedColumnCount) {
+                    // Sütun sayıları uyuşmuyorsa, bu bir hata durumu
+                    return true;
+                }
+            }
+        }
+        
+        // Gelen içerik "| Özellik | Java | C |" gibi bir şekilde bitmiş, ama içerik yok
+        boolean hasMinimalContent = false;
+        for (String line : lines) {
+            // Sütun başlıklarından sonra en az bir içerik satırı var mı?
+            if (line.trim().startsWith("| ") && !line.contains("Özellik") && !line.contains("----")) {
+                hasMinimalContent = true;
+                break;
+            }
+        }
+        
+        return !hasMinimalContent;
+    }
+
+    /**
      * Sorunlu tablo formatını düzeltmek için yeni bir istek oluşturur
      * @param originalRequest Orijinal istek
      * @param originalContent Orijinal yanıt içeriği
@@ -313,15 +379,30 @@ public class LLMController {
         fixRequest.setRequestId(trackingId + "-fix");
         fixRequest.setRequestType("CHAT");
         fixRequest.setLanguage(originalRequest.getLanguage());
-        fixRequest.setModel("google/gemini-2.0-flash-001"); // Daha yeni model kullan
+        fixRequest.setModel("google/gemini-2.0-flash-001"); // Daha güçlü bir model kullan
+        
+        // İçeriği analiz et
+        String promptPrefix = "Oluşturulması gereken tablo eksik veya hatalı. ";
+        
+        // Eğer içerik bir tablo başlığı içeriyorsa, bu bilgiyi kullan
+        if (originalContent.contains("| Özellik") && originalContent.contains("| Java") && originalContent.contains("| C")) {
+            promptPrefix += "Lütfen Java ve C programlama dilleri arasındaki temel farkları karşılaştıran tam ve düzgün bir tablo oluştur. ";
+        } else {
+            // Orijinal isteği analiz et
+            promptPrefix += "Lütfen istenilen konuda tam ve düzgün bir tablo oluştur. ";
+        }
         
         // Tablo düzeltme prompt'u oluştur
-        String fixPrompt = "Aşağıdaki içerikteki tabloyu markdown formatında, daha sade ve okunabilir bir şekilde yeniden düzenle. " +
-            "Tüm içeriği aynen koruyarak sadece tablo formatını düzelt. Tablo hücrelerindeki içerikler çok uzun olmamalı ve düzgün görüntülenmelidir:\n\n" + 
-            originalContent;
+        String fixPrompt = promptPrefix + 
+            "Tablo markdown formatında olmalı, başlık satırı, ayırıcı satır ve içerik satırları eksiksiz olmalı. " +
+            "Tablonun sütun sayısı tutarlı olmalı ve tüm hücreler doldurulmalı. " +
+            "Orijinal istek: \"" + originalRequest.getPrompt() + "\".\n\n" +
+            "Şimdiye kadar oluşturulan içerik: \"" + originalContent + "\"\n\n" +
+            "Lütfen bu içeriği tamamlayarak doğru ve eksiksiz bir tablo oluştur.";
         
         fixRequest.setPrompt(fixPrompt);
-        fixRequest.setTemperature(0.2); // Float (0.2f) yerine Double (0.2) kullan
+        fixRequest.setTemperature(0.2); // Düşük sıcaklık değeri ile daha tutarlı çıktı
+        fixRequest.setMaxTokens(2000); // Yeterli yanıt uzunluğu için
         
         log.info("Sending table format fix request with ID: {}", fixRequest.getRequestId());
         
@@ -331,7 +412,7 @@ public class LLMController {
             .map(chunk -> {
                 String content = chunk.getContent();
                 
-                // Eğer uzun hücreler hala varsa temizle
+                // Eğer uzun hücreler varsa temizle
                 if (content.contains("|")) {
                     content = optimizeTableContent(content);
                 }
