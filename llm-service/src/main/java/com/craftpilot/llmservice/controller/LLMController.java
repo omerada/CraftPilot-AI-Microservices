@@ -20,10 +20,6 @@ import reactor.core.scheduler.Schedulers;
 
 import jakarta.validation.Valid;
 import java.util.UUID;
-import java.util.Map;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.HashMap;
 
 @Slf4j
 @RestController
@@ -99,8 +95,6 @@ public class LLMController {
         
         log.info("Stream chat completion request received with language: {}, requestId: {}, model: {}", 
                 userLanguage, trackingId, request.getModel());
-        
-        // Removed the call to addTableHandlingSystemMessage as requested
         
         request.setRequestType("CHAT");
         request.setLanguage(userLanguage);
@@ -182,7 +176,7 @@ public class LLMController {
         .doOnComplete(() -> log.info("Stream response completed for request: {}", trackingId))
         .doOnError(error -> log.error("Stream response error: {}", error.getMessage(), error));
     }
-    
+
     @PostMapping(value = "/images/generate", 
                 produces = MediaType.APPLICATION_JSON_VALUE,
                 consumes = MediaType.APPLICATION_JSON_VALUE) 

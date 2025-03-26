@@ -35,8 +35,6 @@ import java.util.Objects;
 import java.util.Set;
 import com.craftpilot.llmservice.exception.ValidationException;
 
-import java.util.regex.Pattern;
-
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -65,21 +63,6 @@ public class LLMService {
     );
     // Varsayılan token limiti
     private static final int DEFAULT_TOKEN_LIMIT = 4000;
-
-    // Add these constants for table detection
-    private static final int MAX_CONSECUTIVE_WHITESPACE = 3; // Daha agresif whitespace filtreleme
-    private static final int MAX_CHUNK_SIZE = 1000; // Daha küçük chunk boyutu
-    private static final String TABLE_MARKER = "|";
-    private static final String TABLE_DELIMITER_MARKER = "|-";
-    private static final Pattern TABLE_ROW_PATTERN = Pattern.compile("\\|.+\\|");
-    private static final Pattern TABLE_HEADER_PATTERN = Pattern.compile("\\|[\\s-:]*\\|");
-    private static final boolean CONVERT_TABLES_TO_LISTS = true; // Tabloları liste formatına dönüştür
-
-    // Tablo işleme için ekstra değişkenler
-    private StringBuilder tableBuffer = new StringBuilder();
-    private boolean isBufferingTable = false;
-    private int tableRowCount = 0;
-    private static final int MIN_TABLE_ROWS_TO_BUFFER = 2; // En az bu kadar satır birikmeden gönderme
 
     public Mono<AIResponse> processChatCompletion(AIRequest request) {
         // Request validasyonu
@@ -151,11 +134,6 @@ public class LLMService {
         // OpenRouter'dan gelen JSON parçalarını birleştirmek için
         StringBuilder jsonBuffer = new StringBuilder();
         
-        // Tabloları yeniden başlatmak için
-        tableBuffer.setLength(0);
-        isBufferingTable = false;
-        tableRowCount = 0;
-        
         // Explicit generic type parameter to inform Java compiler about the type we're creating
         return Flux.<StreamResponse>create(sink -> {
             log.debug("Creating stream flux for model: {}", request.getModel());
@@ -198,9 +176,6 @@ public class LLMService {
                             log.warn("Could not process final buffer: {}", e.getMessage());
                         }
                     }
-                    
-                    // Biriken tablo içeriğini gönder
-                    flushTableBuffer(sink);
                     
                     sink.next(StreamResponse.builder()
                         .content("")
@@ -338,16 +313,12 @@ public class LLMService {
                 if (choice.has("delta") && choice.get("delta").has("content")) {
                     String content = choice.get("delta").get("content").asText();
                     if (content != null && !content.isEmpty()) {
-                        content = filterAndProcessContent(content, sink);
                         log.debug("Extracted delta.content: {}", 
                             content.length() > 30 ? content.substring(0, 30) + "..." : content);
-                        
-                        if (!content.isEmpty()) {
-                            sink.next(StreamResponse.builder()
-                                .content(content)
-                                .done(false)
-                                .build());
-                        }
+                        sink.next(StreamResponse.builder()
+                            .content(content)
+                            .done(false)
+                            .build());
                         contentSent = true;
                     }
                 }
@@ -356,15 +327,11 @@ public class LLMService {
                 if (!contentSent && choice.has("text")) {
                     String content = choice.get("text").asText();
                     if (content != null && !content.isEmpty()) {
-                        content = filterAndProcessContent(content, sink);
                         log.debug("Extracted text: {}", content);
-                        
-                        if (!content.isEmpty()) {
-                            sink.next(StreamResponse.builder()
-                                .content(content)
-                                .done(false)
-                                .build());
-                        }
+                        sink.next(StreamResponse.builder()
+                            .content(content)
+                            .done(false)
+                            .build());
                         contentSent = true;
                     }
                 }
@@ -373,15 +340,11 @@ public class LLMService {
                 if (!contentSent && choice.has("message") && choice.get("message").has("content")) {
                     String content = choice.get("message").get("content").asText();
                     if (content != null && !content.isEmpty()) {
-                        content = filterAndProcessContent(content, sink);
                         log.debug("Extracted message.content: {}", content);
-                        
-                        if (!content.isEmpty()) {
-                            sink.next(StreamResponse.builder()
-                                .content(content)
-                                .done(false)
-                                .build());
-                        }
+                        sink.next(StreamResponse.builder()
+                            .content(content)
+                            .done(false)
+                            .build());
                         contentSent = true;
                     }
                 }
@@ -394,8 +357,6 @@ public class LLMService {
             if (jsonNode.has("content") && jsonNode.get("content").isTextual()) {
                 String content = jsonNode.get("content").asText();
                 if (content != null && !content.isEmpty()) {
-                    content = filterAndProcessContent(content, sink);
-                    
                     if (content.startsWith("{") && content.endsWith("}")) {
                         // Bu durumda content alanı başka bir JSON - bunu parse etmeye çalışalım
                         try {
@@ -408,7 +369,7 @@ public class LLMService {
                         }
                     }
                     
-                    if (!contentSent && !content.isEmpty()) {
+                    if (!contentSent) {
                         log.debug("Using direct content: {}", 
                             content.length() > 30 ? content.substring(0, 30) + "..." : content);
                         sink.next(StreamResponse.builder()
@@ -423,202 +384,6 @@ public class LLMService {
             // Hiçbir şekilde içerik çıkaramadıysak...
             if (!contentSent) {
                 log.warn("Could not extract content from JSON: {}", jsonNode);
-            }
-        }
-    }
-    
-    /**
-     * İçeriği filtrele ve işle - tablo içeriği için özel işleme yapar
-     */
-    private String filterAndProcessContent(String content, FluxSink<StreamResponse> sink) {
-        if (content == null || content.isEmpty()) {
-            return content;
-        }
-        
-        // Aşırı boşlukları temizle - Gemini modelinin çıktılarında sorun yaratıyor
-        String filtered = content.replaceAll("\\s{" + MAX_CONSECUTIVE_WHITESPACE + ",}", " ");
-        
-        // Tablo işaretleri içeriyor mu kontrol et
-        boolean hasTableMarker = filtered.contains("|");
-        boolean mightBePartOfTable = hasTableMarker || 
-                                     filtered.trim().equals("**") || 
-                                     filtered.matches("\\s*\\w+\\s*") && isBufferingTable;
-        
-        // Tablo işleme modunda mıyız?
-        if (isBufferingTable) {
-            if (mightBePartOfTable) {
-                // Tablo içeriğine ekle
-                tableBuffer.append(filtered);
-                
-                // Satır tamamlandı mı kontrol et (satır sonu karakteri ile)
-                if (filtered.contains("\n")) {
-                    tableRowCount++;
-                }
-                
-                // Tablo yeterince birikti mi veya tamamlandı mı kontrol et
-                if (tableRowCount >= MIN_TABLE_ROWS_TO_BUFFER || filtered.endsWith("\n\n")) {
-                    // Tabloyu işle ve gönder
-                    String tableContent = processAndReformatTable(tableBuffer.toString());
-                    
-                    // Bufferi temizle ve tablo modu kapat (buffer'da kalabilecek veriler sonraki içeriklerde gönderilecek)
-                    tableBuffer.setLength(0);
-                    tableRowCount = 0;
-                    isBufferingTable = false;
-                    
-                    // İşlenmiş tabloyu döndür
-                    return tableContent;
-                }
-                
-                // Henüz tablo tamamlanmadı, boş dön (birikmeye devam)
-                return "";
-            } else {
-                // Tablo içeriği değil, bufferi işle ve gönder
-                String tableContent = "";
-                if (tableBuffer.length() > 0) {
-                    tableContent = processAndReformatTable(tableBuffer.toString());
-                    tableBuffer.setLength(0);
-                }
-                
-                // Tablo modunu kapat
-                tableRowCount = 0;
-                isBufferingTable = false;
-                
-                // İşlenmiş tabloyu ve mevcut içeriği birleştirerek döndür
-                return tableContent + filtered;
-            }
-        } else if (hasTableMarker || detectTableStart(filtered)) {
-            // Yeni bir tablo başlangıcı tespit edildi
-            isBufferingTable = true;
-            tableBuffer.append(filtered);
-            
-            // Satır tamamlandı mı kontrol et
-            if (filtered.contains("\n")) {
-                tableRowCount++;
-            }
-            
-            // İlk chunk'ta tabloyu tamamlayabilir miyiz?
-            if (tableRowCount >= MIN_TABLE_ROWS_TO_BUFFER || isCompleteTable(filtered)) {
-                // Tabloyu işle ve gönder
-                String tableContent = processAndReformatTable(tableBuffer.toString());
-                
-                // Bufferi temizle ve tablo modu kapat
-                tableBuffer.setLength(0);
-                tableRowCount = 0;
-                isBufferingTable = false;
-                
-                return tableContent;
-            }
-            
-            // Henüz tablo tamamlanmadı, boş dön (birikim için)
-            return "";
-        }
-        
-        // Normal içerik, olduğu gibi döndür
-        return filtered;
-    }
-    
-    /**
-     * Tablo başlangıcını tespit et
-     */
-    private boolean detectTableStart(String content) {
-        return content.contains("| Özellik") ||
-               content.contains("|Özellik") ||
-               content.startsWith("| ") && content.length() < 20 ||
-               content.equals("|") ||
-               content.matches("\\|\\s*\\w+.*");
-    }
-    
-    /**
-     * İçeriğin tam bir tablo olup olmadığını kontrol et
-     */
-    private boolean isCompleteTable(String content) {
-        // Satır sayısını kontrol et
-        int lineCount = content.split("\n").length;
-        
-        // En az 3 satır (başlık, ayraç, veri) ve sonunda boş satır varsa tam bir tablodur
-        return lineCount >= 3 && content.endsWith("\n\n");
-    }
-    
-    /**
-     * Tablo içeriğini işleyerek yeniden formatlar
-     */
-    private String processAndReformatTable(String tableContent) {
-        if (tableContent == null || tableContent.isEmpty()) {
-            return tableContent;
-        }
-        
-        try {
-            // Markdown biçimlendirme sorunlarını temizle
-            tableContent = tableContent.replace("**", "");
-            
-            // Satırları temizle ve normalize et
-            String[] lines = tableContent.split("\n");
-            StringBuilder result = new StringBuilder();
-            
-            for (int i = 0; i < lines.length; i++) {
-                String line = lines[i].trim();
-                
-                // Boş satırları atla
-                if (line.isEmpty()) {
-                    continue;
-                }
-                
-                // Tablo satırı değilse, olduğu gibi ekle
-                if (!line.contains("|")) {
-                    result.append(line).append("\n");
-                    continue;
-                }
-                
-                // Tablo hücrelerinin başında ve sonunda boşlukları normalize et
-                line = line.replaceAll("\\|\\s+", "| ").replaceAll("\\s+\\|", " |");
-                
-                // Eksik olan | karakterlerini tamamla (başta veya sonda yoksa)
-                if (!line.startsWith("|")) {
-                    line = "| " + line;
-                }
-                if (!line.endsWith("|")) {
-                    line = line + " |";
-                }
-                
-                // Yeniden formatlanmış satırı ekle
-                result.append(line).append("\n");
-                
-                // Başlık satırından sonra ayraç satırı oluştur (yoksa)
-                if (i == 0 && (lines.length < 2 || !lines[1].contains("|-"))) {
-                    int pipeCount = (int) line.chars().filter(c -> c == '|').count();
-                    StringBuilder separator = new StringBuilder("|");
-                    for (int j = 1; j < pipeCount; j++) {
-                        separator.append(" --- |");
-                    }
-                    result.append(separator).append("\n");
-                }
-            }
-            
-            return result.toString();
-        } catch (Exception e) {
-            log.warn("Tablo işlenirken hata: {}", e.getMessage());
-            // Hata durumunda orijinal içeriği döndür
-            return tableContent;
-        }
-    }
-
-    // Stream tamamlandığında biriken tablo içeriğini gönder
-    // Bu yöntemi streamChatCompletion metodunda doOnComplete içinde çağırın
-    private void flushTableBuffer(FluxSink<StreamResponse> sink) {
-        if (isBufferingTable && tableBuffer.length() > 0) {
-            String tableContent = processAndReformatTable(tableBuffer.toString());
-            
-            // Bufferı temizle
-            tableBuffer.setLength(0);
-            tableRowCount = 0;
-            isBufferingTable = false;
-            
-            // İçeriği gönder
-            if (!tableContent.isEmpty()) {
-                sink.next(StreamResponse.builder()
-                    .content(tableContent)
-                    .done(false)
-                    .build());
             }
         }
     }
