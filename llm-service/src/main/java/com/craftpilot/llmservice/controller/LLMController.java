@@ -150,12 +150,10 @@ public class LLMController {
                         // İçeriği optimize et
                         String optimizedContent = optimizeStreamContent(chunk.getContent());
                         
-                        // Tablolarla ilgili yanıtlarda buffer'a ekle ve gönder
+                        // İçeriği buffer'a ekle ve gönder
                         if (optimizedContent != null && !optimizedContent.isEmpty()) {
-                            // Buffer'da içeriği biriktir ve birleştir
-                            String mergedContent = mergeStreamContents(contentBuffer.toString(), optimizedContent);
-                            contentBuffer.setLength(0);
-                            contentBuffer.append(mergedContent);
+                            // Buffer'da içeriği biriktir
+                            contentBuffer.append(optimizedContent);
                             
                             // İçeriği güncelle ve gönder
                             StreamResponse optimizedChunk = StreamResponse.builder()
@@ -173,26 +171,6 @@ public class LLMController {
                         
                         // Tamamlanma sinyali geldiğinde son bir kontrol
                         if (chunk.isDone()) {
-                            // Eğer içerik tablo yapısı içeriyor ve yarım kalmış gibi görünüyorsa 
-                            // ek bilgi gönderelim
-                            if (contentBuffer.toString().contains("|") && 
-                                isTableIncomplete(contentBuffer.toString())) {
-                                log.info("Tablo yapısı tamamlanmadan yanıt sonlandı");
-                                
-                                // Tablo için bir kapanış notu gönder
-                                StreamResponse finalNote = StreamResponse.builder()
-                                    .content("\n\n_Not: Tablo yapısı tamamlanamadı, yanıt erken sonlandı._")
-                                    .done(false)
-                                    .error(false)
-                                    .build();
-                                
-                                sink.next(ServerSentEvent.<StreamResponse>builder()
-                                    .id(trackingId)
-                                    .event("message")
-                                    .data(finalNote)
-                                    .build());
-                            }
-                            
                             // Son olarak tamamlanma sinyalini gönder
                             sink.next(ServerSentEvent.<StreamResponse>builder()
                                 .id(trackingId)
@@ -252,102 +230,16 @@ public class LLMController {
     }
     
     /**
-     * Stream yanıtlarını birleştirerek tam tablo yapılarını tespit etmeye çalışan yardımcı metod
+     * Stream yanıtlarını birleştiren yardımcı metod
      * @param streamBuffer Şu ana kadar toplanan içerik
      * @param newContent Yeni gelen içerik
-     * @return Birleştirilmiş ve gerekirse düzeltilmiş içerik
+     * @return Birleştirilmiş içerik
      */
     private String mergeStreamContents(String streamBuffer, String newContent) {
         if (streamBuffer == null) streamBuffer = "";
         if (newContent == null) newContent = "";
         
-        // Tablo parçaları geliyorsa ve henüz tamamlanmamışsa işlemi geliştir
-        String merged = streamBuffer + newContent;
-        
-        // Tablo yapısı algılandı ancak sonlanma belirtileri mevcut değilse
-        // ve model yanıtı erkenden kesti ise, eksik tabloya bir sonlanma ekle
-        if (merged.contains("|") && merged.contains("\n") && merged.endsWith("\n")) {
-            // Son satır kontrolü
-            String[] lines = merged.split("\n");
-            String lastLine = lines.length > 0 ? lines[lines.length - 1] : "";
-            
-            // Son satır yarım kalmış bir tablo satırı ise düzelt
-            if (lastLine.contains("|") && lastLine.trim().endsWith("|")) {
-                log.info("Tablo yapısı tespit edildi ve son satır düzenleniyor: {}", lastLine);
-                return merged;
-            }
-        }
-        
-        return merged;
-    }
-
-    /**
-     * Bir tablonun tamamlanıp tamamlanmadığını kontrol eder
-     * @param content Kontrol edilecek içerik
-     * @return Tablo tamamlanmamışsa true, tamamlanmışsa false
-     */
-    private boolean isTableIncomplete(String content) {
-        // İçerik boşsa veya tablo değilse tamamlanmamış kabul etme
-        if (content == null || content.isEmpty() || !content.contains("|")) {
-            return false;
-        }
-        
-        // Satırlara ayır
-        String[] lines = content.split("\n");
-        if (lines.length < 3) {
-            // En az başlık satırı, ayırıcı satır ve bir veri satırı olmalı
-            return true;
-        }
-        
-        // İlk satırdaki sütun sayısını referans al
-        int firstRowColumns = countColumns(lines[0]);
-        
-        // Tablo satırlarını kontrol et
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i].trim();
-            
-            // Boş satırları atla
-            if (line.isEmpty()) continue;
-            
-            // Tablo satırı ise kontrol et
-            if (line.contains("|")) {
-                // Satırın sütun sayısı ilk satırdan farklıysa veya satır yarım kalmışsa
-                int columns = countColumns(line);
-                if (columns != firstRowColumns || line.endsWith("|")) {
-                    // Son satır "|" ile bitiyorsa ve öncekinden farklı sayıda sütun varsa
-                    // bu muhtemelen yarım kalmış bir satırdır
-                    if (i == lines.length - 1 && columns < firstRowColumns) {
-                        return true;
-                    }
-                }
-            }
-        }
-        
-        // Son satır düzgün bir tablo satırı değilse
-        String lastLine = lines[lines.length - 1].trim();
-        if (lastLine.isEmpty() || !lastLine.startsWith("|") || lastLine.endsWith("|")) {
-            return false; // Tablo muhtemelen tamamlanmış, son satır farklı içerik olabilir
-        }
-        
-        // Tüm kontroller geçildiyse tablo tamamlanmıştır
-        return false;
-    }
-
-    /**
-     * Bir tablo satırındaki sütun sayısını hesaplar
-     * @param line Tablo satırı
-     * @return Sütun sayısı
-     */
-    private int countColumns(String line) {
-        if (line == null || !line.contains("|")) {
-            return 0;
-        }
-        // "|" karakterlerini sayarak sütun sayısını hesapla (ilk ve son | karakterleri hariç)
-        int count = 0;
-        for (char c : line.toCharArray()) {
-            if (c == '|') count++;
-        }
-        return Math.max(0, count - 1); // İlk ve son | için düzeltme
+        return streamBuffer + newContent;
     }
 
     @PostMapping(value = "/images/generate", 

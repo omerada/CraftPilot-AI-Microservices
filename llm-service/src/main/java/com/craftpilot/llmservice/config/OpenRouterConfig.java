@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
 public class OpenRouterConfig {
     private String apiKey;
     private String baseUrl = "https://openrouter.ai/api/v1";
-    private String defaultModel = "google/gemini-2.0-flash-lite-preview-02-05:free";
+    private String defaultModel = "google/gemini-2.0-flash-lite-001";
     private Integer maxTokens = 2000;
     private Double temperature = 0.7;
     private Integer retryAttempts = 3;

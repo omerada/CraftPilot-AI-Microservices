@@ -112,7 +112,7 @@ openrouter:
   api:
     key: ${OPENROUTER_API_KEY}
     url: https://openrouter.ai/api/v1
-    defaultModel: google/gemini-2.0-flash-lite-preview-02-05:free
+    defaultModel: google/gemini-2.0-flash-lite-001
     maxTokens: 2000
     temperature: 0.7
     retryAttempts: 3
