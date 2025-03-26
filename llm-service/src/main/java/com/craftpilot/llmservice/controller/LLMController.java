@@ -20,6 +20,7 @@ import reactor.core.scheduler.Schedulers;
 
 import jakarta.validation.Valid;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Slf4j
 @RestController
@@ -28,6 +29,10 @@ import java.util.UUID;
 public class LLMController {
     
     private final LLMService llmService;
+    // Aşırı uzun boşluk dizilerini tespit etmek için pattern
+    private static final Pattern EXCESSIVE_WHITESPACE = Pattern.compile("\\s{100,}");
+    // Maksimum izin verilen boşluk sayısı
+    private static final int MAX_WHITESPACE = 1;
 
     @PostMapping(value = "/chat/completions", 
                 produces = MediaType.APPLICATION_JSON_VALUE,
@@ -96,6 +101,13 @@ public class LLMController {
         log.info("Stream chat completion request received with language: {}, requestId: {}, model: {}", 
                 userLanguage, trackingId, request.getModel());
         
+        // Tablo yanıtı olabilecek özel anahtar kelimeleri tespit et
+        boolean potentialTableResponse = request.getPrompt() != null && 
+            (request.getPrompt().contains("tablo") || 
+             request.getPrompt().contains("table") || 
+             request.getPrompt().contains("karşılaştır") ||
+             request.getPrompt().contains("compare"));
+        
         request.setRequestType("CHAT");
         request.setLanguage(userLanguage);
         
@@ -118,12 +130,6 @@ public class LLMController {
         
         // Client'a yanıt göndermeye başlayalım
         return Flux.<ServerSentEvent<StreamResponse>>create(sink -> {
-            // İşlem takibi için içerik biriktirme buffer'ı
-            final StringBuilder contentBuffer = new StringBuilder();
-            // Tablo algılama için flag
-            final boolean[] tableDetected = {false};
-            final boolean[] tableIssueDetected = {false};
-            
             // İlk olarak boş bir yorum gönder - bağlantıyı başlatmak için
             sink.next(ServerSentEvent.<StreamResponse>builder()
                 .comment("OPENROUTER PROCESSING")
@@ -150,95 +156,35 @@ public class LLMController {
                     
                     // Only forward non-ping chunks to the client (pings are for internal connection health)
                     if (!chunk.isPing()) {
-                        // İçeriği optimize et
-                        String optimizedContent = optimizeStreamContent(chunk.getContent());
-                        
-                        // Tablo yapısını algıla
-                        if (optimizedContent != null && optimizedContent.contains("|")) {
-                            tableDetected[0] = true;
+                        // İçeriği temizle - Özellikle tablo yanıtı olabilecek durumlarda
+                        if (chunk.getContent() != null && !chunk.isDone()) {
+                            String cleanedContent = chunk.getContent();
                             
-                            // Sorunlu tablo algılama (çok uzun hücre içeren tablolar)
-                            if (optimizedContent.contains("|") && optimizedContent.length() > 500 && 
-                                optimizedContent.split("\\|").length > 2) {
-                                int cellLength = optimizedContent.split("\\|")[1].trim().length();
-                                if (cellLength > 300) {
-                                    tableIssueDetected[0] = true;
-                                    log.warn("Potentially broken table format detected: cell length = {}", cellLength);
+                            // Aşırı uzun boşluk dizilerini temizle
+                            if (cleanedContent.contains("    ") || cleanedContent.contains("\n\n\n")) {
+                                cleanedContent = EXCESSIVE_WHITESPACE.matcher(cleanedContent)
+                                    .replaceAll(" ".repeat(MAX_WHITESPACE));
+                                
+                                // Tablo yapısını kontrol et ve düzelt
+                                if (potentialTableResponse && cleanedContent.contains("|")) {
+                                    // Tablo formatını düzeltmeye çalış
+                                    cleanedContent = cleanTableFormat(cleanedContent);
                                 }
-                            }
-                        }
-                        
-                        // İçeriği buffer'a ekle ve gönder
-                        if (optimizedContent != null && !optimizedContent.isEmpty()) {
-                            // Buffer'da içeriği biriktir
-                            contentBuffer.append(optimizedContent);
-                            
-                            // İçeriği güncelle ve gönder
-                            StreamResponse optimizedChunk = StreamResponse.builder()
-                                .content(optimizedContent)
-                                .done(chunk.isDone())
-                                .error(chunk.isError())
-                                .build();
-                            
-                            sink.next(ServerSentEvent.<StreamResponse>builder()
-                                .id(trackingId)
-                                .event(chunk.isError() ? "error" : "message")
-                                .data(optimizedChunk)
-                                .build());
-                        }
-                        
-                        // Tamamlanma sinyali geldiğinde son bir kontrol
-                        if (chunk.isDone()) {
-                            String finalContent = contentBuffer.toString();
-                            
-                            // Eğer sorunlu tablo algılandıysa düzeltme için yeni istek gönder
-                            if (tableDetected[0] && (tableIssueDetected[0] || isIncompleteTable(finalContent))) {
-                                log.info("Incomplete or broken table detected in response. Sending correction request.");
-                                String originalContent = finalContent;
                                 
-                                // Düzeltme için yeni istek oluştur
-                                StreamResponse fixRequest = StreamResponse.builder()
-                                    .content("\n\n_Not: Tablo yapısı tamamlanmadı. Düzeltilmiş bir tablo formatı oluşturuluyor..._")
-                                    .done(false)
-                                    .error(false)
+                                chunk = StreamResponse.builder()
+                                    .content(cleanedContent)
+                                    .done(chunk.isDone())
+                                    .error(chunk.isError())
                                     .build();
-                                
-                                sink.next(ServerSentEvent.<StreamResponse>builder()
-                                    .id(trackingId)
-                                    .event("message")
-                                    .data(fixRequest)
-                                    .build());
-                                
-                                // Yeni bir istek oluştur ve düzeltilmiş tablo için gönder
-                                fixTableFormat(request, originalContent, trackingId)
-                                    .doOnNext(fixedChunk -> {
-                                        sink.next(ServerSentEvent.<StreamResponse>builder()
-                                            .id(trackingId)
-                                            .event("message")
-                                            .data(fixedChunk)
-                                            .build());
-                                    })
-                                    .doOnComplete(() -> {
-                                        // Son olarak düzeltilmiş yanıtın tamamlandığını bildir
-                                        sink.next(ServerSentEvent.<StreamResponse>builder()
-                                            .id(trackingId)
-                                            .event("message")
-                                            .data(StreamResponse.builder()
-                                                .content("")
-                                                .done(true)
-                                                .build())
-                                            .build());
-                                    })
-                                    .subscribe();
-                            } else {
-                                // Son olarak tamamlanma sinyalini gönder
-                                sink.next(ServerSentEvent.<StreamResponse>builder()
-                                    .id(trackingId)
-                                    .event(chunk.isError() ? "error" : "message")
-                                    .data(chunk)
-                                    .build());
                             }
                         }
+                        
+                        // İçerikte JSON veriyorsa güzelce formatla
+                        sink.next(ServerSentEvent.<StreamResponse>builder()
+                            .id(trackingId)
+                            .event(chunk.isError() ? "error" : "message")
+                            .data(chunk)
+                            .build());
                     }
                 })
                 .doOnComplete(() -> {
@@ -267,200 +213,26 @@ public class LLMController {
     }
     
     /**
-     * Tablo veya büyük metin içeren içeriği algılayan ve optimize eden yardımcı metod
-     * @param content Optimize edilecek içerik
-     * @return Optimize edilmiş içerik
+     * Tablo formatını düzeltmeye yardımcı olacak yardımcı metod
+     * @param content Düzeltilecek içerik
+     * @return Düzeltilmiş tablo içeriği
      */
-    private String optimizeStreamContent(String content) {
-        if (content == null || content.isEmpty()) {
-            return content;
-        }
-        
-        // Tablo satırı gibi çok fazla boşluk içeren satırları optimize et
-        if (content.contains("|") && content.length() > 200) {
-            // Çok fazla ardışık boşluk karakterini temizle (20'den fazla boşluğu 1 boşluğa indirgeme)
-            return content.replaceAll(" {20,}", " ");
-        }
-        
-        // Çok uzun boş satırları temizle (tamamen boşluk karakterlerinden oluşan satırlar)
-        if (content.trim().isEmpty() && content.length() > 100) {
-            return "";
-        }
-        
-        return content;
-    }
-    
-    /**
-     * Stream yanıtlarını birleştiren yardımcı metod
-     * @param streamBuffer Şu ana kadar toplanan içerik
-     * @param newContent Yeni gelen içerik
-     * @return Birleştirilmiş içerik
-     */
-    private String mergeStreamContents(String streamBuffer, String newContent) {
-        if (streamBuffer == null) streamBuffer = "";
-        if (newContent == null) newContent = "";
-        
-        return streamBuffer + newContent;
-    }
-
-    /**
-     * Eksik tablo yapısını tespit eder
-     * @param content İncelenecek içerik
-     * @return Tablo eksikse true, değilse false
-     */
-    private boolean isIncompleteTable(String content) {
-        // İçerik boşsa veya tablo işaretleri yoksa
-        if (content == null || content.isEmpty() || !content.contains("|")) {
-            return false;
-        }
-        
-        // Satırları ayır
-        String[] lines = content.split("\n");
-        
-        // Minimum tablo yapısı kontrolü: En az bir başlık satırı, bir ayırıcı satır, bir veri satırı olmalı
-        if (lines.length < 3) {
-            return true;
-        }
-        
-        // Tablo başlığı bulundu mu?
-        boolean hasTableHeader = false;
-        // Düzgün hücre sayısı
-        int expectedColumnCount = 0;
-        
-        for (String line : lines) {
-            line = line.trim();
-            if (line.isEmpty()) continue;
+    private String cleanTableFormat(String content) {
+        // Birden fazla satır varsa ve tablo formatı olduğunu düşünüyorsak
+        if (content.contains("|")) {
+            // Birden fazla boş satırı kaldır
+            content = content.replaceAll("\\n{3,}", "\n\n");
             
-            if (line.contains("|")) {
-                // İlk başlık satırı bulunduğunda beklenen sütun sayısını al
-                if (!hasTableHeader) {
-                    hasTableHeader = true;
-                    // Sütun sayısını belirle (| karakterleri arasındaki hücre sayısı)
-                    expectedColumnCount = line.split("\\|").length - 1;
-                    if (expectedColumnCount <= 1) {
-                        // Tek sütunlu tablo olmaz, bu bir hata durumu
-                        return true;
-                    }
-                    continue;
-                }
-                
-                // Diğer satırlar için sütun sayısını kontrol et
-                int columnCount = line.split("\\|").length - 1;
-                if (columnCount != expectedColumnCount) {
-                    // Sütun sayıları uyuşmuyorsa, bu bir hata durumu
-                    return true;
-                }
+            // Markdown tablo yapısını düzenle
+            if (content.contains("| -") || content.contains("|-")) {
+                // Tablo başlık satırlarını koruyalım, diğer içeriği düzenleyelim
+                return content;
+            } else if (content.contains("|")) {
+                // Eğer çok uzun boşluklar içeren bir tablo satırı varsa, bunları temizleyelim
+                return content.replaceAll("\\|\\s{10,}", "| ");
             }
         }
-        
-        // Gelen içerik "| Özellik | Java | C |" gibi bir şekilde bitmiş, ama içerik yok
-        boolean hasMinimalContent = false;
-        for (String line : lines) {
-            // Sütun başlıklarından sonra en az bir içerik satırı var mı?
-            if (line.trim().startsWith("| ") && !line.contains("Özellik") && !line.contains("----")) {
-                hasMinimalContent = true;
-                break;
-            }
-        }
-        
-        return !hasMinimalContent;
-    }
-
-    /**
-     * Sorunlu tablo formatını düzeltmek için yeni bir istek oluşturur
-     * @param originalRequest Orijinal istek
-     * @param originalContent Orijinal yanıt içeriği
-     * @param trackingId Talep izleme ID'si
-     * @return Düzeltilmiş içerik stream'i
-     */
-    private Flux<StreamResponse> fixTableFormat(AIRequest originalRequest, String originalContent, String trackingId) {
-        // Yeni bir istek için AIRequest oluştur
-        AIRequest fixRequest = new AIRequest();
-        fixRequest.setRequestId(trackingId + "-fix");
-        fixRequest.setRequestType("CHAT");
-        fixRequest.setLanguage(originalRequest.getLanguage());
-        fixRequest.setModel("google/gemini-2.0-flash-001"); // Daha güçlü bir model kullan
-        
-        // İçeriği analiz et
-        String promptPrefix = "Oluşturulması gereken tablo eksik veya hatalı. ";
-        
-        // Eğer içerik bir tablo başlığı içeriyorsa, bu bilgiyi kullan
-        if (originalContent.contains("| Özellik") && originalContent.contains("| Java") && originalContent.contains("| C")) {
-            promptPrefix += "Lütfen Java ve C programlama dilleri arasındaki temel farkları karşılaştıran tam ve düzgün bir tablo oluştur. ";
-        } else {
-            // Orijinal isteği analiz et
-            promptPrefix += "Lütfen istenilen konuda tam ve düzgün bir tablo oluştur. ";
-        }
-        
-        // Tablo düzeltme prompt'u oluştur
-        String fixPrompt = promptPrefix + 
-            "Tablo markdown formatında olmalı, başlık satırı, ayırıcı satır ve içerik satırları eksiksiz olmalı. " +
-            "Tablonun sütun sayısı tutarlı olmalı ve tüm hücreler doldurulmalı. " +
-            "Orijinal istek: \"" + originalRequest.getPrompt() + "\".\n\n" +
-            "Şimdiye kadar oluşturulan içerik: \"" + originalContent + "\"\n\n" +
-            "Lütfen bu içeriği tamamlayarak doğru ve eksiksiz bir tablo oluştur.";
-        
-        fixRequest.setPrompt(fixPrompt);
-        fixRequest.setTemperature(0.2); // Düşük sıcaklık değeri ile daha tutarlı çıktı
-        fixRequest.setMaxTokens(2000); // Yeterli yanıt uzunluğu için
-        
-        log.info("Sending table format fix request with ID: {}", fixRequest.getRequestId());
-        
-        // Yeni içerik almak için LLM'e istek gönder
-        return llmService.streamChatCompletion(fixRequest)
-            .filter(chunk -> !chunk.isPing() && chunk.getContent() != null && !chunk.getContent().isEmpty())
-            .map(chunk -> {
-                String content = chunk.getContent();
-                
-                // Eğer uzun hücreler varsa temizle
-                if (content.contains("|")) {
-                    content = optimizeTableContent(content);
-                }
-                
-                return StreamResponse.builder()
-                    .content(content)
-                    .done(chunk.isDone())
-                    .error(chunk.isError())
-                    .build();
-            });
-    }
-
-    /**
-     * Tablo içeriğini optimize eder, çok uzun hücreleri kısaltır
-     * @param tableContent Tablo içeriği
-     * @return Optimize edilmiş tablo içeriği
-     */
-    private String optimizeTableContent(String tableContent) {
-        // Çok uzun satırları kısalt
-        String[] lines = tableContent.split("\n");
-        StringBuilder optimized = new StringBuilder();
-        
-        for (String line : lines) {
-            if (line.contains("|")) {
-                String[] cells = line.split("\\|");
-                StringBuilder newLine = new StringBuilder();
-                
-                for (int i = 0; i < cells.length; i++) {
-                    String cell = cells[i];
-                    // Hücre içeriğini makul bir uzunluğa kısalt (100 karakter)
-                    if (cell.trim().length() > 100) {
-                        cell = cell.trim().substring(0, 97) + "...";
-                    }
-                    newLine.append("|").append(cell);
-                }
-                
-                // Son hücre için | ekle
-                if (!line.endsWith("|")) {
-                    newLine.append("|");
-                }
-                
-                optimized.append(newLine).append("\n");
-            } else {
-                optimized.append(line).append("\n");
-            }
-        }
-        
-        return optimized.toString();
+        return content;
     }
 
     @PostMapping(value = "/images/generate", 
