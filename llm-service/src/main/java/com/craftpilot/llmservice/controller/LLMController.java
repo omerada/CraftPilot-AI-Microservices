@@ -144,12 +144,32 @@ public class LLMController {
                     
                     // Only forward non-ping chunks to the client (pings are for internal connection health)
                     if (!chunk.isPing()) {
-                        // İçerikte JSON veriyorsa güzelce formatla
-                        sink.next(ServerSentEvent.<StreamResponse>builder()
-                            .id(trackingId)
-                            .event(chunk.isError() ? "error" : "message")
-                            .data(chunk)
-                            .build());
+                        // İçeriği optimize et
+                        String optimizedContent = optimizeStreamContent(chunk.getContent());
+                        
+                        // Boş içeriği göndermekten kaçın
+                        if (optimizedContent != null && !optimizedContent.isEmpty()) {
+                            // İçeriği güncelle
+                            StreamResponse optimizedChunk = StreamResponse.builder()
+                                .content(optimizedContent)
+                                .done(chunk.isDone())
+                                .error(chunk.isError())
+                                .build();
+                            
+                            // İçerikte JSON veriyorsa güzelce formatla
+                            sink.next(ServerSentEvent.<StreamResponse>builder()
+                                .id(trackingId)
+                                .event(chunk.isError() ? "error" : "message")
+                                .data(optimizedChunk)
+                                .build());
+                        } else if (chunk.isDone()) {
+                            // Sadece done=true ise boş içerik gönder
+                            sink.next(ServerSentEvent.<StreamResponse>builder()
+                                .id(trackingId)
+                                .event(chunk.isError() ? "error" : "message")
+                                .data(chunk)
+                                .build());
+                        }
                     }
                 })
                 .doOnComplete(() -> {
@@ -184,23 +204,23 @@ public class LLMController {
         request.setRequestType("IMAGE");
         return llmService.processImageGeneration(request)
             .map(response -> ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON)timize eden yardımcı metod
                 .body(response))
             .doOnError(error -> log.error("Image generation error: ", error))
             .doOnSuccess(response -> log.debug("Image generation success: {}", response));
     }
-
+mpty()) {
     @PostMapping(value = "/code/completion", 
-                produces = MediaType.APPLICATION_JSON_VALUE,
+                produces = MediaType.APPLICATION_JSON_VALUE,}
                 consumes = MediaType.APPLICATION_JSON_VALUE) 
     public Mono<ResponseEntity<AIResponse>> codeCompletion(@RequestBody AIRequest request) {
-        request.setRequestType("CODE");
-        return llmService.processCodeCompletion(request)
-            .map(response -> ResponseEntity.ok()
+        request.setRequestType("CODE");) {
+        return llmService.processCodeCompletion(request)a boşluğu 1 boşluğa indirgeme)
+            .map(response -> ResponseEntity.ok()aceAll(" {20,}", " ");
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(response))
-            .doOnError(error -> log.error("Code completion error: ", error))
-            .doOnSuccess(response -> log.debug("Code completion success: {}", response));
+            .doOnError(error -> log.error("Code completion error: ", error))tamamen boşluk karakterlerinden oluşan satırlar)
+            .doOnSuccess(response -> log.debug("Code completion success: {}", response));.length() > 100) {
     }
 
     @PostMapping(value = "/enhance-prompt", 
@@ -208,39 +228,63 @@ public class LLMController {
                 consumes = MediaType.APPLICATION_JSON_VALUE) 
     public Mono<ResponseEntity<AIResponse>> enhancePrompt(@RequestBody AIRequest request,
                                                         @RequestHeader(value = "X-User-Language", defaultValue = "en") String userLanguage) {
-        log.info("Prompt enhancement request received with language: {}", userLanguage);
+        log.info("Prompt enhancement request received with language: {}", userLanguage); = MediaType.APPLICATION_JSON_VALUE,
         request.setRequestType("ENHANCE");
         request.setLanguage(userLanguage);
-        
-        // Prompt kontrolü
-        if (request.getPrompt() == null || request.getPrompt().trim().isEmpty()) {
+                                               @RequestHeader(value = "X-User-Language", defaultValue = "en") String userLanguage) {
+        // Prompt kontrolüfo("Prompt enhancement request received with language: {}", userLanguage);
+        if (request.getPrompt() == null || request.getPrompt().trim().isEmpty()) {("ENHANCE");
             AIResponse errorResponse = AIResponse.builder()
                 .response("İyileştirilecek bir prompt göndermelisiniz.")
                 .success(false)
                 .build();
-            
-            return Mono.just(ResponseEntity
+            )
+            return Mono.just(ResponseEntitycek bir prompt göndermelisiniz.")
                 .status(HttpStatus.BAD_REQUEST)
-                .body(errorResponse));
+                .body(errorResponse));build();
         }
-        
+        y
         return llmService.enhancePrompt(request)
-            .doOnSuccess(response -> {
+            .doOnSuccess(response -> {);
                 if (response == null) {
                     log.warn("Prompt enhancement returned null response");
-                } else {
+                } else {pt(request)
                     log.debug("Prompt enhancement success with response length: {}", 
                         response.getResponse() != null ? response.getResponse().length() : 0);
-                }
+                }ned null response");
             })
-            .map(response -> {
-                // Null kontrolü ve varsayılan değer atama
+            .map(response -> {("Prompt enhancement success with response length: {}", 
+                // Null kontrolü ve varsayılan değer atama        response.getResponse() != null ? response.getResponse().length() : 0);
                 if (response == null) {
                     response = AIResponse.builder()
-                        .response("Prompt iyileştirme yanıtı alınamadı. Lütfen daha sonra tekrar deneyin.")
-                        .requestId(request.getRequestId())
-                        .success(false)
-                        .build();
+                        .response("Prompt iyileştirme yanıtı alınamadı. Lütfen daha sonra tekrar deneyin.")(response -> {
+                        .requestId(request.getRequestId())değer atama
+                        .success(false)l) {
+                        .build();builder()
+                }         .response("Prompt iyileştirme yanıtı alınamadı. Lütfen daha sonra tekrar deneyin.")
+                                   .requestId(request.getRequestId())
+                return ResponseEntity.ok()                       .success(false)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}    }            });                    .body(errorResponse));                    .status(status)                return Mono.just(ResponseEntity                                    HttpStatus.BAD_GATEWAY : HttpStatus.INTERNAL_SERVER_ERROR;                HttpStatus status = (error instanceof APIException) ?                                     .build();                    .success(false)                    .requestId(request.getRequestId())                    .response("Prompt iyileştirme sırasında bir hata oluştu: " + error.getMessage())                AIResponse errorResponse = AIResponse.builder()            .onErrorResume(error -> {            .doOnError(error -> log.error("Prompt enhancement error: {}", error.getMessage(), error))            })                    .body(response);                    .contentType(MediaType.APPLICATION_JSON)                        .build();
                 }
                 
                 return ResponseEntity.ok()
