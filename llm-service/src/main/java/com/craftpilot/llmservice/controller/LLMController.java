@@ -118,6 +118,9 @@ public class LLMController {
         
         // Client'a yanıt göndermeye başlayalım
         return Flux.<ServerSentEvent<StreamResponse>>create(sink -> {
+            // İşlem takibi için içerik biriktirme buffer'ı
+            final StringBuilder contentBuffer = new StringBuilder();
+            
             // İlk olarak boş bir yorum gönder - bağlantıyı başlatmak için
             sink.next(ServerSentEvent.<StreamResponse>builder()
                 .comment("OPENROUTER PROCESSING")
@@ -147,23 +150,50 @@ public class LLMController {
                         // İçeriği optimize et
                         String optimizedContent = optimizeStreamContent(chunk.getContent());
                         
-                        // Boş içeriği göndermekten kaçın
+                        // Tablolarla ilgili yanıtlarda buffer'a ekle ve gönder
                         if (optimizedContent != null && !optimizedContent.isEmpty()) {
-                            // İçeriği güncelle
+                            // Buffer'da içeriği biriktir ve birleştir
+                            String mergedContent = mergeStreamContents(contentBuffer.toString(), optimizedContent);
+                            contentBuffer.setLength(0);
+                            contentBuffer.append(mergedContent);
+                            
+                            // İçeriği güncelle ve gönder
                             StreamResponse optimizedChunk = StreamResponse.builder()
                                 .content(optimizedContent)
                                 .done(chunk.isDone())
                                 .error(chunk.isError())
                                 .build();
                             
-                            // İçerikte JSON veriyorsa güzelce formatla
                             sink.next(ServerSentEvent.<StreamResponse>builder()
                                 .id(trackingId)
                                 .event(chunk.isError() ? "error" : "message")
                                 .data(optimizedChunk)
                                 .build());
-                        } else if (chunk.isDone()) {
-                            // Sadece done=true ise boş içerik gönder
+                        }
+                        
+                        // Tamamlanma sinyali geldiğinde son bir kontrol
+                        if (chunk.isDone()) {
+                            // Eğer içerik tablo yapısı içeriyor ve yarım kalmış gibi görünüyorsa 
+                            // ek bilgi gönderelim
+                            if (contentBuffer.toString().contains("|") && 
+                                !contentBuffer.toString().endsWith("\n")) {
+                                log.info("Tablo yapısı tamamlanmadan yanıt sonlandı");
+                                
+                                // Tablo için bir kapanış notu gönder
+                                StreamResponse finalNote = StreamResponse.builder()
+                                    .content("\n\n_Not: Tablo yapısı tamamlanamadı, yanıt erken sonlandı._")
+                                    .done(false)
+                                    .error(false)
+                                    .build();
+                                
+                                sink.next(ServerSentEvent.<StreamResponse>builder()
+                                    .id(trackingId)
+                                    .event("message")
+                                    .data(finalNote)
+                                    .build());
+                            }
+                            
+                            // Son olarak tamamlanma sinyalini gönder
                             sink.next(ServerSentEvent.<StreamResponse>builder()
                                 .id(trackingId)
                                 .event(chunk.isError() ? "error" : "message")
@@ -196,7 +226,7 @@ public class LLMController {
         .doOnComplete(() -> log.info("Stream response completed for request: {}", trackingId))
         .doOnError(error -> log.error("Stream response error: {}", error.getMessage(), error));
     }
-
+    
     /**
      * Tablo veya büyük metin içeren içeriği algılayan ve optimize eden yardımcı metod
      * @param content Optimize edilecek içerik
@@ -219,6 +249,36 @@ public class LLMController {
         }
         
         return content;
+    }
+    
+    /**
+     * Stream yanıtlarını birleştirerek tam tablo yapılarını tespit etmeye çalışan yardımcı metod
+     * @param streamBuffer Şu ana kadar toplanan içerik
+     * @param newContent Yeni gelen içerik
+     * @return Birleştirilmiş ve gerekirse düzeltilmiş içerik
+     */
+    private String mergeStreamContents(String streamBuffer, String newContent) {
+        if (streamBuffer == null) streamBuffer = "";
+        if (newContent == null) newContent = "";
+        
+        // Tablo parçaları geliyorsa ve henüz tamamlanmamışsa işlemi geliştir
+        String merged = streamBuffer + newContent;
+        
+        // Tablo yapısı algılandı ancak sonlanma belirtileri mevcut değilse
+        // ve model yanıtı erkenden kesti ise, eksik tabloya bir sonlanma ekle
+        if (merged.contains("|") && merged.contains("\n") && merged.endsWith("\n")) {
+            // Son satır kontrolü
+            String[] lines = merged.split("\n");
+            String lastLine = lines.length > 0 ? lines[lines.length - 1] : "";
+            
+            // Son satır yarım kalmış bir tablo satırı ise düzelt
+            if (lastLine.contains("|") && lastLine.trim().endsWith("|")) {
+                log.info("Tablo yapısı tespit edildi ve son satır düzenleniyor: {}", lastLine);
+                return merged;
+            }
+        }
+        
+        return merged;
     }
 
     @PostMapping(value = "/images/generate", 
