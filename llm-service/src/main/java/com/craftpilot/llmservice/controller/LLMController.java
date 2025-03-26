@@ -197,6 +197,30 @@ public class LLMController {
         .doOnError(error -> log.error("Stream response error: {}", error.getMessage(), error));
     }
 
+    /**
+     * Tablo veya büyük metin içeren içeriği algılayan ve optimize eden yardımcı metod
+     * @param content Optimize edilecek içerik
+     * @return Optimize edilmiş içerik
+     */
+    private String optimizeStreamContent(String content) {
+        if (content == null || content.isEmpty()) {
+            return content;
+        }
+        
+        // Tablo satırı gibi çok fazla boşluk içeren satırları optimize et
+        if (content.contains("|") && content.length() > 200) {
+            // Çok fazla ardışık boşluk karakterini temizle (20'den fazla boşluğu 1 boşluğa indirgeme)
+            return content.replaceAll(" {20,}", " ");
+        }
+        
+        // Çok uzun boş satırları temizle (tamamen boşluk karakterlerinden oluşan satırlar)
+        if (content.trim().isEmpty() && content.length() > 100) {
+            return "";
+        }
+        
+        return content;
+    }
+
     @PostMapping(value = "/images/generate", 
                 produces = MediaType.APPLICATION_JSON_VALUE,
                 consumes = MediaType.APPLICATION_JSON_VALUE) 
@@ -204,23 +228,23 @@ public class LLMController {
         request.setRequestType("IMAGE");
         return llmService.processImageGeneration(request)
             .map(response -> ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_JSON)timize eden yardımcı metod
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(response))
             .doOnError(error -> log.error("Image generation error: ", error))
             .doOnSuccess(response -> log.debug("Image generation success: {}", response));
     }
-mpty()) {
+
     @PostMapping(value = "/code/completion", 
-                produces = MediaType.APPLICATION_JSON_VALUE,}
+                produces = MediaType.APPLICATION_JSON_VALUE,
                 consumes = MediaType.APPLICATION_JSON_VALUE) 
     public Mono<ResponseEntity<AIResponse>> codeCompletion(@RequestBody AIRequest request) {
-        request.setRequestType("CODE");) {
-        return llmService.processCodeCompletion(request)a boşluğu 1 boşluğa indirgeme)
-            .map(response -> ResponseEntity.ok()aceAll(" {20,}", " ");
+        request.setRequestType("CODE");
+        return llmService.processCodeCompletion(request)
+            .map(response -> ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(response))
-            .doOnError(error -> log.error("Code completion error: ", error))tamamen boşluk karakterlerinden oluşan satırlar)
-            .doOnSuccess(response -> log.debug("Code completion success: {}", response));.length() > 100) {
+            .doOnError(error -> log.error("Code completion error: ", error))
+            .doOnSuccess(response -> log.debug("Code completion success: {}", response));
     }
 
     @PostMapping(value = "/enhance-prompt", 
@@ -228,63 +252,39 @@ mpty()) {
                 consumes = MediaType.APPLICATION_JSON_VALUE) 
     public Mono<ResponseEntity<AIResponse>> enhancePrompt(@RequestBody AIRequest request,
                                                         @RequestHeader(value = "X-User-Language", defaultValue = "en") String userLanguage) {
-        log.info("Prompt enhancement request received with language: {}", userLanguage); = MediaType.APPLICATION_JSON_VALUE,
+        log.info("Prompt enhancement request received with language: {}", userLanguage);
         request.setRequestType("ENHANCE");
         request.setLanguage(userLanguage);
-                                               @RequestHeader(value = "X-User-Language", defaultValue = "en") String userLanguage) {
-        // Prompt kontrolüfo("Prompt enhancement request received with language: {}", userLanguage);
-        if (request.getPrompt() == null || request.getPrompt().trim().isEmpty()) {("ENHANCE");
+        
+        // Prompt kontrolü
+        if (request.getPrompt() == null || request.getPrompt().trim().isEmpty()) {
             AIResponse errorResponse = AIResponse.builder()
                 .response("İyileştirilecek bir prompt göndermelisiniz.")
                 .success(false)
                 .build();
-            )
-            return Mono.just(ResponseEntitycek bir prompt göndermelisiniz.")
+            
+            return Mono.just(ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(errorResponse));build();
+                .body(errorResponse));
         }
-        y
+        
         return llmService.enhancePrompt(request)
-            .doOnSuccess(response -> {);
+            .doOnSuccess(response -> {
                 if (response == null) {
                     log.warn("Prompt enhancement returned null response");
-                } else {pt(request)
+                } else {
                     log.debug("Prompt enhancement success with response length: {}", 
                         response.getResponse() != null ? response.getResponse().length() : 0);
-                }ned null response");
+                }
             })
-            .map(response -> {("Prompt enhancement success with response length: {}", 
-                // Null kontrolü ve varsayılan değer atama        response.getResponse() != null ? response.getResponse().length() : 0);
+            .map(response -> {
+                // Null kontrolü ve varsayılan değer atama
                 if (response == null) {
                     response = AIResponse.builder()
-                        .response("Prompt iyileştirme yanıtı alınamadı. Lütfen daha sonra tekrar deneyin.")(response -> {
-                        .requestId(request.getRequestId())değer atama
-                        .success(false)l) {
-                        .build();builder()
-                }         .response("Prompt iyileştirme yanıtı alınamadı. Lütfen daha sonra tekrar deneyin.")
-                                   .requestId(request.getRequestId())
-                return ResponseEntity.ok()                       .success(false)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}    }            });                    .body(errorResponse));                    .status(status)                return Mono.just(ResponseEntity                                    HttpStatus.BAD_GATEWAY : HttpStatus.INTERNAL_SERVER_ERROR;                HttpStatus status = (error instanceof APIException) ?                                     .build();                    .success(false)                    .requestId(request.getRequestId())                    .response("Prompt iyileştirme sırasında bir hata oluştu: " + error.getMessage())                AIResponse errorResponse = AIResponse.builder()            .onErrorResume(error -> {            .doOnError(error -> log.error("Prompt enhancement error: {}", error.getMessage(), error))            })                    .body(response);                    .contentType(MediaType.APPLICATION_JSON)                        .build();
+                        .response("Prompt iyileştirme yanıtı alınamadı. Lütfen daha sonra tekrar deneyin.")
+                        .requestId(request.getRequestId())
+                        .success(false)
+                        .build();
                 }
                 
                 return ResponseEntity.ok()
