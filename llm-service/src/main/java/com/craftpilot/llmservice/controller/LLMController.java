@@ -20,6 +20,10 @@ import reactor.core.scheduler.Schedulers;
 
 import jakarta.validation.Valid;
 import java.util.UUID;
+import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 @Slf4j
 @RestController
@@ -95,6 +99,9 @@ public class LLMController {
         
         log.info("Stream chat completion request received with language: {}, requestId: {}, model: {}", 
                 userLanguage, trackingId, request.getModel());
+        
+        // Tablo formatı ile ilgili modele yönlendirme ekle
+        addTableHandlingSystemMessage(request);
         
         request.setRequestType("CHAT");
         request.setLanguage(userLanguage);
@@ -175,6 +182,56 @@ public class LLMController {
         .doOnCancel(() -> log.warn("Stream response was cancelled for request: {}", trackingId))
         .doOnComplete(() -> log.info("Stream response completed for request: {}", trackingId))
         .doOnError(error -> log.error("Stream response error: {}", error.getMessage(), error));
+    }
+    
+    /**
+     * Tablo formatlaması için system message ekler
+     */
+    private void addTableHandlingSystemMessage(AIRequest request) {
+        if (request.getMessages() == null || request.getMessages().isEmpty()) {
+            return;
+        }
+        
+        // İçerikte tablo isteği olup olmadığını kontrol et
+        boolean isTableRequest = request.getMessages().stream()
+            .filter(msg -> "user".equals(msg.get("role")))
+            .map(msg -> String.valueOf(msg.get("content")))
+            .anyMatch(content -> 
+                content != null && (
+                    content.toLowerCase().contains("tablo") || 
+                    content.toLowerCase().contains("table") ||
+                    content.toLowerCase().contains("karşılaştır") ||
+                    content.toLowerCase().contains("compare")
+                )
+            );
+        
+        // Tablo isteği varsa özel system message ekle
+        if (isTableRequest) {
+            log.info("Detected potential table request, adding special handling instruction");
+            
+            // Sistem mesajını bul veya oluştur
+            Map<String, Object> systemMessage = request.getMessages().stream()
+                .filter(msg -> "system".equals(msg.get("role")))
+                .findFirst()
+                .orElse(null);
+            
+            if (systemMessage != null) {
+                // Mevcut sistem mesajını güncelle
+                String currentContent = String.valueOf(systemMessage.get("content"));
+                systemMessage.put("content", currentContent + "\n\nÖnemli: Eğer cevabında tablo oluşturman gerekiyorsa, lütfen kompakt ve basit bir tablo formatı kullan. Gereksiz boşluklar ekleme ve sütunları minimum genişlikte tut.");
+            } else {
+                // Yeni sistem mesajı ekle
+                Map<String, Object> newSystemMessage = new HashMap<>();
+                newSystemMessage.put("role", "system");
+                newSystemMessage.put("content", "Cevaplarını net ve özlü tut. Eğer tablo oluşturman gerekiyorsa, basit ve kompakt bir tablo formatı kullan. Gereksiz boşluklar ekleme ve sütunları minimum genişlikte tut.");
+                
+                // Sistem mesajını listenin başına ekle
+                List<Map<String, Object>> updatedMessages = new ArrayList<>();
+                updatedMessages.add(newSystemMessage);
+                updatedMessages.addAll(request.getMessages());
+                request.setMessages(updatedMessages);
+            }
+        }
     }
 
     @PostMapping(value = "/images/generate", 
