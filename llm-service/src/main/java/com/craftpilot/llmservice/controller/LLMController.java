@@ -176,7 +176,7 @@ public class LLMController {
                             // Eğer içerik tablo yapısı içeriyor ve yarım kalmış gibi görünüyorsa 
                             // ek bilgi gönderelim
                             if (contentBuffer.toString().contains("|") && 
-                                !contentBuffer.toString().endsWith("\n")) {
+                                isTableIncomplete(contentBuffer.toString())) {
                                 log.info("Tablo yapısı tamamlanmadan yanıt sonlandı");
                                 
                                 // Tablo için bir kapanış notu gönder
@@ -279,6 +279,75 @@ public class LLMController {
         }
         
         return merged;
+    }
+
+    /**
+     * Bir tablonun tamamlanıp tamamlanmadığını kontrol eder
+     * @param content Kontrol edilecek içerik
+     * @return Tablo tamamlanmamışsa true, tamamlanmışsa false
+     */
+    private boolean isTableIncomplete(String content) {
+        // İçerik boşsa veya tablo değilse tamamlanmamış kabul etme
+        if (content == null || content.isEmpty() || !content.contains("|")) {
+            return false;
+        }
+        
+        // Satırlara ayır
+        String[] lines = content.split("\n");
+        if (lines.length < 3) {
+            // En az başlık satırı, ayırıcı satır ve bir veri satırı olmalı
+            return true;
+        }
+        
+        // İlk satırdaki sütun sayısını referans al
+        int firstRowColumns = countColumns(lines[0]);
+        
+        // Tablo satırlarını kontrol et
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i].trim();
+            
+            // Boş satırları atla
+            if (line.isEmpty()) continue;
+            
+            // Tablo satırı ise kontrol et
+            if (line.contains("|")) {
+                // Satırın sütun sayısı ilk satırdan farklıysa veya satır yarım kalmışsa
+                int columns = countColumns(line);
+                if (columns != firstRowColumns || line.endsWith("|")) {
+                    // Son satır "|" ile bitiyorsa ve öncekinden farklı sayıda sütun varsa
+                    // bu muhtemelen yarım kalmış bir satırdır
+                    if (i == lines.length - 1 && columns < firstRowColumns) {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        // Son satır düzgün bir tablo satırı değilse
+        String lastLine = lines[lines.length - 1].trim();
+        if (lastLine.isEmpty() || !lastLine.startsWith("|") || lastLine.endsWith("|")) {
+            return false; // Tablo muhtemelen tamamlanmış, son satır farklı içerik olabilir
+        }
+        
+        // Tüm kontroller geçildiyse tablo tamamlanmıştır
+        return false;
+    }
+
+    /**
+     * Bir tablo satırındaki sütun sayısını hesaplar
+     * @param line Tablo satırı
+     * @return Sütun sayısı
+     */
+    private int countColumns(String line) {
+        if (line == null || !line.contains("|")) {
+            return 0;
+        }
+        // "|" karakterlerini sayarak sütun sayısını hesapla (ilk ve son | karakterleri hariç)
+        int count = 0;
+        for (char c : line.toCharArray()) {
+            if (c == '|') count++;
+        }
+        return Math.max(0, count - 1); // İlk ve son | için düzeltme
     }
 
     @PostMapping(value = "/images/generate", 
