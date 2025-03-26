@@ -321,7 +321,7 @@ public class LLMController {
             originalContent;
         
         fixRequest.setPrompt(fixPrompt);
-        fixRequest.setTemperature(0.2f); // Daha düşük ısı değeri belirle - daha tutarlı çıktı için
+        fixRequest.setTemperature(0.2); // Float (0.2f) yerine Double (0.2) kullan
         
         log.info("Sending table format fix request with ID: {}", fixRequest.getRequestId());
         
@@ -469,4 +469,3 @@ public class LLMController {
             });
     }
 }
-```
