@@ -120,6 +120,9 @@ public class LLMController {
         return Flux.<ServerSentEvent<StreamResponse>>create(sink -> {
             // İşlem takibi için içerik biriktirme buffer'ı
             final StringBuilder contentBuffer = new StringBuilder();
+            // Tablo algılama için flag
+            final boolean[] tableDetected = {false};
+            final boolean[] tableIssueDetected = {false};
             
             // İlk olarak boş bir yorum gönder - bağlantıyı başlatmak için
             sink.next(ServerSentEvent.<StreamResponse>builder()
@@ -150,6 +153,21 @@ public class LLMController {
                         // İçeriği optimize et
                         String optimizedContent = optimizeStreamContent(chunk.getContent());
                         
+                        // Tablo yapısını algıla
+                        if (optimizedContent != null && optimizedContent.contains("|")) {
+                            tableDetected[0] = true;
+                            
+                            // Sorunlu tablo algılama (çok uzun hücre içeren tablolar)
+                            if (optimizedContent.contains("|") && optimizedContent.length() > 500 && 
+                                optimizedContent.split("\\|").length > 2) {
+                                int cellLength = optimizedContent.split("\\|")[1].trim().length();
+                                if (cellLength > 300) {
+                                    tableIssueDetected[0] = true;
+                                    log.warn("Potentially broken table format detected: cell length = {}", cellLength);
+                                }
+                            }
+                        }
+                        
                         // İçeriği buffer'a ekle ve gönder
                         if (optimizedContent != null && !optimizedContent.isEmpty()) {
                             // Buffer'da içeriği biriktir
@@ -171,12 +189,52 @@ public class LLMController {
                         
                         // Tamamlanma sinyali geldiğinde son bir kontrol
                         if (chunk.isDone()) {
-                            // Son olarak tamamlanma sinyalini gönder
-                            sink.next(ServerSentEvent.<StreamResponse>builder()
-                                .id(trackingId)
-                                .event(chunk.isError() ? "error" : "message")
-                                .data(chunk)
-                                .build());
+                            // Eğer sorunlu tablo algılandıysa düzeltme için yeni istek gönder
+                            if (tableDetected[0] && tableIssueDetected[0]) {
+                                String originalContent = contentBuffer.toString();
+                                
+                                // Düzeltme için yeni istek oluştur
+                                StreamResponse fixRequest = StreamResponse.builder()
+                                    .content("\n\n_Not: Tablo formatı sorunlu görünüyor. Düzeltilmiş bir tablo formatı gönderiliyor..._")
+                                    .done(false)
+                                    .error(false)
+                                    .build();
+                                
+                                sink.next(ServerSentEvent.<StreamResponse>builder()
+                                    .id(trackingId)
+                                    .event("message")
+                                    .data(fixRequest)
+                                    .build());
+                                
+                                // Yeni bir istek oluştur ve düzeltilmiş tablo için gönder
+                                fixTableFormat(request, originalContent, trackingId)
+                                    .doOnNext(fixedChunk -> {
+                                        sink.next(ServerSentEvent.<StreamResponse>builder()
+                                            .id(trackingId)
+                                            .event("message")
+                                            .data(fixedChunk)
+                                            .build());
+                                    })
+                                    .doOnComplete(() -> {
+                                        // Son olarak düzeltilmiş yanıtın tamamlandığını bildir
+                                        sink.next(ServerSentEvent.<StreamResponse>builder()
+                                            .id(trackingId)
+                                            .event("message")
+                                            .data(StreamResponse.builder()
+                                                .content("")
+                                                .done(true)
+                                                .build())
+                                            .build());
+                                    })
+                                    .subscribe();
+                            } else {
+                                // Son olarak tamamlanma sinyalini gönder
+                                sink.next(ServerSentEvent.<StreamResponse>builder()
+                                    .id(trackingId)
+                                    .event(chunk.isError() ? "error" : "message")
+                                    .data(chunk)
+                                    .build());
+                            }
                         }
                     }
                 })
@@ -240,6 +298,88 @@ public class LLMController {
         if (newContent == null) newContent = "";
         
         return streamBuffer + newContent;
+    }
+
+    /**
+     * Sorunlu tablo formatını düzeltmek için yeni bir istek oluşturur
+     * @param originalRequest Orijinal istek
+     * @param originalContent Orijinal yanıt içeriği
+     * @param trackingId Talep izleme ID'si
+     * @return Düzeltilmiş içerik stream'i
+     */
+    private Flux<StreamResponse> fixTableFormat(AIRequest originalRequest, String originalContent, String trackingId) {
+        // Yeni bir istek için AIRequest oluştur
+        AIRequest fixRequest = new AIRequest();
+        fixRequest.setRequestId(trackingId + "-fix");
+        fixRequest.setRequestType("CHAT");
+        fixRequest.setLanguage(originalRequest.getLanguage());
+        fixRequest.setModel("google/gemini-2.0-flash-001"); // Daha yeni model kullan
+        
+        // Tablo düzeltme prompt'u oluştur
+        String fixPrompt = "Aşağıdaki içerikteki tabloyu markdown formatında, daha sade ve okunabilir bir şekilde yeniden düzenle. " +
+            "Tüm içeriği aynen koruyarak sadece tablo formatını düzelt. Tablo hücrelerindeki içerikler çok uzun olmamalı ve düzgün görüntülenmelidir:\n\n" + 
+            originalContent;
+        
+        fixRequest.setPrompt(fixPrompt);
+        fixRequest.setTemperature(0.2f); // Daha düşük ısı değeri belirle - daha tutarlı çıktı için
+        
+        log.info("Sending table format fix request with ID: {}", fixRequest.getRequestId());
+        
+        // Yeni içerik almak için LLM'e istek gönder
+        return llmService.streamChatCompletion(fixRequest)
+            .filter(chunk -> !chunk.isPing() && chunk.getContent() != null && !chunk.getContent().isEmpty())
+            .map(chunk -> {
+                String content = chunk.getContent();
+                
+                // Eğer uzun hücreler hala varsa temizle
+                if (content.contains("|")) {
+                    content = optimizeTableContent(content);
+                }
+                
+                return StreamResponse.builder()
+                    .content(content)
+                    .done(chunk.isDone())
+                    .error(chunk.isError())
+                    .build();
+            });
+    }
+
+    /**
+     * Tablo içeriğini optimize eder, çok uzun hücreleri kısaltır
+     * @param tableContent Tablo içeriği
+     * @return Optimize edilmiş tablo içeriği
+     */
+    private String optimizeTableContent(String tableContent) {
+        // Çok uzun satırları kısalt
+        String[] lines = tableContent.split("\n");
+        StringBuilder optimized = new StringBuilder();
+        
+        for (String line : lines) {
+            if (line.contains("|")) {
+                String[] cells = line.split("\\|");
+                StringBuilder newLine = new StringBuilder();
+                
+                for (int i = 0; i < cells.length; i++) {
+                    String cell = cells[i];
+                    // Hücre içeriğini makul bir uzunluğa kısalt (100 karakter)
+                    if (cell.trim().length() > 100) {
+                        cell = cell.trim().substring(0, 97) + "...";
+                    }
+                    newLine.append("|").append(cell);
+                }
+                
+                // Son hücre için | ekle
+                if (!line.endsWith("|")) {
+                    newLine.append("|");
+                }
+                
+                optimized.append(newLine).append("\n");
+            } else {
+                optimized.append(line).append("\n");
+            }
+        }
+        
+        return optimized.toString();
     }
 
     @PostMapping(value = "/images/generate", 
@@ -329,3 +469,4 @@ public class LLMController {
             });
     }
 }
+```
