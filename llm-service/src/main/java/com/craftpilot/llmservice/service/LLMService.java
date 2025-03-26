@@ -75,6 +75,12 @@ public class LLMService {
     private static final Pattern TABLE_HEADER_PATTERN = Pattern.compile("\\|[\\s-:]*\\|");
     private static final boolean CONVERT_TABLES_TO_LISTS = true; // Tabloları liste formatına dönüştür
 
+    // Tablo işleme için ekstra değişkenler
+    private StringBuilder tableBuffer = new StringBuilder();
+    private boolean isBufferingTable = false;
+    private int tableRowCount = 0;
+    private static final int MIN_TABLE_ROWS_TO_BUFFER = 2; // En az bu kadar satır birikmeden gönderme
+
     public Mono<AIResponse> processChatCompletion(AIRequest request) {
         // Request validasyonu
         if (request.getRequestId() == null) {
@@ -145,6 +151,11 @@ public class LLMService {
         // OpenRouter'dan gelen JSON parçalarını birleştirmek için
         StringBuilder jsonBuffer = new StringBuilder();
         
+        // Tabloları yeniden başlatmak için
+        tableBuffer.setLength(0);
+        isBufferingTable = false;
+        tableRowCount = 0;
+        
         // Explicit generic type parameter to inform Java compiler about the type we're creating
         return Flux.<StreamResponse>create(sink -> {
             log.debug("Creating stream flux for model: {}", request.getModel());
@@ -187,6 +198,9 @@ public class LLMService {
                             log.warn("Could not process final buffer: {}", e.getMessage());
                         }
                     }
+                    
+                    // Biriken tablo içeriğini gönder
+                    flushTableBuffer(sink);
                     
                     sink.next(StreamResponse.builder()
                         .content("")
@@ -424,175 +438,189 @@ public class LLMService {
         // Aşırı boşlukları temizle - Gemini modelinin çıktılarında sorun yaratıyor
         String filtered = content.replaceAll("\\s{" + MAX_CONSECUTIVE_WHITESPACE + ",}", " ");
         
-        // Tablo içeriği kontrolü
-        if (isTableContent(filtered)) {
-            log.debug("Table content detected, applying special processing");
-            return processTableContent(filtered, sink);
+        // Tablo işaretleri içeriyor mu kontrol et
+        boolean hasTableMarker = filtered.contains("|");
+        boolean mightBePartOfTable = hasTableMarker || 
+                                     filtered.trim().equals("**") || 
+                                     filtered.matches("\\s*\\w+\\s*") && isBufferingTable;
+        
+        // Tablo işleme modunda mıyız?
+        if (isBufferingTable) {
+            if (mightBePartOfTable) {
+                // Tablo içeriğine ekle
+                tableBuffer.append(filtered);
+                
+                // Satır tamamlandı mı kontrol et (satır sonu karakteri ile)
+                if (filtered.contains("\n")) {
+                    tableRowCount++;
+                }
+                
+                // Tablo yeterince birikti mi veya tamamlandı mı kontrol et
+                if (tableRowCount >= MIN_TABLE_ROWS_TO_BUFFER || filtered.endsWith("\n\n")) {
+                    // Tabloyu işle ve gönder
+                    String tableContent = processAndReformatTable(tableBuffer.toString());
+                    
+                    // Bufferi temizle ve tablo modu kapat (buffer'da kalabilecek veriler sonraki içeriklerde gönderilecek)
+                    tableBuffer.setLength(0);
+                    tableRowCount = 0;
+                    isBufferingTable = false;
+                    
+                    // İşlenmiş tabloyu döndür
+                    return tableContent;
+                }
+                
+                // Henüz tablo tamamlanmadı, boş dön (birikmeye devam)
+                return "";
+            } else {
+                // Tablo içeriği değil, bufferi işle ve gönder
+                String tableContent = "";
+                if (tableBuffer.length() > 0) {
+                    tableContent = processAndReformatTable(tableBuffer.toString());
+                    tableBuffer.setLength(0);
+                }
+                
+                // Tablo modunu kapat
+                tableRowCount = 0;
+                isBufferingTable = false;
+                
+                // İşlenmiş tabloyu ve mevcut içeriği birleştirerek döndür
+                return tableContent + filtered;
+            }
+        } else if (hasTableMarker || detectTableStart(filtered)) {
+            // Yeni bir tablo başlangıcı tespit edildi
+            isBufferingTable = true;
+            tableBuffer.append(filtered);
+            
+            // Satır tamamlandı mı kontrol et
+            if (filtered.contains("\n")) {
+                tableRowCount++;
+            }
+            
+            // İlk chunk'ta tabloyu tamamlayabilir miyiz?
+            if (tableRowCount >= MIN_TABLE_ROWS_TO_BUFFER || isCompleteTable(filtered)) {
+                // Tabloyu işle ve gönder
+                String tableContent = processAndReformatTable(tableBuffer.toString());
+                
+                // Bufferi temizle ve tablo modu kapat
+                tableBuffer.setLength(0);
+                tableRowCount = 0;
+                isBufferingTable = false;
+                
+                return tableContent;
+            }
+            
+            // Henüz tablo tamamlanmadı, boş dön (birikim için)
+            return "";
         }
         
+        // Normal içerik, olduğu gibi döndür
         return filtered;
     }
     
     /**
-     * İçeriğin tablo formatlaması içerip içermediğini kontrol eder
+     * Tablo başlangıcını tespit et
      */
-    private boolean isTableContent(String content) {
-        if (content == null || content.isEmpty()) {
-            return false;
-        }
-        
-        // | karakteri varsa ve özel desenler içeriyorsa tablo olabilir
-        boolean containsPipe = content.contains(TABLE_MARKER);
-        boolean containsTableDelimiter = content.contains(TABLE_DELIMITER_MARKER);
-        boolean matchesTableRowPattern = TABLE_ROW_PATTERN.matcher(content).find();
-        boolean matchesTableHeaderPattern = TABLE_HEADER_PATTERN.matcher(content).find();
-        
-        return containsPipe && (containsTableDelimiter || matchesTableRowPattern || matchesTableHeaderPattern);
+    private boolean detectTableStart(String content) {
+        return content.contains("| Özellik") ||
+               content.contains("|Özellik") ||
+               content.startsWith("| ") && content.length() < 20 ||
+               content.equals("|") ||
+               content.matches("\\|\\s*\\w+.*");
     }
     
     /**
-     * Tablo içeriğini özel olarak işler
+     * İçeriğin tam bir tablo olup olmadığını kontrol et
      */
-    private String processTableContent(String content, FluxSink<StreamResponse> sink) {
-        // İçerik tablo içeriyorsa özel işlem yap
+    private boolean isCompleteTable(String content) {
+        // Satır sayısını kontrol et
+        int lineCount = content.split("\n").length;
         
-        // 1. Eğer içerik sadece tablo başlığının bir parçasıysa (| Özellik | Java gibi)
-        if (content.contains(TABLE_MARKER) && !content.contains("\n") && content.length() < 100) {
-            // Başlık satırının bir parçası, boşlukları normalize et
-            return content.replaceAll("\\s+", " ");
-        }
-        
-        // 2. Eğer içerik tablo başlangıcıysa ve CONVERT_TABLES_TO_LISTS aktifse, alternatif format kullan
-        if (CONVERT_TABLES_TO_LISTS && content.contains("| Özellik |") || 
-            (content.contains(TABLE_MARKER) && content.contains("\n"))) {
-            
-            // Kullanıcıyı alternatif formatla ilgili bilgilendir
-            if (!isTableWarningShown) {
-                sink.next(StreamResponse.builder()
-                    .content("\n\n**Not**: Tablo formatı stream modunda sorunlar yaratabilir. " +
-                             "İçeriği daha okunabilir bir formatta sunuyorum.\n\n")
-                    .done(false)
-                    .build());
-                isTableWarningShown = true;
-            }
-            
-            // Tabloyu liste formatına dönüştür
-            return convertTableToList(content);
-        }
-        
-        // 3. İçerik uzun bir tablo satırıysa boşlukları normalize et
-        if (content.contains(TABLE_MARKER) && content.split("\\|").length > 1) {
-            return content.replaceAll("\\s+", " ").replaceAll("\\| +", "| ").replaceAll(" +\\|", " |");
-        }
-        
-        return content;
+        // En az 3 satır (başlık, ayraç, veri) ve sonunda boş satır varsa tam bir tablodur
+        return lineCount >= 3 && content.endsWith("\n\n");
     }
     
-    // Tablo uyarısının bir kez gösterilmesini sağlamak için bayrak
-    private boolean isTableWarningShown = false;
-    
     /**
-     * Markdown tablosunu daha stream-dostu bir liste formatına dönüştürür
+     * Tablo içeriğini işleyerek yeniden formatlar
      */
-    private String convertTableToList(String tableContent) {
+    private String processAndReformatTable(String tableContent) {
         if (tableContent == null || tableContent.isEmpty()) {
             return tableContent;
         }
         
-        // Eğer içerik tam bir tablo değilse, olduğu gibi döndür
-        if (!tableContent.contains(TABLE_MARKER) || !tableContent.contains("\n")) {
-            return tableContent;
-        }
-        
         try {
-            // Tablo satırlarını ayır
+            // Markdown biçimlendirme sorunlarını temizle
+            tableContent = tableContent.replace("**", "");
+            
+            // Satırları temizle ve normalize et
             String[] lines = tableContent.split("\n");
             StringBuilder result = new StringBuilder();
             
-            // Tablo başlıklarını bul
-            String[] headers = null;
-            for (String line : lines) {
-                line = line.trim();
-                if (line.startsWith(TABLE_MARKER) && !line.contains(TABLE_DELIMITER_MARKER)) {
-                    // Başlık satırı
-                    headers = extractTableCells(line);
-                    break;
-                }
-            }
-            
-            if (headers == null || headers.length == 0) {
-                // Başlık bulunamadı, içeriği olduğu gibi döndür
-                return tableContent;
-            }
-            
-            // Tablo verilerini işle
-            boolean headerProcessed = false;
-            for (String line : lines) {
-                line = line.trim();
+            for (int i = 0; i < lines.length; i++) {
+                String line = lines[i].trim();
                 
-                // Ayırıcı satırları atla (|---|---|)
-                if (line.contains(TABLE_DELIMITER_MARKER)) {
+                // Boş satırları atla
+                if (line.isEmpty()) {
                     continue;
                 }
                 
-                // Başlık satırını atla (zaten işlendi)
-                if (!headerProcessed && line.startsWith(TABLE_MARKER)) {
-                    headerProcessed = true;
-                    continue;
-                }
-                
-                // Veri satırlarını işle
-                if (line.startsWith(TABLE_MARKER)) {
-                    String[] cells = extractTableCells(line);
-                    
-                    if (cells.length >= headers.length) {
-                        // Her satır için bir bölüm oluştur
-                        result.append("\n");
-                        
-                        // İlk sütun genellikle özellik adıdır, onu başlık olarak kullan
-                        result.append("**").append(cells[0]).append("**\n");
-                        
-                        // Diğer sütunları liste öğeleri olarak göster
-                        for (int i = 1; i < Math.min(cells.length, headers.length); i++) {
-                            result.append("- **").append(headers[i]).append("**: ")
-                                  .append(cells[i].trim()).append("\n");
-                        }
-                    }
-                } else if (!line.isEmpty()) {
-                    // Tablo olmayan içeriği olduğu gibi ekle
+                // Tablo satırı değilse, olduğu gibi ekle
+                if (!line.contains("|")) {
                     result.append(line).append("\n");
+                    continue;
+                }
+                
+                // Tablo hücrelerinin başında ve sonunda boşlukları normalize et
+                line = line.replaceAll("\\|\\s+", "| ").replaceAll("\\s+\\|", " |");
+                
+                // Eksik olan | karakterlerini tamamla (başta veya sonda yoksa)
+                if (!line.startsWith("|")) {
+                    line = "| " + line;
+                }
+                if (!line.endsWith("|")) {
+                    line = line + " |";
+                }
+                
+                // Yeniden formatlanmış satırı ekle
+                result.append(line).append("\n");
+                
+                // Başlık satırından sonra ayraç satırı oluştur (yoksa)
+                if (i == 0 && (lines.length < 2 || !lines[1].contains("|-"))) {
+                    int pipeCount = (int) line.chars().filter(c -> c == '|').count();
+                    StringBuilder separator = new StringBuilder("|");
+                    for (int j = 1; j < pipeCount; j++) {
+                        separator.append(" --- |");
+                    }
+                    result.append(separator).append("\n");
                 }
             }
             
             return result.toString();
-            
         } catch (Exception e) {
-            log.warn("Tablo dönüştürme hatası: {}", e.getMessage());
-            return tableContent; // Hata durumunda orijinal içeriği döndür
+            log.warn("Tablo işlenirken hata: {}", e.getMessage());
+            // Hata durumunda orijinal içeriği döndür
+            return tableContent;
         }
     }
-    
-    /**
-     * Tablo satırından hücreleri çıkarır
-     */
-    private String[] extractTableCells(String tableRow) {
-        if (tableRow == null || !tableRow.startsWith(TABLE_MARKER)) {
-            return new String[0];
+
+    // Stream tamamlandığında biriken tablo içeriğini gönder
+    // Bu yöntemi streamChatCompletion metodunda doOnComplete içinde çağırın
+    private void flushTableBuffer(FluxSink<StreamResponse> sink) {
+        if (isBufferingTable && tableBuffer.length() > 0) {
+            String tableContent = processAndReformatTable(tableBuffer.toString());
+            
+            // Bufferı temizle
+            tableBuffer.setLength(0);
+            tableRowCount = 0;
+            isBufferingTable = false;
+            
+            // İçeriği gönder
+            if (!tableContent.isEmpty()) {
+                sink.next(StreamResponse.builder()
+                    .content(tableContent)
+                    .done(false)
+                    .build());
+            }
         }
-        
-        // Başlangıç ve sondaki | karakterlerini kaldır
-        String rowContent = tableRow.trim();
-        if (rowContent.startsWith(TABLE_MARKER)) {
-            rowContent = rowContent.substring(1);
-        }
-        if (rowContent.endsWith(TABLE_MARKER)) {
-            rowContent = rowContent.substring(0, rowContent.length() - 1);
-        }
-        
-        // Hücreleri ayır
-        return Arrays.stream(rowContent.split("\\|"))
-                    .map(String::trim)
-                    .toArray(String[]::new);
     }
 
     // HTML içeriğinden hata mesajını çıkaran yardımcı metod
