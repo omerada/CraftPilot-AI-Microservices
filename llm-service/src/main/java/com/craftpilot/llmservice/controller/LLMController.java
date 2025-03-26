@@ -20,12 +20,6 @@ import reactor.core.scheduler.Schedulers;
 
 import jakarta.validation.Valid;
 import java.util.UUID;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import reactor.core.Disposable;
-import java.time.Duration;
 
 @Slf4j
 @RestController
@@ -102,21 +96,6 @@ public class LLMController {
         log.info("Stream chat completion request received with language: {}, requestId: {}, model: {}", 
                 userLanguage, trackingId, request.getModel());
         
-        // Check for duplicate messages in request - often causes table formatting issues
-        if (request.getMessages() != null && request.getMessages().size() > 1) {
-            List<Map<String, Object>> distinctMessages = request.getMessages().stream()
-                .distinct()
-                .collect(Collectors.toList());
-            
-            if (distinctMessages.size() < request.getMessages().size()) {
-                log.warn("Detected duplicate messages in request - this may cause formatting issues. Original count: {}, Distinct count: {}", 
-                         request.getMessages().size(), distinctMessages.size());
-                
-                // Optional: Replace with distinct messages to avoid issues
-                request.setMessages(distinctMessages);
-            }
-        }
-        
         request.setRequestType("CHAT");
         request.setLanguage(userLanguage);
         
@@ -152,21 +131,6 @@ public class LLMController {
                 .data(StreamResponse.builder().content("").done(false).build())
                 .build());
             
-            // Setup timeout for the stream
-            Disposable timeout = Schedulers.parallel().schedule(() -> {
-                log.warn("Stream timeout triggered for request: {}", trackingId);
-                sink.next(ServerSentEvent.<StreamResponse>builder()
-                    .id(trackingId)
-                    .event("error")
-                    .data(StreamResponse.builder()
-                        .content("Stream timed out after 60 seconds. Please try again with a simpler query.")
-                        .done(true)
-                        .error(true)
-                        .build())
-                    .build());
-                sink.complete();
-            }, 60, TimeUnit.SECONDS);
-            
             // LLM servisi ile gerçek akışı başlat
             llmService.streamChatCompletion(request)
                 .doOnNext(chunk -> {
@@ -190,12 +154,10 @@ public class LLMController {
                 })
                 .doOnComplete(() -> {
                     log.info("LLM stream completed for request: {}", trackingId);
-                    timeout.dispose(); // Cancel the timeout
                     sink.complete();
                 })
                 .doOnError(error -> {
                     log.error("LLM stream error: {}", error.getMessage(), error);
-                    timeout.dispose(); // Cancel the timeout
                     sink.next(ServerSentEvent.<StreamResponse>builder()
                         .id(trackingId)
                         .event("error")
@@ -212,18 +174,7 @@ public class LLMController {
         .onBackpressureBuffer(256)
         .doOnCancel(() -> log.warn("Stream response was cancelled for request: {}", trackingId))
         .doOnComplete(() -> log.info("Stream response completed for request: {}", trackingId))
-        .doOnError(error -> log.error("Stream response error: {}", error.getMessage(), error))
-        .timeout(Duration.ofSeconds(65), Flux.just(
-            ServerSentEvent.<StreamResponse>builder()
-                .id(trackingId)
-                .event("error")
-                .data(StreamResponse.builder()
-                    .content("Response stream timed out. This may be due to complex table formatting or an overloaded server.")
-                    .done(true)
-                    .error(true)
-                    .build())
-                .build()
-        ));
+        .doOnError(error -> log.error("Stream response error: {}", error.getMessage(), error));
     }
 
     @PostMapping(value = "/images/generate", 

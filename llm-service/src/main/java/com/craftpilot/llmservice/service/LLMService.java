@@ -64,11 +64,6 @@ public class LLMService {
     // Varsayılan token limiti
     private static final int DEFAULT_TOKEN_LIMIT = 4000;
 
-    // Add this constant for content filtering
-    private static final int MAX_CONSECUTIVE_WHITESPACE = 100;
-    private static final int MAX_CHUNK_SIZE = 2000;
-    private static final String EXCESSIVE_WHITESPACE_PATTERN = "\\s{" + MAX_CONSECUTIVE_WHITESPACE + ",}";
-
     public Mono<AIResponse> processChatCompletion(AIRequest request) {
         // Request validasyonu
         if (request.getRequestId() == null) {
@@ -318,12 +313,12 @@ public class LLMService {
                 if (choice.has("delta") && choice.get("delta").has("content")) {
                     String content = choice.get("delta").get("content").asText();
                     if (content != null && !content.isEmpty()) {
-                        content = filterContent(content);
                         log.debug("Extracted delta.content: {}", 
                             content.length() > 30 ? content.substring(0, 30) + "..." : content);
-                        
-                        // Send content in smaller chunks if it's too large
-                        sendContentInChunks(content, sink);
+                        sink.next(StreamResponse.builder()
+                            .content(content)
+                            .done(false)
+                            .build());
                         contentSent = true;
                     }
                 }
@@ -332,9 +327,11 @@ public class LLMService {
                 if (!contentSent && choice.has("text")) {
                     String content = choice.get("text").asText();
                     if (content != null && !content.isEmpty()) {
-                        content = filterContent(content);
                         log.debug("Extracted text: {}", content);
-                        sendContentInChunks(content, sink);
+                        sink.next(StreamResponse.builder()
+                            .content(content)
+                            .done(false)
+                            .build());
                         contentSent = true;
                     }
                 }
@@ -343,9 +340,11 @@ public class LLMService {
                 if (!contentSent && choice.has("message") && choice.get("message").has("content")) {
                     String content = choice.get("message").get("content").asText();
                     if (content != null && !content.isEmpty()) {
-                        content = filterContent(content);
                         log.debug("Extracted message.content: {}", content);
-                        sendContentInChunks(content, sink);
+                        sink.next(StreamResponse.builder()
+                            .content(content)
+                            .done(false)
+                            .build());
                         contentSent = true;
                     }
                 }
@@ -358,8 +357,6 @@ public class LLMService {
             if (jsonNode.has("content") && jsonNode.get("content").isTextual()) {
                 String content = jsonNode.get("content").asText();
                 if (content != null && !content.isEmpty()) {
-                    content = filterContent(content);
-                    
                     if (content.startsWith("{") && content.endsWith("}")) {
                         // Bu durumda content alanı başka bir JSON - bunu parse etmeye çalışalım
                         try {
@@ -375,7 +372,10 @@ public class LLMService {
                     if (!contentSent) {
                         log.debug("Using direct content: {}", 
                             content.length() > 30 ? content.substring(0, 30) + "..." : content);
-                        sendContentInChunks(content, sink);
+                        sink.next(StreamResponse.builder()
+                            .content(content)
+                            .done(false)
+                            .build());
                         contentSent = true;
                     }
                 }
@@ -385,108 +385,6 @@ public class LLMService {
             if (!contentSent) {
                 log.warn("Could not extract content from JSON: {}", jsonNode);
             }
-        }
-    }
-    
-    /**
-     * Filters content to prevent issues with excessive whitespace
-     */
-    private String filterContent(String content) {
-        if (content == null || content.isEmpty()) {
-            return content;
-        }
-        
-        // Replace excessive whitespace sequences with a reasonable amount
-        String filtered = content.replaceAll(EXCESSIVE_WHITESPACE_PATTERN, " ");
-        
-        // Log if significant reduction occurred (helps with debugging)
-        if (content.length() > filtered.length() + 100) {
-            log.debug("Reduced content size from {} to {} characters by filtering whitespace", 
-                      content.length(), filtered.length());
-        }
-        
-        return filtered;
-    }
-    
-    /**
-     * Breaks content into smaller chunks to prevent browser overwhelm
-     */
-    private void sendContentInChunks(String content, FluxSink<StreamResponse> sink) {
-        if (content == null || content.isEmpty()) {
-            return;
-        }
-        
-        // If content is small enough, send as is
-        if (content.length() <= MAX_CHUNK_SIZE) {
-            sink.next(StreamResponse.builder()
-                .content(content)
-                .done(false)
-                .build());
-            return;
-        }
-        
-        // Special handling for table content - can be very problematic in streaming
-        if (content.contains("|") && content.contains("-")) {
-            // This is likely a table or ASCII art - handle specially
-            handleTableContent(content, sink);
-            return;
-        }
-        
-        // Otherwise, break into smaller chunks at sensible boundaries
-        int start = 0;
-        while (start < content.length()) {
-            int end = Math.min(start + MAX_CHUNK_SIZE, content.length());
-            
-            // Try to break at a newline or space if possible
-            if (end < content.length()) {
-                int newlinePos = content.lastIndexOf('\n', end);
-                int spacePos = content.lastIndexOf(' ', end);
-                
-                if (newlinePos > start && end - newlinePos < 200) {
-                    end = newlinePos + 1; // Include the newline
-                } else if (spacePos > start && end - spacePos < 100) {
-                    end = spacePos + 1; // Include the space
-                }
-            }
-            
-            String chunk = content.substring(start, end);
-            sink.next(StreamResponse.builder()
-                .content(chunk)
-                .done(false)
-                .build());
-            
-            start = end;
-        }
-    }
-    
-    /**
-     * Special handling for table content which can cause streaming issues
-     */
-    private void handleTableContent(String content, FluxSink<StreamResponse> sink) {
-        // For tables/ASCII art, we'll convert to a more streaming-friendly format
-        // This is a simple implementation - replace with more sophisticated logic if needed
-        
-        // If this is just a table header or row (common case), process normally
-        if (!content.contains("\n") && content.length() < MAX_CHUNK_SIZE) {
-            sink.next(StreamResponse.builder()
-                .content(content)
-                .done(false)
-                .build());
-            return;
-        }
-        
-        // For more complex tables, break at newlines
-        String[] lines = content.split("\n");
-        for (String line : lines) {
-            if (line.isEmpty()) continue;
-            
-            // Further filter lines for excessive spaces
-            line = line.replaceAll("\\s{3,}", " ");
-            
-            sink.next(StreamResponse.builder()
-                .content(line + "\n")
-                .done(false)
-                .build());
         }
     }
 
