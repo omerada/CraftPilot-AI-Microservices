@@ -103,48 +103,28 @@ public class ChatHistoryController {
 
     @PostMapping("/histories/{id}/conversations")
     public Mono<ResponseEntity<ChatHistory>> addConversation(@PathVariable String id, @RequestBody Conversation conversation) {
-        log.info("Sohbete mesaj ekleme isteği, Chat ID: {}, Role: {}, Sequence: {}", id, conversation.getRole(), conversation.getSequence());
+        log.info("Adding conversation, Chat ID: {}, Role: {}", id, conversation.getRole());
         
-        // Kesinlikle null olmaması gereken alanları kontrol et
+        // Validate the conversation
+        if (conversation.getContent() == null || conversation.getContent().isEmpty()) {
+            return Mono.just(ResponseEntity.badRequest().body(null));
+        }
+        
+        // Ensure ID exists
         if (conversation.getId() == null) {
             conversation.setId(UUID.randomUUID().toString());
-            log.debug("Null conversation ID için yeni UUID atandı: {}", conversation.getId());
         }
         
-        // Timestamp değerini düzelt
-        processConversationTimestamp(conversation);
-        
-        // SEQUENCE DEĞERİNİ KESİNLİKLE ATAMAK İÇİN GÜÇLENDİRİLMİŞ MANTIK
-        // Her durumda bir sequence değeri atanmasını sağla
-        long currentTime = System.currentTimeMillis();
-        
-        if (conversation.getSequence() == null || conversation.getSequence() == 0) {
-            // Role'e göre sequence değeri ata
-            if ("user".equals(conversation.getRole())) {
-                conversation.setSequence(currentTime);
-                log.debug("User mesajı için sequence atandı: {}", currentTime);
-            } else {
-                // AI yanıtları için, her zaman user mesajından sonra gelecek şekilde daha büyük bir sequence
-                conversation.setSequence(currentTime + 1000);
-                log.debug("AI mesajı için sequence atandı: {}", currentTime + 1000);
-            }
-        } else {
-            log.debug("Mevcut sequence değeri korundu: {}", conversation.getSequence());
-        }
-        
-        // Timestamp ve sequence değerinin tutarlı olmasını sağla
-        conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
-            conversation.getSequence() / 1000,
-            (int) ((conversation.getSequence() % 1000) * 1_000_000)
-        ));
-        
-        log.debug("Mesaj kaydediliyor: ID={}, sequence={}, timestamp={}", 
-                 conversation.getId(), conversation.getSequence(), conversation.getTimestamp());
-
+        // Simplify by delegating all sequence and timestamp handling to the repository layer
+        // This ensures a single source of truth for sequencing
         return chatHistoryService.addConversation(id, conversation)
-                .map(updated -> ResponseEntity.ok(updated))
+                .map(updated -> {
+                    log.info("Successfully added conversation to chat {}, total conversations: {}", 
+                            id, updated.getConversations() != null ? updated.getConversations().size() : 0);
+                    return ResponseEntity.ok(updated);
+                })
                 .onErrorResume(error -> {
-                    log.error("Mesaj eklenirken hata, Chat ID {}: {}", id, error.getMessage());
+                    log.error("Error adding conversation to chat {}: {}", id, error.getMessage(), error);
                     return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
                 })
                 .defaultIfEmpty(ResponseEntity.notFound().build());

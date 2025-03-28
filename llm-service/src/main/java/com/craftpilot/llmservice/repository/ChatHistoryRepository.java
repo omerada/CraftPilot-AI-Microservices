@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.ArrayList; 
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
+import java.util.Comparator;
+import java.util.UUID;
 
 @Repository
 @RequiredArgsConstructor
@@ -118,110 +120,87 @@ public class ChatHistoryRepository {
         return Mono.create(emitter -> {
             DocumentReference docRef = firestore.collection(COLLECTION_NAME).document(historyId);
             
+            // Execute in a transaction for atomicity
             firestore.runTransaction(transaction -> {
                 DocumentSnapshot snapshot = transaction.get(docRef).get();
-                ChatHistory history = snapshot.toObject(ChatHistory.class);
-                
-                if (history != null) {
-                    // EKLEME ÖNCESİ KESİN NULL SEQUENCE KONTROLÜ
-                    if (conversation.getSequence() == null || conversation.getSequence() == 0) {
-                        // Eğer sequence değeri hala null veya 0 ise, ciddi bir hata var demektir
-                        log.warn("Null sequence değeri ile ekleme yapılmaya çalışılıyor, otomatik düzeltiliyor");
-                        
-                        // Şu anki zamanı kullanarak sequence oluştur
-                        long currentTime = System.currentTimeMillis();
-                        
-                        // Role'e göre sequence değeri ata
-                        if ("user".equals(conversation.getRole())) {
-                            conversation.setSequence(currentTime);
-                        } else {
-                            // AI mesajları için daha büyük bir değer
-                            conversation.setSequence(currentTime + 1000);
-                        }
-                        
-                        // Timestamp değerini de güncelle
-                        conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
-                            conversation.getSequence() / 1000,
-                            (int) ((conversation.getSequence() % 1000) * 1_000_000)
-                        ));
-                        
-                        log.info("Repository'de sequence değeri atandı: {}", conversation.getSequence());
-                    }
-                    
-                    // Mevcut koleksiyonu kontrol et
-                    if (history.getConversations() == null) {
-                        history.setConversations(List.of(conversation));
-                        log.debug("İlk mesaj ekleniyor: {}", conversation.getId());
-                    } else {
-                        // Mevcut mesajlarda null sequence kontrolü yap
-                        List<Conversation> updatedConversations = new ArrayList<>();
-                        long currentTime = System.currentTimeMillis();
-                        
-                        for (Conversation existingConv : history.getConversations()) {
-                            // Eğer mevcut bir mesajda null sequence varsa düzelt
-                            if (existingConv.getSequence() == null || existingConv.getSequence() == 0) {
-                                log.warn("Mevcut mesajda null sequence bulundu, düzeltiliyor. ID: {}", existingConv.getId());
-                                
-                                // Timestamp'ten sequence türet
-                                if (existingConv.getTimestamp() != null) {
-                                    long seconds = existingConv.getTimestamp().getSeconds();
-                                    int nanos = existingConv.getTimestamp().getNanos();
-                                    existingConv.setSequence(seconds * 1000 + (nanos / 1_000_000));
-                                } else {
-                                    // Hem timestamp hem de sequence yoksa yeni bir değer ata
-                                    existingConv.setSequence(currentTime - 10000); // Eski bir mesaj olduğunu varsay
-                                    existingConv.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
-                                        existingConv.getSequence() / 1000,
-                                        (int) ((existingConv.getSequence() % 1000) * 1_000_000)
-                                    ));
-                                }
-                                
-                                log.info("Mevcut mesaja sequence atandı: {}, ID: {}", 
-                                        existingConv.getSequence(), existingConv.getId());
-                            }
-                            
-                            updatedConversations.add(existingConv);
-                        }
-                        
-                        // Yeni mesajı ekle
-                        updatedConversations.add(conversation);
-                        
-                        // Tüm mesajları sequence'e göre sırala
-                        history.setConversations(
-                            updatedConversations.stream()
-                                .sorted((a, b) -> {
-                                    // Sequence bazlı karşılaştırma
-                                    Long seqA = a.getSequence() != null ? a.getSequence() : 0L;
-                                    Long seqB = b.getSequence() != null ? b.getSequence() : 0L;
-                                    
-                                    // Aynı sequence değeri olması durumunda role'e göre sırala
-                                    if (Math.abs(seqA - seqB) < 100) {
-                                        if ("user".equals(a.getRole()) && !"user".equals(b.getRole())) {
-                                            return -1; // Kullanıcı mesajları önce
-                                        } else if (!"user".equals(a.getRole()) && "user".equals(b.getRole())) {
-                                            return 1; // AI mesajları sonra
-                                        }
-                                    }
-                                    
-                                    return seqA.compareTo(seqB);
-                                })
-                                .collect(Collectors.toList())
-                        );
-                        
-                        log.debug("Mesaj eklendi ve sıralama yapıldı, toplam mesaj sayısı: {}", 
-                                 history.getConversations().size());
-                    }
-                    
-                    history.setUpdatedAt(Timestamp.now());
-                    transaction.set(docRef, history);
+                if (!snapshot.exists()) {
+                    throw new IllegalArgumentException("Chat history with ID " + historyId + " does not exist");
                 }
                 
+                ChatHistory history = snapshot.toObject(ChatHistory.class);
+                if (history == null) {
+                    throw new IllegalArgumentException("Failed to deserialize chat history");
+                }
+                
+                // Ensure conversation has an ID
+                if (conversation.getId() == null || conversation.getId().isEmpty()) {
+                    conversation.setId(UUID.randomUUID().toString());
+                    log.debug("Generated new conversation ID: {}", conversation.getId());
+                }
+                
+                // HANDLING TIMESTAMPS AND SEQUENCES - SIMPLIFIED APPROACH
+                long currentTimeMillis = System.currentTimeMillis();
+                
+                // If conversations list is null, initialize it
+                if (history.getConversations() == null) {
+                    history.setConversations(new ArrayList<>());
+                }
+                
+                // Get the highest existing sequence value
+                long highestSequence = 0;
+                for (Conversation existingConv : history.getConversations()) {
+                    if (existingConv.getSequence() != null && existingConv.getSequence() > highestSequence) {
+                        highestSequence = existingConv.getSequence();
+                    }
+                }
+                
+                // SIMPLE SEQUENTIAL APPROACH: Always increment from the highest existing sequence
+                // Use at least the current time in milliseconds for completely new chats
+                long newSequence = Math.max(highestSequence + 1000, currentTimeMillis);
+                
+                // Set the new sequence value
+                conversation.setSequence(newSequence);
+                log.info("Assigned sequential value: {} for conversation {}, role {}", 
+                        newSequence, conversation.getId(), conversation.getRole());
+                
+                // Set or update the timestamp to match the sequence
+                conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
+                    newSequence / 1000,
+                    (int) ((newSequence % 1000) * 1_000_000)
+                ));
+                
+                // Add the new conversation to the list
+                List<Conversation> updatedConversations = new ArrayList<>(history.getConversations());
+                updatedConversations.add(conversation);
+                
+                // Sort by sequence (simplest approach)
+                updatedConversations.sort(Comparator.comparing(
+                    c -> c.getSequence() != null ? c.getSequence() : 0L
+                ));
+                
+                // Update the history object
+                history.setConversations(updatedConversations);
+                history.setUpdatedAt(Timestamp.now());
+                
+                // For easily showing the latest message in the UI
+                if (conversation.getContent() != null && !conversation.getContent().isEmpty()) {
+                    history.setLastConversation(conversation.getContent());
+                }
+                
+                // Update the document in Firestore
+                transaction.set(docRef, history);
                 return history;
             }).addListener(() -> {
                 try {
+                    // Get the latest version of the history after the transaction
                     ChatHistory updatedHistory = findById(historyId).block();
                     emitter.success(updatedHistory);
+                    log.info("Successfully added conversation {} to chat {}, total conversations: {}", 
+                            conversation.getId(), historyId, 
+                            updatedHistory != null && updatedHistory.getConversations() != null ? 
+                                updatedHistory.getConversations().size() : 0);
                 } catch (Exception e) {
+                    log.error("Error retrieving updated chat history after adding conversation: {}", e.getMessage(), e);
                     emitter.error(e);
                 }
             }, Runnable::run);
