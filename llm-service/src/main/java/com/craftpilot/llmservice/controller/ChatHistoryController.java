@@ -148,18 +148,27 @@ public class ChatHistoryController {
      * Frontend'den gelen timestamp değerlerini Google Cloud Timestamp'e dönüştürür
      */
     private void processTimestamps(ChatHistory chatHistory) {
-        // createdAt ve updatedAt alanları null ise şu anki zamanı kullan
-        if (chatHistory.getCreatedAt() == null) {
+        try {
+            // createdAt ve updatedAt alanları null ise şu anki zamanı kullan
+            if (chatHistory.getCreatedAt() == null) {
+                log.debug("createdAt null, şu anki zaman kullanılıyor");
+                chatHistory.setCreatedAt(Timestamp.now());
+            }
+            
+            if (chatHistory.getUpdatedAt() == null) {
+                log.debug("updatedAt null, şu anki zaman kullanılıyor");
+                chatHistory.setUpdatedAt(Timestamp.now());
+            }
+            
+            // Eğer conversations listesi varsa içindeki timestamp değerlerini de işle
+            if (chatHistory.getConversations() != null) {
+                chatHistory.getConversations().forEach(this::processConversationTimestamp);
+            }
+        } catch (Exception e) {
+            log.error("Timestamp işlenirken hata: {}", e.getMessage());
+            // Hata durumunda yeni timestamp'ler oluştur
             chatHistory.setCreatedAt(Timestamp.now());
-        }
-        
-        if (chatHistory.getUpdatedAt() == null) {
             chatHistory.setUpdatedAt(Timestamp.now());
-        }
-        
-        // Eğer conversations listesi varsa içindeki timestamp değerlerini de işle
-        if (chatHistory.getConversations() != null) {
-            chatHistory.getConversations().forEach(this::processConversationTimestamp);
         }
     }
 
@@ -167,7 +176,13 @@ public class ChatHistoryController {
      * Conversation için timestamp işleme
      */
     private void processConversationTimestamp(Conversation conversation) {
-        if (conversation.getTimestamp() == null) {
+        try {
+            if (conversation.getTimestamp() == null) {
+                log.debug("Conversation timestamp null, şu anki zaman kullanılıyor");
+                conversation.setTimestamp(Timestamp.now());
+            }
+        } catch (Exception e) {
+            log.error("Conversation timestamp işlenirken hata: {}", e.getMessage());
             conversation.setTimestamp(Timestamp.now());
         }
     }

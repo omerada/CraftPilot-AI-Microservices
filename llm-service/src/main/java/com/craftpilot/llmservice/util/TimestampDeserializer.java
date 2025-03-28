@@ -3,7 +3,7 @@ package com.craftpilot.llmservice.util;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.node.TextNode;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.cloud.Timestamp;
 import lombok.extern.slf4j.Slf4j;
 
@@ -22,12 +22,18 @@ public class TimestampDeserializer extends JsonDeserializer<Timestamp> {
     @Override
     public Timestamp deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
         try {
-            if (p.getCurrentToken().isNumeric()) {
+            // JsonNode olarak al (daha güvenilir analiz için)
+            JsonNode node = p.getCodec().readTree(p);
+            
+            if (node.isNumber()) {
                 // Sayısal değer (unix timestamp) - saniye veya milisaniye olabilir
-                long value = p.getLongValue();
+                long value = node.asLong();
                 
                 // 10 karakterli ise saniye, 13 karakterli ise milisaniye olarak kabul et
-                if (String.valueOf(value).length() <= 10) {
+                String valueStr = String.valueOf(value);
+                log.debug("Numeric timestamp value: {}, length: {}", value, valueStr.length());
+                
+                if (valueStr.length() <= 10) {
                     // Saniye cinsinden
                     return Timestamp.ofTimeSecondsAndNanos(value, 0);
                 } else {
@@ -37,9 +43,10 @@ public class TimestampDeserializer extends JsonDeserializer<Timestamp> {
                         (int) TimeUnit.MILLISECONDS.toNanos(value % 1000)
                     );
                 }
-            } else if (p.getCurrentToken().isScalarValue()) {
+            } else if (node.isTextual()) {
                 // String değer - ISO-8601 formatı veya başka bir tarih formatı olabilir
-                String text = p.getValueAsString();
+                String text = node.asText();
+                log.debug("Text timestamp value: {}", text);
                 
                 try {
                     // ISO-8601 formatını parse et
@@ -49,18 +56,25 @@ public class TimestampDeserializer extends JsonDeserializer<Timestamp> {
                         instant.getNano()
                     );
                 } catch (DateTimeParseException e) {
-                    // Alternatif format denemeleri
-                    log.warn("ISO-8601 tarih formatı parse edilemedi: {}", text);
-                    
-                    // Şu anki zamanı kullan
+                    // Alternatif format denemeleri veya hata durumunda mevcut zaman
+                    log.warn("ISO-8601 tarih formatı parse edilemedi: {}, şu anki zaman kullanılıyor", text);
                     return Timestamp.now();
                 }
-            } else if (p.getCurrentToken().isStructStart()) {
+            } else if (node.isObject()) {
                 // JSON nesnesi - Firebase Timestamp formatı olabilir
-                p.skipChildren();
-                
-                // Geçerli bir format bulunamadı, varsayılan değeri döndür
-                log.warn("Geçerli bir timestamp formatı değil (JSON nesnesi)");
+                if (node.has("seconds") && node.has("nanos")) {
+                    // Firebase Timestamp formatı
+                    long seconds = node.get("seconds").asLong();
+                    int nanos = node.get("nanos").asInt();
+                    return Timestamp.ofTimeSecondsAndNanos(seconds, nanos);
+                } else {
+                    // Geçerli bir format bulunamadı, varsayılan değeri döndür
+                    log.warn("Geçerli bir timestamp formatı değil (JSON nesnesi), şu anki zaman kullanılıyor");
+                    return Timestamp.now();
+                }
+            } else if (node.isNull()) {
+                // Null değer - şu anki zamanı döndür
+                log.info("Null timestamp değeri, şu anki zaman kullanılıyor");
                 return Timestamp.now();
             }
             
