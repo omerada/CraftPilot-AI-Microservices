@@ -102,10 +102,15 @@ public class ChatHistoryController {
 
     @PostMapping("/histories/{id}/conversations")
     public Mono<ResponseEntity<ChatHistory>> addConversation(@PathVariable String id, @RequestBody Conversation conversation) {
-        log.info("Sohbete mesaj ekleme isteği, Chat ID: {}", id);
+        log.info("Sohbete mesaj ekleme isteği, Chat ID: {}, Sequence: {}", id, conversation.getSequence());
         
         // Timestamp değerini düzelt
         processConversationTimestamp(conversation);
+        
+        // Sequence yoksa sıfır olarak ayarla (sonra sıralamada en sona gidecek)
+        if (conversation.getSequence() == null) {
+            conversation.setSequence(0L);
+        }
         
         return chatHistoryService.addConversation(id, conversation)
                 .map(updated -> {

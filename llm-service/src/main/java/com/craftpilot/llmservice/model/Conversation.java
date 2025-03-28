@@ -21,4 +21,7 @@ public class Conversation {
     private Timestamp timestamp;
     
     private boolean fresh;
+    
+    // Sıralama için yeni alan eklendi
+    private Long sequence;
 }
