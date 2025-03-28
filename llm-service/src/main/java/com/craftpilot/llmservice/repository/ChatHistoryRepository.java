@@ -122,41 +122,93 @@ public class ChatHistoryRepository {
                 ChatHistory history = snapshot.toObject(ChatHistory.class);
                 
                 if (history != null) {
-                    // Önce mesaj sıralamasını doğru yapmak için null sequence kontrolü yap
-                    if (conversation.getSequence() == null) {
-                        // Eğer sequence değeri null ise, otomatik olarak bir değer ata
-                        long currentTime = System.currentTimeMillis();
-                        conversation.setSequence(currentTime);
+                    // EKLEME ÖNCESİ KESİN NULL SEQUENCE KONTROLÜ
+                    if (conversation.getSequence() == null || conversation.getSequence() == 0) {
+                        // Eğer sequence değeri hala null veya 0 ise, ciddi bir hata var demektir
+                        log.warn("Null sequence değeri ile ekleme yapılmaya çalışılıyor, otomatik düzeltiliyor");
                         
-                        // Timestamp'i de güncelle
+                        // Şu anki zamanı kullanarak sequence oluştur
+                        long currentTime = System.currentTimeMillis();
+                        
+                        // Role'e göre sequence değeri ata
+                        if ("user".equals(conversation.getRole())) {
+                            conversation.setSequence(currentTime);
+                        } else {
+                            // AI mesajları için daha büyük bir değer
+                            conversation.setSequence(currentTime + 1000);
+                        }
+                        
+                        // Timestamp değerini de güncelle
                         conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
-                            currentTime / 1000,
-                            (int) ((currentTime % 1000) * 1_000_000)
+                            conversation.getSequence() / 1000,
+                            (int) ((conversation.getSequence() % 1000) * 1_000_000)
                         ));
+                        
+                        log.info("Repository'de sequence değeri atandı: {}", conversation.getSequence());
                     }
                     
+                    // Mevcut koleksiyonu kontrol et
                     if (history.getConversations() == null) {
                         history.setConversations(List.of(conversation));
+                        log.debug("İlk mesaj ekleniyor: {}", conversation.getId());
                     } else {
-                        history.getConversations().add(conversation);
+                        // Mevcut mesajlarda null sequence kontrolü yap
+                        List<Conversation> updatedConversations = new ArrayList<>();
+                        long currentTime = System.currentTimeMillis();
                         
-                        // Eklenen mesajlardan sonra tüm konuşmaları sequence veya timestamp değerine göre sırala
+                        for (Conversation existingConv : history.getConversations()) {
+                            // Eğer mevcut bir mesajda null sequence varsa düzelt
+                            if (existingConv.getSequence() == null || existingConv.getSequence() == 0) {
+                                log.warn("Mevcut mesajda null sequence bulundu, düzeltiliyor. ID: {}", existingConv.getId());
+                                
+                                // Timestamp'ten sequence türet
+                                if (existingConv.getTimestamp() != null) {
+                                    long seconds = existingConv.getTimestamp().getSeconds();
+                                    int nanos = existingConv.getTimestamp().getNanos();
+                                    existingConv.setSequence(seconds * 1000 + (nanos / 1_000_000));
+                                } else {
+                                    // Hem timestamp hem de sequence yoksa yeni bir değer ata
+                                    existingConv.setSequence(currentTime - 10000); // Eski bir mesaj olduğunu varsay
+                                    existingConv.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
+                                        existingConv.getSequence() / 1000,
+                                        (int) ((existingConv.getSequence() % 1000) * 1_000_000)
+                                    ));
+                                }
+                                
+                                log.info("Mevcut mesaja sequence atandı: {}, ID: {}", 
+                                        existingConv.getSequence(), existingConv.getId());
+                            }
+                            
+                            updatedConversations.add(existingConv);
+                        }
+                        
+                        // Yeni mesajı ekle
+                        updatedConversations.add(conversation);
+                        
+                        // Tüm mesajları sequence'e göre sırala
                         history.setConversations(
-                            history.getConversations().stream()
+                            updatedConversations.stream()
                                 .sorted((a, b) -> {
-                                    // Önce sequence değerine göre karşılaştır
-                                    if (a.getSequence() != null && b.getSequence() != null) {
-                                        return a.getSequence().compareTo(b.getSequence());
+                                    // Sequence bazlı karşılaştırma
+                                    Long seqA = a.getSequence() != null ? a.getSequence() : 0L;
+                                    Long seqB = b.getSequence() != null ? b.getSequence() : 0L;
+                                    
+                                    // Aynı sequence değeri olması durumunda role'e göre sırala
+                                    if (Math.abs(seqA - seqB) < 100) {
+                                        if ("user".equals(a.getRole()) && !"user".equals(b.getRole())) {
+                                            return -1; // Kullanıcı mesajları önce
+                                        } else if (!"user".equals(a.getRole()) && "user".equals(b.getRole())) {
+                                            return 1; // AI mesajları sonra
+                                        }
                                     }
-                                    // Sequence yoksa timestamp değerine göre karşılaştır
-                                    else if (a.getTimestamp() != null && b.getTimestamp() != null) {
-                                        return a.getTimestamp().compareTo(b.getTimestamp());
-                                    }
-                                    // Hiçbir değer yoksa varsayılan sırada bırak
-                                    return 0;
+                                    
+                                    return seqA.compareTo(seqB);
                                 })
                                 .collect(Collectors.toList())
                         );
+                        
+                        log.debug("Mesaj eklendi ve sıralama yapıldı, toplam mesaj sayısı: {}", 
+                                 history.getConversations().size());
                     }
                     
                     history.setUpdatedAt(Timestamp.now());
