@@ -15,6 +15,7 @@ import reactor.core.publisher.Mono;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/chat")
@@ -102,43 +103,41 @@ public class ChatHistoryController {
 
     @PostMapping("/histories/{id}/conversations")
     public Mono<ResponseEntity<ChatHistory>> addConversation(@PathVariable String id, @RequestBody Conversation conversation) {
-        log.info("Sohbete mesaj ekleme isteği, Chat ID: {}, Sequence: {}, Role: {}", id, conversation.getSequence(), conversation.getRole());
+        log.info("Sohbete mesaj ekleme isteği, Chat ID: {}, Role: {}", id, conversation.getRole());
         
         // Timestamp değerini düzelt
         processConversationTimestamp(conversation);
         
         // Sequence yoksa veya 0 ise rol ve zaman damgasına göre uygun bir değer atama
-        // Daha agresif kontrol yapıyoruz
         if (conversation.getSequence() == null || conversation.getSequence() == 0) {
-            // Şu anki zamanı milisaniye olarak al
+            // Current time in milliseconds
             long currentTime = System.currentTimeMillis();
             
-            // Eğer bu kullanıcı mesajı ise, çok daha geriye dönük bir timestamp ver
-            // Bu sayede kullanıcı mesajı her zaman AI yanıtından önce gelecek
+            // Role'e göre sequence değeri ata
             if ("user".equals(conversation.getRole())) {
-                // İlk mesaj olabilir - çok daha eski bir timestamp ver (1 saat önce)
-                conversation.setSequence(currentTime - 3600000); // 1 saat öncesi
-                log.info("USER mesajı için sequence atandı: {}", conversation.getSequence());
-            } else {
+                // User mesajları için, AI yanıtından önce gelmesi için 100ms daha küçük sequence
                 conversation.setSequence(currentTime);
-                log.info("AI mesajı için sequence atandı: {}", conversation.getSequence());
+                conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
+                    currentTime / 1000,
+                    (int) ((currentTime % 1000) * 1_000_000)
+                ));
+            } else {
+                // AI yanıtları için, user mesajından sonra gelmesi için 100ms daha büyük sequence
+                conversation.setSequence(currentTime + 100);
+                conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
+                    (currentTime + 100) / 1000,
+                    (int) (((currentTime + 100) % 1000) * 1_000_000)
+                ));
             }
         }
-        
-        // Timestamp değerini sequence ile uyumlu hale getir
-        if (conversation.getTimestamp() == null) {
-            conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
-                conversation.getSequence() / 1000,
-                (int) ((conversation.getSequence() % 1000) * 1_000_000)
-            ));
+
+        // UUID ata
+        if (conversation.getId() == null) {
+            conversation.setId(UUID.randomUUID().toString());
         }
-        
-        log.info("Sohbete mesaj ekleniyor, Chat ID: {}, Sequence: {}", id, conversation.getSequence());
+
         return chatHistoryService.addConversation(id, conversation)
-                .map(updated -> {
-                    log.debug("Mesaj eklendi, Chat ID: {}", id);
-                    return ResponseEntity.ok(updated);
-                })
+                .map(updated -> ResponseEntity.ok(updated))
                 .onErrorResume(error -> {
                     log.error("Mesaj eklenirken hata, Chat ID {}: {}", id, error.getMessage());
                     return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
