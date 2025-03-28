@@ -190,7 +190,9 @@ spring:
         "[/**]":
           allowedOrigins:
             - "http://localhost:5173"
+            - "http://localhost:3000"
             - "https://app.craftpilot.io"
+            - "https://*.craftpilot.io"
           allowedMethods:
             - GET
             - POST
