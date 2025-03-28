@@ -29,8 +29,11 @@ public class ChatHistory {
     @JsonDeserialize(using = TimestampDeserializer.class)
     private Timestamp updatedAt;
     
+    @Builder.Default
     private List<Conversation> conversations = new ArrayList<>();
     private String aiModel;
     private double temperature;
+    
+    @Builder.Default
     private boolean enable = true;
 }
