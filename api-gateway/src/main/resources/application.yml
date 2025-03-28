@@ -184,27 +184,7 @@ spring:
       - name: RequestSize
         args:
           maxSize: 10MB
-    globalcors:
-      add-to-simple-url-handler-mapping: true
-      cors-configurations:
-        "[/**]":
-          allowedOrigins:
-            - "http://localhost:5173"
-            - "https://app.craftpilot.io"
-          allowedMethods:
-            - GET
-            - POST
-            - PUT
-            - DELETE
-            - OPTIONS
-            - PATCH
-          allowedHeaders: "*"
-          exposedHeaders:
-            - "X-Total-Count"
-            - "X-Error-Message"
-            - "X-CSRF-TOKEN"
-          allowCredentials: true
-          maxAge: 3600
+    # CORS yapılandırmasını kaldırdık (CorsConfig sınıfını kullanıyoruz)
 
 eureka:
   instance:
