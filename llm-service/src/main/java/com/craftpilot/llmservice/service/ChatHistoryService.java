@@ -116,7 +116,12 @@ public class ChatHistoryService {
             conversation.setId(UUID.randomUUID().toString());
         }
         
-        // Timestamp kontrolü
+        // Sequence değeri yoksa, şu anki timestamp değerini ekle
+        if (conversation.getSequence() == null) {
+            conversation.setSequence(System.currentTimeMillis());
+        }
+        
+        // Timestamp değeri yoksa, şu anki zamanı ekle
         if (conversation.getTimestamp() == null) {
             conversation.setTimestamp(Timestamp.now());
         }
