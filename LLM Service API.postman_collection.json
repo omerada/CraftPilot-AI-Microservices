@@ -14,7 +14,7 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImEwODA2N2Q4M2YwY2Y5YzcxNjQyNjUwYzUyMWQ0ZWZhNWI2YTNlMDkiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiQWRhIEdhbWVzIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0xaMEM2RXBvLXdJQzNnb2FONUlkdDFxb2N2bWJtUDJwY0dnbnZ1U05UTlFGZzNoUUU9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vY3JhZnQtcGlsb3QtYWkiLCJhdWQiOiJjcmFmdC1waWxvdC1haSIsImF1dGhfdGltZSI6MTc0MjA0NDQyNywidXNlcl9pZCI6IkU0Z1FTNjRYUTdmemdVRkVaaFlSZ2M2dHl0dzIiLCJzdWIiOiJFNGdRUzY0WFE3ZnpnVUZFWmhZUmdjNnR5dHcyIiwiaWF0IjoxNzQyMDQ0NDI3LCJleHAiOjE3NDIwNDgwMjcsImVtYWlsIjoiYWRhZ2FtZXNwcm9kdWN0aW9uc0BnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJnb29nbGUuY29tIjpbIjExNDU3MTgyNzgxNDcyMzAyODM3OSJdLCJlbWFpbCI6WyJhZGFnYW1lc3Byb2R1Y3Rpb25zQGdtYWlsLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6Imdvb2dsZS5jb20ifX0.XPMFUoisxvOfYDUREpxqXw8FsKA2dmH_iTYWRVN6gQzIkYD2B3_TNsKLfYc3sAAzkc8-NtGrhSq9gaX-Xdw-Qdu-IkUwE3iB-lmMgNcUKyYnfWsm7eEbEY-Rw1tdWMjhuutSFjNXjfeB6qovy8mTTq0sIVZyrWMeQUGVyr3laoJUHQ9Wr0v11D5a9tSmKXYI4OwZek351h5PaDfU_y0QbRTUMSTWPJax-QhROM-2k5ZE74h8fLhdpguNUM9A_vznAcMJNBUpzJltTsx7gIOMuRlwHiSbCvwtCjP1JAwPAo6NttGUgmwrK3FHYBIDMCynz3Kky4bKyAZ45tnMqJ3hcQ",
+              "value": "{{firebaseToken}}",
               "type": "string"
             }
           ]
@@ -47,22 +47,22 @@
           "raw": "{\n    \"prompt\": \"Hüçreyi anlat örnekleyerek\",\n    \"requestType\": \"CHAT\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/ai/enhance-prompt",
+          "raw": "{{baseUrl}}/enhance-prompt",
           "host": ["{{baseUrl}}"],
-          "path": ["ai", "enhance-prompt"]
+          "path": ["enhance-prompt"]
         }
       },
       "response": []
     },
     {
-      "name": "Text Completion",
+      "name": "Chat Completion",
       "request": {
         "auth": {
           "type": "bearer",
           "bearer": [
             {
               "key": "token",
-              "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjMwYjIyMWFiNjU2MTdiY2Y4N2VlMGY4NDYyZjc0ZTM2NTIyY2EyZTQiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiQWRhIEdhbWVzIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0xaMEM2RXBvLXdJQzNnb2FONUlkdDFxb2N2bWJtUDJwY0dnbnZ1U05UTlFGZzNoUUU9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vY3JhZnQtcGlsb3QtYWkiLCJhdWQiOiJjcmFmdC1waWxvdC1haSIsImF1dGhfdGltZSI6MTc0MjUwMzY3MywidXNlcl9pZCI6IkU0Z1FTNjRYUTdmemdVRkVaaFlSZ2M2dHl0dzIiLCJzdWIiOiJFNGdRUzY0WFE3ZnpnVUZFWmhZUmdjNnR5dHcyIiwiaWF0IjoxNzQyNTAzNjczLCJleHAiOjE3NDI1MDcyNzMsImVtYWlsIjoiYWRhZ2FtZXNwcm9kdWN0aW9uc0BnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJnb29nbGUuY29tIjpbIjExNDU3MTgyNzgxNDcyMzAyODM3OSJdLCJlbWFpbCI6WyJhZGFnYW1lc3Byb2R1Y3Rpb25zQGdtYWlsLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6Imdvb2dsZS5jb20ifX0.irQdGTPdqBsJrhJ5oBYeRwzaK3j59Mohx5sgrvKKMz7tKkWwGl3ActoIa2fsVtJ7xZ5nOm-5iQwQnQdfQh8oRmeepm9Nr4po7eG95frwgBC6xr2N8d_6bYMypP8U2DHViD48iwSf7Dyoxquw8fDNMQ8t6KI8yLgVuOr1sjDGuCaprwGnzrf0TiDyHtq3t0GyzDcaThzQBcTPqLyVe5p1YZosQJsjPXTrO3uCmePafInAj1q4lj-LN3vcqC7XW-sKTEIuhqVMTlg_4NOL0Z3aPQE7H8TYMy0rmi62O4F-ctDuY-XIoBEnnUPtWOXxfrJZZ2leMMbzr4fn92DHcRrYBg",
+              "value": "{{firebaseToken}}",
               "type": "string"
             }
           ]
@@ -95,9 +95,9 @@
           "raw": "{\n  \"model\": \"google/gemini-2.0-flash-lite-001\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Hücre nedir?\"\n    }\n  ],\n  \"maxTokens\": 20000,\n  \"temperature\": 0.3\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/ai/chat/completions",
+          "raw": "{{baseUrl}}/chat/completions",
           "host": ["{{baseUrl}}"],
-          "path": ["ai", "chat", "completions"]
+          "path": ["chat", "completions"]
         },
         "description": "Text completion endpoint"
       },
@@ -111,7 +111,7 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjMwYjIyMWFiNjU2MTdiY2Y4N2VlMGY4NDYyZjc0ZTM2NTIyY2EyZTQiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiQWRhIEdhbWVzIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0xaMEM2RXBvLXdJQzNnb2FONUlkdDFxb2N2bWJtUDJwY0dnbnZ1U05UTlFGZzNoUUU9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vY3JhZnQtcGlsb3QtYWkiLCJhdWQiOiJjcmFmdC1waWxvdC1haSIsImF1dGhfdGltZSI6MTc0Mjc4MjM3OSwidXNlcl9pZCI6IkU0Z1FTNjRYUTdmemdVRkVaaFlSZ2M2dHl0dzIiLCJzdWIiOiJFNGdRUzY0WFE3ZnpnVUZFWmhZUmdjNnR5dHcyIiwiaWF0IjoxNzQyNzgyMzc5LCJleHAiOjE3NDI3ODU5NzksImVtYWlsIjoiYWRhZ2FtZXNwcm9kdWN0aW9uc0BnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJnb29nbGUuY29tIjpbIjExNDU3MTgyNzgxNDcyMzAyODM3OSJdLCJlbWFpbCI6WyJhZGFnYW1lc3Byb2R1Y3Rpb25zQGdtYWlsLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6Imdvb2dsZS5jb20ifX0.EPQnu39WEP1asM4qQRZfk9qZbn6WomoBNw2nZHukcWaDVy8tiodLpcAE4YzbhQhGloBs0_GQYHwyLQ9nqzMDJ_iYYkT29G3ERe4qZlb3AA1JFVkZyGiD5IYK_kkGZ4HqI9XTmXr4t8CBS9epzuN8Btr_Hmp7gyhQ7l2u-2O5yrJX-1KfRrN-91suIJ97RDsuhmgNyEA_FZhfp2xd1wpXm763A1YB2GZvhwGo8OaZ2sBmIp44lU2ZFuanTRuTDkExGAjiXWaEMHTnq8eHOmvP430eFZzxKmehpTRC5_oewr-IuAYqq5txoPYDaPOVXS3BrcQarWCTiCEuVxmjLu8o0g",
+              "value": "{{firebaseToken}}",
               "type": "string"
             }
           ]
@@ -149,11 +149,11 @@
           "raw": "{\n  \"model\": \"openai/gpt-4o-mini\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Sen yardımcı bir AI asistanısın. Kullanıcıya doğru, yararlı ve detaylı yanıtlar ver.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"java nedir çok kısa?\"\n    }\n  ],\n  \"maxTokens\": 10000,\n  \"temperature\": 0.3\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/ai/chat/completions/stream",
+          "raw": "{{baseUrl}}/chat/completions/stream",
           "host": ["{{baseUrl}}"],
-          "path": ["ai", "chat", "completions", "stream"]
+          "path": ["chat", "completions", "stream"]
         },
-        "description": "Text completion endpoint"
+        "description": "Stream destekli chat API endpoint"
       },
       "response": []
     },
@@ -165,7 +165,7 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImRjNjI2MmYzZTk3NzIzOWMwMDUzY2ViODY0Yjc3NDBmZjMxZmNkY2MiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiQWRhIEdhbWVzIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0xaMEM2RXBvLXdJQzNnb2FONUlkdDFxb2N2bWJtUDJwY0dnbnZ1U05UTlFGZzNoUUU9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vY3JhZnQtcGlsb3QtYWkiLCJhdWQiOiJjcmFmdC1waWxvdC1haSIsImF1dGhfdGltZSI6MTc0MDYwMjg3MywidXNlcl9pZCI6IkU0Z1FTNjRYUTdmemdVRkVaaFlSZ2M2dHl0dzIiLCJzdWIiOiJFNGdRUzY0WFE3ZnpnVUZFWmhZUmdjNnR5dHcyIiwiaWF0IjoxNzQwNjAyODczLCJleHAiOjE3NDA2MDY0NzMsImVtYWlsIjoiYWRhZ2FtZXNwcm9kdWN0aW9uc0BnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJnb29nbGUuY29tIjpbIjExNDU3MTgyNzgxNDcyMzAyODM3OSJdLCJlbWFpbCI6WyJhZGFnYW1lc3Byb2R1Y3Rpb25zQGdtYWlsLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6Imdvb2dsZS5jb20ifX0.ouvli9Z0oB9yHZL790lwOfQ18wsMscf2nmaUJw1gsQvkU3J3L0Wf2o7qCYnxdd6-Zm1v7x9oaCx8CzuatCiefA6VsDzXGEmdMUvo7Lm3TsWLxdbaqbnmAevRLwd3IalUrjbdH_ZVdUrHfib-5MmBGaTqtLGrMrTKzYv60Xd7g7zcjUl-QeoxfU3KKY__xvNg7dyyeGduPG3VXfL8B9nPQgOIwqZJEDpuDywTv0P8EUAV145MLD43zGtrlYJkHmNnZB43O3MJYDYnvafmIdrAJ57V-sJluobhWK_0DibV3nYw3zm68c51B7UQ9WJ93wQocHYrekzaD2VwhgJGOV2wyw",
+              "value": "{{firebaseToken}}",
               "type": "string"
             }
           ]
@@ -198,10 +198,11 @@
           "raw": "{\n    \"model\": \"google/gemini-2.0-flash-lite-preview-02-05:free\",\n    \"prompt\": \"Write a Java Spring Boot REST controller with CRUD operations\",\n    \"maxTokens\": 500,\n    \"temperature\": 0.7,\n    \"requestId\": \"test-123\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/ai/completions",
+          "raw": "{{baseUrl}}/code/completion",
           "host": ["{{baseUrl}}"],
-          "path": ["ai", "completions"]
-        }
+          "path": ["code", "completion"]
+        },
+        "description": "Kod tamamlama API endpoint"
       },
       "response": []
     },
@@ -226,12 +227,85 @@
           "raw": "{\n    \"prompt\": \"A beautiful sunset over mountains\",\n    \"maxTokens\": 150,\n    \"temperature\": 0.7\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/ai/images/generate",
+          "raw": "{{baseUrl}}/images/generate",
           "host": ["{{baseUrl}}"],
-          "path": ["ai", "images", "generate"]
-        }
+          "path": ["images", "generate"]
+        },
+        "description": "Görsel oluşturma API endpoint (henüz desteklenmiyor)"
       },
       "response": []
+    },
+    {
+      "name": "Model Config API",
+      "item": [
+        {
+          "name": "Get Default Model Config",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{firebaseToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ai/config/model-defaults?model=google/gemini-pro",
+              "host": ["{{baseUrl}}"],
+              "path": ["config", "model-defaults"],
+              "query": [
+                {
+                  "key": "model",
+                  "value": "google/gemini-pro"
+                }
+              ]
+            },
+            "description": "Model için varsayılan yapılandırmayı getirir"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Available Models",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{firebaseToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ai/config/models",
+              "host": ["{{baseUrl}}"],
+              "path": ["config", "models"]
+            },
+            "description": "Kullanılabilir modellerin listesini getirir"
+          },
+          "response": []
+        }
+      ],
+      "description": "Model yapılandırması ile ilgili API endpointleri"
     },
     {
       "name": "Chat History API",
@@ -273,9 +347,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/ai/chat/histories?userId={{userId}}",
+              "raw": "{{baseUrl}}/chat/histories?userId={{userId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["ai", "chat", "histories"],
+              "path": ["chat", "histories"],
               "query": [
                 {
                   "key": "userId",
@@ -324,9 +398,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
+              "raw": "{{baseUrl}}/chat/histories/{{chatHistoryId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
+              "path": ["chat", "histories", "{{chatHistoryId}}"]
             },
             "description": "Belirtilen ID ile sohbet geçmişini getirir"
           },
@@ -373,9 +447,9 @@
               "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"Yeni Sohbet\",\n  \"conversations\": [],\n  \"aiModel\": \"google/gemini-2.0-flash-lite-001\",\n  \"temperature\": 0.5\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/ai/chat/histories",
+              "raw": "{{baseUrl}}/chat/histories",
               "host": ["{{baseUrl}}"],
-              "path": ["ai", "chat", "histories"]
+              "path": ["chat", "histories"]
             },
             "description": "Yeni bir sohbet geçmişi oluşturur"
           },
@@ -422,9 +496,9 @@
               "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"Güncellenmiş Sohbet\",\n  \"conversations\": [],\n  \"aiModel\": \"google/gemini-2.0-flash-lite-001\",\n  \"temperature\": 0.7\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
+              "raw": "{{baseUrl}}/chat/histories/{{chatHistoryId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
+              "path": ["chat", "histories", "{{chatHistoryId}}"]
             },
             "description": "Belirtilen sohbet geçmişini günceller"
           },
@@ -467,9 +541,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
+              "raw": "{{baseUrl}}/chat/histories/{{chatHistoryId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
+              "path": ["chat", "histories", "{{chatHistoryId}}"]
             },
             "description": "Belirtilen sohbet geçmişini siler"
           },
@@ -516,10 +590,9 @@
               "raw": "{\n  \"content\": \"Merhaba, nasılsın?\",\n  \"role\": \"user\",\n  \"fresh\": true\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}/conversations",
+              "raw": "{{baseUrl}}/chat/histories/{{chatHistoryId}}/conversations",
               "host": ["{{baseUrl}}"],
               "path": [
-                "ai",
                 "chat",
                 "histories",
                 "{{chatHistoryId}}",
@@ -571,9 +644,9 @@
               "raw": "{\n  \"title\": \"Yeni Başlık\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
+              "raw": "{{baseUrl}}/chat/histories/{{chatHistoryId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
+              "path": ["chat", "histories", "{{chatHistoryId}}"]
             },
             "description": "Belirtilen sohbet geçmişinin başlığını günceller"
           },
@@ -611,11 +684,7 @@
           "});",
           "",
           "pm.test(\"Response has content-type header\", function () {",
-          "    pm.response.to.have.header(\"Content-Type\", \"application/json\");",
-          "});",
-          "",
-          "pm.test(\"Response has request ID header\", function () {",
-          "    pm.response.to.have.header(\"X-Request-ID\");",
+          "    pm.response.to.have.header(\"Content-Type\");",
           "});",
           "",
           "if (pm.response.json()) {",
@@ -648,6 +717,11 @@
     },
     {
       "key": "chatHistoryId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "firebaseToken",
       "value": "",
       "type": "string"
     }

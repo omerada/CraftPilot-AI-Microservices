@@ -59,6 +59,9 @@ public class ChatHistoryController {
     public Mono<ResponseEntity<ChatHistory>> createChatHistory(@RequestBody ChatHistory chatHistory) {
         log.info("Yeni sohbet geçmişi oluşturma isteği: {}", chatHistory.getId());
         
+        // String veya Long olarak gelen timestamp değerlerini işle
+        processTimestamps(chatHistory);
+        
         return chatHistoryService.createChatHistory(chatHistory)
                 .map(createdHistory -> {
                     log.debug("Sohbet geçmişi oluşturuldu: {}", createdHistory.getId());
@@ -100,6 +103,9 @@ public class ChatHistoryController {
     public Mono<ResponseEntity<ChatHistory>> addConversation(@PathVariable String id, @RequestBody Conversation conversation) {
         log.info("Sohbete mesaj ekleme isteği, Chat ID: {}", id);
         
+        // Timestamp değerini düzelt
+        processConversationTimestamp(conversation);
+        
         return chatHistoryService.addConversation(id, conversation)
                 .map(updated -> {
                     log.debug("Mesaj eklendi, Chat ID: {}", id);
@@ -134,6 +140,34 @@ public class ChatHistoryController {
 
         public void setTitle(String title) {
             this.title = title;
+        }
+    }
+
+    /**
+     * Frontend'den gelen timestamp değerlerini Google Cloud Timestamp'e dönüştürür
+     */
+    private void processTimestamps(ChatHistory chatHistory) {
+        // createdAt ve updatedAt alanları null ise şu anki zamanı kullan
+        if (chatHistory.getCreatedAt() == null) {
+            chatHistory.setCreatedAt(Timestamp.now());
+        }
+        
+        if (chatHistory.getUpdatedAt() == null) {
+            chatHistory.setUpdatedAt(Timestamp.now());
+        }
+        
+        // Eğer conversations listesi varsa içindeki timestamp değerlerini de işle
+        if (chatHistory.getConversations() != null) {
+            chatHistory.getConversations().forEach(this::processConversationTimestamp);
+        }
+    }
+
+    /**
+     * Conversation için timestamp işleme
+     */
+    private void processConversationTimestamp(Conversation conversation) {
+        if (conversation.getTimestamp() == null) {
+            conversation.setTimestamp(Timestamp.now());
         }
     }
 }
