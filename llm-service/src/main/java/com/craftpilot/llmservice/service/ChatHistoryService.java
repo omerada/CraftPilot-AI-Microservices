@@ -118,7 +118,9 @@ public class ChatHistoryService {
         
         // Sequence değeri yoksa, şu anki timestamp değerini ekle
         if (conversation.getSequence() == null) {
+            // Şu anki zamanı milisaniye olarak al - sıralama için ideal
             conversation.setSequence(System.currentTimeMillis());
+            log.debug("Conversation için sequence değeri oluşturuldu: {}", conversation.getSequence());
         }
         
         // Timestamp değeri yoksa, şu anki zamanı ekle
@@ -126,9 +128,12 @@ public class ChatHistoryService {
             conversation.setTimestamp(Timestamp.now());
         }
         
-        log.debug("Sohbete mesaj ekleniyor, Chat ID: {}", historyId);
+        log.debug("Sohbete mesaj ekleniyor, Chat ID: {}, Sequence: {}", historyId, conversation.getSequence());
         return chatHistoryRepository.addConversation(historyId, conversation)
-                .doOnError(error -> log.error("Mesaj eklenirken hata, Chat ID {}: {}", historyId, error.getMessage()))
+                .doOnSuccess(result -> log.info("Mesaj başarıyla eklendi, Chat ID: {}, Sequence: {}", 
+                                          historyId, conversation.getSequence()))
+                .doOnError(error -> log.error("Mesaj eklenirken hata, Chat ID {}, Sequence {}: {}", 
+                                        historyId, conversation.getSequence(), error.getMessage()))
                 .onErrorMap(e -> new RuntimeException("Mesaj eklenemedi: " + e.getMessage(), e));
     }
 
