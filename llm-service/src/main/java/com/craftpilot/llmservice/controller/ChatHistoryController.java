@@ -103,7 +103,7 @@ public class ChatHistoryController {
 
     @PostMapping("/histories/{id}/conversations")
     public Mono<ResponseEntity<ChatHistory>> addConversation(@PathVariable String id, @RequestBody Conversation conversation) {
-        log.info("Sohbete mesaj ekleme isteği, Chat ID: {}, Role: {}", id, conversation.getRole());
+        log.info("Sohbete mesaj ekleme isteği, Chat ID: {}, Role: {}, Sequence: {}", id, conversation.getRole(), conversation.getSequence());
         
         // Timestamp değerini düzelt
         processConversationTimestamp(conversation);
@@ -113,16 +113,15 @@ public class ChatHistoryController {
             // Current time in milliseconds
             long currentTime = System.currentTimeMillis();
             
-            // Role'e göre sequence değeri ata
+            // Role'e göre sequence değeri ata - User mesajları için daha küçük sequence
             if ("user".equals(conversation.getRole())) {
-                // User mesajları için, AI yanıtından önce gelmesi için 100ms daha küçük sequence
                 conversation.setSequence(currentTime);
                 conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
                     currentTime / 1000,
                     (int) ((currentTime % 1000) * 1_000_000)
                 ));
             } else {
-                // AI yanıtları için, user mesajından sonra gelmesi için 100ms daha büyük sequence
+                // AI yanıtları için, her zaman user mesajından sonra gelecek şekilde daha büyük bir sequence
                 conversation.setSequence(currentTime + 100);
                 conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
                     (currentTime + 100) / 1000,
