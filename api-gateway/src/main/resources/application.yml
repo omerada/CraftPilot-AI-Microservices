@@ -178,13 +178,13 @@ spring:
 
   gateway:
     default-filters:
-      - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
-      - AddResponseHeader=X-Powered-By,Craft-Pilot-API-Gateway
       - RemoveRequestHeader=Cookie
+      - AddResponseHeader=X-Powered-By,Craft-Pilot-API-Gateway
       - name: RequestSize
         args:
           maxSize: 10MB
-    # CORS yapılandırmasını kaldırdık (CorsConfig sınıfını kullanıyoruz)
+    # CORS yapılandırmasını kaldırdık ve DedupeResponseHeader filtresini de kaldırıyoruz
+    # CORS kontrolü artık CorsWebFilter tarafından yapılacak
 
 eureka:
   instance:
