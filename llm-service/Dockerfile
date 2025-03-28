@@ -42,6 +42,12 @@ ENV JAVA_TOOL_OPTIONS="\
     --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
     --add-opens=java.base/java.lang=ALL-UNNAMED"
 
+# Google Cloud credential yapılandırması - CI/CD ile uyumlu hale getirildi
+ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
+
+# Service account anahtarını container'a kopyala (CI/CD ile uyumlu yol)
+COPY serviceAccountKey.json /gcp-credentials.json
+
 # Health check düzeltmesi
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8062/health || curl -f http://localhost:8062/actuator/health || exit 1
