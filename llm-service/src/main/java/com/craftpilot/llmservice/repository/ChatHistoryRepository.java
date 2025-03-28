@@ -182,10 +182,9 @@ public class ChatHistoryRepository {
                 history.setConversations(updatedConversations);
                 history.setUpdatedAt(Timestamp.now());
                 
-                // For easily showing the latest message in the UI
-                if (conversation.getContent() != null && !conversation.getContent().isEmpty()) {
-                    history.setLastConversation(conversation.getContent());
-                }
+                // Şu anda ChatHistory modelinde lastConversation alanı için setter metodu yok.
+                // Bu satırı kaldırıp frontend tarafında yönetebiliriz ya da modelde bu alanı ekleyebiliriz
+                // history.setLastConversation(conversation.getContent());
                 
                 // Update the document in Firestore
                 transaction.set(docRef, history);

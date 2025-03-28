@@ -34,6 +34,8 @@ public class ChatHistory {
     private String aiModel;
     private double temperature;
     
+    private String lastConversation; // Son mesajı önizleme için saklamak üzere eklenen alan
+    
     @Builder.Default
     private boolean enable = true;
 }
