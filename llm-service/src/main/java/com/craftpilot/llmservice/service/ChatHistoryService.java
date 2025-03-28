@@ -123,9 +123,17 @@ public class ChatHistoryService {
             log.debug("Conversation için sequence değeri oluşturuldu: {}", conversation.getSequence());
         }
         
-        // Timestamp değeri yoksa, şu anki zamanı ekle
+        // Timestamp değeri yoksa, sequence değeriyle uyumlu bir timestamp oluştur
         if (conversation.getTimestamp() == null) {
-            conversation.setTimestamp(Timestamp.now());
+            // Eğer sequence varsa, timestamp değerini onunla uyumlu hale getir
+            if (conversation.getSequence() != null) {
+                conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
+                    conversation.getSequence() / 1000,
+                    (int) ((conversation.getSequence() % 1000) * 1_000_000)
+                ));
+            } else {
+                conversation.setTimestamp(Timestamp.now());
+            }
         }
         
         log.debug("Sohbete mesaj ekleniyor, Chat ID: {}, Sequence: {}", historyId, conversation.getSequence());
