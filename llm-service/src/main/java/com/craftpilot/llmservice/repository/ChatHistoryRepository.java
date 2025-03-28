@@ -182,48 +182,52 @@ public class ChatHistoryRepository {
                 history.setConversations(updatedConversations);
                 history.setUpdatedAt(Timestamp.now());
                 
-                // Şu anda ChatHistory modelinde lastConversation alanı için setter metodu yok.
-                // Bu satırı kaldırıp frontend tarafında yönetebiliriz ya da modelde bu alanı ekleyebiliriz
-                // history.setLastConversation(conversation.getContent());
+                // Son konuşma içeriğini lastConversation alanına ekle
+                if (conversation.getContent() != null && !conversation.getContent().isEmpty()) {
+                    // Doğrudan field'a erişim yerine lastConversation değerini atayalımdirekt kullanacağız
+                    history.setLastConversation(conversation.getContent());    history.lastConversation = conversation.getContent();
+                }
                 
-                // Update the document in Firestore
-                transaction.set(docRef, history);
-                return history;
+                // Update the document in Firestoreocument in Firestore
+                transaction.set(docRef, history);cRef, history);
+                return history;n history;
             }).addListener(() -> {
                 try {
-                    // Get the latest version of the history after the transaction
+                    // Get the latest version of the history after the transaction history after the transaction
                     ChatHistory updatedHistory = findById(historyId).block();
                     emitter.success(updatedHistory);
-                    log.info("Successfully added conversation {} to chat {}, total conversations: {}", 
+                    log.info("Successfully added conversation {} to chat {}, total conversations: {}", {}", 
                             conversation.getId(), historyId, 
-                            updatedHistory != null && updatedHistory.getConversations() != null ? 
+                            updatedHistory != null && updatedHistory.getConversations() != null ? ory != null && updatedHistory.getConversations() != null ? 
                                 updatedHistory.getConversations().size() : 0);
-                } catch (Exception e) {
-                    log.error("Error retrieving updated chat history after adding conversation: {}", e.getMessage(), e);
-                    emitter.error(e);
-                }
-            }, Runnable::run);
-        });
+                } catch (Exception e) { {
+                    log.error("Error retrieving updated chat history after adding conversation: {}", e.getMessage(), e);   log.error("Error retrieving updated chat history after adding conversation: {}", e.getMessage(), e);
+                    emitter.error(e);ror(e);
+                }     }
+            }, Runnable::run);       }, Runnable::run);
+        });        });
     }
 
     public Mono<ChatHistory> updateTitle(String historyId, String newTitle) {
-        return Mono.create(emitter -> {
-            DocumentReference docRef = firestore.collection(COLLECTION_NAME).document(historyId);
+        return Mono.create(emitter -> {rn Mono.create(emitter -> {
+            DocumentReference docRef = firestore.collection(COLLECTION_NAME).document(historyId);n(COLLECTION_NAME).document(historyId);
             
-            ApiFuture<WriteResult> future = docRef.update(
-                "title", newTitle,
-                "updatedAt", Timestamp.now()
+            ApiFuture<WriteResult> future = docRef.update(docRef.update(
+                "title", newTitle,  "title", newTitle,
+                "updatedAt", Timestamp.now()    "updatedAt", Timestamp.now()
             );
             
-            future.addListener(() -> {
+            future.addListener(() -> { -> {
                 try {
                     future.get();
-                    ChatHistory updatedHistory = findById(historyId).block();
-                    emitter.success(updatedHistory);
-                } catch (Exception e) {
-                    emitter.error(e);
-                }
-            }, Runnable::run);
-        });
-    }
-}
+                    ChatHistory updatedHistory = findById(historyId).block();History = findById(historyId).block();
+                    emitter.success(updatedHistory);pdatedHistory);
+                } catch (Exception e) { catch (Exception e) {
+                    emitter.error(e);ror(e);
+                }     }
+            }, Runnable::run);       }, Runnable::run);
+        });       });
+    }    }
+
+
+}}
