@@ -122,10 +122,11 @@ public class ChatHistoryController {
                 ));
             } else {
                 // AI yanıtları için, her zaman user mesajından sonra gelecek şekilde daha büyük bir sequence
-                conversation.setSequence(currentTime + 100);
+                // Frontend ile tutarlı olmak için 100 yerine 1000 kullanıyoruz
+                conversation.setSequence(currentTime + 1000);
                 conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
-                    (currentTime + 100) / 1000,
-                    (int) (((currentTime + 100) % 1000) * 1_000_000)
+                    (currentTime + 1000) / 1000,
+                    (int) (((currentTime + 1000) % 1000) * 1_000_000)
                 ));
             }
         }
