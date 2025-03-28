@@ -13,6 +13,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
@@ -121,10 +122,41 @@ public class ChatHistoryRepository {
                 ChatHistory history = snapshot.toObject(ChatHistory.class);
                 
                 if (history != null) {
+                    // Önce mesaj sıralamasını doğru yapmak için null sequence kontrolü yap
+                    if (conversation.getSequence() == null) {
+                        // Eğer sequence değeri null ise, otomatik olarak bir değer ata
+                        long currentTime = System.currentTimeMillis();
+                        conversation.setSequence(currentTime);
+                        
+                        // Timestamp'i de güncelle
+                        conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
+                            currentTime / 1000,
+                            (int) ((currentTime % 1000) * 1_000_000)
+                        ));
+                    }
+                    
                     if (history.getConversations() == null) {
                         history.setConversations(List.of(conversation));
                     } else {
                         history.getConversations().add(conversation);
+                        
+                        // Eklenen mesajlardan sonra tüm konuşmaları sequence veya timestamp değerine göre sırala
+                        history.setConversations(
+                            history.getConversations().stream()
+                                .sorted((a, b) -> {
+                                    // Önce sequence değerine göre karşılaştır
+                                    if (a.getSequence() != null && b.getSequence() != null) {
+                                        return a.getSequence().compareTo(b.getSequence());
+                                    }
+                                    // Sequence yoksa timestamp değerine göre karşılaştır
+                                    else if (a.getTimestamp() != null && b.getTimestamp() != null) {
+                                        return a.getTimestamp().compareTo(b.getTimestamp());
+                                    }
+                                    // Hiçbir değer yoksa varsayılan sırada bırak
+                                    return 0;
+                                })
+                                .collect(Collectors.toList())
+                        );
                     }
                     
                     history.setUpdatedAt(Timestamp.now());

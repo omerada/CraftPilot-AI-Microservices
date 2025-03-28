@@ -109,27 +109,26 @@ public class ChatHistoryController {
         processConversationTimestamp(conversation);
         
         // Sequence yoksa veya 0 ise rol ve zaman damgasına göre uygun bir değer atama
+        // Bu kısmı revize ediyoruz - HER DURUMDA sequence değeri ata!
+        // Current time in milliseconds
+        long currentTime = System.currentTimeMillis();
+        
+        // Kullanıcıdan gelen sequence değerini koruyalım (frontend ile uyum için)
         if (conversation.getSequence() == null || conversation.getSequence() == 0) {
-            // Current time in milliseconds
-            long currentTime = System.currentTimeMillis();
-            
-            // Role'e göre sequence değeri ata - User mesajları için daha küçük sequence
+            // Role'e göre sequence değeri ata
             if ("user".equals(conversation.getRole())) {
                 conversation.setSequence(currentTime);
-                conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
-                    currentTime / 1000,
-                    (int) ((currentTime % 1000) * 1_000_000)
-                ));
             } else {
                 // AI yanıtları için, her zaman user mesajından sonra gelecek şekilde daha büyük bir sequence
-                // Frontend ile tutarlı olmak için 100 yerine 1000 kullanıyoruz
                 conversation.setSequence(currentTime + 1000);
-                conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
-                    (currentTime + 1000) / 1000,
-                    (int) (((currentTime + 1000) % 1000) * 1_000_000)
-                ));
             }
         }
+        
+        // Timestamp ve sequence değerinin tutarlı olmasını sağla
+        conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
+            conversation.getSequence() / 1000,
+            (int) ((conversation.getSequence() % 1000) * 1_000_000)
+        ));
 
         // UUID ata
         if (conversation.getId() == null) {
@@ -199,17 +198,34 @@ public class ChatHistoryController {
     }
 
     /**
-     * Conversation için timestamp işleme
+     * Conversation için geliştirilmiş timestamp işleme
      */
     private void processConversationTimestamp(Conversation conversation) {
         try {
-            if (conversation.getTimestamp() == null) {
-                log.debug("Conversation timestamp null, şu anki zaman kullanılıyor");
-                conversation.setTimestamp(Timestamp.now());
+            // Sequence değerini öncelikle kontrol et
+            Long sequence = conversation.getSequence();
+            
+            if (sequence != null && sequence > 0) {
+                // Sequence varsa, timestamp değerini ondan türet
+                conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
+                    sequence / 1000,
+                    (int) ((sequence % 1000) * 1_000_000)
+                ));
+            } 
+            else if (conversation.getTimestamp() == null) {
+                // Hem sequence hem de timestamp yoksa, şu anki zamanı kullan
+                Timestamp now = Timestamp.now();
+                conversation.setTimestamp(now);
+                
+                // Ve bu timestamp'ten bir sequence değeri oluştur
+                long nanos = now.getNanos() / 1_000_000; // millisecond kısmını al
+                conversation.setSequence(now.getSeconds() * 1000 + nanos);
             }
         } catch (Exception e) {
             log.error("Conversation timestamp işlenirken hata: {}", e.getMessage());
-            conversation.setTimestamp(Timestamp.now());
+            Timestamp now = Timestamp.now();
+            conversation.setTimestamp(now);
+            conversation.setSequence(now.getSeconds() * 1000 + (now.getNanos() / 1_000_000));
         }
     }
 }

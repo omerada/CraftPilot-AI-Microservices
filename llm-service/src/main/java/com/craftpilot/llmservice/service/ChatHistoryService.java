@@ -121,34 +121,39 @@ public class ChatHistoryService {
             long currentTime = System.currentTimeMillis();
             
             if ("user".equals(conversation.getRole())) {
-                // User mesajları için her zaman daha düşük sequence (10 saniye öncesi)
-                conversation.setSequence(currentTime - 10000);
-            } else {
-                // Assistant mesajları için güncel zaman
+                // User mesajları için timestamp ile aynı değeri kullan
                 conversation.setSequence(currentTime);
+            } else {
+                // Assistant mesajları için user mesajlarından sonra gelecek şekilde daha büyük bir değer
+                conversation.setSequence(currentTime + 1000);
             }
             
-            // Timestamp'i sequence ile senkronize et
+            // Timestamp değerini sequence ile uyumlu olacak şekilde güncelle
             conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
                 conversation.getSequence() / 1000,
                 (int) ((conversation.getSequence() % 1000) * 1_000_000)
             ));
         }
         
-        // Timestamp değeri yoksa, sequence değeriyle uyumlu bir timestamp oluştur
-        if (conversation.getTimestamp() == null) {
-            // Eğer sequence varsa, timestamp değerini onunla uyumlu hale getir
-            if (conversation.getSequence() != null) {
-                conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
-                    conversation.getSequence() / 1000,
-                    (int) ((conversation.getSequence() % 1000) * 1_000_000)
-                ));
-            } else {
-                conversation.setTimestamp(Timestamp.now());
+        // Eğer timestamp varsa ama sequence yoksa, timestamp'ten sequence türet
+        else if (conversation.getTimestamp() != null && 
+                (conversation.getSequence() == null || conversation.getSequence() == 0)) {
+            
+            // Timestamp'i milisaniye cinsinden sequence değerine dönüştür
+            long seconds = conversation.getTimestamp().getSeconds();
+            int nanos = conversation.getTimestamp().getNanos();
+            long millis = seconds * 1000 + nanos / 1_000_000;
+            
+            // Role göre offset ekle
+            if ("assistant".equals(conversation.getRole())) {
+                millis += 1000; // AI mesajlarını kullanıcıdan sonra göster
             }
+            
+            conversation.setSequence(millis);
         }
         
-        log.debug("Sohbete mesaj ekleniyor, Chat ID: {}, Sequence: {}", historyId, conversation.getSequence());
+        log.debug("Sohbete mesaj ekleniyor, Chat ID: {}, Sequence: {}, Timestamp: {}", 
+                historyId, conversation.getSequence(), conversation.getTimestamp());
         return chatHistoryRepository.addConversation(historyId, conversation)
                 .doOnSuccess(result -> log.info("Mesaj başarıyla eklendi, Chat ID: {}, Sequence: {}", 
                                           historyId, conversation.getSequence()))
