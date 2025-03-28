@@ -107,15 +107,17 @@ public class ChatHistoryController {
         // Timestamp değerini düzelt
         processConversationTimestamp(conversation);
         
-        // Sequence yoksa rol ve zaman damgasına göre uygun bir değer atama
-        if (conversation.getSequence() == null) {
+        // Sequence yoksa veya 0 ise rol ve zaman damgasına göre uygun bir değer atama
+        // Daha agresif kontrol yapıyoruz
+        if (conversation.getSequence() == null || conversation.getSequence() == 0) {
             // Şu anki zamanı milisaniye olarak al
             long currentTime = System.currentTimeMillis();
             
-            // Eğer bu kullanıcı mesajı ise (ilk mesaj olabilir), geriye dönük bir timestamp vererek
-            // AI yanıtlarının önüne yerleştir (10 sn önce gibi)
+            // Eğer bu kullanıcı mesajı ise, çok daha geriye dönük bir timestamp ver
+            // Bu sayede kullanıcı mesajı her zaman AI yanıtından önce gelecek
             if ("user".equals(conversation.getRole())) {
-                conversation.setSequence(currentTime - 10000); // 10 saniye önce
+                // İlk mesaj olabilir - çok daha eski bir timestamp ver (1 saat önce)
+                conversation.setSequence(currentTime - 3600000); // 1 saat öncesi
                 log.info("USER mesajı için sequence atandı: {}", conversation.getSequence());
             } else {
                 conversation.setSequence(currentTime);

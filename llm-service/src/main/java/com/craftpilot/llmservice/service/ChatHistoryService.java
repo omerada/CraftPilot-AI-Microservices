@@ -116,14 +116,34 @@ public class ChatHistoryService {
             conversation.setId(UUID.randomUUID().toString());
         }
         
-        // Sequence değeri yoksa, şu anki timestamp değerini ekle
-        if (conversation.getSequence() == null) {
+        // Sequence değeri yoksa veya 0 ise, uygun bir değer ata
+        if (conversation.getSequence() == null || conversation.getSequence() == 0) {
             // Kullanıcı mesajlarını ayırt etmek için özel işlem
             if ("user".equals(conversation.getRole())) {
-                // Kullanıcı mesajı için daha eski bir zaman damgası (AI yanıtlarından önce görüntülenmesi için)
+                // Kullanıcı mesajı için çok daha eski bir zaman damgası 
+                // (kesinlikle AI yanıtlarından önce görüntülenmesi için)
                 long currentTime = System.currentTimeMillis();
-                conversation.setSequence(currentTime - 10000); // 10 saniye daha eski
-                log.debug("User mesajı için özel sequence değeri oluşturuldu: {}", conversation.getSequence());
+                
+                // getChatHistoryById kullanarak geçmiş mesaj sayısını kontrol et
+                try {
+                    ChatHistory history = chatHistoryRepository.findById(historyId).block();
+                    int messageCount = (history != null && history.getConversations() != null) ? 
+                                       history.getConversations().size() : 0;
+                    
+                    if (messageCount <= 1) {
+                        // İlk mesaj olabilir - çok daha eski bir timestamp ver (1 saat önce)
+                        conversation.setSequence(currentTime - 3600000); // 1 saat öncesi
+                        log.debug("İlk user mesajı için özel sequence değeri: {}", conversation.getSequence());
+                    } else {
+                        // Normal mesaj - sadece biraz eski (10 saniye)
+                        conversation.setSequence(currentTime - 10000); // 10 saniye daha eski
+                        log.debug("Normal user mesajı için sequence değeri: {}", conversation.getSequence());
+                    }
+                } catch (Exception e) {
+                    // Herhangi bir hata durumunda güvenli bir değer ayarla
+                    conversation.setSequence(currentTime - 3600000); // 1 saat öncesi (hata durumunda)
+                    log.warn("Mesaj sayısı kontrolünde hata, güvenli sequence değeri atandı: {}", e.getMessage());
+                }
             } else {
                 // AI mesajları için normal zaman damgası
                 conversation.setSequence(System.currentTimeMillis());
