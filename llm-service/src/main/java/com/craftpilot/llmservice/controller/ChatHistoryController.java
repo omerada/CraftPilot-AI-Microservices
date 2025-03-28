@@ -102,16 +102,36 @@ public class ChatHistoryController {
 
     @PostMapping("/histories/{id}/conversations")
     public Mono<ResponseEntity<ChatHistory>> addConversation(@PathVariable String id, @RequestBody Conversation conversation) {
-        log.info("Sohbete mesaj ekleme isteği, Chat ID: {}, Sequence: {}", id, conversation.getSequence());
+        log.info("Sohbete mesaj ekleme isteği, Chat ID: {}, Sequence: {}, Role: {}", id, conversation.getSequence(), conversation.getRole());
         
         // Timestamp değerini düzelt
         processConversationTimestamp(conversation);
         
-        // Sequence yoksa sıfır olarak ayarla (sonra sıralamada en sona gidecek)
+        // Sequence yoksa rol ve zaman damgasına göre uygun bir değer atama
         if (conversation.getSequence() == null) {
-            conversation.setSequence(0L);
+            // Şu anki zamanı milisaniye olarak al
+            long currentTime = System.currentTimeMillis();
+            
+            // Eğer bu kullanıcı mesajı ise (ilk mesaj olabilir), geriye dönük bir timestamp vererek
+            // AI yanıtlarının önüne yerleştir (10 sn önce gibi)
+            if ("user".equals(conversation.getRole())) {
+                conversation.setSequence(currentTime - 10000); // 10 saniye önce
+                log.info("USER mesajı için sequence atandı: {}", conversation.getSequence());
+            } else {
+                conversation.setSequence(currentTime);
+                log.info("AI mesajı için sequence atandı: {}", conversation.getSequence());
+            }
         }
         
+        // Timestamp değerini sequence ile uyumlu hale getir
+        if (conversation.getTimestamp() == null) {
+            conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
+                conversation.getSequence() / 1000,
+                (int) ((conversation.getSequence() % 1000) * 1_000_000)
+            ));
+        }
+        
+        log.info("Sohbete mesaj ekleniyor, Chat ID: {}, Sequence: {}", id, conversation.getSequence());
         return chatHistoryService.addConversation(id, conversation)
                 .map(updated -> {
                     log.debug("Mesaj eklendi, Chat ID: {}", id);

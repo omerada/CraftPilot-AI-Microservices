@@ -118,9 +118,17 @@ public class ChatHistoryService {
         
         // Sequence değeri yoksa, şu anki timestamp değerini ekle
         if (conversation.getSequence() == null) {
-            // Şu anki zamanı milisaniye olarak al - sıralama için ideal
-            conversation.setSequence(System.currentTimeMillis());
-            log.debug("Conversation için sequence değeri oluşturuldu: {}", conversation.getSequence());
+            // Kullanıcı mesajlarını ayırt etmek için özel işlem
+            if ("user".equals(conversation.getRole())) {
+                // Kullanıcı mesajı için daha eski bir zaman damgası (AI yanıtlarından önce görüntülenmesi için)
+                long currentTime = System.currentTimeMillis();
+                conversation.setSequence(currentTime - 10000); // 10 saniye daha eski
+                log.debug("User mesajı için özel sequence değeri oluşturuldu: {}", conversation.getSequence());
+            } else {
+                // AI mesajları için normal zaman damgası
+                conversation.setSequence(System.currentTimeMillis());
+                log.debug("AI mesajı için normal sequence değeri oluşturuldu: {}", conversation.getSequence());
+            }
         }
         
         // Timestamp değeri yoksa, sequence değeriyle uyumlu bir timestamp oluştur
