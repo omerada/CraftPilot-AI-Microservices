@@ -157,8 +157,8 @@ public class ChatHistoryRepository {
                         // Set next index in sequence
                         conversation.setOrderIndex(highestIndex + 1);
                     } else {
-                        // Kullanıcı tarafından belirtilen orderIndex değeri var
-                        // Çakışmaları önlemek için, aynı orderIndex değerine sahip başka bir konuşma var mı kontrol et
+                        // Frontend'den gelen orderIndex değerine öncelik ver - değiştirmeden kullan
+                        // Sadece çakışma kontrolü yap
                         boolean indexConflict = false;
                         for (Conversation existingConv : history.getConversations()) {
                             if (existingConv.getOrderIndex() != null && 
@@ -222,10 +222,11 @@ public class ChatHistoryRepository {
                     // Get the latest version of the history after the transaction
                     ChatHistory updatedHistory = findById(historyId).block();
                     
-                    // Ek log ile orderIndex bilgisi ve atanan değeri göster
-                    if (conversation != null && conversation.getOrderIndex() != null) {
-                        log.info("Conversation added with orderIndex: {}, to chat: {}", 
-                               conversation.getOrderIndex(), historyId);
+                    // Yanıtta atanan orderIndex'i loglayalım (debug için)
+                    if (conversation != null) {
+                        log.info("Added conversation: role={}, orderIndex={}, content={}", 
+                            conversation.getRole(), conversation.getOrderIndex(), 
+                            conversation.getContent() != null ? conversation.getContent().substring(0, Math.min(20, conversation.getContent().length())) + "..." : "null");
                     }
                     
                     emitter.success(updatedHistory);
