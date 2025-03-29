@@ -130,21 +130,20 @@ public class ChatHistoryController {
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
-    @PatchMapping("/histories/{id}")
-    public Mono<ResponseEntity<ChatHistory>> updateChatHistoryTitle(@PathVariable String id, @RequestBody TitleUpdateRequest request) {
+    @PatchMapping(path = "/histories/{id}")
+    @ResponseBody
+    public Mono<ResponseEntity<ChatHistory>> updateChatHistoryTitle(
+            @PathVariable String id,
+            @RequestBody TitleUpdateRequest request) {
         log.info("Sohbet başlığı güncelleme isteği, ID: {}, Yeni başlık: {}", id, request.getTitle());
         
-        // Önce sohbet geçmişini getirip sadece başlığı güncelleyelim
         return chatHistoryService.getChatHistoryById(id)
                 .flatMap(chatHistory -> {
-                    // Sadece başlığı güncelle, diğer verileri koru
                     chatHistory.setTitle(request.getTitle());
                     chatHistory.setUpdatedAt(Timestamp.now());
-                    
-                    // Güncellenmiş sohbet geçmişini kaydet
                     return chatHistoryService.updateChatHistory(chatHistory);
                 })
-                .map(updated -> ResponseEntity.ok(updated))
+                .map(ResponseEntity::ok)
                 .onErrorResume(error -> {
                     log.error("Sohbet başlığı güncellenirken hata, ID {}: {}", id, error.getMessage());
                     return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
