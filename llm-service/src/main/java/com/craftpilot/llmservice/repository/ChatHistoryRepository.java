@@ -142,8 +142,7 @@ public class ChatHistoryRepository {
                         history.setConversations(new ArrayList<>());
                     }
                     
-                    // USING ORDER INDEX APPROACH
-                    // If orderIndex is not set by frontend, calculate next order index
+                    // OrderIndex kullanımı - sequence kullanımı tamamen kaldırıldı
                     if (conversation.getOrderIndex() == null) {
                         int highestIndex = 0;
                         for (Conversation existingConv : history.getConversations()) {
@@ -167,7 +166,7 @@ public class ChatHistoryRepository {
                     List<Conversation> updatedConversations = new ArrayList<>(history.getConversations());
                     updatedConversations.add(conversation);
                     
-                    // Sort primarily by orderIndex and secondarily by timestamp
+                    // Sort primarily by orderIndex only
                     updatedConversations.sort(
                         Comparator.<Conversation, Integer>comparing(
                             c -> c.getOrderIndex() != null ? c.getOrderIndex() : Integer.MAX_VALUE

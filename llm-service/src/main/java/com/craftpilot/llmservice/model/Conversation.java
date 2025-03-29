@@ -21,10 +21,6 @@ public class Conversation {
     @JsonDeserialize(using = TimestampDeserializer.class)
     private Timestamp timestamp;
     
-    // Replace sequence with orderIndex
+    // orderIndex konuşma sıralaması için kullanılır
     private Integer orderIndex;
-    
-    // Keep sequence field for backward compatibility but mark as deprecated
-    @Deprecated
-    private Long sequence;
 }
