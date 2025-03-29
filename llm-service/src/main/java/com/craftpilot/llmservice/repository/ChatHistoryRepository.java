@@ -144,14 +144,43 @@ public class ChatHistoryRepository {
                     
                     // OrderIndex kullanımı - sequence kullanımı tamamen kaldırıldı
                     if (conversation.getOrderIndex() == null) {
+                        // Mevcut en yüksek orderIndex değerini bul
                         int highestIndex = 0;
+                        
+                        // Tüm orderIndex değerlerini kontrol et
                         for (Conversation existingConv : history.getConversations()) {
                             if (existingConv.getOrderIndex() != null && existingConv.getOrderIndex() > highestIndex) {
                                 highestIndex = existingConv.getOrderIndex();
                             }
                         }
+                        
                         // Set next index in sequence
                         conversation.setOrderIndex(highestIndex + 1);
+                    } else {
+                        // Kullanıcı tarafından belirtilen orderIndex değeri var
+                        // Çakışmaları önlemek için, aynı orderIndex değerine sahip başka bir konuşma var mı kontrol et
+                        boolean indexConflict = false;
+                        for (Conversation existingConv : history.getConversations()) {
+                            if (existingConv.getOrderIndex() != null && 
+                                existingConv.getOrderIndex().equals(conversation.getOrderIndex())) {
+                                indexConflict = true;
+                                break;
+                            }
+                        }
+                        
+                        // Çakışma varsa, en yüksek orderIndex değerini bul ve onun üzerine ekle
+                        if (indexConflict) {
+                            int highestIndex = 0;
+                            for (Conversation existingConv : history.getConversations()) {
+                                if (existingConv.getOrderIndex() != null && existingConv.getOrderIndex() > highestIndex) {
+                                    highestIndex = existingConv.getOrderIndex();
+                                }
+                            }
+                            // Set to next available index
+                            conversation.setOrderIndex(highestIndex + 1);
+                            log.warn("OrderIndex conflict detected for conversation {} in chat {}. Assigned new orderIndex: {}", 
+                                  conversation.getId(), historyId, conversation.getOrderIndex());
+                        }
                     }
                     
                     log.info("Using orderIndex: {} for conversation {}, role {}", 
@@ -166,13 +195,10 @@ public class ChatHistoryRepository {
                     List<Conversation> updatedConversations = new ArrayList<>(history.getConversations());
                     updatedConversations.add(conversation);
                     
-                    // Sort primarily by orderIndex only
+                    // Sort primarily by orderIndex to ensure consistent ordering
                     updatedConversations.sort(
-                        Comparator.<Conversation, Integer>comparing(
-                            c -> c.getOrderIndex() != null ? c.getOrderIndex() : Integer.MAX_VALUE
-                        ).thenComparing(
-                            c -> c.getTimestamp() != null ? c.getTimestamp().getSeconds() : 0
-                        )
+                        Comparator.comparing(c -> c.getOrderIndex() != null ? c.getOrderIndex() : Integer.MAX_VALUE)
+                            .thenComparing(c -> c.getTimestamp() != null ? c.getTimestamp().getSeconds() : 0)
                     );
                     
                     // Update the history object
