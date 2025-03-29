@@ -134,7 +134,16 @@ public class ChatHistoryController {
     public Mono<ResponseEntity<ChatHistory>> updateChatHistoryTitle(@PathVariable String id, @RequestBody TitleUpdateRequest request) {
         log.info("Sohbet başlığı güncelleme isteği, ID: {}, Yeni başlık: {}", id, request.getTitle());
         
-        return chatHistoryService.updateChatHistoryTitle(id, request.getTitle())
+        // Önce sohbet geçmişini getirip sadece başlığı güncelleyelim
+        return chatHistoryService.getChatHistoryById(id)
+                .flatMap(chatHistory -> {
+                    // Sadece başlığı güncelle, diğer verileri koru
+                    chatHistory.setTitle(request.getTitle());
+                    chatHistory.setUpdatedAt(Timestamp.now());
+                    
+                    // Güncellenmiş sohbet geçmişini kaydet
+                    return chatHistoryService.updateChatHistory(chatHistory);
+                })
                 .map(updated -> ResponseEntity.ok(updated))
                 .onErrorResume(error -> {
                     log.error("Sohbet başlığı güncellenirken hata, ID {}: {}", id, error.getMessage());
