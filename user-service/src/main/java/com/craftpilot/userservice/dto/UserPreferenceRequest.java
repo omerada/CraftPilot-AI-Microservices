@@ -1,14 +1,19 @@
 package com.craftpilot.userservice.dto;
 
-import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.util.List;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class UserPreferenceRequest {
-    @NotNull
     private String theme;
-    @NotNull
     private String language;
-    private boolean notifications;
-    private boolean pushEnabled;
+    private Boolean notifications;
+    private Boolean pushEnabled;
+    private List<String> aiModelFavorites;
 }

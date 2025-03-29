@@ -11,7 +11,9 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -31,24 +33,58 @@ public class UserPreferenceService {
     }
 
     public Mono<UserPreference> saveUserPreferences(UserPreference preferences) {
+        if (preferences.getCreatedAt() == null) {
+            preferences.setCreatedAt(System.currentTimeMillis());
+        }
+        preferences.setUpdatedAt(System.currentTimeMillis());
+        
         return redisCacheService.saveUserPreferences(preferences)
                 .thenReturn(preferences)
                 .doOnNext(saved -> {
-                    // Preference değişikliğini event olarak yayınla
-                    publishPreferenceUpdated(saved.getUserId(), "language", saved.getLanguage());
+                    // Tüm tercihleri event olarak yayınla
+                    publishPreferenceUpdated(saved.getUserId(), "all", "");
                 });
     }
     
+    public Mono<UserPreference> updateTheme(String userId, String theme) {
+        return getUserPreferences(userId)
+            .flatMap(pref -> {
+                pref.setTheme(theme);
+                pref.setUpdatedAt(System.currentTimeMillis());
+                return redisCacheService.saveUserPreferences(pref)
+                    .thenReturn(pref);
+            })
+            .doOnNext(saved -> {
+                // Sadece tema değişikliğini event olarak yayınla
+                publishPreferenceUpdated(userId, "theme", theme);
+            });
+    }
+
     public Mono<UserPreference> updateLanguage(String userId, String language) {
         return getUserPreferences(userId)
             .flatMap(pref -> {
                 pref.setLanguage(language);
+                pref.setUpdatedAt(System.currentTimeMillis());
                 return redisCacheService.saveUserPreferences(pref)
                     .thenReturn(pref);
             })
             .doOnNext(saved -> {
                 // Sadece dil değişikliğini event olarak yayınla
                 publishPreferenceUpdated(userId, "language", language);
+            });
+    }
+    
+    public Mono<UserPreference> updateAiModelFavorites(String userId, List<String> favorites) {
+        return getUserPreferences(userId)
+            .flatMap(pref -> {
+                pref.setAiModelFavorites(favorites);
+                pref.setUpdatedAt(System.currentTimeMillis());
+                return redisCacheService.saveUserPreferences(pref)
+                    .thenReturn(pref);
+            })
+            .doOnNext(saved -> {
+                // Favori model değişikliğini event olarak yayınla
+                publishPreferenceUpdated(userId, "aiModelFavorites", String.join(",", favorites));
             });
     }
 
@@ -79,12 +115,14 @@ public class UserPreferenceService {
     }
 
     private Mono<UserPreference> getDefaultPreferences(String userId, Throwable t) {
+        log.warn("Falling back to default preferences for user: {}, error: {}", userId, t.getMessage());
         return Mono.just(UserPreference.builder()
                 .userId(userId)
                 .theme("light")
-                .language("en")
+                .language("tr")
                 .notifications(true)
                 .pushEnabled(true)
+                .aiModelFavorites(new ArrayList<>())
                 .createdAt(System.currentTimeMillis())
                 .updatedAt(System.currentTimeMillis())
                 .build());

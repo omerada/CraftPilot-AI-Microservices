@@ -1,19 +1,39 @@
 package com.craftpilot.userservice.mapper;
 
 import com.craftpilot.userservice.dto.UserPreferenceRequest;
-import com.craftpilot.userservice.dto.UserPreferenceResponse;
 import com.craftpilot.userservice.model.UserPreference;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.MappingConstants;
+import org.springframework.stereotype.Component;
 
-@Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
-public interface UserPreferenceMapper {
-    
-    @Mapping(target = "createdAt", expression = "java(System.currentTimeMillis())")
-    @Mapping(target = "updatedAt", expression = "java(System.currentTimeMillis())")
-    @Mapping(target = "userId", ignore = true)
-    UserPreference toEntity(UserPreferenceRequest request);
+import java.util.ArrayList;
 
-    UserPreferenceResponse toResponse(UserPreference preference);
+@Component
+public class UserPreferenceMapper {
+
+    public UserPreference toEntity(UserPreferenceRequest dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        return UserPreference.builder()
+                .theme(dto.getTheme())
+                .language(dto.getLanguage())
+                .notifications(dto.getNotifications())
+                .pushEnabled(dto.getPushEnabled())
+                .aiModelFavorites(dto.getAiModelFavorites())
+                .build();
+    }
+
+    public UserPreferenceRequest toDto(UserPreference entity) {
+        if (entity == null) {
+            return null;
+        }
+
+        return UserPreferenceRequest.builder()
+                .theme(entity.getTheme())
+                .language(entity.getLanguage())
+                .notifications(entity.getNotifications())
+                .pushEnabled(entity.getPushEnabled())
+                .aiModelFavorites(entity.getAiModelFavorites())
+                .build();
+    }
 }

@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.util.List;
 
 @Data
 @Builder
@@ -13,8 +14,9 @@ public class UserPreference {
     private String userId;
     private String theme;
     private String language;
-    private boolean notifications;
-    private boolean pushEnabled;
+    private Boolean notifications;
+    private Boolean pushEnabled;
+    private List<String> aiModelFavorites; // Favori modeller için yeni alan
     private Long createdAt;
     private Long updatedAt;
 }
