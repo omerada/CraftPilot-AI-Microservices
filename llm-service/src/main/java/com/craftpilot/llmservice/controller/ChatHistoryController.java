@@ -17,13 +17,13 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/chat")
+@RequestMapping("/chat/histories") // Changed from "/chat" to "/chat/histories" to match API Gateway routing
 @RequiredArgsConstructor
 @Slf4j
 public class ChatHistoryController {
     private final ChatHistoryService chatHistoryService;
 
-    @GetMapping("/histories")
+    @GetMapping
     public Mono<ResponseEntity<Map<String, List<ChatHistory>>>> getChatHistories(@RequestParam String userId) {
         log.info("Sohbet geçmişi istendi, kullanıcı: {}", userId);
         
@@ -43,7 +43,7 @@ public class ChatHistoryController {
                 });
     }
 
-    @GetMapping("/histories/{id}")
+    @GetMapping("/{id}")
     public Mono<ResponseEntity<ChatHistory>> getChatHistoryById(@PathVariable String id) {
         log.info("Sohbet geçmişi detayı istendi, ID: {}", id);
         
@@ -56,7 +56,7 @@ public class ChatHistoryController {
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
-    @PostMapping("/histories")
+    @PostMapping
     public Mono<ResponseEntity<ChatHistory>> createChatHistory(@RequestBody ChatHistory chatHistory) {
         log.info("Yeni sohbet geçmişi oluşturma isteği: {}", chatHistory.getId());
         
@@ -74,7 +74,7 @@ public class ChatHistoryController {
                 });
     }
 
-    @PutMapping("/histories/{id}")
+    @PutMapping("/{id}")
     public Mono<ResponseEntity<ChatHistory>> updateChatHistory(@PathVariable String id, @RequestBody ChatHistory chatHistory) {
         log.info("Sohbet geçmişi güncelleme isteği, ID: {}", id);
         
@@ -88,7 +88,7 @@ public class ChatHistoryController {
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
-    @DeleteMapping("/histories/{id}")
+    @DeleteMapping("/{id}")
     public Mono<ResponseEntity<Void>> deleteChatHistory(@PathVariable String id) {
         log.info("Sohbet geçmişi silme isteği, ID: {}", id);
         
@@ -100,7 +100,7 @@ public class ChatHistoryController {
                 });
     }
 
-    @PostMapping("/histories/{id}/conversations")
+    @PostMapping("/{id}/conversations")
     public Mono<ResponseEntity<ChatHistory>> addConversation(@PathVariable String id, @RequestBody Conversation conversation) {
         log.info("Sohbete mesaj ekleme isteği alındı: Chat ID: {}, Role: {}, OrderIndex: {}", 
                   id, conversation.getRole(), conversation.getOrderIndex());
@@ -130,7 +130,7 @@ public class ChatHistoryController {
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
-    @PatchMapping("/histories/{id}")
+    @PatchMapping("/{id}")
     public Mono<ResponseEntity<ChatHistory>> updateChatHistoryTitle(@PathVariable String id, @RequestBody TitleUpdateRequest request) {
         log.info("Sohbet başlığı güncelleme isteği, ID: {}, Yeni başlık: {}", id, request.getTitle());
         
@@ -152,7 +152,7 @@ public class ChatHistoryController {
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
-    @PatchMapping("/histories/{id}/archive")
+    @PatchMapping("/{id}/archive")
     public Mono<ResponseEntity<ChatHistory>> archiveChatHistory(@PathVariable String id) {
         log.info("Sohbet arşivleme isteği, ID: {}", id);
         
