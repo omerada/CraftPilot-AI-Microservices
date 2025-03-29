@@ -197,8 +197,8 @@ public class ChatHistoryRepository {
                     
                     // Sort primarily by orderIndex to ensure consistent ordering
                     updatedConversations.sort(
-                        Comparator.comparing(c -> c.getOrderIndex() != null ? c.getOrderIndex() : Integer.MAX_VALUE)
-                            .thenComparing(c -> c.getTimestamp() != null ? c.getTimestamp().getSeconds() : 0)
+                        Comparator.comparing((Conversation c) -> c.getOrderIndex() != null ? c.getOrderIndex() : Integer.MAX_VALUE)
+                            .thenComparing((Conversation c) -> c.getTimestamp() != null ? c.getTimestamp().getSeconds() : 0)
                     );
                     
                     // Update the history object
