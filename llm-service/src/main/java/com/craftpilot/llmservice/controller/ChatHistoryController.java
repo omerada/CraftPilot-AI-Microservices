@@ -143,6 +143,19 @@ public class ChatHistoryController {
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
+    @PatchMapping("/histories/{id}/archive")
+    public Mono<ResponseEntity<ChatHistory>> archiveChatHistory(@PathVariable String id) {
+        log.info("Sohbet arşivleme isteği, ID: {}", id);
+        
+        return chatHistoryService.archiveChatHistory(id)
+                .map(updated -> ResponseEntity.ok(updated))
+                .onErrorResume(error -> {
+                    log.error("Sohbet arşivlenirken hata, ID {}: {}", id, error.getMessage());
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
+                })
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
     public static class TitleUpdateRequest {
         private String title;
 

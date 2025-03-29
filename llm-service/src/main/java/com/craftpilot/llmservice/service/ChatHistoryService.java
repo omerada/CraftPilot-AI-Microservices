@@ -146,4 +146,21 @@ public class ChatHistoryService {
                 .doOnError(error -> log.error("Sohbet başlığı güncellenirken hata, ID {}: {}", historyId, error.getMessage()))
                 .onErrorMap(e -> new RuntimeException("Sohbet başlığı güncellenemedi: " + e.getMessage(), e));
     }
+
+    public Mono<ChatHistory> archiveChatHistory(String historyId) {
+        if (historyId == null || historyId.isEmpty()) {
+            log.warn("Geçersiz ID ile sohbet arşivleme isteği");
+            return Mono.error(new IllegalArgumentException("Geçerli bir ID gerekli"));
+        }
+        
+        log.debug("Sohbet arşivleniyor, ID: {}", historyId);
+        return chatHistoryRepository.findById(historyId)
+                .flatMap(chatHistory -> {
+                    chatHistory.setEnable(false); // Arşivleme için enable değerini false yap
+                    chatHistory.setUpdatedAt(Timestamp.now());
+                    return chatHistoryRepository.save(chatHistory);
+                })
+                .doOnError(error -> log.error("Sohbet arşivlenirken hata, ID {}: {}", historyId, error.getMessage()))
+                .onErrorMap(e -> new RuntimeException("Sohbet arşivlenemedi: " + e.getMessage(), e));
+    }
 }
