@@ -347,7 +347,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/chat/histories?userId={{userId}}",
+              "raw": "{{baseUrl}}/ai/chat/histories?userId={{userId}}",
               "host": ["{{baseUrl}}"],
               "path": ["chat", "histories"],
               "query": [
@@ -398,7 +398,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/chat/histories/{{chatHistoryId}}",
+              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
               "host": ["{{baseUrl}}"],
               "path": ["chat", "histories", "{{chatHistoryId}}"]
             },
@@ -447,7 +447,7 @@
               "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"Yeni Sohbet\",\n  \"conversations\": [],\n  \"aiModel\": \"google/gemini-2.0-flash-lite-001\",\n  \"temperature\": 0.5\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/chat/histories",
+              "raw": "{{baseUrl}}/ai/chat/histories",
               "host": ["{{baseUrl}}"],
               "path": ["chat", "histories"]
             },
@@ -496,7 +496,7 @@
               "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"Güncellenmiş Sohbet\",\n  \"conversations\": [],\n  \"aiModel\": \"google/gemini-2.0-flash-lite-001\",\n  \"temperature\": 0.7\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/chat/histories/{{chatHistoryId}}",
+              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
               "host": ["{{baseUrl}}"],
               "path": ["chat", "histories", "{{chatHistoryId}}"]
             },
@@ -541,7 +541,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/chat/histories/{{chatHistoryId}}",
+              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
               "host": ["{{baseUrl}}"],
               "path": ["chat", "histories", "{{chatHistoryId}}"]
             },
@@ -590,7 +590,7 @@
               "raw": "{\n  \"content\": \"Merhaba, nasılsın?\",\n  \"role\": \"user\",\n  \"fresh\": true\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/chat/histories/{{chatHistoryId}}/conversations",
+              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}/conversations",
               "host": ["{{baseUrl}}"],
               "path": [
                 "chat",
@@ -644,7 +644,7 @@
               "raw": "{\n  \"title\": \"Yeni Başlık\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/chat/histories/{{chatHistoryId}}",
+              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
               "host": ["{{baseUrl}}"],
               "path": ["chat", "histories", "{{chatHistoryId}}"]
             },
