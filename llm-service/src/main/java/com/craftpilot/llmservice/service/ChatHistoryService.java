@@ -6,7 +6,9 @@ import com.craftpilot.llmservice.repository.ChatHistoryRepository;
 import com.google.cloud.Timestamp;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -148,19 +150,28 @@ public class ChatHistoryService {
     }
 
     public Mono<ChatHistory> archiveChatHistory(String historyId) {
-        if (historyId == null || historyId.isEmpty()) {
-            log.warn("Geçersiz ID ile sohbet arşivleme isteği");
-            return Mono.error(new IllegalArgumentException("Geçerli bir ID gerekli"));
-        }
+        log.info("Sohbet arşivleniyor, ID: {}", historyId);
         
-        log.debug("Sohbet arşivleniyor, ID: {}", historyId);
         return chatHistoryRepository.findById(historyId)
+                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, 
+                        "Chat history with ID " + historyId + " not found")))
                 .flatMap(chatHistory -> {
-                    chatHistory.setEnable(false); // Arşivleme için enable değerini false yap
+                    log.debug("Sohbet geçmişi bulundu, şu anki enable değeri: {}", chatHistory.isEnable());
+                    chatHistory.setEnable(false);
                     chatHistory.setUpdatedAt(Timestamp.now());
-                    return chatHistoryRepository.save(chatHistory);
+                    
+                    return chatHistoryRepository.save(chatHistory)
+                            .doOnSuccess(updatedChat -> 
+                                log.info("Sohbet başarıyla arşivlendi, ID: {}", updatedChat.getId()));
                 })
-                .doOnError(error -> log.error("Sohbet arşivlenirken hata, ID {}: {}", historyId, error.getMessage()))
-                .onErrorMap(e -> new RuntimeException("Sohbet arşivlenemedi: " + e.getMessage(), e));
+                .onErrorResume(e -> {
+                    if (e instanceof ResponseStatusException) {
+                        log.error("Sohbet arşivlenemedi: {}", e.getMessage());
+                        return Mono.error(e);
+                    }
+                    log.error("Sohbet arşivlenirken hata: {}", e.getMessage(), e);
+                    return Mono.error(new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, 
+                            "Sohbet arşivlenemedi: " + e.getMessage(), e));
+                });
     }
 }

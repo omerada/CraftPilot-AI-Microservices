@@ -262,7 +262,7 @@
             "url": {
               "raw": "{{baseUrl}}/ai/config/model-defaults?model=google/gemini-pro",
               "host": ["{{baseUrl}}"],
-              "path": ["config", "model-defaults"],
+              "path": ["ai", "config", "model-defaults"],
               "query": [
                 {
                   "key": "model",
@@ -298,7 +298,7 @@
             "url": {
               "raw": "{{baseUrl}}/ai/config/models",
               "host": ["{{baseUrl}}"],
-              "path": ["config", "models"]
+              "path": ["ai", "config", "models"]
             },
             "description": "Kullanılabilir modellerin listesini getirir"
           },
@@ -349,7 +349,7 @@
             "url": {
               "raw": "{{baseUrl}}/ai/chat/histories?userId={{userId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["chat", "histories"],
+              "path": ["ai", "chat", "histories"],
               "query": [
                 {
                   "key": "userId",
@@ -400,7 +400,7 @@
             "url": {
               "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["chat", "histories", "{{chatHistoryId}}"]
+              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
             },
             "description": "Belirtilen ID ile sohbet geçmişini getirir"
           },
@@ -449,7 +449,7 @@
             "url": {
               "raw": "{{baseUrl}}/ai/chat/histories",
               "host": ["{{baseUrl}}"],
-              "path": ["chat", "histories"]
+              "path": ["ai", "chat", "histories"]
             },
             "description": "Yeni bir sohbet geçmişi oluşturur"
           },
@@ -498,7 +498,7 @@
             "url": {
               "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["chat", "histories", "{{chatHistoryId}}"]
+              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
             },
             "description": "Belirtilen sohbet geçmişini günceller"
           },
@@ -543,7 +543,7 @@
             "url": {
               "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["chat", "histories", "{{chatHistoryId}}"]
+              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
             },
             "description": "Belirtilen sohbet geçmişini siler"
           },
@@ -593,6 +593,7 @@
               "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}/conversations",
               "host": ["{{baseUrl}}"],
               "path": [
+                "ai",
                 "chat",
                 "histories",
                 "{{chatHistoryId}}",
@@ -646,9 +647,60 @@
             "url": {
               "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["chat", "histories", "{{chatHistoryId}}"]
+              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
             },
             "description": "Belirtilen sohbet geçmişinin başlığını günceller"
+          },
+          "response": []
+        },
+        {
+          "name": "Archive Chat History",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{firebaseToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Role",
+                "value": "{{userRole}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Email",
+                "value": "{{userEmail}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}/do-archive",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "ai",
+                "chat",
+                "histories",
+                "{{chatHistoryId}}",
+                "do-archive"
+              ]
+            },
+            "description": "Belirtilen sohbet geçmişini arşivler"
           },
           "response": []
         }
@@ -1054,44 +1106,247 @@
         }
       ],
       "description": "Kullanıcı tercihleri ile ilgili API endpointleri"
-    }
-  ],
-  "event": [
-    {
-      "listen": "prerequest",
-      "script": {
-        "type": "text/javascript",
-        "exec": [
-          "if (!pm.variables.get('userId')) {",
-          "    pm.variables.set('userId', '12345');",
-          "}",
-          "if (!pm.variables.get('userRole')) {",
-          "    pm.variables.set('userRole', 'USER');",
-          "}",
-          "if (!pm.variables.get('userEmail')) {",
-          "    pm.variables.set('userEmail', 'test@craftpilot.io');",
-          "}"
-        ]
-      }
     },
     {
-      "listen": "test",
-      "script": {
-        "type": "text/javascript",
-        "exec": [
-          "pm.test(\"Status code is 200\", function () {",
-          "    pm.response.to.have.status(200);",
-          "});",
-          "",
-          "pm.test(\"Response has content-type header\", function () {",
-          "    pm.response.to.have.header(\"Content-Type\");",
-          "});",
-          "",
-          "if (pm.response.json()) {",
-          "    console.log('Response:', JSON.stringify(pm.response.json(), null, 2));",
-          "}"
-        ]
-      }
+      "name": "LLM Service",
+      "item": [
+        {
+          "name": "Get Chat Histories",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/ai/chat/histories?userId={{userId}}",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "chat", "histories"],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Get Chat History By ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/ai/chat/histories/{{chatHistoryId}}",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Create Chat History",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/ai/chat/histories",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "chat", "histories"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"New Chat\",\n  \"enable\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Chat History",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{base_url}}/ai/chat/histories/{{chatHistoryId}}",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"Updated Chat\",\n  \"enable\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Chat History",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/ai/chat/histories/{{chatHistoryId}}",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Add Conversation",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/ai/chat/histories/{{chatHistoryId}}/conversations",
+              "host": ["{{base_url}}"],
+              "path": [
+                "ai",
+                "chat",
+                "histories",
+                "{{chatHistoryId}}",
+                "conversations"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"user\",\n  \"content\": \"Hello AI!\",\n  \"orderIndex\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Chat Title",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/ai/chat/histories/{{chatHistoryId}}/update-title",
+              "host": ["{{base_url}}"],
+              "path": [
+                "ai",
+                "chat",
+                "histories",
+                "{{chatHistoryId}}",
+                "update-title"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Role",
+                "value": "{{userRole}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Email",
+                "value": "{{userEmail}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Title\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Archive Chat History",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/ai/chat/histories/{{chatHistoryId}}/do-archive",
+              "host": ["{{base_url}}"],
+              "path": [
+                "ai",
+                "chat",
+                "histories",
+                "{{chatHistoryId}}",
+                "do-archive"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Role",
+                "value": "{{userRole}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Email",
+                "value": "{{userEmail}}",
+                "type": "text"
+              }
+            ],
+            "description": "Sohbet geçmişini arşivler"
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "variable": [
@@ -1124,6 +1379,14 @@
       "key": "firebaseToken",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "base_url",
+      "value": "https://api.craftpilot.io"
+    },
+    {
+      "key": "token",
+      "value": "your-auth-token"
     }
   ]
 }

@@ -130,7 +130,6 @@ public class ChatHistoryController {
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
-    // Başlık güncelleme endpointi için alternatif bir endpoint ekleyelim
     @PostMapping("/histories/{id}/update-title")
     public Mono<ResponseEntity<ChatHistory>> updateChatHistoryTitlePost(
             @PathVariable String id,
@@ -150,34 +149,14 @@ public class ChatHistoryController {
                 })
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
+  
 
-    // Orijinal PATCH metodu yerine aşağıdaki metodu ekle (mevcut kaldırılabilir)
-    @RequestMapping(path = "/histories/{id}/title", method = RequestMethod.PATCH, consumes = "application/json")
-    public Mono<ResponseEntity<ChatHistory>> patchChatHistoryTitle(
-            @PathVariable String id,
-            @RequestBody TitleUpdateRequest request) {
-        log.info("Sohbet başlığı güncelleme isteği (PATCH method), ID: {}, Yeni başlık: {}", id, request.getTitle());
-        
-        return chatHistoryService.getChatHistoryById(id)
-                .flatMap(chatHistory -> {
-                    chatHistory.setTitle(request.getTitle());
-                    chatHistory.setUpdatedAt(Timestamp.now());
-                    return chatHistoryService.updateChatHistory(chatHistory);
-                })
-                .map(ResponseEntity::ok)
-                .onErrorResume(error -> {
-                    log.error("Sohbet başlığı güncellenirken hata, ID {}: {}", id, error.getMessage());
-                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
-                })
-                .defaultIfEmpty(ResponseEntity.notFound().build());
-    }
-
-    @PatchMapping("/histories/{id}/archive")
-    public Mono<ResponseEntity<ChatHistory>> archiveChatHistory(@PathVariable String id) {
-        log.info("Sohbet arşivleme isteği, ID: {}", id);
+    @PostMapping("/histories/{id}/do-archive")
+    public Mono<ResponseEntity<ChatHistory>> archiveChatHistoryPost(@PathVariable String id) {
+        log.info("Sohbet arşivleme isteği (POST method), ID: {}", id);
         
         return chatHistoryService.archiveChatHistory(id)
-                .map(updated -> ResponseEntity.ok(updated))
+                .map(ResponseEntity::ok)
                 .onErrorResume(error -> {
                     log.error("Sohbet arşivlenirken hata, ID {}: {}", id, error.getMessage());
                     return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
