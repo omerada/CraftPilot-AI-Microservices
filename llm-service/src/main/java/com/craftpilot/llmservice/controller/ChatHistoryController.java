@@ -102,14 +102,25 @@ public class ChatHistoryController {
 
     @PostMapping("/histories/{id}/conversations")
     public Mono<ResponseEntity<ChatHistory>> addConversation(@PathVariable String id, @RequestBody Conversation conversation) {
-        log.info("Sohbete mesaj ekleme isteği, Chat ID: {}, OrderIndex: {}", id, conversation.getOrderIndex());
+        log.info("Sohbete mesaj ekleme isteği alındı: Chat ID: {}, Role: {}, OrderIndex: {}", 
+                  id, conversation.getRole(), conversation.getOrderIndex());
         
         // Process timestamp if needed
         processConversationTimestamp(conversation);
         
         return chatHistoryService.addConversation(id, conversation)
                 .map(updated -> {
-                    log.debug("Mesaj eklendi, Chat ID: {}", id);
+                    // Mesaj ekleme başarılı oldu, tüm orderIndex'leri logla
+                    if (updated != null && updated.getConversations() != null) {
+                        StringBuilder sb = new StringBuilder("Güncel mesaj sıralaması - Chat ID: " + id + " - ");
+                        for (Conversation c : updated.getConversations()) {
+                            sb.append(c.getOrderIndex())
+                              .append("(").append(c.getRole()).append("), ");
+                        }
+                        log.info(sb.toString());
+                    }
+                    
+                    log.debug("Mesaj eklendi, Chat ID: {}, OrderIndex: {}", id, conversation.getOrderIndex());
                     return ResponseEntity.ok(updated);
                 })
                 .onErrorResume(error -> {
