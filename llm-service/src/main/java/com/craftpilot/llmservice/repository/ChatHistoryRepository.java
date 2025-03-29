@@ -221,6 +221,13 @@ public class ChatHistoryRepository {
                 try {
                     // Get the latest version of the history after the transaction
                     ChatHistory updatedHistory = findById(historyId).block();
+                    
+                    // Ek log ile orderIndex bilgisi ve atanan değeri göster
+                    if (conversation != null && conversation.getOrderIndex() != null) {
+                        log.info("Conversation added with orderIndex: {}, to chat: {}", 
+                               conversation.getOrderIndex(), historyId);
+                    }
+                    
                     emitter.success(updatedHistory);
                     log.info("Successfully added conversation {} to chat {}, total conversations: {}", 
                             conversation.getId(), historyId, 
