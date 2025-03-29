@@ -654,6 +654,406 @@
         }
       ],
       "description": "Sohbet geçmişi ile ilgili API endpointleri"
+    },
+    {
+      "name": "User Preferences API",
+      "item": [
+        {
+          "name": "Get User Preferences",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{firebaseToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Role",
+                "value": "{{userRole}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Email",
+                "value": "{{userEmail}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "preferences"]
+            },
+            "description": "Kullanıcının tüm tercihlerini getirir"
+          },
+          "response": []
+        },
+        {
+          "name": "Create User Preferences",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{firebaseToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Role",
+                "value": "{{userRole}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Email",
+                "value": "{{userEmail}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theme\": \"light\",\n  \"language\": \"tr\",\n  \"notifications\": true,\n  \"pushEnabled\": true,\n  \"aiModelFavorites\": [\"google/gemini-pro\", \"openai/gpt-4o-mini\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "preferences"]
+            },
+            "description": "Yeni kullanıcı tercihleri oluşturur"
+          },
+          "response": []
+        },
+        {
+          "name": "Update User Preferences",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{firebaseToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Role",
+                "value": "{{userRole}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Email",
+                "value": "{{userEmail}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theme\": \"dark\",\n  \"language\": \"en\",\n  \"notifications\": true,\n  \"pushEnabled\": false,\n  \"aiModelFavorites\": [\"google/gemini-pro\", \"openai/gpt-4o-mini\", \"mistral/mistral-medium\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "preferences"]
+            },
+            "description": "Kullanıcı tercihlerini günceller"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User Preferences",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{firebaseToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Role",
+                "value": "{{userRole}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Email",
+                "value": "{{userEmail}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "preferences"]
+            },
+            "description": "Kullanıcı tercihlerini siler"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Theme Preference",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{firebaseToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Role",
+                "value": "{{userRole}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Email",
+                "value": "{{userEmail}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/preferences/theme?theme=dark",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "preferences", "theme"],
+              "query": [
+                {
+                  "key": "theme",
+                  "value": "dark"
+                }
+              ]
+            },
+            "description": "Kullanıcının tema tercihini günceller"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Language Preference",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{firebaseToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Role",
+                "value": "{{userRole}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Email",
+                "value": "{{userEmail}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/preferences/language?language=en",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "preferences", "language"],
+              "query": [
+                {
+                  "key": "language",
+                  "value": "en"
+                }
+              ]
+            },
+            "description": "Kullanıcının dil tercihini günceller"
+          },
+          "response": []
+        },
+        {
+          "name": "Update AI Model Favorites",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{firebaseToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Role",
+                "value": "{{userRole}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Email",
+                "value": "{{userEmail}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\"google/gemini-pro\", \"openai/gpt-4o\", \"anthropic/claude-3-opus\"]"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/preferences/ai-model-favorites",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "users",
+                "{{userId}}",
+                "preferences",
+                "ai-model-favorites"
+              ]
+            },
+            "description": "Kullanıcının favori AI modellerini günceller"
+          },
+          "response": []
+        },
+        {
+          "name": "Get AI Model Favorites",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{firebaseToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Role",
+                "value": "{{userRole}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Email",
+                "value": "{{userEmail}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/preferences/ai-model-favorites",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "users",
+                "{{userId}}",
+                "preferences",
+                "ai-model-favorites"
+              ]
+            },
+            "description": "Kullanıcının favori AI modellerini getirir"
+          },
+          "response": []
+        }
+      ],
+      "description": "Kullanıcı tercihleri ile ilgili API endpointleri"
     }
   ],
   "event": [
