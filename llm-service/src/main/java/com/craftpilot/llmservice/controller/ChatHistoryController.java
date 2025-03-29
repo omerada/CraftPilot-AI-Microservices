@@ -15,7 +15,6 @@ import reactor.core.publisher.Mono;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/chat")
@@ -103,28 +102,18 @@ public class ChatHistoryController {
 
     @PostMapping("/histories/{id}/conversations")
     public Mono<ResponseEntity<ChatHistory>> addConversation(@PathVariable String id, @RequestBody Conversation conversation) {
-        log.info("Adding conversation, Chat ID: {}, Role: {}", id, conversation.getRole());
+        log.info("Sohbete mesaj ekleme isteği, Chat ID: {}, OrderIndex: {}", id, conversation.getOrderIndex());
         
-        // Validate the conversation
-        if (conversation.getContent() == null || conversation.getContent().isEmpty()) {
-            return Mono.just(ResponseEntity.badRequest().body(null));
-        }
+        // Process timestamp if needed
+        processConversationTimestamp(conversation);
         
-        // Ensure ID exists
-        if (conversation.getId() == null) {
-            conversation.setId(UUID.randomUUID().toString());
-        }
-        
-        // Simplify by delegating all sequence and timestamp handling to the repository layer
-        // This ensures a single source of truth for sequencing
         return chatHistoryService.addConversation(id, conversation)
                 .map(updated -> {
-                    log.info("Successfully added conversation to chat {}, total conversations: {}", 
-                            id, updated.getConversations() != null ? updated.getConversations().size() : 0);
+                    log.debug("Mesaj eklendi, Chat ID: {}", id);
                     return ResponseEntity.ok(updated);
                 })
                 .onErrorResume(error -> {
-                    log.error("Error adding conversation to chat {}: {}", id, error.getMessage(), error);
+                    log.error("Mesaj eklenirken hata, Chat ID {}: {}", id, error.getMessage());
                     return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
                 })
                 .defaultIfEmpty(ResponseEntity.notFound().build());
@@ -184,55 +173,17 @@ public class ChatHistoryController {
     }
 
     /**
-     * Conversation için geliştirilmiş timestamp işleme
+     * Conversation için timestamp işleme
      */
     private void processConversationTimestamp(Conversation conversation) {
         try {
-            // Sequence değerini öncelikle kontrol et
-            Long sequence = conversation.getSequence();
-            
-            if (sequence != null && sequence > 0) {
-                // Sequence varsa, timestamp değerini ondan türet
-                conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
-                    sequence / 1000,
-                    (int) ((sequence % 1000) * 1_000_000)
-                 ));
-                log.debug("Sequence'ten timestamp oluşturuldu: {}", conversation.getTimestamp());
-            } 
-            else if (conversation.getTimestamp() == null) {
-                // Hem sequence hem de timestamp yoksa, şu anki zamanı kullan
-                Timestamp now = Timestamp.now();
-                conversation.setTimestamp(now);
-                
-                // Ve bu timestamp'ten bir sequence değeri oluştur
-                long seconds = now.getSeconds();
-                long nanos = now.getNanos() / 1_000_000; // millisecond kısmını al
-                long sequenceValue = seconds * 1000 + nanos;
-                conversation.setSequence(sequenceValue);
-                
-                log.debug("Yeni timestamp ve sequence oluşturuldu: timestamp={}, sequence={}", 
-                         now, sequenceValue);
-            }
-            else {
-                // Timestamp var ama sequence yok ise timestamp'ten sequence oluştur
-                long seconds = conversation.getTimestamp().getSeconds();
-                long nanos = conversation.getTimestamp().getNanos() / 1_000_000;
-                long sequenceValue = seconds * 1000 + nanos;
-                conversation.setSequence(sequenceValue);
-                
-                log.debug("Mevcut timestamp'ten sequence oluşturuldu: sequence={}", sequenceValue);
+            if (conversation.getTimestamp() == null) {
+                log.debug("Conversation timestamp null, şu anki zaman kullanılıyor");
+                conversation.setTimestamp(Timestamp.now());
             }
         } catch (Exception e) {
-            // Herhangi bir hata olursa güvenli değerler kullan
             log.error("Conversation timestamp işlenirken hata: {}", e.getMessage());
-            Timestamp now = Timestamp.now();
-            conversation.setTimestamp(now);
-            
-            long sequenceValue = now.getSeconds() * 1000 + (now.getNanos() / 1_000_000);
-            conversation.setSequence(sequenceValue);
-            
-            log.debug("Hata sonrası yeni değerler atandı: timestamp={}, sequence={}", 
-                     now, sequenceValue);
+            conversation.setTimestamp(Timestamp.now());
         }
     }
 }

@@ -14,14 +14,17 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class Conversation {
     private String id;
+    private String role;
     private String content;
-    private String role; // 'user' veya 'assistant'
+    private Boolean fresh;
     
     @JsonDeserialize(using = TimestampDeserializer.class)
     private Timestamp timestamp;
     
-    private boolean fresh;
+    // Replace sequence with orderIndex
+    private Integer orderIndex;
     
-    // Sıralama için yeni alan eklendi
+    // Keep sequence field for backward compatibility but mark as deprecated
+    @Deprecated
     private Long sequence;
 }

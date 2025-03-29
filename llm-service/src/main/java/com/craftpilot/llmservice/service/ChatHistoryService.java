@@ -116,49 +116,17 @@ public class ChatHistoryService {
             conversation.setId(UUID.randomUUID().toString());
         }
         
-        // Sequence değeri yoksa veya 0 ise, daha güvenli bir değer atama
-        if (conversation.getSequence() == null || conversation.getSequence() == 0) {
-            long currentTime = System.currentTimeMillis();
-            
-            if ("user".equals(conversation.getRole())) {
-                // User mesajları için timestamp ile aynı değeri kullan
-                conversation.setSequence(currentTime);
-            } else {
-                // Assistant mesajları için user mesajlarından sonra gelecek şekilde daha büyük bir değer
-                conversation.setSequence(currentTime + 1000);
-            }
-            
-            // Timestamp değerini sequence ile uyumlu olacak şekilde güncelle
-            conversation.setTimestamp(Timestamp.ofTimeSecondsAndNanos(
-                conversation.getSequence() / 1000,
-                (int) ((conversation.getSequence() % 1000) * 1_000_000)
-            ));
+        // Timestamp değeri yoksa, şu anki zamanı ekle
+        if (conversation.getTimestamp() == null) {
+            conversation.setTimestamp(Timestamp.now());
         }
         
-        // Eğer timestamp varsa ama sequence yoksa, timestamp'ten sequence türet
-        else if (conversation.getTimestamp() != null && 
-                (conversation.getSequence() == null || conversation.getSequence() == 0)) {
-            
-            // Timestamp'i milisaniye cinsinden sequence değerine dönüştür
-            long seconds = conversation.getTimestamp().getSeconds();
-            int nanos = conversation.getTimestamp().getNanos();
-            long millis = seconds * 1000 + nanos / 1_000_000;
-            
-            // Role göre offset ekle
-            if ("assistant".equals(conversation.getRole())) {
-                millis += 1000; // AI mesajlarını kullanıcıdan sonra göster
-            }
-            
-            conversation.setSequence(millis);
-        }
-        
-        log.debug("Sohbete mesaj ekleniyor, Chat ID: {}, Sequence: {}, Timestamp: {}", 
-                historyId, conversation.getSequence(), conversation.getTimestamp());
+        log.debug("Sohbete mesaj ekleniyor, Chat ID: {}, OrderIndex: {}", historyId, conversation.getOrderIndex());
         return chatHistoryRepository.addConversation(historyId, conversation)
-                .doOnSuccess(result -> log.info("Mesaj başarıyla eklendi, Chat ID: {}, Sequence: {}", 
-                                          historyId, conversation.getSequence()))
-                .doOnError(error -> log.error("Mesaj eklenirken hata, Chat ID {}, Sequence {}: {}", 
-                                        historyId, conversation.getSequence(), error.getMessage()))
+                .doOnSuccess(result -> log.info("Mesaj başarıyla eklendi, Chat ID: {}, OrderIndex: {}", 
+                                          historyId, conversation.getOrderIndex()))
+                .doOnError(error -> log.error("Mesaj eklenirken hata, Chat ID {}, OrderIndex {}: {}", 
+                                        historyId, conversation.getOrderIndex(), error.getMessage()))
                 .onErrorMap(e -> new RuntimeException("Mesaj eklenemedi: " + e.getMessage(), e));
     }
 
