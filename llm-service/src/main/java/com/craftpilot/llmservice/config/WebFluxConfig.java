@@ -33,7 +33,8 @@ public class WebFluxConfig implements WebFluxConfigurer {
             .allowedOrigins(
                 "http://localhost:5173",
                 "http://localhost:3000", 
-                "https://app.craftpilot.io"
+                "https://app.craftpilot.io",
+                "https://api.craftpilot.io"
             )
             .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
             .allowedHeaders("*")

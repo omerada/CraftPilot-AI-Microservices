@@ -34,8 +34,8 @@ public class SecurityConfig {
     private final UserPreferenceCache userPreferenceCache;
     
     private static final List<String> ALLOWED_ORIGINS = Arrays.asList(
-        "http://localhost:5173",
-        "http://localhost:3000",
+        "http://localhost:5173", 
+        "http://api.craftpilot:io",
         "https://*.craftpilot.io",
         "https://craftpilot.io"
     );
@@ -94,7 +94,8 @@ public class SecurityConfig {
         // Origin patterns yerine specific origins kullan
         config.setAllowedOrigins(Arrays.asList(
             "http://localhost:5173",
-            "https://app.craftpilot.io"
+            "https://app.craftpilot.io",
+            "https://api.craftpilot.io"
         ));
         
         config.setAllowedMethods(Arrays.asList(

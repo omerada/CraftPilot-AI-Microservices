@@ -23,7 +23,7 @@ public class CorsConfig implements WebFluxConfigurer {
     @Bean
     public CorsWebFilter corsWebFilter() {
         CorsConfiguration corsConfig = new CorsConfiguration();
-        corsConfig.setAllowedOrigins(Arrays.asList("http://localhost:5173", "https://app.craftpilot.io"));
+        corsConfig.setAllowedOrigins(Arrays.asList("http://localhost:5173", "https://app.craftpilot.io",  "https://api.craftpilot.io", "https://*.craftpilot.io"));
         corsConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         corsConfig.setAllowedHeaders(Arrays.asList("*"));
         corsConfig.setExposedHeaders(Arrays.asList("X-Total-Count", "X-Error-Message", "X-CSRF-TOKEN"));
