@@ -24,10 +24,14 @@ public class ChatHistoryController {
     private final ChatHistoryService chatHistoryService;
 
     @GetMapping("/histories")
-    public Mono<ResponseEntity<Map<String, List<ChatHistory>>>> getChatHistories(@RequestParam String userId) {
-        log.info("Sohbet geçmişi istendi, kullanıcı: {}", userId);
+    public Mono<ResponseEntity<Map<String, List<ChatHistory>>>> getChatHistories(
+            @RequestParam String userId,
+            @RequestParam(required = false, defaultValue = "1") int page,
+            @RequestParam(required = false, defaultValue = "10") int pageSize) {
         
-        return chatHistoryService.getChatHistoriesByUserId(userId)
+        log.info("Sohbet geçmişi istendi, kullanıcı: {}, sayfa: {}, sayfa boyutu: {}", userId, page, pageSize);
+        
+        return chatHistoryService.getChatHistoriesByUserId(userId, page, pageSize)
                 .collectList()
                 .map(histories -> {
                     log.debug("Bulunan sohbet geçmişi sayısı: {}", histories.size());

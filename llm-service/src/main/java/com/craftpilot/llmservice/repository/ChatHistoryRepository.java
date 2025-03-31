@@ -23,25 +23,64 @@ public class ChatHistoryRepository {
     private final Firestore firestore;
     private static final String COLLECTION_NAME = "chatHistories";
 
-    public Flux<ChatHistory> findAllByUserId(String userId) {
+    public Flux<ChatHistory> findAllByUserId(String userId, int page, int pageSize) {
         return Flux.create(emitter -> {
-            ApiFuture<QuerySnapshot> future = firestore.collection(COLLECTION_NAME)
-                    .whereEqualTo("userId", userId)
-                    .orderBy("updatedAt", Query.Direction.DESCENDING)
-                    .get();
-
-            future.addListener(() -> {
-                try {
-                    List<QueryDocumentSnapshot> documents = future.get().getDocuments();
-                    for (DocumentSnapshot document : documents) {
-                        ChatHistory history = document.toObject(ChatHistory.class);
-                        emitter.next(history);
+            try {
+                // Başlangıç indeksini hesapla
+                int startIndex = (page - 1) * pageSize;
+                
+                log.debug("Sohbet geçmişleri alınıyor, userId: {}, startIndex: {}, pageSize: {}", 
+                         userId, startIndex, pageSize);
+                
+                // Firestore sorgusu oluştur
+                Query query = firestore.collection(COLLECTION_NAME)
+                        .whereEqualTo("userId", userId)
+                        .orderBy("updatedAt", Query.Direction.DESCENDING);
+                
+                // Sayfalama için Firestore limitlerini kullan (offset and limit)
+                if (startIndex > 0) {
+                    // Önce offset uygula (Firebase'de başlat/offset olarak bilinen)
+                    ApiFuture<QuerySnapshot> offsetFuture = query.limit(startIndex).get();
+                    try {
+                        QuerySnapshot offsetSnapshot = offsetFuture.get();
+                        if (!offsetSnapshot.isEmpty()) {
+                            // Son dökümanı al ve ardından bu belgeden sonrakileri iste
+                            DocumentSnapshot lastDoc = offsetSnapshot.getDocuments().get(offsetSnapshot.size() - 1);
+                            query = query.startAfter(lastDoc);
+                        }
+                    } catch (Exception e) {
+                        log.error("Offset uygularken hata: {}", e.getMessage());
+                        // Hata durumunda offsetsiz devam et
                     }
-                    emitter.complete();
-                } catch (Exception e) {
-                    emitter.error(e);
                 }
-            }, Runnable::run);
+                
+                // Sayfa boyutunu uygula
+                query = query.limit(pageSize);
+                
+                // Sorguyu çalıştır
+                ApiFuture<QuerySnapshot> future = query.get();
+                
+                future.addListener(() -> {
+                    try {
+                        List<QueryDocumentSnapshot> documents = future.get().getDocuments();
+                        log.debug("Sorgu sonucu {} sohbet geçmişi bulundu", documents.size());
+                        
+                        for (DocumentSnapshot document : documents) {
+                            ChatHistory history = document.toObject(ChatHistory.class);
+                            if (history != null) {
+                                emitter.next(history);
+                            }
+                        }
+                        emitter.complete();
+                    } catch (Exception e) {
+                        log.error("Sohbet geçmişleri getirilirken hata: {}", e.getMessage());
+                        emitter.error(e);
+                    }
+                }, Runnable::run);
+            } catch (Exception e) {
+                log.error("Sohbet geçmişi sorgusu oluşturulurken hata: {}", e.getMessage());
+                emitter.error(e);
+            }
         });
     }
 

@@ -21,14 +21,25 @@ import java.util.UUID;
 public class ChatHistoryService {
     private final ChatHistoryRepository chatHistoryRepository;
 
-    public Flux<ChatHistory> getChatHistoriesByUserId(String userId) {
+    public Flux<ChatHistory> getChatHistoriesByUserId(String userId, int page, int pageSize) {
         if (userId == null || userId.isEmpty()) {
             log.warn("Geçersiz userId ile sohbet geçmişi istendi: {}", userId);
             return Flux.empty();
         }
         
-        log.debug("Kullanıcı için sohbet geçmişleri getiriliyor: {}", userId);
-        return chatHistoryRepository.findAllByUserId(userId)
+        // Sayfalama parametrelerini doğrula
+        if (page < 1) {
+            page = 1;
+        }
+        
+        if (pageSize < 1 || pageSize > 100) { // Maksimum sayfa boyutunu sınırla
+            pageSize = 10;
+        }
+        
+        log.debug("Kullanıcı için sohbet geçmişleri getiriliyor: {}, sayfa: {}, sayfa boyutu: {}", 
+                 userId, page, pageSize);
+                 
+        return chatHistoryRepository.findAllByUserId(userId, page, pageSize)
                 .doOnError(error -> log.error("Sohbet geçmişi getirirken hata: {}", error.getMessage()))
                 .onErrorResume(e -> Flux.empty());
     }
