@@ -208,6 +208,9 @@ public class ChatHistoryService {
         return getChatHistoriesByUserId(userId, 1, Integer.MAX_VALUE) // Get all histories first
                 .collectList()
                 .flatMap(allHistories -> {
+                    // Veritabanındaki toplam kayıt sayısı (filtrelemeden önce)
+                    int totalDatabaseRecords = allHistories.size();
+                    
                     // Apply search filter if specified
                     List<ChatHistory> filteredHistories = allHistories;
                     if (searchQuery != null && !searchQuery.trim().isEmpty()) {
@@ -244,40 +247,31 @@ public class ChatHistoryService {
                     
                     // Create the response structure with LinkedHashMap to maintain order
                     LinkedHashMap<String, CategoryData> categories = new LinkedHashMap<>();
-                    int totalItems = 0;
                     
-                    // Yeni ekleme: Sayfalama için kullanılacak birleştirilmiş liste
-                    List<ChatHistory> allCategoryHistories = new ArrayList<>();
+                    // Bu sayfada gösterilecek toplam öğe sayısı
+                    int displayedItems = 0;
+                    int totalCategorizedItems = 0;
                     
-                    // Önce tüm kategorileri işleyip, toplam öğe sayısını ve kategorilerdeki öğeleri hesapla
+                    // Önce tüm kategorilerin toplam öğe sayısını hesapla
                     for (String category : finalCategoryFilters) {
                         List<ChatHistory> histories = categorizedHistories.getOrDefault(category, List.of());
-                        totalItems += histories.size();
-                        allCategoryHistories.addAll(histories);
-                        
-                        // Kategorileri ve toplam sayıları ekle (içerik sonra eklenecek)
-                        categories.put(category, new CategoryData(new ArrayList<>(), histories.size()));
+                        totalCategorizedItems += histories.size();
                     }
                     
-                    // Sayfalama hesaplamaları
-                    int totalPages = (int) Math.ceil((double) totalItems / pageSize);
-                    boolean hasMore = page * pageSize < totalItems; // Düzeltilmiş hasMore hesaplaması
-                    
-                    // Sadece gerekli öğeleri görüntülemek için kategorileri yeniden işle
+                    // Sayfalama için skip ve limit değerlerini hesapla
                     int skipCount = (page - 1) * pageSize;
-                    int remainingItems = Math.min(pageSize, totalItems - skipCount);
+                    int remainingItems = Math.min(pageSize, totalCategorizedItems - skipCount);
                     
+                    // Kategorileri işle ve gösterilecek öğeleri belirle
                     if (remainingItems > 0) {
-                        // Her kategori için sayfalama mantığını ayrı ayrı uygula
                         for (String category : finalCategoryFilters) {
                             List<ChatHistory> histories = categorizedHistories.getOrDefault(category, List.of());
-                            
-                            // Bu kategoriden kaç öğe atlanacak?
                             int categorySize = histories.size();
                             
                             if (skipCount >= categorySize) {
                                 // Bu kategorinin tüm öğelerini atla
                                 skipCount -= categorySize;
+                                categories.put(category, new CategoryData(List.of(), categorySize));
                             } else {
                                 // Bu kategoriden bazı öğeleri al
                                 int itemsToTake = Math.min(remainingItems, categorySize - skipCount);
@@ -289,27 +283,42 @@ public class ChatHistoryService {
                                             .map(this::convertToChatItem)
                                             .collect(Collectors.toList());
                                     
-                                    // Kategoriye öğeleri ekle
                                     categories.put(category, new CategoryData(items, categorySize));
                                     
-                                    // Kalan değerleri güncelle
+                                    displayedItems += itemsToTake;
                                     remainingItems -= itemsToTake;
                                     skipCount = 0;
+                                } else {
+                                    categories.put(category, new CategoryData(List.of(), categorySize));
                                 }
                             }
                             
-                            // Eğer tüm gerekli öğeler alındıysa döngüyü sonlandır
                             if (remainingItems <= 0) {
                                 break;
                             }
                         }
                     }
                     
+                    // Kalan kategorileri boş listelerle doldur
+                    for (String category : finalCategoryFilters) {
+                        if (!categories.containsKey(category)) {
+                            categories.put(category, new CategoryData(List.of(), 
+                                categorizedHistories.getOrDefault(category, List.of()).size()));
+                        }
+                    }
+                    
+                    // Sayfalama bilgilerini hesapla (toplam kategori öğeleri üzerinden)
+                    int totalPages = (int) Math.ceil((double) totalCategorizedItems / pageSize);
+                    
+                    // hasMore değerini veritabanındaki toplam kayıt sayısına göre hesapla
+                    // Mevcut sayfa * sayfa boyutu, toplam kayıt sayısından küçükse, daha fazla kayıt vardır
+                    boolean hasMore = page * pageSize < totalDatabaseRecords;
+                    
                     PaginationInfo paginationInfo = PaginationInfo.builder()
                             .currentPage(page)
                             .totalPages(totalPages)
                             .pageSize(pageSize)
-                            .totalItems(totalItems)
+                            .totalItems(totalDatabaseRecords) // Toplam kayıt sayısını göster
                             .hasMore(hasMore)
                             .build();
                     
