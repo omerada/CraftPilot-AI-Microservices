@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Data
@@ -12,6 +13,6 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PaginatedChatHistoryResponse {
-    private Map<String, CategoryData> categories;
+    private LinkedHashMap<String, CategoryData> categories;
     private PaginationInfo pagination;
 }

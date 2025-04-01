@@ -200,7 +200,7 @@ public class ChatHistoryService {
             String searchQuery, String sortBy, String sortOrder) {
         log.info("Kategorize edilmiş sohbet geçmişi alınıyor: {}", userId);
         
-        // If no categories are specified, use all categories
+        // If no categories are specified, use all categories in correct order
         final List<String> finalCategoryFilters = categoryFilters == null || categoryFilters.isEmpty() 
                 ? List.of("today", "yesterday", "lastWeek", "lastMonth", "older")
                 : categoryFilters;
@@ -242,10 +242,11 @@ public class ChatHistoryService {
                     // Group histories by category (today, yesterday, etc.)
                     Map<String, List<ChatHistory>> categorizedHistories = categorizeHistories(filteredHistories);
                     
-                    // Create the response structure
-                    Map<String, CategoryData> categories = new HashMap<>();
+                    // Create the response structure with LinkedHashMap to maintain order
+                    LinkedHashMap<String, CategoryData> categories = new LinkedHashMap<>();
                     int totalItems = 0;
                     
+                    // Add categories in the specified order
                     for (String category : finalCategoryFilters) {
                         List<ChatHistory> histories = categorizedHistories.getOrDefault(category, List.of());
                         totalItems += histories.size();
@@ -291,7 +292,8 @@ public class ChatHistoryService {
         LocalDate lastWeekStart = today.minusDays(7);
         LocalDate lastMonthStart = today.minusDays(30);
         
-        Map<String, List<ChatHistory>> categorized = new HashMap<>();
+        // Use LinkedHashMap to maintain insertion order
+        Map<String, List<ChatHistory>> categorized = new LinkedHashMap<>();
         categorized.put("today", new ArrayList<>());
         categorized.put("yesterday", new ArrayList<>());
         categorized.put("lastWeek", new ArrayList<>());
@@ -299,7 +301,9 @@ public class ChatHistoryService {
         categorized.put("older", new ArrayList<>());
         
         for (ChatHistory history : histories) {
-            LocalDate historyDate = getLocalDateFromTimestamp(history.getCreatedAt());
+            // Use updatedAt if available, otherwise use createdAt
+            Timestamp timestamp = history.getUpdatedAt() != null ? history.getUpdatedAt() : history.getCreatedAt();
+            LocalDate historyDate = getLocalDateFromTimestamp(timestamp);
             
             if (historyDate.equals(today)) {
                 categorized.get("today").add(history);

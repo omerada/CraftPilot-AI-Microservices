@@ -13,6 +13,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -52,13 +53,13 @@ public class ChatHistoryController {
     }
 
     private PaginatedChatHistoryResponse createEmptyResponse(int page, int pageSize) {
-        Map<String, CategoryData> emptyCategories = Map.of(
-                "today", new CategoryData(List.of(), 0),
-                "yesterday", new CategoryData(List.of(), 0),
-                "lastWeek", new CategoryData(List.of(), 0),
-                "lastMonth", new CategoryData(List.of(), 0),
-                "older", new CategoryData(List.of(), 0)
-        );
+        LinkedHashMap<String, CategoryData> emptyCategories = new LinkedHashMap<>();
+        // Sıralamayı koruyarak boş kategorileri ekle
+        emptyCategories.put("today", new CategoryData(List.of(), 0));
+        emptyCategories.put("yesterday", new CategoryData(List.of(), 0));
+        emptyCategories.put("lastWeek", new CategoryData(List.of(), 0));
+        emptyCategories.put("lastMonth", new CategoryData(List.of(), 0));
+        emptyCategories.put("older", new CategoryData(List.of(), 0));
         
         PaginationInfo pagination = PaginationInfo.builder()
                 .currentPage(page)
