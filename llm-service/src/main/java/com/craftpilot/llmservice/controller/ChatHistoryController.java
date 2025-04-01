@@ -16,6 +16,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.craftpilot.llmservice.model.response.CategoryData;
+import com.craftpilot.llmservice.model.response.ChatItem;
+import com.craftpilot.llmservice.model.response.PaginatedChatHistoryResponse;
+import com.craftpilot.llmservice.model.response.PaginationInfo;
+
 @RestController
 @RequestMapping("/chat")
 @RequiredArgsConstructor
@@ -24,27 +29,49 @@ public class ChatHistoryController {
     private final ChatHistoryService chatHistoryService;
 
     @GetMapping("/histories")
-    public Mono<ResponseEntity<Map<String, List<ChatHistory>>>> getChatHistories(
+    public Mono<ResponseEntity<PaginatedChatHistoryResponse>> getChatHistories(
             @RequestParam String userId,
             @RequestParam(required = false, defaultValue = "1") int page,
-            @RequestParam(required = false, defaultValue = "10") int pageSize) {
+            @RequestParam(required = false, defaultValue = "10") int pageSize,
+            @RequestParam(required = false) List<String> categories,
+            @RequestParam(required = false) String searchQuery,
+            @RequestParam(required = false, defaultValue = "updatedAt") String sortBy,
+            @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
         
-        log.info("Sohbet geçmişi istendi, kullanıcı: {}, sayfa: {}, sayfa boyutu: {}", userId, page, pageSize);
+        log.info("Sohbet geçmişi istendi, kullanıcı: {}, sayfa: {}, sayfa boyutu: {}, kategoriler: {}, arama: {}, sıralama: {} {}", 
+                userId, page, pageSize, categories, searchQuery, sortBy, sortOrder);
         
-        return chatHistoryService.getChatHistoriesByUserId(userId, page, pageSize)
-                .collectList()
-                .map(histories -> {
-                    log.debug("Bulunan sohbet geçmişi sayısı: {}", histories.size());
-                    Map<String, List<ChatHistory>> response = new HashMap<>();
-                    response.put("histories", histories);
-                    return ResponseEntity.ok(response);
-                })
+        return chatHistoryService.getChatHistoriesByUserIdCategorized(userId, page, pageSize, categories, searchQuery, sortBy, sortOrder)
+                .map(response -> ResponseEntity.ok(response))
                 .onErrorResume(error -> {
                     log.error("Sohbet geçmişi alınırken hata: {}", error.getMessage());
-                    Map<String, List<ChatHistory>> response = new HashMap<>();
-                    response.put("histories", List.of());
-                    return Mono.just(ResponseEntity.ok(response));
+                    // Return an empty response in case of error
+                    PaginatedChatHistoryResponse emptyResponse = createEmptyResponse(page, pageSize);
+                    return Mono.just(ResponseEntity.ok(emptyResponse));
                 });
+    }
+
+    private PaginatedChatHistoryResponse createEmptyResponse(int page, int pageSize) {
+        Map<String, CategoryData> emptyCategories = Map.of(
+                "today", new CategoryData(List.of(), 0),
+                "yesterday", new CategoryData(List.of(), 0),
+                "lastWeek", new CategoryData(List.of(), 0),
+                "lastMonth", new CategoryData(List.of(), 0),
+                "older", new CategoryData(List.of(), 0)
+        );
+        
+        PaginationInfo pagination = PaginationInfo.builder()
+                .currentPage(page)
+                .totalPages(0)
+                .pageSize(pageSize)
+                .totalItems(0)
+                .hasMore(false)
+                .build();
+        
+        return PaginatedChatHistoryResponse.builder()
+                .categories(emptyCategories)
+                .pagination(pagination)
+                .build();
     }
 
     @GetMapping("/histories/{id}")
@@ -153,7 +180,6 @@ public class ChatHistoryController {
                 })
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
-  
 
     @PostMapping("/histories/{id}/do-archive")
     public Mono<ResponseEntity<ChatHistory>> archiveChatHistoryPost(@PathVariable String id) {

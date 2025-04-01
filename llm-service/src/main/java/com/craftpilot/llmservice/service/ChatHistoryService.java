@@ -12,8 +12,17 @@ import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
-import java.util.UUID;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import com.craftpilot.llmservice.model.response.CategoryData;
+import com.craftpilot.llmservice.model.response.ChatItem;
+import com.craftpilot.llmservice.model.response.PaginatedChatHistoryResponse;
+import com.craftpilot.llmservice.model.response.PaginationInfo;
 
 @Service
 @RequiredArgsConstructor
@@ -36,9 +45,9 @@ public class ChatHistoryService {
             pageSize = 10;
         }
         
-        log.debug("Kullanıcı için sohbet geçmişleri getiriliyor: {}, sayfa: {}, sayfa boyutu: {}", 
-                 userId, page, pageSize);
-                 
+        log.info("Kullanıcının sohbet geçmişleri getiriliyor: {}, sayfa: {}, sayfa boyutu: {}", 
+                userId, page, pageSize);
+        
         return chatHistoryRepository.findAllByUserId(userId, page, pageSize)
                 .doOnError(error -> log.error("Sohbet geçmişi getirirken hata: {}", error.getMessage()))
                 .onErrorResume(e -> Flux.empty());
@@ -184,5 +193,162 @@ public class ChatHistoryService {
                     return Mono.error(new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, 
                             "Sohbet arşivlenemedi: " + e.getMessage(), e));
                 });
+    }
+    
+    public Mono<PaginatedChatHistoryResponse> getChatHistoriesByUserIdCategorized(
+            String userId, int page, int pageSize, List<String> categoryFilters, 
+            String searchQuery, String sortBy, String sortOrder) {
+        log.info("Kategorize edilmiş sohbet geçmişi alınıyor: {}", userId);
+        
+        // If no categories are specified, use all categories
+        final List<String> finalCategoryFilters = categoryFilters == null || categoryFilters.isEmpty() 
+                ? List.of("today", "yesterday", "lastWeek", "lastMonth", "older")
+                : categoryFilters;
+        
+        return getChatHistoriesByUserId(userId, 1, Integer.MAX_VALUE) // Get all histories first
+                .collectList()
+                .flatMap(allHistories -> {
+                    // Apply search filter if specified
+                    List<ChatHistory> filteredHistories = allHistories;
+                    if (searchQuery != null && !searchQuery.trim().isEmpty()) {
+                        String query = searchQuery.toLowerCase();
+                        filteredHistories = allHistories.stream()
+                                .filter(history -> history.getTitle() != null && 
+                                        history.getTitle().toLowerCase().contains(query))
+                                .collect(Collectors.toList());
+                    }
+                    
+                    // Sort the histories
+                    Comparator<ChatHistory> comparator;
+                    if ("createdAt".equals(sortBy)) {
+                        comparator = Comparator.comparing(history -> getTimestampValue(history.getCreatedAt()));
+                    } else {
+                        // Default to updatedAt
+                        comparator = Comparator.comparing(history -> getTimestampValue(history.getUpdatedAt()));
+                    }
+                    
+                    // Apply sort order
+                    if ("asc".equals(sortOrder)) {
+                        // Keep original comparator for ascending
+                    } else {
+                        // Default to descending
+                        comparator = comparator.reversed();
+                    }
+                    
+                    filteredHistories = filteredHistories.stream()
+                            .sorted(comparator)
+                            .collect(Collectors.toList());
+                    
+                    // Group histories by category (today, yesterday, etc.)
+                    Map<String, List<ChatHistory>> categorizedHistories = categorizeHistories(filteredHistories);
+                    
+                    // Create the response structure
+                    Map<String, CategoryData> categories = new HashMap<>();
+                    int totalItems = 0;
+                    
+                    for (String category : finalCategoryFilters) {
+                        List<ChatHistory> histories = categorizedHistories.getOrDefault(category, List.of());
+                        totalItems += histories.size();
+                        
+                        List<ChatItem> items = histories.stream()
+                                .skip((long) (page - 1) * pageSize)
+                                .limit(pageSize)
+                                .map(this::convertToChatItem)
+                                .collect(Collectors.toList());
+                        
+                        categories.put(category, new CategoryData(items, histories.size()));
+                    }
+                    
+                    // Calculate pagination info
+                    int totalPages = (int) Math.ceil((double) totalItems / pageSize);
+                    boolean hasMore = page < totalPages;
+                    
+                    PaginationInfo paginationInfo = PaginationInfo.builder()
+                            .currentPage(page)
+                            .totalPages(totalPages)
+                            .pageSize(pageSize)
+                            .totalItems(totalItems)
+                            .hasMore(hasMore)
+                            .build();
+                    
+                    // Construct the final response
+                    PaginatedChatHistoryResponse response = PaginatedChatHistoryResponse.builder()
+                            .categories(categories)
+                            .pagination(paginationInfo)
+                            .build();
+                    
+                    return Mono.just(response);
+                });
+    }
+
+    private long getTimestampValue(Timestamp timestamp) {
+        return timestamp != null ? timestamp.getSeconds() : 0L;
+    }
+
+    private Map<String, List<ChatHistory>> categorizeHistories(List<ChatHistory> histories) {
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+        LocalDate lastWeekStart = today.minusDays(7);
+        LocalDate lastMonthStart = today.minusDays(30);
+        
+        Map<String, List<ChatHistory>> categorized = new HashMap<>();
+        categorized.put("today", new ArrayList<>());
+        categorized.put("yesterday", new ArrayList<>());
+        categorized.put("lastWeek", new ArrayList<>());
+        categorized.put("lastMonth", new ArrayList<>());
+        categorized.put("older", new ArrayList<>());
+        
+        for (ChatHistory history : histories) {
+            LocalDate historyDate = getLocalDateFromTimestamp(history.getCreatedAt());
+            
+            if (historyDate.equals(today)) {
+                categorized.get("today").add(history);
+            } else if (historyDate.equals(yesterday)) {
+                categorized.get("yesterday").add(history);
+            } else if (historyDate.isAfter(lastWeekStart)) {
+                categorized.get("lastWeek").add(history);
+            } else if (historyDate.isAfter(lastMonthStart)) {
+                categorized.get("lastMonth").add(history);
+            } else {
+                categorized.get("older").add(history);
+            }
+        }
+        
+        return categorized;
+    }
+
+    private LocalDate getLocalDateFromTimestamp(Timestamp timestamp) {
+        if (timestamp == null) {
+            return LocalDate.now(); // Default to today if no timestamp
+        }
+        return LocalDateTime.ofInstant(
+                Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()),
+                ZoneId.systemDefault()
+        ).toLocalDate();
+    }
+
+    private ChatItem convertToChatItem(ChatHistory history) {
+        String lastConversation = null;
+        if (history.getConversations() != null && !history.getConversations().isEmpty()) {
+            // Find the last conversation based on orderIndex or timestamp
+            Optional<Conversation> lastConv = history.getConversations().stream()
+                    .max(Comparator.comparing(Conversation::getOrderIndex));
+            
+            if (lastConv.isPresent()) {
+                lastConversation = lastConv.get().getContent();
+                // Truncate if too long
+                if (lastConversation != null && lastConversation.length() > 100) {
+                    lastConversation = lastConversation.substring(0, 97) + "...";
+                }
+            }
+        }
+        
+        return ChatItem.builder()
+                .id(history.getId())
+                .title(history.getTitle())
+                .createdAt(history.getCreatedAt())
+                .updatedAt(history.getUpdatedAt())
+                .lastConversation(lastConversation)
+                .build();
     }
 }
