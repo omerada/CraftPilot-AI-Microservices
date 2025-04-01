@@ -205,11 +205,14 @@ public class ChatHistoryService {
                 ? List.of("today", "yesterday", "lastWeek", "lastMonth", "older")
                 : categoryFilters;
         
-        return getChatHistoriesByUserId(userId, 1, Integer.MAX_VALUE) // Get all histories first
+        // Sayfalama mantığını doğru hesaplamak için önce tüm kayıtları getirelim
+        return chatHistoryRepository.findAllByUserId(userId, 1, Integer.MAX_VALUE) // Get all histories first
                 .collectList()
                 .flatMap(allHistories -> {
                     // Veritabanındaki toplam kayıt sayısı (filtrelemeden önce)
                     int totalDatabaseRecords = allHistories.size();
+                    
+                    log.debug("Toplam kayıt sayısı: {}", totalDatabaseRecords);
                     
                     // Apply search filter if specified
                     List<ChatHistory> filteredHistories = allHistories;
@@ -307,18 +310,21 @@ public class ChatHistoryService {
                         }
                     }
                     
-                    // Sayfalama bilgilerini hesapla (toplam kategori öğeleri üzerinden)
-                    int totalPages = (int) Math.ceil((double) totalCategorizedItems / pageSize);
+                    // Sayfalama bilgilerini hesapla
+                    int totalPages = (int) Math.ceil((double) totalDatabaseRecords / pageSize);
                     
                     // hasMore değerini veritabanındaki toplam kayıt sayısına göre hesapla
-                    // Mevcut sayfa * sayfa boyutu, toplam kayıt sayısından küçükse, daha fazla kayıt vardır
-                    boolean hasMore = page * pageSize < totalDatabaseRecords;
+                    // Toplam kayıt sayısı > pageSize * page ise daha fazla kayıt var demektir
+                    boolean hasMore = totalDatabaseRecords > page * pageSize;
+                    
+                    log.debug("hasMore hesaplaması: totalDatabaseRecords({}) > page({}) * pageSize({}) = {}", 
+                              totalDatabaseRecords, page, pageSize, hasMore);
                     
                     PaginationInfo paginationInfo = PaginationInfo.builder()
                             .currentPage(page)
                             .totalPages(totalPages)
                             .pageSize(pageSize)
-                            .totalItems(totalDatabaseRecords) // Toplam kayıt sayısını göster
+                            .totalItems(totalDatabaseRecords)
                             .hasMore(hasMore)
                             .build();
                     
