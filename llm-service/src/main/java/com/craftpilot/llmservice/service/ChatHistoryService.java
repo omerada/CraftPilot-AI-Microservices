@@ -246,23 +246,64 @@ public class ChatHistoryService {
                     LinkedHashMap<String, CategoryData> categories = new LinkedHashMap<>();
                     int totalItems = 0;
                     
-                    // Add categories in the specified order
+                    // Yeni ekleme: Sayfalama için kullanılacak birleştirilmiş liste
+                    List<ChatHistory> allCategoryHistories = new ArrayList<>();
+                    
+                    // Önce tüm kategorileri işleyip, toplam öğe sayısını ve kategorilerdeki öğeleri hesapla
                     for (String category : finalCategoryFilters) {
                         List<ChatHistory> histories = categorizedHistories.getOrDefault(category, List.of());
                         totalItems += histories.size();
+                        allCategoryHistories.addAll(histories);
                         
-                        List<ChatItem> items = histories.stream()
-                                .skip((long) (page - 1) * pageSize)
-                                .limit(pageSize)
-                                .map(this::convertToChatItem)
-                                .collect(Collectors.toList());
-                        
-                        categories.put(category, new CategoryData(items, histories.size()));
+                        // Kategorileri ve toplam sayıları ekle (içerik sonra eklenecek)
+                        categories.put(category, new CategoryData(new ArrayList<>(), histories.size()));
                     }
                     
-                    // Calculate pagination info
+                    // Sayfalama hesaplamaları
                     int totalPages = (int) Math.ceil((double) totalItems / pageSize);
-                    boolean hasMore = page < totalPages;
+                    boolean hasMore = page * pageSize < totalItems; // Düzeltilmiş hasMore hesaplaması
+                    
+                    // Sadece gerekli öğeleri görüntülemek için kategorileri yeniden işle
+                    int skipCount = (page - 1) * pageSize;
+                    int remainingItems = Math.min(pageSize, totalItems - skipCount);
+                    
+                    if (remainingItems > 0) {
+                        // Her kategori için sayfalama mantığını ayrı ayrı uygula
+                        for (String category : finalCategoryFilters) {
+                            List<ChatHistory> histories = categorizedHistories.getOrDefault(category, List.of());
+                            
+                            // Bu kategoriden kaç öğe atlanacak?
+                            int categorySize = histories.size();
+                            
+                            if (skipCount >= categorySize) {
+                                // Bu kategorinin tüm öğelerini atla
+                                skipCount -= categorySize;
+                            } else {
+                                // Bu kategoriden bazı öğeleri al
+                                int itemsToTake = Math.min(remainingItems, categorySize - skipCount);
+                                
+                                if (itemsToTake > 0) {
+                                    List<ChatItem> items = histories.stream()
+                                            .skip(skipCount)
+                                            .limit(itemsToTake)
+                                            .map(this::convertToChatItem)
+                                            .collect(Collectors.toList());
+                                    
+                                    // Kategoriye öğeleri ekle
+                                    categories.put(category, new CategoryData(items, categorySize));
+                                    
+                                    // Kalan değerleri güncelle
+                                    remainingItems -= itemsToTake;
+                                    skipCount = 0;
+                                }
+                            }
+                            
+                            // Eğer tüm gerekli öğeler alındıysa döngüyü sonlandır
+                            if (remainingItems <= 0) {
+                                break;
+                            }
+                        }
+                    }
                     
                     PaginationInfo paginationInfo = PaginationInfo.builder()
                             .currentPage(page)
