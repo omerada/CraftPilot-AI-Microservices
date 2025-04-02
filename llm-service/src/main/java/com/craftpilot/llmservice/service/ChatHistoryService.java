@@ -252,25 +252,29 @@ public class ChatHistoryService {
                     // Create the response structure with LinkedHashMap to maintain order
                     LinkedHashMap<String, CategoryData> categories = new LinkedHashMap<>();
                     
-                    // Bu sayfada gösterilecek toplam öğe sayısı
-                    int displayedItems = 0;
-                    int totalCategorizedItems = 0;
+                    // Toplam kategorize edilmiş öğe sayısını ve her kategorinin doğru sayısını hesapla
+                    int totalFilteredRecords = 0;
+                    Map<String, Integer> categorySizes = new HashMap<>();
                     
-                    // Önce tüm kategorilerin toplam öğe sayısını hesapla
+                    // Her kategorinin gerçek boyutunu hesapla ve toplam kayıt sayısını güncelle
                     for (String category : finalCategoryFilters) {
                         List<ChatHistory> histories = categorizedHistories.getOrDefault(category, List.of());
-                        totalCategorizedItems += histories.size();
+                        int categorySize = histories.size();
+                        categorySizes.put(category, categorySize);
+                        totalFilteredRecords += categorySize;
                     }
+                    
+                    log.debug("Filtrelenmiş toplam kayıt sayısı: {}", totalFilteredRecords);
                     
                     // Sayfalama için skip ve limit değerlerini hesapla
                     int skipCount = (page - 1) * pageSize;
-                    int remainingItems = Math.min(pageSize, totalCategorizedItems - skipCount);
+                    int remainingItems = Math.min(pageSize, totalFilteredRecords - skipCount);
                     
                     // Kategorileri işle ve gösterilecek öğeleri belirle
                     if (remainingItems > 0) {
                         for (String category : finalCategoryFilters) {
                             List<ChatHistory> histories = categorizedHistories.getOrDefault(category, List.of());
-                            int categorySize = histories.size();
+                            int categorySize = categorySizes.get(category);
                             
                             if (skipCount >= categorySize) {
                                 // Bu kategorinin tüm öğelerini atla
@@ -289,7 +293,6 @@ public class ChatHistoryService {
                                     
                                     categories.put(category, new CategoryData(items, categorySize));
                                     
-                                    displayedItems += itemsToTake;
                                     remainingItems -= itemsToTake;
                                     skipCount = 0;
                                 } else {
@@ -306,25 +309,27 @@ public class ChatHistoryService {
                     // Kalan kategorileri boş listelerle doldur
                     for (String category : finalCategoryFilters) {
                         if (!categories.containsKey(category)) {
-                            categories.put(category, new CategoryData(List.of(), 
-                                categorizedHistories.getOrDefault(category, List.of()).size()));
+                            int categorySize = categorySizes.getOrDefault(category, 0);
+                            categories.put(category, new CategoryData(List.of(), categorySize));
                         }
                     }
                     
-                    // Sayfalama bilgilerini hesapla
-                    int totalPages = (int) Math.ceil((double) totalDatabaseRecords / pageSize);
+                    // Sayfalama bilgilerini hesapla - toplam filtrelenmiş kayıt sayısını kullan
+                    int totalPages = totalFilteredRecords > 0 
+                        ? (int) Math.ceil((double) totalFilteredRecords / pageSize) 
+                        : 0;
                     
-                    // hasMore değerini veritabanındaki toplam kayıt sayısına göre hesapla
-                    boolean hasMore = totalDatabaseRecords > page * pageSize;
+                    // hasMore değerini filtrelenmiş kayıt sayısına göre hesapla
+                    boolean hasMore = totalFilteredRecords > page * pageSize;
                     
-                    log.debug("hasMore hesaplaması: totalDatabaseRecords({}) > page({}) * pageSize({}) = {}", 
-                              totalDatabaseRecords, page, pageSize, hasMore);
+                    log.debug("hasMore hesaplaması: totalFilteredRecords({}) > page({}) * pageSize({}) = {}", 
+                              totalFilteredRecords, page, pageSize, hasMore);
                     
                     PaginationInfo paginationInfo = PaginationInfo.builder()
                             .currentPage(page)
                             .totalPages(totalPages)
                             .pageSize(pageSize)
-                            .totalItems(totalDatabaseRecords)
+                            .totalItems(totalFilteredRecords)
                             .hasMore(hasMore)
                             .build();
                     
@@ -343,16 +348,21 @@ public class ChatHistoryService {
     }
 
     private Map<String, List<ChatHistory>> categorizeHistories(List<ChatHistory> histories) {
-        // UTC zaman dilimini kullan - Firestore/Firebase UTC bazlı timestamp kullanır
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        // Zamanı değerlendirirken timestamp değerlerini daha doğru yorumlamak için
+        // Şu anki zamanı alırken milisaniye kesinliğinde UTC zamanı alalım
+        Instant nowInstant = Instant.now();
+        
+        // Bugün ve dün için UTC zamanını günlük sınırlara göre hesapla
+        // Bu sayede gün sınırları kesin olarak belirlenecek
+        LocalDate today = LocalDate.ofInstant(nowInstant, ZoneOffset.UTC);
         LocalDate yesterday = today.minusDays(1);
         
         // Son hafta ve son ay aralıkları
         LocalDate lastWeekStart = today.minusDays(7); // 7 gün öncesi
         LocalDate lastMonthStart = today.minusDays(30); // 30 gün öncesi
         
-        log.debug("Kategorilendirme tarihleri (UTC) - Bugün: {}, Dün: {}, Son Hafta Başlangıç: {}, Son Ay Başlangıç: {}", 
-                today, yesterday, lastWeekStart, lastMonthStart);
+        log.debug("Kategorilendirme tarihleri (UTC) - Şimdi: {}, Bugün: {}, Dün: {}, Son Hafta Başlangıç: {}, Son Ay Başlangıç: {}", 
+                nowInstant, today, yesterday, lastWeekStart, lastMonthStart);
         
         // Use LinkedHashMap to maintain insertion order
         Map<String, List<ChatHistory>> categorized = new LinkedHashMap<>();
@@ -365,10 +375,19 @@ public class ChatHistoryService {
         for (ChatHistory history : histories) {
             // Use updatedAt if available, otherwise use createdAt
             Timestamp timestamp = history.getUpdatedAt() != null ? history.getUpdatedAt() : history.getCreatedAt();
-            LocalDate historyDate = getLocalDateFromTimestamp(timestamp);
             
-            log.debug("Sohbet tarih kontrolü (UTC) - ID: {}, Tarih: {}, Timestamp: {}", 
-                    history.getId(), historyDate, timestamp);
+            if (timestamp == null) {
+                // Zaman damgası yoksa bugüne ekle ve devam et
+                categorized.get("today").add(history);
+                continue;
+            }
+            
+            // Timestamp'i Instant'a dönüştür ve günün başlangıcından itibaren UTC tabanlı LocalDate elde et
+            Instant historyInstant = Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos());
+            LocalDate historyDate = LocalDate.ofInstant(historyInstant, ZoneOffset.UTC);
+            
+            log.debug("Sohbet tarih kontrolü (UTC) - ID: {}, Tarih: {}, Timestamp: {}, Unix Epoch: {} sn", 
+                    history.getId(), historyDate, timestamp, timestamp.getSeconds());
             
             // Doğru kategoriye ekle - öncelik sırasına dikkat et!
             if (historyDate.isEqual(today)) {
