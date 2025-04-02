@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -314,7 +315,6 @@ public class ChatHistoryService {
                     int totalPages = (int) Math.ceil((double) totalDatabaseRecords / pageSize);
                     
                     // hasMore değerini veritabanındaki toplam kayıt sayısına göre hesapla
-                    // Toplam kayıt sayısı > pageSize * page ise daha fazla kayıt var demektir
                     boolean hasMore = totalDatabaseRecords > page * pageSize;
                     
                     log.debug("hasMore hesaplaması: totalDatabaseRecords({}) > page({}) * pageSize({}) = {}", 
@@ -343,10 +343,16 @@ public class ChatHistoryService {
     }
 
     private Map<String, List<ChatHistory>> categorizeHistories(List<ChatHistory> histories) {
-        LocalDate today = LocalDate.now();
+        // UTC zaman dilimini kullan - Firestore/Firebase UTC bazlı timestamp kullanır
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         LocalDate yesterday = today.minusDays(1);
-        LocalDate lastWeekStart = today.minusDays(7);
-        LocalDate lastMonthStart = today.minusDays(30);
+        
+        // Son hafta ve son ay aralıkları
+        LocalDate lastWeekStart = today.minusDays(7); // 7 gün öncesi
+        LocalDate lastMonthStart = today.minusDays(30); // 30 gün öncesi
+        
+        log.debug("Kategorilendirme tarihleri (UTC) - Bugün: {}, Dün: {}, Son Hafta Başlangıç: {}, Son Ay Başlangıç: {}", 
+                today, yesterday, lastWeekStart, lastMonthStart);
         
         // Use LinkedHashMap to maintain insertion order
         Map<String, List<ChatHistory>> categorized = new LinkedHashMap<>();
@@ -361,17 +367,38 @@ public class ChatHistoryService {
             Timestamp timestamp = history.getUpdatedAt() != null ? history.getUpdatedAt() : history.getCreatedAt();
             LocalDate historyDate = getLocalDateFromTimestamp(timestamp);
             
-            if (historyDate.equals(today)) {
+            log.debug("Sohbet tarih kontrolü (UTC) - ID: {}, Tarih: {}, Timestamp: {}", 
+                    history.getId(), historyDate, timestamp);
+            
+            // Doğru kategoriye ekle - öncelik sırasına dikkat et!
+            if (historyDate.isEqual(today)) {
                 categorized.get("today").add(history);
-            } else if (historyDate.equals(yesterday)) {
+                log.debug("Sohbet 'today' kategorisine eklendi - ID: {}", history.getId());
+            } 
+            else if (historyDate.isEqual(yesterday)) {
                 categorized.get("yesterday").add(history);
-            } else if (historyDate.isAfter(lastWeekStart)) {
-                categorized.get("lastWeek").add(history);
-            } else if (historyDate.isAfter(lastMonthStart)) {
-                categorized.get("lastMonth").add(history);
-            } else {
-                categorized.get("older").add(history);
+                log.debug("Sohbet 'yesterday' kategorisine eklendi - ID: {}", history.getId());
             }
+            // lastWeek: dün ve bugün hariç son 7 gün
+            else if (historyDate.isAfter(lastWeekStart) && historyDate.isBefore(yesterday)) {
+                categorized.get("lastWeek").add(history);
+                log.debug("Sohbet 'lastWeek' kategorisine eklendi - ID: {}", history.getId());
+            }
+            // lastMonth: son hafta hariç son 30 gün
+            else if (historyDate.isAfter(lastMonthStart) && historyDate.isBefore(lastWeekStart.plusDays(1))) {
+                categorized.get("lastMonth").add(history);
+                log.debug("Sohbet 'lastMonth' kategorisine eklendi - ID: {}", history.getId());
+            }
+            // 30 günden daha eski
+            else {
+                categorized.get("older").add(history);
+                log.debug("Sohbet 'older' kategorisine eklendi - ID: {}", history.getId());
+            }
+        }
+        
+        // Kategorilerin toplam sayılarını logla
+        for (Map.Entry<String, List<ChatHistory>> entry : categorized.entrySet()) {
+            log.debug("Kategori: {}, Toplam: {}", entry.getKey(), entry.getValue().size());
         }
         
         return categorized;
@@ -379,12 +406,16 @@ public class ChatHistoryService {
 
     private LocalDate getLocalDateFromTimestamp(Timestamp timestamp) {
         if (timestamp == null) {
-            return LocalDate.now(); // Default to today if no timestamp
+            return LocalDate.now(ZoneOffset.UTC); // Default to today UTC if no timestamp
         }
-        return LocalDateTime.ofInstant(
+        
+        // Firestore Timestamp değerlerini UTC olarak değerlendir
+        LocalDate date = LocalDateTime.ofInstant(
                 Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()),
-                ZoneId.systemDefault()
+                ZoneOffset.UTC
         ).toLocalDate();
+        
+        return date;
     }
 
     private ChatItem convertToChatItem(ChatHistory history) {
@@ -412,3 +443,4 @@ public class ChatHistoryService {
                 .build();
     }
 }
+
