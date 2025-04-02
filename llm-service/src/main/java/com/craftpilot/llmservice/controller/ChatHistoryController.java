@@ -195,6 +195,30 @@ public class ChatHistoryController {
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/flat-histories")
+    public Mono<ResponseEntity<Map<String, Object>>> getFlatChatHistories(
+            @RequestParam String userId,
+            @RequestParam(required = false, defaultValue = "0") int offset,
+            @RequestParam(required = false, defaultValue = "20") int limit,
+            @RequestParam(required = false, defaultValue = "updated") String order) {
+        
+        log.info("Düz sohbet geçmişi istendi, kullanıcı: {}, offset: {}, limit: {}, sıralama: {}", 
+                userId, offset, limit, order);
+        
+        return chatHistoryService.getFlatChatHistoriesByUserId(userId, offset, limit, order)
+                .map(ResponseEntity::ok)
+                .onErrorResume(error -> {
+                    log.error("Sohbet geçmişi alınırken hata: {}", error.getMessage());
+                    // Boş yanıt dön
+                    Map<String, Object> emptyResponse = new HashMap<>();
+                    emptyResponse.put("items", List.of());
+                    emptyResponse.put("total", 0);
+                    emptyResponse.put("limit", limit);
+                    emptyResponse.put("offset", offset);
+                    return Mono.just(ResponseEntity.ok(emptyResponse));
+                });
+    }
+
     public static class TitleUpdateRequest {
         private String title;
 

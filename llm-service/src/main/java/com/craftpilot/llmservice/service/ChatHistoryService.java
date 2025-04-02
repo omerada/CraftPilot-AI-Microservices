@@ -473,5 +473,95 @@ public class ChatHistoryService {
                 .lastConversation(lastConversation)
                 .build();
     }
+
+    /**
+     * ChatGPT benzeri düz liste halinde sohbet geçmişlerini döndüren metot
+     */
+    public Mono<Map<String, Object>> getFlatChatHistoriesByUserId(String userId, int offset, int limit, String order) {
+        log.info("Düz liste halinde sohbet geçmişi alınıyor: {}, offset: {}, limit: {}", 
+                userId, offset, limit);
+        
+        // Tüm kayıtları getir ve sonra filtreleme, sıralama yap
+        return chatHistoryRepository.findAllByUserId(userId, 1, Integer.MAX_VALUE)
+                .collectList()
+                .flatMap(allHistories -> {
+                    // Toplam kayıt sayısı
+                    int totalCount = allHistories.size();
+                    
+                    // Sıralama kriterleri
+                    Comparator<ChatHistory> comparator;
+                    if ("created".equals(order)) {
+                        comparator = Comparator.comparing(history -> getTimestampValue(history.getCreatedAt()));
+                    } else {
+                        // Default to updatedAt
+                        comparator = Comparator.comparing(history -> getTimestampValue(history.getUpdatedAt()));
+                    }
+                    
+                    // Varsayılan olarak azalan sıralama (en son güncellenen en üstte)
+                    comparator = comparator.reversed();
+                    
+                    // Sıralama ve sayfalama uygula
+                    List<Map<String, Object>> items = allHistories.stream()
+                            .sorted(comparator)
+                            .skip(offset)
+                            .limit(limit)
+                            .map(this::convertToChatGPTFormat)
+                            .collect(Collectors.toList());
+                    
+                    // ChatGPT benzeri yanıt formatı oluştur
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("items", items);
+                    response.put("total", totalCount);
+                    response.put("limit", limit);
+                    response.put("offset", offset);
+                    
+                    return Mono.just(response);
+                });
+    }
+
+    /**
+     * ChatHistory modelini ChatGPT benzeri formata dönüştürür
+     */
+    private Map<String, Object> convertToChatGPTFormat(ChatHistory history) {
+        Map<String, Object> item = new HashMap<>();
+        item.put("id", history.getId());
+        item.put("title", history.getTitle());
+        
+        // Timestamp formatlarını ChatGPT formatına dönüştür
+        if (history.getCreatedAt() != null) {
+            // Google Cloud Timestamp'i ISO formatına dönüştür
+            Instant createdInstant = Instant.ofEpochSecond(
+                    history.getCreatedAt().getSeconds(), 
+                    history.getCreatedAt().getNanos());
+            item.put("create_time", createdInstant.toString());
+        }
+        
+        if (history.getUpdatedAt() != null) {
+            Instant updatedInstant = Instant.ofEpochSecond(
+                    history.getUpdatedAt().getSeconds(), 
+                    history.getUpdatedAt().getNanos());
+            item.put("update_time", updatedInstant.toString());
+        }
+        
+        // Arşivlenme durumu
+        item.put("is_archived", !history.isEnable());
+        
+        // Son konuşma içeriğinden snippet oluştur
+        String snippet = null;
+        if (history.getConversations() != null && !history.getConversations().isEmpty()) {
+            Optional<Conversation> lastConv = history.getConversations().stream()
+                    .max(Comparator.comparing(Conversation::getOrderIndex));
+            
+            if (lastConv.isPresent()) {
+                String content = lastConv.get().getContent();
+                if (content != null && !content.isEmpty()) {
+                    snippet = content.length() > 100 ? content.substring(0, 97) + "..." : content;
+                }
+            }
+        }
+        item.put("snippet", snippet);
+        
+        return item;
+    }
 }
 
