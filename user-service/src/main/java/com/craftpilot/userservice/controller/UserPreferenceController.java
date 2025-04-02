@@ -7,14 +7,19 @@ import com.craftpilot.userservice.mapper.UserPreferenceMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/users/{userId}/preferences")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "User Preferences", description = "Kullanıcı tercihlerini yönetme API'leri")
 public class UserPreferenceController {
     private final UserPreferenceService userPreferenceService;
@@ -67,8 +72,15 @@ public class UserPreferenceController {
     @Operation(summary = "Dil tercihini güncelle", description = "Kullanıcının dil tercihini günceller")
     public Mono<UserPreference> updateLanguage(
             @PathVariable String userId,
-            @RequestParam String language) {
-        return userPreferenceService.updateLanguage(userId, language);
+            @RequestBody Map<String, String> requestBody) {
+        String language = requestBody.get("language");
+        if (language == null || language.isEmpty()) {
+            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dil parametresi gerekli"));
+        }
+        log.info("Dil güncelleme isteği: userId={}, language={}", userId, language);
+        return userPreferenceService.updateLanguage(userId, language)
+                .doOnSuccess(pref -> log.info("Dil güncellendi: userId={}, language={}", userId, language))
+                .doOnError(e -> log.error("Dil güncellenirken hata: userId={}, error={}", userId, e.getMessage()));
     }
 
     // Favori modeller için özel endpoint

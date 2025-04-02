@@ -109,6 +109,24 @@ resilience4j:
         slidingWindowSize: 10
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 5
+        registerHealthIndicator: true
+        allowHealthIndicatorToFail: true
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        recordExceptions:
+          - java.lang.Exception
+  retry:
+    instances:
+      userPreferences:
+        maxAttempts: 3
+        waitDuration: 1000ms
+        retryExceptions:
+          - java.lang.Exception
+  timelimiter:
+    instances:
+      userPreferences:
+        timeoutDuration: 5s
+        cancelRunningFuture: true
 
 kafka:
   topics:

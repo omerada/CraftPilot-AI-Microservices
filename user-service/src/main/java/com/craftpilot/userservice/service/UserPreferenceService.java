@@ -11,6 +11,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -60,18 +61,52 @@ public class UserPreferenceService {
             });
     }
 
+    @CircuitBreaker(name = "userPreferences", fallbackMethod = "updateLanguageFallback")
     public Mono<UserPreference> updateLanguage(String userId, String language) {
+        log.info("Dil güncelleniyor: userId={}, language={}", userId, language);
         return getUserPreferences(userId)
             .flatMap(pref -> {
+                // Aynı değer ise işlem yapmaya gerek yok, mevcut tercihi döndür
+                if (language.equals(pref.getLanguage())) {
+                    log.info("Dil değeri zaten '{}' olarak ayarlı, güncelleme yapılmadı", language);
+                    return Mono.just(pref);
+                }
+                
                 pref.setLanguage(language);
                 pref.setUpdatedAt(System.currentTimeMillis());
                 return redisCacheService.saveUserPreferences(pref)
+                    .timeout(Duration.ofSeconds(5)) // Timeout ekle
                     .thenReturn(pref);
             })
             .doOnNext(saved -> {
                 // Sadece dil değişikliğini event olarak yayınla
                 publishPreferenceUpdated(userId, "language", language);
-            });
+            })
+            .doOnError(e -> log.error("Dil güncellenirken hata oluştu: {}", e.getMessage()));
+    }
+
+    public Mono<UserPreference> updateLanguageFallback(String userId, String language, Throwable t) {
+        log.warn("Dil güncelleme işlemi için fallback çalıştırıldı: userId={}, error={}", userId, t.getMessage());
+        
+        // Basit bir UserPreference oluştur ve sadece dil değerini ayarla
+        UserPreference fallbackPreference = UserPreference.builder()
+                .userId(userId)
+                .language(language)
+                .theme("light") // varsayılan değer
+                .notifications(true) // varsayılan değer
+                .pushEnabled(true) // varsayılan değer
+                .aiModelFavorites(new ArrayList<>())
+                .updatedAt(System.currentTimeMillis())
+                .build();
+        
+        // Asenkron olarak tercihleri güncelleme işlemi başlat
+        redisCacheService.saveUserPreferences(fallbackPreference)
+            .subscribe(
+                success -> log.info("Fallback sonrası asenkron güncelleme başarılı: userId={}", userId),
+                error -> log.error("Fallback sonrası asenkron güncelleme başarısız: userId={}, error={}", userId, error.getMessage())
+            );
+        
+        return Mono.just(fallbackPreference);
     }
     
     public Mono<UserPreference> updateAiModelFavorites(String userId, List<String> favorites) {
