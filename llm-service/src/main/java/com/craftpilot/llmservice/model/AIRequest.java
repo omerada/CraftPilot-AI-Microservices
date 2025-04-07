@@ -22,4 +22,5 @@ public class AIRequest {
     private Double temperature;
     private String requestType;
     private String language; // Kullanıcı dil tercihi
+    private String systemPrompt;
 }

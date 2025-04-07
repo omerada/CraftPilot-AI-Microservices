@@ -1,942 +1,127 @@
 {
   "info": {
-    "_postman_id": "a5cbcb77-ef4b-4f78-9922-2571776abaa7",
-    "name": "LLM Service API",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "13899394"
+    "_postman_id": "a5c238e3-9d68-4d1c-b8ab-720f01234567",
+    "name": "Craft-Pilot-AI API",
+    "description": "Craft-Pilot-AI backend API koleksiyonu",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "Prompt Geliştirme",
-      "request": {
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{firebaseToken}}",
-              "type": "string"
-            }
-          ]
-        },
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "type": "text"
-          },
-          {
-            "key": "X-User-Id",
-            "value": "{{userId}}",
-            "type": "text"
-          },
-          {
-            "key": "X-User-Role",
-            "value": "{{userRole}}",
-            "type": "text"
-          },
-          {
-            "key": "X-User-Email",
-            "value": "{{userEmail}}",
-            "type": "text"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"prompt\": \"Hüçreyi anlat örnekleyerek\",\n    \"requestType\": \"CHAT\"\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/enhance-prompt",
-          "host": ["{{baseUrl}}"],
-          "path": ["enhance-prompt"]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "Chat Completion",
-      "request": {
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{firebaseToken}}",
-              "type": "string"
-            }
-          ]
-        },
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "type": "text"
-          },
-          {
-            "key": "X-User-Id",
-            "value": "{{userId}}",
-            "type": "text"
-          },
-          {
-            "key": "X-User-Role",
-            "value": "{{userRole}}",
-            "type": "text"
-          },
-          {
-            "key": "X-User-Email",
-            "value": "{{userEmail}}",
-            "type": "text"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"model\": \"google/gemini-2.0-flash-lite-001\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Hücre nedir?\"\n    }\n  ],\n  \"maxTokens\": 20000,\n  \"temperature\": 0.3\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/chat/completions",
-          "host": ["{{baseUrl}}"],
-          "path": ["chat", "completions"]
-        },
-        "description": "Text completion endpoint"
-      },
-      "response": []
-    },
-    {
-      "name": "Chat Stream API",
-      "request": {
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{firebaseToken}}",
-              "type": "string"
-            }
-          ]
-        },
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "type": "text"
-          },
-          {
-            "key": "X-User-Id",
-            "value": "{{userId}}",
-            "type": "text"
-          },
-          {
-            "key": "X-User-Role",
-            "value": "{{userRole}}",
-            "type": "text"
-          },
-          {
-            "key": "X-User-Email",
-            "value": "{{userEmail}}",
-            "type": "text"
-          },
-          {
-            "key": "Accept",
-            "value": "text/event-stream",
-            "type": "text"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"model\": \"openai/gpt-4o-mini\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Sen yardımcı bir AI asistanısın. Kullanıcıya doğru, yararlı ve detaylı yanıtlar ver.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"java nedir çok kısa?\"\n    }\n  ],\n  \"maxTokens\": 10000,\n  \"temperature\": 0.3\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/chat/completions/stream",
-          "host": ["{{baseUrl}}"],
-          "path": ["chat", "completions", "stream"]
-        },
-        "description": "Stream destekli chat API endpoint"
-      },
-      "response": []
-    },
-    {
-      "name": "Code Completion",
-      "request": {
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{firebaseToken}}",
-              "type": "string"
-            }
-          ]
-        },
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "type": "text"
-          },
-          {
-            "key": "X-User-Id",
-            "value": "{{userId}}",
-            "type": "text"
-          },
-          {
-            "key": "X-User-Role",
-            "value": "{{userRole}}",
-            "type": "text"
-          },
-          {
-            "key": "X-User-Email",
-            "value": "{{userEmail}}",
-            "type": "text"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"model\": \"google/gemini-2.0-flash-lite-preview-02-05:free\",\n    \"prompt\": \"Write a Java Spring Boot REST controller with CRUD operations\",\n    \"maxTokens\": 500,\n    \"temperature\": 0.7,\n    \"requestId\": \"test-123\"\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/code/completion",
-          "host": ["{{baseUrl}}"],
-          "path": ["code", "completion"]
-        },
-        "description": "Kod tamamlama API endpoint"
-      },
-      "response": []
-    },
-    {
-      "name": "Image Generation (Not Supported)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{firebaseToken}}",
-            "type": "text"
-          },
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "type": "text"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"prompt\": \"A beautiful sunset over mountains\",\n    \"maxTokens\": 150,\n    \"temperature\": 0.7\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/images/generate",
-          "host": ["{{baseUrl}}"],
-          "path": ["images", "generate"]
-        },
-        "description": "Görsel oluşturma API endpoint (henüz desteklenmiyor)"
-      },
-      "response": []
-    },
-    {
-      "name": "Model Config API",
-      "item": [
-        {
-          "name": "Get Default Model Config",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/ai/config/model-defaults?model=google/gemini-pro",
-              "host": ["{{baseUrl}}"],
-              "path": ["ai", "config", "model-defaults"],
-              "query": [
-                {
-                  "key": "model",
-                  "value": "google/gemini-pro"
-                }
-              ]
-            },
-            "description": "Model için varsayılan yapılandırmayı getirir"
-          },
-          "response": []
-        },
-        {
-          "name": "Get Available Models",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/ai/config/models",
-              "host": ["{{baseUrl}}"],
-              "path": ["ai", "config", "models"]
-            },
-            "description": "Kullanılabilir modellerin listesini getirir"
-          },
-          "response": []
-        }
-      ],
-      "description": "Model yapılandırması ile ilgili API endpointleri"
-    },
-    {
-      "name": "Chat History API",
-      "item": [
-        {
-          "name": "Get Chat Histories",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/ai/chat/histories?userId={{userId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["ai", "chat", "histories"],
-              "query": [
-                {
-                  "key": "userId",
-                  "value": "{{userId}}"
-                }
-              ]
-            },
-            "description": "Kullanıcıya ait tüm sohbet geçmişlerini getirir"
-          },
-          "response": []
-        },
-        {
-          "name": "Get Chat History By ID",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
-            },
-            "description": "Belirtilen ID ile sohbet geçmişini getirir"
-          },
-          "response": []
-        },
-        {
-          "name": "Create Chat History",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
-                "type": "text"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"Yeni Sohbet\",\n  \"conversations\": [],\n  \"aiModel\": \"google/gemini-2.0-flash-lite-001\",\n  \"temperature\": 0.5\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/ai/chat/histories",
-              "host": ["{{baseUrl}}"],
-              "path": ["ai", "chat", "histories"]
-            },
-            "description": "Yeni bir sohbet geçmişi oluşturur"
-          },
-          "response": []
-        },
-        {
-          "name": "Update Chat History",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
-                "type": "text"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"Güncellenmiş Sohbet\",\n  \"conversations\": [],\n  \"aiModel\": \"google/gemini-2.0-flash-lite-001\",\n  \"temperature\": 0.7\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
-            },
-            "description": "Belirtilen sohbet geçmişini günceller"
-          },
-          "response": []
-        },
-        {
-          "name": "Delete Chat History",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
-            },
-            "description": "Belirtilen sohbet geçmişini siler"
-          },
-          "response": []
-        },
-        {
-          "name": "Add Conversation",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
-                "type": "text"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"content\": \"Merhaba, nasılsın?\",\n  \"role\": \"user\",\n  \"fresh\": true\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}/conversations",
-              "host": ["{{baseUrl}}"],
-              "path": [
-                "ai",
-                "chat",
-                "histories",
-                "{{chatHistoryId}}",
-                "conversations"
-              ]
-            },
-            "description": "Belirtilen sohbet geçmişine yeni bir konuşma ekler"
-          },
-          "response": []
-        },
-        {
-          "name": "Update Chat History Title",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
-                "type": "text"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"Yeni Başlık\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
-            },
-            "description": "Belirtilen sohbet geçmişinin başlığını günceller"
-          },
-          "response": []
-        },
-        {
-          "name": "Archive Chat History",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/ai/chat/histories/{{chatHistoryId}}/do-archive",
-              "host": ["{{baseUrl}}"],
-              "path": [
-                "ai",
-                "chat",
-                "histories",
-                "{{chatHistoryId}}",
-                "do-archive"
-              ]
-            },
-            "description": "Belirtilen sohbet geçmişini arşivler"
-          },
-          "response": []
-        }
-      ],
-      "description": "Sohbet geçmişi ile ilgili API endpointleri"
-    },
-    {
-      "name": "User Preferences API",
+      "name": "User Preferences",
+      "description": "Kullanıcı tercihleri ile ilgili API'ler",
       "item": [
         {
           "name": "Get User Preferences",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [
               {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/users/{{userId}}/preferences",
-              "host": ["{{baseUrl}}"],
+              "raw": "{{base_url}}/users/{{userId}}/preferences",
+              "host": ["{{base_url}}"],
               "path": ["users", "{{userId}}", "preferences"]
             },
-            "description": "Kullanıcının tüm tercihlerini getirir"
+            "description": "Kullanıcı tercihlerini getir"
           },
           "response": []
         },
         {
           "name": "Create User Preferences",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
                 "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"theme\": \"light\",\n  \"language\": \"tr\",\n  \"notifications\": true,\n  \"pushEnabled\": true,\n  \"aiModelFavorites\": [\"google/gemini-pro\", \"openai/gpt-4o-mini\"]\n}"
+              "raw": "{\n  \"theme\": \"dark\",\n  \"language\": \"tr\",\n  \"notifications\": true,\n  \"pushEnabled\": true,\n  \"aiModelFavorites\": [\"gpt-3.5-turbo\", \"gpt-4\"]\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/users/{{userId}}/preferences",
-              "host": ["{{baseUrl}}"],
+              "raw": "{{base_url}}/users/{{userId}}/preferences",
+              "host": ["{{base_url}}"],
               "path": ["users", "{{userId}}", "preferences"]
             },
-            "description": "Yeni kullanıcı tercihleri oluşturur"
+            "description": "Yeni kullanıcı tercihleri oluştur"
           },
           "response": []
         },
         {
           "name": "Update User Preferences",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "PUT",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
                 "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"theme\": \"dark\",\n  \"language\": \"en\",\n  \"notifications\": true,\n  \"pushEnabled\": false,\n  \"aiModelFavorites\": [\"google/gemini-pro\", \"openai/gpt-4o-mini\", \"mistral/mistral-medium\"]\n}"
+              "raw": "{\n  \"theme\": \"light\",\n  \"language\": \"en\",\n  \"notifications\": true,\n  \"pushEnabled\": false,\n  \"aiModelFavorites\": [\"gpt-3.5-turbo\"]\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/users/{{userId}}/preferences",
-              "host": ["{{baseUrl}}"],
+              "raw": "{{base_url}}/users/{{userId}}/preferences",
+              "host": ["{{base_url}}"],
               "path": ["users", "{{userId}}", "preferences"]
             },
-            "description": "Kullanıcı tercihlerini günceller"
+            "description": "Kullanıcı tercihlerini güncelle"
           },
           "response": []
         },
         {
           "name": "Delete User Preferences",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "DELETE",
             "header": [
               {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/users/{{userId}}/preferences",
-              "host": ["{{baseUrl}}"],
+              "raw": "{{base_url}}/users/{{userId}}/preferences",
+              "host": ["{{base_url}}"],
               "path": ["users", "{{userId}}", "preferences"]
             },
-            "description": "Kullanıcı tercihlerini siler"
+            "description": "Kullanıcı tercihlerini sil"
           },
           "response": []
         },
         {
-          "name": "Update Theme Preference",
+          "name": "Update Theme",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "PUT",
             "header": [
               {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/users/{{userId}}/preferences/theme?theme=dark",
-              "host": ["{{baseUrl}}"],
+              "raw": "{{base_url}}/users/{{userId}}/preferences/theme?theme=dark",
+              "host": ["{{base_url}}"],
               "path": ["users", "{{userId}}", "preferences", "theme"],
               "query": [
                 {
@@ -945,104 +130,62 @@
                 }
               ]
             },
-            "description": "Kullanıcının tema tercihini günceller"
+            "description": "Tema tercihini güncelle"
           },
           "response": []
         },
         {
-          "name": "Update Language Preference",
+          "name": "Update Language",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "PUT",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
-                "type": "text"
               }
             ],
-            "url": {
-              "raw": "{{baseUrl}}/users/{{userId}}/preferences/language?language=en",
-              "host": ["{{baseUrl}}"],
-              "path": ["users", "{{userId}}", "preferences", "language"],
-              "query": [
-                {
-                  "key": "language",
-                  "value": "en"
-                }
-              ]
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"language\": \"en\"\n}"
             },
-            "description": "Kullanıcının dil tercihini günceller"
+            "url": {
+              "raw": "{{base_url}}/users/{{userId}}/preferences/language",
+              "host": ["{{base_url}}"],
+              "path": ["users", "{{userId}}", "preferences", "language"]
+            },
+            "description": "Dil tercihini güncelle"
           },
           "response": []
         },
         {
           "name": "Update AI Model Favorites",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "PUT",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
                 "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "[\"google/gemini-pro\", \"openai/gpt-4o\", \"anthropic/claude-3-opus\"]"
+              "raw": "[\"gpt-3.5-turbo\", \"gpt-4\", \"claude-v2\"]"
             },
             "url": {
-              "raw": "{{baseUrl}}/users/{{userId}}/preferences/ai-model-favorites",
-              "host": ["{{baseUrl}}"],
+              "raw": "{{base_url}}/users/{{userId}}/preferences/ai-model-favorites",
+              "host": ["{{base_url}}"],
               "path": [
                 "users",
                 "{{userId}}",
@@ -1050,49 +193,24 @@
                 "ai-model-favorites"
               ]
             },
-            "description": "Kullanıcının favori AI modellerini günceller"
+            "description": "Favori AI modellerini güncelle"
           },
           "response": []
         },
         {
           "name": "Get AI Model Favorites",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{firebaseToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [
               {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/users/{{userId}}/preferences/ai-model-favorites",
-              "host": ["{{baseUrl}}"],
+              "raw": "{{base_url}}/users/{{userId}}/preferences/ai-model-favorites",
+              "host": ["{{base_url}}"],
               "path": [
                 "users",
                 "{{userId}}",
@@ -1100,293 +218,511 @@
                 "ai-model-favorites"
               ]
             },
-            "description": "Kullanıcının favori AI modellerini getirir"
+            "description": "Favori AI modellerini getir"
           },
           "response": []
         }
-      ],
-      "description": "Kullanıcı tercihleri ile ilgili API endpointleri"
+      ]
     },
     {
-      "name": "LLM Service",
+      "name": "Chat History",
+      "description": "Sohbet geçmişi ile ilgili API'ler",
       "item": [
         {
-          "name": "Get Chat Histories",
+          "name": "Get Chat Histories (Categorized)",
           "request": {
             "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
             "url": {
-              "raw": "{{base_url}}/ai/chat/histories?userId={{userId}}",
+              "raw": "{{base_url}}/ai/chat/histories?userId={{userId}}&page=1&pageSize=10",
               "host": ["{{base_url}}"],
               "path": ["ai", "chat", "histories"],
               "query": [
                 {
                   "key": "userId",
                   "value": "{{userId}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "10"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "updatedAt",
+                  "disabled": true
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc",
+                  "disabled": true
+                },
+                {
+                  "key": "searchQuery",
+                  "value": "",
+                  "disabled": true
                 }
               ]
             },
+            "description": "Kategorilere ayrılmış sohbet geçmişini getir"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Flat Chat Histories (ChatGPT Style)",
+          "request": {
+            "method": "GET",
             "header": [
               {
                 "key": "Authorization",
                 "value": "Bearer {{token}}",
                 "type": "text"
               }
-            ]
-          }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai/chat/flat-histories?userId={{userId}}&offset=0&limit=20&order=updated",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "chat", "flat-histories"],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "order",
+                  "value": "updated"
+                }
+              ]
+            },
+            "description": "ChatGPT benzeri düz liste halinde sohbet geçmişini getir"
+          },
+          "response": []
         },
         {
           "name": "Get Chat History By ID",
           "request": {
             "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/ai/chat/histories/{{chatHistoryId}}",
-              "host": ["{{base_url}}"],
-              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
-            },
             "header": [
               {
                 "key": "Authorization",
                 "value": "Bearer {{token}}",
                 "type": "text"
               }
-            ]
-          }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai/chat/histories/{{chatId}}",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "chat", "histories", "{{chatId}}"]
+            },
+            "description": "Belirli bir sohbet geçmişini getir"
+          },
+          "response": []
         },
         {
           "name": "Create Chat History",
           "request": {
             "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"Yeni Sohbet\",\n  \"enable\": true,\n  \"conversations\": []\n}"
+            },
             "url": {
               "raw": "{{base_url}}/ai/chat/histories",
               "host": ["{{base_url}}"],
               "path": ["ai", "chat", "histories"]
             },
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}",
-                "type": "text"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"New Chat\",\n  \"enable\": true\n}"
-            }
-          }
+            "description": "Yeni sohbet geçmişi oluştur"
+          },
+          "response": []
         },
         {
           "name": "Update Chat History",
           "request": {
             "method": "PUT",
-            "url": {
-              "raw": "{{base_url}}/ai/chat/histories/{{chatHistoryId}}",
-              "host": ["{{base_url}}"],
-              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
-            },
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
               {
                 "key": "Authorization",
                 "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
                 "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"Updated Chat\",\n  \"enable\": true\n}"
-            }
-          }
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"Güncellenmiş Sohbet Başlığı\",\n  \"enable\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/ai/chat/histories/{{chatId}}",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "chat", "histories", "{{chatId}}"]
+            },
+            "description": "Sohbet geçmişini güncelle"
+          },
+          "response": []
         },
         {
           "name": "Delete Chat History",
           "request": {
             "method": "DELETE",
-            "url": {
-              "raw": "{{base_url}}/ai/chat/histories/{{chatHistoryId}}",
-              "host": ["{{base_url}}"],
-              "path": ["ai", "chat", "histories", "{{chatHistoryId}}"]
-            },
             "header": [
               {
                 "key": "Authorization",
                 "value": "Bearer {{token}}",
                 "type": "text"
               }
-            ]
-          }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai/chat/histories/{{chatId}}",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "chat", "histories", "{{chatId}}"]
+            },
+            "description": "Sohbet geçmişini sil"
+          },
+          "response": []
         },
         {
           "name": "Add Conversation",
           "request": {
             "method": "POST",
-            "url": {
-              "raw": "{{base_url}}/ai/chat/histories/{{chatHistoryId}}/conversations",
-              "host": ["{{base_url}}"],
-              "path": [
-                "ai",
-                "chat",
-                "histories",
-                "{{chatHistoryId}}",
-                "conversations"
-              ]
-            },
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
               {
                 "key": "Authorization",
                 "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
                 "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"role\": \"user\",\n  \"content\": \"Hello AI!\",\n  \"orderIndex\": 1\n}"
-            }
-          }
+              "raw": "{\n  \"role\": \"user\",\n  \"content\": \"Merhaba, bu bir test mesajıdır.\",\n  \"orderIndex\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/ai/chat/histories/{{chatId}}/conversations",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "chat", "histories", "{{chatId}}", "conversations"]
+            },
+            "description": "Sohbete yeni mesaj ekle"
+          },
+          "response": []
         },
         {
           "name": "Update Chat Title",
           "request": {
             "method": "POST",
-            "url": {
-              "raw": "{{base_url}}/ai/chat/histories/{{chatHistoryId}}/update-title",
-              "host": ["{{base_url}}"],
-              "path": [
-                "ai",
-                "chat",
-                "histories",
-                "{{chatHistoryId}}",
-                "update-title"
-              ]
-            },
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
               {
                 "key": "Authorization",
                 "value": "Bearer {{token}}",
                 "type": "text"
               },
               {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
+                "key": "Content-Type",
+                "value": "application/json",
                 "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Updated Title\"\n}"
-            }
-          }
+              "raw": "{\n  \"title\": \"Yeni Sohbet Başlığı\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/ai/chat/histories/{{chatId}}/update-title",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "chat", "histories", "{{chatId}}", "update-title"]
+            },
+            "description": "Sohbet başlığını güncelle"
+          },
+          "response": []
         },
         {
-          "name": "Archive Chat History",
+          "name": "Archive Chat",
           "request": {
             "method": "POST",
-            "url": {
-              "raw": "{{base_url}}/ai/chat/histories/{{chatHistoryId}}/do-archive",
-              "host": ["{{base_url}}"],
-              "path": [
-                "ai",
-                "chat",
-                "histories",
-                "{{chatHistoryId}}",
-                "do-archive"
-              ]
-            },
             "header": [
               {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai/chat/histories/{{chatId}}/do-archive",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "chat", "histories", "{{chatId}}", "do-archive"]
+            },
+            "description": "Sohbeti arşivle"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notification Preferences",
+      "description": "Bildirim tercihleri ile ilgili API'ler",
+      "item": [
+        {
+          "name": "Create Notification Preference",
+          "request": {
+            "method": "POST",
+            "header": [
               {
                 "key": "Authorization",
                 "value": "Bearer {{token}}",
                 "type": "text"
               },
               {
-                "key": "X-User-Id",
-                "value": "{{userId}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "{{userRole}}",
-                "type": "text"
-              },
-              {
-                "key": "X-User-Email",
-                "value": "{{userEmail}}",
+                "key": "Content-Type",
+                "value": "application/json",
                 "type": "text"
               }
             ],
-            "description": "Sohbet geçmişini arşivler"
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"channelPreferences\": {\n    \"SYSTEM\": [\"email\", \"push\"],\n    \"CHAT\": [\"push\"],\n    \"MARKETING\": [\"email\"]\n  },\n  \"email\": \"user@example.com\",\n  \"deviceToken\": \"device-token-123\",\n  \"additionalSettings\": {\n    \"emailFrequency\": \"daily\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/notifications/preferences",
+              "host": ["{{base_url}}"],
+              "path": ["notifications", "preferences"]
+            },
+            "description": "Yeni bildirim tercihi oluştur"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Notification Preference By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/preferences/{{preferenceId}}",
+              "host": ["{{base_url}}"],
+              "path": ["notifications", "preferences", "{{preferenceId}}"]
+            },
+            "description": "Bildirim tercihlerini ID ile getir"
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Notification Preference",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/preferences/user/{{userId}}",
+              "host": ["{{base_url}}"],
+              "path": ["notifications", "preferences", "user", "{{userId}}"]
+            },
+            "description": "Kullanıcının bildirim tercihlerini getir"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Notification Preference",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"channelPreferences\": {\n    \"SYSTEM\": [\"email\"],\n    \"CHAT\": [\"push\"],\n    \"MARKETING\": []\n  },\n  \"email\": \"updated-user@example.com\",\n  \"deviceToken\": \"device-token-123\",\n  \"additionalSettings\": {\n    \"emailFrequency\": \"weekly\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/notifications/preferences/{{preferenceId}}",
+              "host": ["{{base_url}}"],
+              "path": ["notifications", "preferences", "{{preferenceId}}"]
+            },
+            "description": "Bildirim tercihlerini güncelle"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Notification Preference",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/preferences/{{preferenceId}}",
+              "host": ["{{base_url}}"],
+              "path": ["notifications", "preferences", "{{preferenceId}}"]
+            },
+            "description": "Bildirim tercihlerini sil"
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/preferences/verify/email/{{userId}}?token=verification-token-123",
+              "host": ["{{base_url}}"],
+              "path": [
+                "notifications",
+                "preferences",
+                "verify",
+                "email",
+                "{{userId}}"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "verification-token-123"
+                }
+              ]
+            },
+            "description": "E-posta adresini doğrula"
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Phone",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/preferences/verify/phone/{{userId}}?code=123456",
+              "host": ["{{base_url}}"],
+              "path": [
+                "notifications",
+                "preferences",
+                "verify",
+                "phone",
+                "{{userId}}"
+              ],
+              "query": [
+                {
+                  "key": "code",
+                  "value": "123456"
+                }
+              ]
+            },
+            "description": "Telefon numarasını doğrula"
           },
           "response": []
         }
       ]
     }
   ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    }
+  ],
   "variable": [
     {
-      "key": "baseUrl",
-      "value": "https://api.craftpilot.io",
+      "key": "base_url",
+      "value": "http://localhost:5173/api",
       "type": "string"
     },
     {
       "key": "userId",
-      "value": "",
+      "value": "E4gQS64XQ7fzgUFEZhYRgc6tytw2",
       "type": "string"
     },
     {
-      "key": "userRole",
-      "value": "",
+      "key": "chatId",
+      "value": "your-chat-id-here",
       "type": "string"
     },
     {
-      "key": "userEmail",
-      "value": "",
+      "key": "preferenceId",
+      "value": "your-preference-id-here",
       "type": "string"
-    },
-    {
-      "key": "chatHistoryId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "firebaseToken",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "base_url",
-      "value": "https://api.craftpilot.io"
     },
     {
       "key": "token",
-      "value": "your-auth-token"
+      "value": "your-auth-token-here",
+      "type": "string"
     }
   ]
 }

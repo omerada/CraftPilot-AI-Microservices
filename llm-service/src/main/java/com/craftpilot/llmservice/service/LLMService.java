@@ -64,6 +64,17 @@ public class LLMService {
     // Varsayılan token limiti
     private static final int DEFAULT_TOKEN_LIMIT = 4000;
 
+    // Define the system prompt as a constant
+    private static final String CRAFTPILOT_SYSTEM_PROMPT = 
+        "You are the CraftPilot AI Assistant. You are an advanced large language model integrated into the CraftPilot AI platform. " +
+        "You are a helpful, honest, and harmless assistant. You provide users with accurate, clear, and reliable information. " +
+        "Your responses should be natural and conversational.\n\n" +
+        "You are expected to adapt to the user's communication style and tone. You must respond in the language the user started " +
+        "the conversation with, unless the user explicitly requests otherwise.\n\n" +
+        "If you do not know something or are unsure about an answer, you must clearly state it. You should avoid providing " +
+        "misleading, fabricated, or questionable information.\n\n" +
+        "The purpose of CraftPilot AI is to add value to the user, provide practical solutions, and deliver a trustworthy digital assistant experience.";
+
     public Mono<AIResponse> processChatCompletion(AIRequest request) {
         // Request validasyonu
         if (request.getRequestId() == null) {
@@ -111,6 +122,12 @@ public class LLMService {
     }
 
     public Flux<StreamResponse> streamChatCompletion(AIRequest request) {
+        // Check if we need to add the system prompt
+        if (request.getSystemPrompt() == null || request.getSystemPrompt().trim().isEmpty()) {
+            // Add the system prompt to the request
+            request.setSystemPrompt(CRAFTPILOT_SYSTEM_PROMPT); 
+        }
+        
         Map<String, Object> requestBody = createRequestBody(request);
         requestBody.put("stream", true);
         
@@ -655,7 +672,8 @@ public class LLMService {
             if (!hasSystemMessage) {
                 Map<String, Object> systemMessage = new HashMap<>();
                 systemMessage.put("role", "system");
-                systemMessage.put("content", getSystemPrompt(request.getRequestType(), request.getLanguage()));
+                systemMessage.put("content", request.getSystemPrompt() != null ? 
+                    request.getSystemPrompt() : CRAFTPILOT_SYSTEM_PROMPT);
                 // Sistem mesajını listenin başına ekle
                 messages.add(0, systemMessage);
             }
@@ -666,7 +684,8 @@ public class LLMService {
             // Sistem mesajını ekle
             Map<String, Object> systemMessage = new HashMap<>();
             systemMessage.put("role", "system");
-            systemMessage.put("content", getSystemPrompt(request.getRequestType(), request.getLanguage()));
+            systemMessage.put("content", request.getSystemPrompt() != null ? 
+                request.getSystemPrompt() : CRAFTPILOT_SYSTEM_PROMPT);
             messages.add(systemMessage);
             // Kullanıcı mesajını ekle
             Map<String, Object> userMessage = new HashMap<>();
@@ -683,62 +702,7 @@ public class LLMService {
         log.debug("Oluşturulan request body: {}", body);
         return body;
     }
-
-    private String getSystemPrompt(String requestType, String language) {
-        String basePrompt;
-        if ("CODE".equalsIgnoreCase(requestType)) {
-            basePrompt = "You are an expert coding assistant. Provide clean, efficient, and well-documented code solutions. " +
-                   "Explain your approach briefly when helpful, focusing on best practices and performance considerations. " +
-                   "When providing code, ensure it's production-ready and includes appropriate error handling.";
-        } else if ("CHAT".equalsIgnoreCase(requestType)) {
-            basePrompt = "You are a helpful, accurate, and thoughtful assistant. Provide clear, concise, and relevant responses. " +
-                   "Maintain context throughout the conversation and ask clarifying questions when necessary. " +
-                   "Balance thoroughness with brevity based on the user's needs. " +
-                   "Always aim to provide factually correct information and acknowledge limitations in your knowledge.";
-        } else {
-            basePrompt = "You are a helpful AI assistant. Provide accurate, relevant, and detailed responses to the user's requests.";
-        }
-        // Kullanıcının diline göre yanıt vermesi için ek talimatlar ekle
-        if (language != null && !language.equalsIgnoreCase("en")) {
-            String languageName = getLanguageName(language);
-            return basePrompt + " Always respond in " + languageName + " language unless explicitly asked to use a different language.";
-        }
-        return basePrompt;
-    }
-
-    private String getLanguageName(String languageCode) {
-        Map<String, String> languageMap = buildSystemPrompts();
-        return languageMap.getOrDefault(languageCode.toLowerCase(), "the user's preferred language (" + languageCode + ")");
-    }
-
-    private Map<String, String> buildSystemPrompts() {
-        Map<String, String> prompts = new HashMap<>();
-        // Ana promptları ekle
-        prompts.put("DEFAULT", "You are a helpful AI assistant.");
-        prompts.put("DEFAULT_TR", "Yardımsever bir yapay zeka asistanısın.");
-        prompts.put("CODE", "You are an expert software developer. Write clean, efficient, and well-dokümante edilmiş kod yaz.");
-        prompts.put("CODE_TR", "Uzman bir yazılım geliştiricisisin. Temiz, verimli ve iyi dokümante edilmiş kod yaz.");
-        prompts.put("CHAT", "You are a friendly conversational AI. Be helpful and engaging.");
-        prompts.put("CHAT_TR", "Arkadaş canlısı bir sohbet yapay zekasısın. Yardımsever ve ilgi çekici ol.");
-        prompts.put("EXPLAIN", "You are a skilled teacher. Explain concepts clearly and thoroughly.");
-        prompts.put("EXPLAIN_TR", "Yetenekli bir öğretmensin. Kavramları net ve detaylı açıkla.");
-        prompts.put("ANALYZE", "You are an analytical expert. Provide detailed analysis and insights.");
-        prompts.put("ANALYZE_TR", "Analitik bir uzmanısın. Detaylı analiz ve içgörüler sun.");
-        prompts.put("BRAINSTORM", "You are a creative thinker. Generate innovative ideas and solutions.");
-        prompts.put("BRAINSTORM_TR", "Yaratıcı bir düşünürsün. Yenilikçi fikirler ve çözümler üret.");
-        prompts.put("DATA", "You are a data analyst. Process and explain data patterns effectively.");
-        prompts.put("DATA_TR", "Bir veri analistisin. Veri desenlerini etkili şekilde işle ve açıkla.");
-        prompts.put("REVIEW", "You are a thorough reviewer. Provide constructive and detailed feedback.");
-        prompts.put("REVIEW_TR", "Detaylı bir eleştirmensin. Yapıcı ve ayrıntılı geri bildirim ver.");
-        prompts.put("PLAN", "You are a strategic planner. Create organized and actionable plans.");
-        prompts.put("PLAN_TR", "Stratejik bir planlayıcısın. Organize ve uygulanabilir planlar oluştur.");
-        prompts.put("SUMMARIZE", "You are an efficient summarizer. Extract and convey key information concisely.");
-        prompts.put("SUMMARIZE_TR", "Verimli bir özetleyicisin. Önemli bilgileri özlü bir şekilde çıkar ve ilet.");
-        prompts.put("DEBUG", "You are a skilled debugger. Help identify and fix technical issues.");
-        prompts.put("DEBUG_TR", "Yetenekli bir hata ayıklayıcısın. Teknik sorunları belirleme ve çözme konusunda yardımcı ol.");
-        return Map.copyOf(prompts);  // Değiştirilemez kopya dön
-    }
-
+ 
     private AIResponse mapToAIResponse(Map<String, Object> openRouterResponse, AIRequest request) {
         log.debug("OpenRouter yanıtı haritalanıyor: {}", openRouterResponse);
         String responseText = extractResponseText(openRouterResponse);
