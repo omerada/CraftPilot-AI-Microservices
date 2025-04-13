@@ -4,7 +4,6 @@ import com.craftpilot.userservice.model.UserPreference;
 import com.craftpilot.userservice.model.user.entity.UserEntity;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.RedisConnectionFailureException;
@@ -18,7 +17,6 @@ import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class RedisCacheService {
     private final ReactiveRedisTemplate<String, UserEntity> userRedisTemplate;
@@ -37,7 +35,7 @@ public class RedisCacheService {
     private final Timer redisSetTimer;
     private final Timer redisDeleteTimer;
 
-    // Constructor ile Timer nesnelerini tanımlıyoruz
+    // Constructor: @RequiredArgsConstructor yerine açık bir constructor tanımlıyoruz
     public RedisCacheService(
             ReactiveRedisTemplate<String, UserEntity> userRedisTemplate,
             ReactiveRedisTemplate<String, UserPreference> preferenceRedisTemplate,

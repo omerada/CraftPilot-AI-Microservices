@@ -3,10 +3,13 @@ FROM maven:3.9.6-eclipse-temurin-21 AS build
 
 WORKDIR /build
 COPY pom.xml .
-COPY src ./src
 
-# Maven build
-RUN mvn clean package -DskipTests
+# Maven dependency optimization - önce sadece bağımlılıkları indir
+RUN mvn dependency:go-offline
+
+# Kaynak kodları kopyala ve build et
+COPY src ./src
+RUN mvn clean package -DskipTests -Dmaven.test.skip=true
 
 # Run stage
 FROM eclipse-temurin:21-jre-jammy
