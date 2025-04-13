@@ -20,10 +20,10 @@ RUN if [ -f "/app/parent-pom.xml" ]; then \
     fi
 
 # Handle redis-client-lib if exists
-COPY ../redis-client-lib /app/redis-client-lib
-RUN if [ -d "/app/redis-client-lib" ]; then \
+COPY --from=builder /app/redis-client-lib /app/redis-client-lib 2>/dev/null || true
+RUN if [ -d "/app/redis-client-lib" ] && [ -f "/app/redis-client-lib/pom.xml" ]; then \
         cd /app/redis-client-lib && \
-        mvn clean install -DskipTests || echo "redis-client-lib build failed, continuing with user-service"; \
+        mvn install -DskipTests; \
     fi
 
 # Cache Maven dependencies
