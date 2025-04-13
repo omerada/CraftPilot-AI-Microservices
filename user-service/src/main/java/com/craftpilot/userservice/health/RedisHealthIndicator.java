@@ -30,9 +30,9 @@ public class RedisHealthIndicator implements ReactiveHealthIndicator {
                 .build());
         }
         
-        // Actively ping Redis to verify connection
+        // Actively ping Redis to verify connection - zaman aşımını 3'ten 1 saniyeye düşürelim
         return redisCacheService.pingRedis()
-            .timeout(Duration.ofSeconds(3))
+            .timeout(Duration.ofMillis(1000)) // 3 saniyeden 1 saniyeye düşürüldü
             .map(ping -> {
                 if (ping) {
                     log.debug("Redis health check passed");

@@ -170,7 +170,7 @@ public class RedisCacheService {
                         redisHealthy.set(false);
                     }
                 })
-                .timeout(Duration.ofSeconds(5)) // Timeout'u 5 saniyeye çıkaralım
+                .timeout(Duration.ofSeconds(2)) // 5 saniyeden 2 saniyeye düşürüldü
                 .onErrorResume(e -> {
                     log.error("Redis kaydetme işlemi timeout veya hata: userId={}, error={}", 
                         preference.getUserId(), e.getClass().getName() + ": " + e.getMessage());
@@ -228,21 +228,22 @@ public class RedisCacheService {
      * @return Mono<Boolean> true if ping is successful, false otherwise
      */
     public Mono<Boolean> pingRedis() {
-        log.debug("Actively pinging Redis to verify connection");
+        log.debug("Redis bağlantısını kontrol için ping gönderiliyor");
         return Mono.from(redisConnectionFactory.getReactiveConnection().ping())
-            .map(pong -> {
+            .flatMap(pong -> {
                 boolean pingSuccess = "PONG".equalsIgnoreCase(pong);
                 if (pingSuccess) {
-                    log.debug("Redis ping successful");
+                    log.debug("Redis ping başarılı");
                     redisHealthy.set(true);
                 } else {
-                    log.warn("Redis ping returned unexpected response: {}", pong);
+                    log.warn("Redis ping beklenmeyen yanıt döndürdü: {}", pong);
                     redisHealthy.set(false);
                 }
-                return pingSuccess;
+                return Mono.just(pingSuccess);
             })
+            .timeout(Duration.ofMillis(800)) // Zaman aşımını 800ms olarak ayarlayalım
             .doOnError(e -> {
-                log.error("Redis ping failed: {}", e.getMessage());
+                log.error("Redis ping hatası: {}", e.getMessage());
                 redisHealthy.set(false);
                 meterRegistry.counter("redis.ping.error").increment();
             })
