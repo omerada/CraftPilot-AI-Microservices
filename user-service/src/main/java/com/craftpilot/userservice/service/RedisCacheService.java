@@ -4,6 +4,7 @@ import com.craftpilot.userservice.model.UserPreference;
 import com.craftpilot.userservice.model.user.entity.UserEntity;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.RedisConnectionFailureException;
@@ -13,10 +14,12 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class RedisCacheService {
     private final ReactiveRedisTemplate<String, UserEntity> userRedisTemplate;
@@ -31,22 +34,13 @@ public class RedisCacheService {
     private long cacheHours;
     
     private final AtomicBoolean redisHealthy = new AtomicBoolean(true);
-    private final Timer redisGetTimer;
-    private final Timer redisSetTimer;
-    private final Timer redisDeleteTimer;
+    private Timer redisGetTimer;
+    private Timer redisSetTimer;
+    private Timer redisDeleteTimer;
 
-    // Constructor: @RequiredArgsConstructor yerine açık bir constructor tanımlıyoruz
-    public RedisCacheService(
-            ReactiveRedisTemplate<String, UserEntity> userRedisTemplate,
-            ReactiveRedisTemplate<String, UserPreference> preferenceRedisTemplate,
-            ReactiveRedisConnectionFactory redisConnectionFactory,
-            MeterRegistry meterRegistry) {
-        this.userRedisTemplate = userRedisTemplate;
-        this.preferenceRedisTemplate = preferenceRedisTemplate;
-        this.redisConnectionFactory = redisConnectionFactory;
-        this.meterRegistry = meterRegistry;
-        
-        // Timer'ları constructor içinde başlatıyoruz
+    @PostConstruct
+    public void init() {
+        // Initialize timers after constructor
         this.redisGetTimer = Timer.builder("redis.operation.get").register(meterRegistry);
         this.redisSetTimer = Timer.builder("redis.operation.set").register(meterRegistry);
         this.redisDeleteTimer = Timer.builder("redis.operation.delete").register(meterRegistry);
