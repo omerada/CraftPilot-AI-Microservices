@@ -78,14 +78,16 @@ management:
         enabled: true
       group:
         readiness:
-          include: redis,diskSpace
+          # Redis sağlık kontrolcüsünü burada kaldırıyoruz
+          include: diskSpace
           show-details: always
         liveness:
           include: ping
           show-details: always
   health:
     redis:
-      enabled: false # Set to true when you want to enable Redis health checks
+      # Redis health check'i aktifleştiriyoruz
+      enabled: true
     livenessState:
       enabled: true
     readinessState:
@@ -95,7 +97,9 @@ management:
     circuitbreakers:
       enabled: true
     kafka:
-      enabled: false # Disable Kafka health check temporarily
+      enabled: false
+    # Grup üyelik doğrulamasını devre dışı bırakıyoruz (alternatif çözüm)
+    validate-group-membership: false
 
 springdoc:
   api-docs:
