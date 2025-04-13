@@ -29,6 +29,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import com.craftpilot.userservice.model.user.event.UserEvent;
 import com.google.firebase.auth.UserRecord;
 import com.google.firebase.auth.UserRecord.UpdateRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Kullanıcı işlemleri için servis arayüzü.
@@ -260,8 +261,18 @@ public class UserService {
 
     public Mono<UserEntity> findById(String id) {
         return cacheService.get(id)
+                .flatMap(cachedJson -> {
+                    // Convert cached JSON string to UserEntity
+                    try {
+                        ObjectMapper objectMapper = new ObjectMapper();
+                        return Mono.just(objectMapper.readValue(cachedJson, UserEntity.class));
+                    } catch (Exception e) {
+                        log.error("Error deserializing cached user data: {}", e.getMessage());
+                        return Mono.empty();
+                    }
+                })
                 .switchIfEmpty(userRepository.findById(id)
-                        .flatMap(user -> cacheService.set(user.getId(), user)
+                        .flatMap(user -> cacheService.set(id, user)
                                 .thenReturn(user)));
     }
 }

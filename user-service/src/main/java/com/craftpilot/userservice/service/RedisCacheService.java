@@ -83,4 +83,22 @@ public class RedisCacheService {
     public <T> Mono<T> getOrCache(String key, Class<T> type, Mono<T> fallback, Duration ttl) {
         return cacheService.getOrCache(key, () -> fallback, type, ttl);
     }
+    
+    // Direct get and set methods used by UserService
+    public Mono<String> get(String key) {
+        log.debug("Redis'ten doğrudan değer alınıyor: key={}", key);
+        return cacheService.get(key);
+    }
+    
+    // Specific method for UserEntity to ensure type compatibility
+    public Mono<Boolean> set(String key, UserEntity value) {
+        log.debug("Redis'e doğrudan UserEntity kaydediliyor: key={}", key);
+        return cacheService.cache(key, value);
+    }
+    
+    // Generic set method for other types
+    public <T> Mono<Boolean> setGeneric(String key, T value) {
+        log.debug("Redis'e doğrudan değer kaydediliyor: key={}", key);
+        return cacheService.cache(key, value);
+    }
 }
