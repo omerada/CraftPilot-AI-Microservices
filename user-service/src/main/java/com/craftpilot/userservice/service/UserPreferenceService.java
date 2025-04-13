@@ -32,26 +32,32 @@ public class UserPreferenceService {
     public Mono<UserPreference> getUserPreferences(String userId) {
         log.info("Kullanıcı tercihleri getiriliyor: userId={}", userId);
         return redisCacheService.getUserPreferences(userId)
-            .timeout(Duration.ofSeconds(10))
             .doOnSuccess(pref -> log.debug("Kullanıcı tercihleri başarıyla getirildi: userId={}", userId))
             .doOnError(e -> log.error("Kullanıcı tercihleri getirilirken hata: userId={}, error={}", userId, e.getMessage()));
     }
 
+    public Mono<UserPreference> getDefaultPreferences(String userId, Throwable t) {
+        log.warn("Varsayılan tercihler döndürülüyor (fallback): userId={}, error={}", userId, t.getMessage());
+        return Mono.just(UserPreference.builder()
+                .userId(userId)
+                .theme("light")
+                .language("tr")
+                .notifications(true)
+                .pushEnabled(true)
+                .createdAt(System.currentTimeMillis())
+                .updatedAt(System.currentTimeMillis())
+                .build());
+    }
+
     public Mono<UserPreference> saveUserPreferences(UserPreference preferences) {
-        if (preferences.getCreatedAt() == null) {
-            preferences.setCreatedAt(System.currentTimeMillis());
-        }
-        preferences.setUpdatedAt(System.currentTimeMillis());
-        
         log.info("Kullanıcı tercihleri kaydediliyor: userId={}", preferences.getUserId());
         return redisCacheService.saveUserPreferences(preferences)
-                .timeout(Duration.ofSeconds(10))
-                .thenReturn(preferences)
-                .doOnNext(saved -> {
-                    log.debug("Kullanıcı tercihleri başarıyla kaydedildi: userId={}", saved.getUserId());
-                    // Tüm tercihleri event olarak yayınla
-                    publishPreferenceUpdated(saved.getUserId(), "all", "");
-                })
+                .then(Mono.defer(() -> {
+                    // Kafka'ya bildirim gönder
+                    kafkaTemplate.send(userPreferencesTopic, preferences.getUserId(), preferences);
+                    return Mono.just(preferences);
+                }))
+                .doOnSuccess(pref -> log.debug("Kullanıcı tercihleri başarıyla kaydedildi: userId={}", preferences.getUserId()))
                 .doOnError(e -> log.error("Kullanıcı tercihleri kaydedilirken hata: userId={}, error={}", 
                         preferences.getUserId(), e.getMessage()));
     }
@@ -226,19 +232,5 @@ public class UserPreferenceService {
         } catch (Exception e) {
             log.error("Error publishing preference update: {}", e.getMessage());
         }
-    }
-
-    private Mono<UserPreference> getDefaultPreferences(String userId, Throwable t) {
-        log.warn("Varsayılan tercihlere dönülüyor: userId={}, error={}", userId, t.getMessage());
-        return Mono.just(UserPreference.builder()
-                .userId(userId)
-                .theme("light")
-                .language("tr")
-                .notifications(true)
-                .pushEnabled(true)
-                .aiModelFavorites(new ArrayList<>())
-                .createdAt(System.currentTimeMillis())
-                .updatedAt(System.currentTimeMillis())
-                .build());
     }
 }

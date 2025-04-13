@@ -4,34 +4,6 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
     include: kafka-base
-  data:
-    redis:
-      host: ${REDIS_HOST:redis}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:13579ada}
-      connect-timeout: 3000
-      timeout: 3000
-      database: 0
-      client-type: lettuce
-      ssl:
-        enabled: false
-      lettuce:
-        pool:
-          max-active: 32
-          max-idle: 16
-          min-idle: 8
-          max-wait: -1ms
-          time-between-eviction-runs: 60000ms
-        shutdown-timeout: 5000ms
-        cluster:
-          refresh:
-            adaptive: true
-            period: 30s
-      retry:
-        max-attempts: 2
-        initial-interval: 500
-        max-interval: 1500
-        multiplier: 1.5
 
   firebase:
     config:
@@ -79,7 +51,7 @@ management:
         enabled: true
       group:
         readiness:
-          include: diskSpace
+          include: diskSpace,redis
           show-details: always
         liveness:
           include: ping
@@ -141,3 +113,25 @@ logging:
     org.springframework.boot.actuate: DEBUG
     org.springframework.web: INFO
     io.lettuce: DEBUG
+
+craftpilot:
+  redis:
+    host: ${REDIS_HOST:redis}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:13579ada}
+    database: 0
+    connect-timeout: 3000
+    timeout: 3000
+    cache-ttl-hours: 24
+    pool-max-active: 16
+    pool-max-idle: 8
+    pool-min-idle: 4
+    pool-max-wait: 1000ms
+    circuit-breaker-enabled: true
+    circuit-breaker-failure-rate-threshold: 50.0
+    circuit-breaker-wait-duration-in-open-state: 10s
+    circuit-breaker-permitted-calls-in-half-open-state: 3
+    retry-enabled: true
+    max-retry-attempts: 2
+    retry-wait-duration: 500ms
+    health-indicator-enabled: true

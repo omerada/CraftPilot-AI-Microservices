@@ -37,6 +37,13 @@
 	</properties>
 
 	<dependencies>
+		 <!-- Redis Client Library -->
+        <dependency>
+            <groupId>com.craftpilot</groupId>
+            <artifactId>redis-client-lib</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        
 		<!-- Spring WebFlux -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -44,10 +51,8 @@
 		</dependency>
 
 		 <!-- Redis -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-redis-reactive</artifactId>
-		</dependency>
+		<!-- Redis Bağımlılıkları: Artık kütüphanemiz içinde -->
+        <!-- Spring Data Redis ve Lettuce bağımlılıkları kaldırıldı -->
 
 		 <!-- Validation -->
 		<dependency>
