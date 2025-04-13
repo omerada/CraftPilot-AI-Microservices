@@ -20,7 +20,7 @@ RUN if [ -f "/app/parent-pom.xml" ]; then \
     fi
 
 # Handle redis-client-lib if exists
-COPY --from=builder /app/redis-client-lib /app/redis-client-lib 2>/dev/null || true
+COPY ../redis-client-lib /app/redis-client-lib/ 2>/dev/null || true
 RUN if [ -d "/app/redis-client-lib" ] && [ -f "/app/redis-client-lib/pom.xml" ]; then \
         cd /app/redis-client-lib && \
         mvn install -DskipTests; \
