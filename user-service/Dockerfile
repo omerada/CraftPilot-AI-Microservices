@@ -11,7 +11,8 @@ WORKDIR /app
 COPY pom.xml /app/
 
 # If parent POM exists, copy and install it first
-COPY ../pom.xml /app/parent-pom.xml
+# Note: Parent POM should be copied into build context if needed
+COPY parent-pom.xml /app/parent-pom.xml 2>/dev/null || true
 RUN if [ -f "/app/parent-pom.xml" ]; then \
         mkdir -p /app/parent && \
         mv /app/parent-pom.xml /app/parent/pom.xml && \
@@ -19,10 +20,8 @@ RUN if [ -f "/app/parent-pom.xml" ]; then \
         mvn install -DskipTests; \
     fi
 
-# Handle redis-client-lib if exists
-# We use COPY with an empty target directory to avoid errors if the source doesn't exist
-# The shell operator '||' doesn't work properly in this context
-COPY ["../redis-client-lib", "/app/redis-client-lib/"]
+# Handle redis-client-lib if exists in build context
+COPY redis-client-lib/ /app/redis-client-lib/ 2>/dev/null || true
 RUN if [ -d "/app/redis-client-lib" ] && [ -f "/app/redis-client-lib/pom.xml" ]; then \
         cd /app/redis-client-lib && \
         mvn install -DskipTests; \
