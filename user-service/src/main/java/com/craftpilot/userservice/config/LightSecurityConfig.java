@@ -27,7 +27,7 @@ public class LightSecurityConfig {
     );
 
     @Bean
-    @Order(1) // Öncelik verelim
+    @Order(1) 
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
@@ -35,32 +35,32 @@ public class LightSecurityConfig {
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .anonymous(anonymous -> anonymous.authorities("ROLE_ANONYMOUS"))
                 .authorizeExchange(exchanges -> exchanges
-                        .pathMatchers("/**").permitAll() // Tüm isteklere izin ver, header kontrolünü WebFilter ile yap
+                        .pathMatchers("/**").permitAll() 
                 )
                 .build();
     }
 
     @Bean
-    @Order(0) // En önce çalışacak
+    @Order(0)  
     public WebFilter loggingHeadersFilter() {
         return (exchange, chain) -> {
             ServerHttpRequest request = exchange.getRequest();
             String path = request.getPath().value();
-
+            
             log.debug("İstek geldi: {} {}", request.getMethod(), path);
-
+            
             if (isPublicPath(path)) {
                 log.debug("Public path erişimi: {} - kontrolsüz geçiyor", path);
                 return chain.filter(exchange);
             }
-
+            
             // Debug için tüm headerları yazdıralım
-            request.getHeaders().forEach((key, values) ->
-                    log.debug("Header: {} = {}", key, values));
-
+            request.getHeaders().forEach((key, values) -> 
+                log.debug("Header: {} = {}", key, values));
+            
             // X-User-Id header'ı kontrolü
             String userId = request.getHeaders().getFirst("X-User-Id");
-
+            
             if (userId == null || userId.isEmpty()) {
                 log.warn("Gerekli X-User-Id header eksik, ancak isteğe devam ediliyor");
                 // İsteği reddetmek yerine loga yazıp devam edelim
@@ -68,7 +68,7 @@ public class LightSecurityConfig {
             } else {
                 log.debug("İstek kimlik doğrulaması başarılı: {}", userId);
             }
-
+            
             return chain.filter(exchange);
         };
     }
