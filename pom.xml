@@ -25,7 +25,6 @@
         <module>notification-service</module>
         <module>analytics-service</module>
         <module>admin-service</module>
-        <module>redis-service</module>
         <module>llm-service</module>
         <module>image-service</module>
     </modules>

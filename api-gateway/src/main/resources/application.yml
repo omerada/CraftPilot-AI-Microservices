@@ -134,16 +134,6 @@ spring:
               args:
                 name: notificationServiceCircuitBreaker
 
-        - id: redis-service
-          uri: lb://redis-service
-          predicates:
-            - Path=/cache/**
-          filters:
-            - StripPrefix=1
-            - name: CircuitBreaker
-              args:
-                name: redisServiceCircuitBreaker
-
   data:
     redis:
       host: ${REDIS_HOST:redis}

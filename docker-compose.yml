@@ -145,32 +145,7 @@ services:
     volumes:
       - ./firebase-service-account.json:/app/firebase-service-account.json
 
-  # Redis Service
-  redis-service:
-    image: ${DOCKERHUB_USERNAME}/redis-service:latest-arm64
-    container_name: redis-service
-    ports:
-      - "8079:8079"
-    environment:
-      <<: *common-variables
-      SPRING_CLOUD_GCP_SA_KEY_LOCATION: file:/app/gcp-credentials.json
-      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-craft-pilot-ai}
-    volumes:
-      - ${GCP_SA_KEY_PATH:-./redis-service/src/main/resources/firebase-service-account.json}:/app/gcp-credentials.json:ro
-    networks:
-      craftpilot-network:
-        ipv4_address: 172.18.0.15
-    depends_on:
-      redis:
-        condition: service_healthy
-      eureka-server:
-        condition: service_healthy
-    <<: *common-deploy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8079/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+
 
   # LLM Service
   llm-service:

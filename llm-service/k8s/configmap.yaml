@@ -12,5 +12,5 @@ kind: ConfigMap
 metadata:
   name: redis-config
 data:
-  host: redis-service
+  host: redis
   port: "6379"
