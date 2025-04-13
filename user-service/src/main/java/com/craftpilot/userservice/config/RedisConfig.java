@@ -50,8 +50,9 @@ public class RedisConfig {
     @Value("${spring.data.redis.lettuce.pool.min-idle:4}")
     private int minIdle;
     
+    // Değişiklik burada: String tipinden Duration'a çeviriyoruz
     @Value("${spring.data.redis.lettuce.pool.max-wait:-1}")
-    private long maxWait;
+    private String maxWaitStr;
 
     @Bean
     @Primary
@@ -67,7 +68,25 @@ public class RedisConfig {
         poolConfig.setMaxTotal(maxActive);
         poolConfig.setMaxIdle(maxIdle);
         poolConfig.setMinIdle(minIdle);
-        poolConfig.setMaxWait(Duration.ofMillis(maxWait));
+        
+        // maxWait string değerini long'a dönüştürüyoruz
+        // Varsayılan değer olarak -1 (sınırsız) kullanıyoruz
+        Duration maxWaitDuration;
+        try {
+            // Eğer "-1" veya sayısal değerse doğrudan kullan
+            if (maxWaitStr.equals("-1") || maxWaitStr.matches("^-?\\d+$")) {
+                long maxWaitValue = Long.parseLong(maxWaitStr);
+                maxWaitDuration = maxWaitValue < 0 ? Duration.ofMillis(-1) : Duration.ofMillis(maxWaitValue);
+            } else {
+                // Aksi halde Duration parseEt (örn. "1000ms" veya "1s")
+                maxWaitDuration = Duration.parse("PT" + maxWaitStr.replaceAll("(\\d+)(ms|s|m|h)", "$1$2").toUpperCase());
+            }
+        } catch (Exception e) {
+            // Hata durumunda varsayılan değeri kullan
+            maxWaitDuration = Duration.ofMillis(-1);
+        }
+        
+        poolConfig.setMaxWait(maxWaitDuration);
         poolConfig.setTestOnBorrow(true);
         poolConfig.setTestOnReturn(true);
         poolConfig.setTestWhileIdle(true);
