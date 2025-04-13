@@ -9,8 +9,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build-and-push:
     runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: ./eureka-server
     steps:
       - uses: actions/checkout@v3
 
@@ -28,14 +31,10 @@ jobs:
           restore-keys: ${{ runner.os }}-m2
 
       - name: Grant execute permission for mvnw
-        run: |
-          cd eureka-server
-          chmod +x mvnw
+        run: chmod +x mvnw
 
       - name: Build
-        run: |
-          cd eureka-server
-          ./mvnw clean package -DskipTests
+        run: ./mvnw clean package -DskipTests
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -44,6 +43,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+        with:
+          platforms: linux/arm64
 
       - name: Login to DockerHub
         uses: docker/login-action@v2
@@ -57,7 +58,11 @@ jobs:
           context: ./eureka-server
           platforms: linux/arm64
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
+            ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:${{ github.sha }}-arm64
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:buildcache-arm64
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:buildcache-arm64,mode=max
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
@@ -66,119 +71,103 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "=== Infrastructure Setup Started ==="
-
-            # Create network if not exists
-            docker network create craftpilot-network || true
-
-            # Check and start Redis if not running
+            # Redis güvenlik ve performans konfigürasyonlarını kontrol et
             if ! docker ps | grep -q redis; then
-              echo "Starting Redis..."
+              echo "Redis container not running, starting with optimized settings..."
               docker run -d \
                 --name redis \
                 --network craftpilot-network \
                 -p 6379:6379 \
                 -e REDIS_PASSWORD=13579ada \
-                redis:latest redis-server --requirepass 13579ada
+                --restart unless-stopped \
+                --memory 1g \
+                --memory-swap 2g \
+                --cpu-shares 1024 \
+                -v redis-data:/data \
+                redis:latest redis-server \
+                --requirepass 13579ada \
+                --protected-mode yes \
+                --maxclients 500 \
+                --tcp-backlog 511 \
+                --timeout 300 \
+                --tcp-keepalive 300 \
+                --maxmemory 800mb \
+                --maxmemory-policy allkeys-lru \
+                --appendonly yes \
+                --appendfsync everysec \
+                --no-appendfsync-on-rewrite yes \
+                --auto-aof-rewrite-percentage 100 \
+                --auto-aof-rewrite-min-size 64mb \
+                --slowlog-log-slower-than 10000 \
+                --slowlog-max-len 128 \
+                --notify-keyspace-events KEA \
+                --io-threads 4
                 
-              # Wait for Redis to be ready
+              # Sistem önbelleğini optimize et
+              echo "Optimizing system memory allocation..."
+              sysctl -w vm.overcommit_memory=1
+              
+              # Redis'in hazır olmasını bekle
               echo "Waiting for Redis to be ready..."
-              for i in {1..30}; do
+              MAX_ATTEMPTS=30
+              ATTEMPT=0
+              while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
                 if docker exec redis redis-cli -a 13579ada ping | grep -q "PONG"; then
-                  echo "Redis is ready"
+                  echo "Redis is ready!"
                   break
                 fi
-                echo "Waiting for Redis... attempt $i/30"
+                ATTEMPT=$((ATTEMPT+1))
+                echo "Waiting for Redis... Attempt $ATTEMPT/$MAX_ATTEMPTS"
                 sleep 2
               done
-            else
-              echo "Redis is already running"
             fi
 
-            # Check and start Zookeeper if not running
-            if ! docker ps | grep -q zookeeper; then
-              echo "Starting Zookeeper..."
-              docker run -d \
-                --name zookeeper \
-                --network craftpilot-network \
-                -e ZOOKEEPER_CLIENT_PORT=2181 \
-                -e ZOOKEEPER_TICK_TIME=2000 \
-                confluentinc/cp-zookeeper:latest
-
-              # Wait for Zookeeper
-              echo "Waiting for Zookeeper to be ready..."
-              sleep 10
-            else
-              echo "Zookeeper is already running"
-            fi
-
-            # Check and start Kafka if not running
-            if ! docker ps | grep -q kafka; then
-              echo "Starting Kafka..."
-              docker run -d \
-                --name kafka \
-                --network craftpilot-network \
-                -p 9092:9092 \
-                -e KAFKA_BROKER_ID=1 \
-                -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
-                -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
-                -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
-                -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
-                -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 \
-                confluentinc/cp-kafka:latest
-
-              # Wait for Kafka
-              echo "Waiting for Kafka to be ready..."
-              sleep 20
-            else
-              echo "Kafka is already running"
-            fi
-
-            echo "=== Infrastructure Setup Completed ==="
-
-            # Deploy Eureka Server
-            echo "=== Deploying Eureka Server ==="
+            # Eureka Server'ı başlat
+            echo "Starting Eureka Server..."
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
             docker stop eureka-server || true
             docker rm eureka-server || true
 
             docker run -d \
               --name eureka-server \
-              --hostname eureka-server \
               --network craftpilot-network \
               --restart unless-stopped \
               -p 8761:8761 \
+              --memory 600m \
+              --memory-swap 1g \
+              --cpu-shares 512 \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_USERNAME=craftpilot \
-              -e EUREKA_PASSWORD=13579ada \
               -e SERVER_PORT=8761 \
-              -e EUREKA_INSTANCE_HOSTNAME=eureka-server \
               -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
               -e EUREKA_CLIENT_FETCH_REGISTRY=false \
-              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info \
+              -e SPRING_SECURITY_USER_NAME=craftpilot \
+              -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+              -e EUREKA_SERVER_ENABLE_SELF_PRESERVATION=false \
+              -e EUREKA_SERVER_EVICTION_INTERVAL_TIMER_IN_MS=3000 \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Xms256m -Xmx512m" \
               ${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:latest-arm64
 
-            # Enhanced health check for Eureka Server
-            echo "=== Performing Health Checks ==="
+            # Health check - port 8761'i kontrol et
+            echo "Checking Eureka Server health..."
             for i in {1..30}; do
-              echo "Health check attempt $i/30"
+              HEALTH_STATUS=$(curl -s -u craftpilot:13579ada http://localhost:8761/actuator/health || echo "Failed to connect")
               
-              if curl -sf http://localhost:8761/actuator/health | grep -q "UP"; then
-                echo "✓ Eureka Server is healthy"
-                echo "=== Deployment Completed Successfully ==="
+              if echo "$HEALTH_STATUS" | grep -q "UP"; then
+                echo "Eureka Server is healthy"
                 exit 0
               fi
               
               if [ $i -eq 15 ]; then
                 echo "Mid-point container logs:"
-                docker logs eureka-server --tail 50
+                docker logs eureka-server
               fi
               
-              echo "Waiting for next check..."
+              echo "Waiting for Eureka Server to be healthy... (attempt $i/30)"
               sleep 10
             done
 
-            echo "=== Deployment Failed - Debug Information ==="
+            echo "Eureka Server failed to become healthy"
             docker logs eureka-server
             exit 1

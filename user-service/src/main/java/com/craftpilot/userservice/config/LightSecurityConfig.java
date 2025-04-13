@@ -3,13 +3,14 @@ package com.craftpilot.userservice.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import lombok.extern.slf4j.Slf4j;
-
 import java.util.List;
 import java.util.Arrays;
 
@@ -23,7 +24,8 @@ public class LightSecurityConfig {
             "/actuator/health",
             "/actuator/info",
             "/health",
-            "/info"
+            "/info",
+            "/users/sync"
     );
 
     @Bean
@@ -46,27 +48,37 @@ public class LightSecurityConfig {
         return (exchange, chain) -> {
             ServerHttpRequest request = exchange.getRequest();
             String path = request.getPath().value();
-            
-            log.debug("İstek geldi: {} {}", request.getMethod(), path);
+            String method = request.getMethod().name();
+            String clientIp = getClientIp(exchange);
             
             if (isPublicPath(path)) {
-                log.debug("Public path erişimi: {} - kontrolsüz geçiyor", path);
+                log.debug("Public path erişimi: {} {} - kontrolsüz geçiyor [IP: {}]", method, path, clientIp);
                 return chain.filter(exchange);
             }
             
-            // Debug için tüm headerları yazdıralım
-            request.getHeaders().forEach((key, values) -> 
-                log.debug("Header: {} = {}", key, values));
+            // Redis bağlantı yolları için ek log
+            if (path.contains("/redis-health") || path.contains("/preferences")) {
+                log.debug("Redis bağlantılı istek: {} {} [IP: {}]", method, path, clientIp);
+            }
             
             // X-User-Id header'ı kontrolü
             String userId = request.getHeaders().getFirst("X-User-Id");
             
             if (userId == null || userId.isEmpty()) {
-                log.warn("Gerekli X-User-Id header eksik, ancak isteğe devam ediliyor");
-                // İsteği reddetmek yerine loga yazıp devam edelim
-                // API Gateway zaten yetkilendirmeyi yapıyor
+                log.debug("Gerekli X-User-Id header eksik: {} {} [IP: {}]", method, path, clientIp);
+                
+                // Tercihler için güvenlik by-pass: Geliştirme ortamında
+                if (path.contains("/preferences")) {
+                    log.debug("Preferences isteği için güvenlik by-pass aktif: {}", path);
+                    // Burada default bir user-id ekleyebiliriz (geliştirme ortamı için)
+                    exchange = exchange.mutate()
+                        .request(exchange.getRequest().mutate()
+                        .header("X-User-Id", "system-default")
+                        .build())
+                        .build();
+                }
             } else {
-                log.debug("İstek kimlik doğrulaması başarılı: {}", userId);
+                log.debug("İstek kimliği: {} {} - userId: {} [IP: {}]", method, path, userId, clientIp);
             }
             
             return chain.filter(exchange);
@@ -75,5 +87,14 @@ public class LightSecurityConfig {
 
     private boolean isPublicPath(String path) {
         return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
+    }
+    
+    private String getClientIp(ServerWebExchange exchange) {
+        String forwardedFor = exchange.getRequest().getHeaders().getFirst("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isEmpty()) {
+            return forwardedFor.split(",")[0].trim();
+        }
+        return exchange.getRequest().getRemoteAddress() != null ? 
+            exchange.getRequest().getRemoteAddress().getHostString() : "unknown";
     }
 }

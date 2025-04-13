@@ -40,7 +40,7 @@ services:
   # Redis service configuration
   redis:
     image: redis:latest
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD} --protected-mode yes --bind 0.0.0.0 --maxclients 100
     ports:
       - "6379:6379"
     volumes:

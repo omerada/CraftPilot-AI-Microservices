@@ -72,25 +72,65 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Redis container'ını başlat
+            # Redis container'ını gelişmiş güvenlik ve performans ayarlarıyla başlat
             if ! docker ps | grep -q redis; then
-              echo "Starting Redis container..."
+              echo "Starting Redis container with enhanced security settings..."
               docker run -d \
                 --name redis \
                 --network craftpilot-network \
                 -p 6379:6379 \
                 -e REDIS_PASSWORD=13579ada \
-                redis:latest redis-server --requirepass 13579ada
+                --restart unless-stopped \
+                --memory 1g \
+                --memory-swap 2g \
+                --cpu-shares 1024 \
+                -v redis-data:/data \
+                redis:latest redis-server \
+                --requirepass 13579ada \
+                --protected-mode yes \
+                --maxclients 500 \
+                --tcp-backlog 511 \
+                --timeout 300 \
+                --tcp-keepalive 300 \
+                --maxmemory 800mb \
+                --maxmemory-policy allkeys-lru \
+                --appendonly yes \
+                --appendfsync everysec \
+                --no-appendfsync-on-rewrite yes \
+                --auto-aof-rewrite-percentage 100 \
+                --auto-aof-rewrite-min-size 64mb \
+                --slowlog-log-slower-than 10000 \
+                --slowlog-max-len 128 \
+                --notify-keyspace-events KEA \
+                --io-threads 4
             fi
 
-            # Redis'in hazır olmasını bekle
+            # Redis'in hazır olmasını bekle (daha güvenilir health check)
             echo "Redis'in hazır olması bekleniyor..."
-            until docker exec redis redis-cli -a 13579ada ping | grep -q "PONG"; do
+            MAX_ATTEMPTS=30
+            ATTEMPT=0
+            while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+              if docker exec redis redis-cli -a 13579ada ping | grep -q "PONG"; then
+                echo "Redis is ready!"
+                break
+              fi
+              ATTEMPT=$((ATTEMPT+1))
+              echo "Waiting for Redis... Attempt $ATTEMPT/$MAX_ATTEMPTS"
               sleep 2
             done
 
-            # Redis Service'i başlat
-            echo "Starting redis-service..."
+            if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+              echo "Redis failed to start properly. Check logs:"
+              docker logs redis
+              exit 1
+            fi
+
+            # Sistem önbelleğini optimize et
+            echo "Optimizing system memory allocation..."
+            sysctl -w vm.overcommit_memory=1
+
+            # Redis Service'i güncellenmiş yapılandırmayla başlat
+            echo "Starting redis-service with improved configurations..."
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
             docker stop redis-service || true
             docker rm redis-service || true
@@ -100,6 +140,9 @@ jobs:
               --network craftpilot-network \
               --restart unless-stopped \
               -p 8079:8079 \
+              --memory 600m \
+              --memory-swap 1g \
+              --cpu-shares 512 \
               -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8079 \
@@ -112,15 +155,27 @@ jobs:
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
+              -e SPRING_REDIS_TIMEOUT=10000 \
+              -e SPRING_REDIS_CONNECT_TIMEOUT=10000 \
+              -e SPRING_REDIS_LETTUCE_POOL_MAX_ACTIVE=16 \
+              -e SPRING_REDIS_LETTUCE_POOL_MAX_IDLE=8 \
+              -e SPRING_REDIS_LETTUCE_POOL_MIN_IDLE=4 \
+              -e SPRING_REDIS_LETTUCE_POOL_MAX_WAIT=2000ms \
+              -e SPRING_REDIS_LETTUCE_SHUTDOWN_TIMEOUT=3000ms \
               -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
-              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+              -e MANAGEMENT_HEALTH_REDIS_ENABLED=true \
+              -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+              -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
               -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e SPRING_KAFKA_CONSUMER_GROUP_ID=redis-service-group \
               -e SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET=earliest \
+              -e JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Xms256m -Xmx512m" \
               ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
 
-            # Health check - port 8079'u kontrol et
+            # Daha kapsamlı health check
             echo "Checking service health..."
             for i in {1..30}; do
               HEALTH_STATUS=$(curl -s http://localhost:8079/actuator/health || echo "Failed to connect")
@@ -128,7 +183,15 @@ jobs:
               
               if echo "$HEALTH_STATUS" | grep -q "UP"; then
                 echo "Service is healthy"
-                exit 0
+                
+                # Redis bağlantısını özel olarak kontrol et
+                REDIS_HEALTH=$(curl -s http://localhost:8079/actuator/health/redis || echo "Failed to check Redis")
+                if echo "$REDIS_HEALTH" | grep -q "UP"; then
+                  echo "Redis connection verified successfully"
+                  exit 0
+                else
+                  echo "Redis connection issue detected in health check"
+                fi
               fi
               
               if [ $i -eq 15 ]; then
