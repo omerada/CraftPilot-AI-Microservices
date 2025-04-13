@@ -2,6 +2,9 @@ package com.craftpilot.userservice.config;
 
 import com.craftpilot.userservice.model.UserPreference;
 import com.craftpilot.userservice.model.user.entity.UserEntity;
+import io.lettuce.core.ClientOptions;
+import io.lettuce.core.ReadFrom;
+import io.lettuce.core.SocketOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,38 +13,80 @@ import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettucePoolingClientConfiguration;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+
 import java.time.Duration;
 
 @Configuration
 public class RedisConfig {
 
-    @Value("${spring.data.redis.host:redis}")
+    @Value("${spring.redis.host:localhost}")
     private String redisHost;
-
-    @Value("${spring.data.redis.port:6379}")
+    
+    @Value("${spring.redis.port:6379}")
     private int redisPort;
-
-    @Value("${spring.data.redis.password:13579ada}")
-    private String password;
+    
+    @Value("${spring.redis.database:0}")
+    private int redisDatabase;
+    
+    @Value("${spring.redis.timeout:10000}")
+    private long timeout;
+    
+    @Value("${spring.redis.lettuce.pool.max-active:16}")
+    private int maxActive;
+    
+    @Value("${spring.redis.lettuce.pool.max-idle:8}")
+    private int maxIdle;
+    
+    @Value("${spring.redis.lettuce.pool.min-idle:4}")
+    private int minIdle;
+    
+    @Value("${spring.redis.lettuce.pool.max-wait:-1}")
+    private long maxWait;
 
     @Bean
     @Primary
     public ReactiveRedisConnectionFactory reactiveRedisConnectionFactory() {
-        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
-        config.setHostName(redisHost);
-        config.setPort(redisPort);
-        config.setPassword(password);
+        RedisStandaloneConfiguration redisConfig = new RedisStandaloneConfiguration();
+        redisConfig.setHostName(redisHost);
+        redisConfig.setPort(redisPort);
+        redisConfig.setDatabase(redisDatabase);
         
-        LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
-            .commandTimeout(Duration.ofSeconds(5))
-            .shutdownTimeout(Duration.ofSeconds(2))
-            .build();
+        // Bağlantı havuzu yapılandırması
+        GenericObjectPoolConfig poolConfig = new GenericObjectPoolConfig();
+        poolConfig.setMaxTotal(maxActive);
+        poolConfig.setMaxIdle(maxIdle);
+        poolConfig.setMinIdle(minIdle);
+        poolConfig.setMaxWait(Duration.ofMillis(maxWait));
+        poolConfig.setTestOnBorrow(true);
+        poolConfig.setTestOnReturn(true);
+        poolConfig.setTestWhileIdle(true);
+        poolConfig.setTimeBetweenEvictionRuns(Duration.ofSeconds(30));
         
-        return new LettuceConnectionFactory(config, clientConfig);
+        // Socket ve client seçenekleri
+        SocketOptions socketOptions = SocketOptions.builder()
+                .connectTimeout(Duration.ofMillis(timeout))
+                .build();
+                
+        ClientOptions clientOptions = ClientOptions.builder()
+                .socketOptions(socketOptions)
+                .autoReconnect(true)
+                .disconnectedBehavior(ClientOptions.DisconnectedBehavior.REJECT_COMMANDS)
+                .build();
+        
+        LettuceClientConfiguration clientConfig = LettucePoolingClientConfiguration.builder()
+                .poolConfig(poolConfig)
+                .clientOptions(clientOptions)
+                .commandTimeout(Duration.ofMillis(timeout))
+                .readFrom(ReadFrom.REPLICA_PREFERRED) // Önce replikadan okuma
+                .build();
+        
+        return new LettuceConnectionFactory(redisConfig, clientConfig);
     }
 
     @Bean
@@ -63,7 +108,7 @@ public class RedisConfig {
         StringRedisSerializer keySerializer = new StringRedisSerializer();
         Jackson2JsonRedisSerializer<UserPreference> valueSerializer = new Jackson2JsonRedisSerializer<>(UserPreference.class);
         
-        RedisSerializationContext.RedisSerializationContextBuilder<String, UserPreference> builder = 
+        RedisSerializationContext.RedisSerializationContext.RedisSerializationContextBuilder<String, UserPreference> builder = 
                 RedisSerializationContext.newSerializationContext(keySerializer);
         
         RedisSerializationContext<String, UserPreference> context = 

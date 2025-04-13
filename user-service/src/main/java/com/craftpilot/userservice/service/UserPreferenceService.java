@@ -30,7 +30,11 @@ public class UserPreferenceService {
 
     @CircuitBreaker(name = "userPreferences", fallbackMethod = "getDefaultPreferences")
     public Mono<UserPreference> getUserPreferences(String userId) {
-        return redisCacheService.getUserPreferences(userId);
+        log.info("Kullanıcı tercihleri getiriliyor: userId={}", userId);
+        return redisCacheService.getUserPreferences(userId)
+            .timeout(Duration.ofSeconds(10))
+            .doOnSuccess(pref -> log.debug("Kullanıcı tercihleri başarıyla getirildi: userId={}", userId))
+            .doOnError(e -> log.error("Kullanıcı tercihleri getirilirken hata: userId={}, error={}", userId, e.getMessage()));
     }
 
     public Mono<UserPreference> saveUserPreferences(UserPreference preferences) {
@@ -39,26 +43,61 @@ public class UserPreferenceService {
         }
         preferences.setUpdatedAt(System.currentTimeMillis());
         
+        log.info("Kullanıcı tercihleri kaydediliyor: userId={}", preferences.getUserId());
         return redisCacheService.saveUserPreferences(preferences)
+                .timeout(Duration.ofSeconds(10))
                 .thenReturn(preferences)
                 .doOnNext(saved -> {
+                    log.debug("Kullanıcı tercihleri başarıyla kaydedildi: userId={}", saved.getUserId());
                     // Tüm tercihleri event olarak yayınla
                     publishPreferenceUpdated(saved.getUserId(), "all", "");
-                });
+                })
+                .doOnError(e -> log.error("Kullanıcı tercihleri kaydedilirken hata: userId={}, error={}", 
+                        preferences.getUserId(), e.getMessage()));
     }
     
     public Mono<UserPreference> updateTheme(String userId, String theme) {
+        log.info("Tema güncelleniyor: userId={}, theme={}", userId, theme);
         return getUserPreferences(userId)
             .flatMap(pref -> {
+                if (theme.equals(pref.getTheme())) {
+                    log.info("Tema değeri zaten '{}' olarak ayarlı, güncelleme yapılmadı", theme);
+                    return Mono.just(pref);
+                }
+                
                 pref.setTheme(theme);
                 pref.setUpdatedAt(System.currentTimeMillis());
                 return redisCacheService.saveUserPreferences(pref)
+                    .timeout(Duration.ofSeconds(8))
                     .thenReturn(pref);
             })
             .doOnNext(saved -> {
+                log.debug("Tema başarıyla güncellendi: userId={}, theme={}", userId, theme);
                 // Sadece tema değişikliğini event olarak yayınla
                 publishPreferenceUpdated(userId, "theme", theme);
+            })
+            .doOnError(e -> log.error("Tema güncellenirken hata: userId={}, theme={}, error={}", 
+                    userId, theme, e.getMessage()))
+            .onErrorResume(e -> {
+                log.warn("Tema güncelleme hatası için fallback çalıştırılıyor: userId={}", userId);
+                return createFallbackThemePreference(userId, theme);
             });
+    }
+
+    private Mono<UserPreference> createFallbackThemePreference(String userId, String theme) {
+        UserPreference fallbackPreference = UserPreference.builder()
+                .userId(userId)
+                .theme(theme)
+                .language("tr")
+                .notifications(true)
+                .pushEnabled(true)
+                .aiModelFavorites(new ArrayList<>())
+                .createdAt(System.currentTimeMillis())
+                .updatedAt(System.currentTimeMillis())
+                .build();
+        
+        log.info("Fallback tema tercihi oluşturuldu: userId={}, theme={}", userId, theme);
+        return Mono.just(fallbackPreference);
     }
 
     @CircuitBreaker(name = "userPreferences", fallbackMethod = "updateLanguageFallback")
@@ -75,14 +114,16 @@ public class UserPreferenceService {
                 pref.setLanguage(language);
                 pref.setUpdatedAt(System.currentTimeMillis());
                 return redisCacheService.saveUserPreferences(pref)
-                    .timeout(Duration.ofSeconds(5)) // Timeout ekle
+                    .timeout(Duration.ofSeconds(8)) // Timeout ekle
                     .thenReturn(pref);
             })
             .doOnNext(saved -> {
+                log.debug("Dil başarıyla güncellendi: userId={}, language={}", userId, language);
                 // Sadece dil değişikliğini event olarak yayınla
                 publishPreferenceUpdated(userId, "language", language);
             })
-            .doOnError(e -> log.error("Dil güncellenirken hata oluştu: {}", e.getMessage()));
+            .doOnError(e -> log.error("Dil güncellenirken hata oluştu: userId={}, language={}, error={}", 
+                    userId, language, e.getMessage()));
     }
 
     public Mono<UserPreference> updateLanguageFallback(String userId, String language, Throwable t) {
@@ -110,21 +151,59 @@ public class UserPreferenceService {
     }
     
     public Mono<UserPreference> updateAiModelFavorites(String userId, List<String> favorites) {
+        log.info("Favori modeller güncelleniyor: userId={}, favoriteCount={}", userId, favorites.size());
         return getUserPreferences(userId)
             .flatMap(pref -> {
                 pref.setAiModelFavorites(favorites);
                 pref.setUpdatedAt(System.currentTimeMillis());
                 return redisCacheService.saveUserPreferences(pref)
+                    .timeout(Duration.ofSeconds(8))
                     .thenReturn(pref);
             })
             .doOnNext(saved -> {
+                log.debug("Favori modeller başarıyla güncellendi: userId={}", userId);
                 // Favori model değişikliğini event olarak yayınla
                 publishPreferenceUpdated(userId, "aiModelFavorites", String.join(",", favorites));
+            })
+            .doOnError(e -> log.error("Favori modeller güncellenirken hata: userId={}, error={}", 
+                    userId, e.getMessage()))
+            .onErrorResume(e -> {
+                log.warn("Favori modeller güncelleme hatası için fallback çalıştırılıyor: userId={}", userId);
+                return createFallbackFavoritesPreference(userId, favorites);
             });
     }
 
+    private Mono<UserPreference> createFallbackFavoritesPreference(String userId, List<String> favorites) {
+        UserPreference fallbackPreference = UserPreference.builder()
+                .userId(userId)
+                .theme("light")
+                .language("tr")
+                .notifications(true)
+                .pushEnabled(true)
+                .aiModelFavorites(favorites)
+                .createdAt(System.currentTimeMillis())
+                .updatedAt(System.currentTimeMillis())
+                .build();
+        
+        log.info("Fallback favori modeller tercihi oluşturuldu: userId={}", userId);
+        return Mono.just(fallbackPreference);
+    }
+
     public Mono<Boolean> deleteUserPreferences(String userId) {
-        return redisCacheService.deleteUserPreferences(userId);
+        log.info("Kullanıcı tercihleri siliniyor: userId={}", userId);
+        return redisCacheService.deleteUserPreferences(userId)
+            .timeout(Duration.ofSeconds(8))
+            .doOnSuccess(result -> {
+                if (Boolean.TRUE.equals(result)) {
+                    log.info("Kullanıcı tercihleri başarıyla silindi: userId={}", userId);
+                    publishPreferenceUpdated(userId, "deleted", "true");
+                } else {
+                    log.warn("Kullanıcı tercihleri silinemedi (mevcut değil): userId={}", userId);
+                }
+            })
+            .doOnError(e -> log.error("Kullanıcı tercihleri silinirken hata: userId={}, error={}", 
+                    userId, e.getMessage()))
+            .onErrorReturn(false);
     }
 
     private void publishPreferenceUpdated(String userId, String preferenceType, String value) {
@@ -150,7 +229,7 @@ public class UserPreferenceService {
     }
 
     private Mono<UserPreference> getDefaultPreferences(String userId, Throwable t) {
-        log.warn("Falling back to default preferences for user: {}, error: {}", userId, t.getMessage());
+        log.warn("Varsayılan tercihlere dönülüyor: userId={}, error={}", userId, t.getMessage());
         return Mono.just(UserPreference.builder()
                 .userId(userId)
                 .theme("light")
