@@ -108,7 +108,7 @@ public class RedisConfig {
         StringRedisSerializer keySerializer = new StringRedisSerializer();
         Jackson2JsonRedisSerializer<UserPreference> valueSerializer = new Jackson2JsonRedisSerializer<>(UserPreference.class);
         
-        RedisSerializationContext.RedisSerializationContext.RedisSerializationContextBuilder<String, UserPreference> builder = 
+        RedisSerializationContext.RedisSerializationContextBuilder<String, UserPreference> builder = 
                 RedisSerializationContext.newSerializationContext(keySerializer);
         
         RedisSerializationContext<String, UserPreference> context = 

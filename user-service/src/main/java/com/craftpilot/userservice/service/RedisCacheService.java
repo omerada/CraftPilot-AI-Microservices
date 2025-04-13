@@ -33,9 +33,26 @@ public class RedisCacheService {
     private long cacheHours;
     
     private final AtomicBoolean redisHealthy = new AtomicBoolean(true);
-    private final Timer redisGetTimer = Timer.builder("redis.operation.get").register(meterRegistry);
-    private final Timer redisSetTimer = Timer.builder("redis.operation.set").register(meterRegistry);
-    private final Timer redisDeleteTimer = Timer.builder("redis.operation.delete").register(meterRegistry);
+    private final Timer redisGetTimer;
+    private final Timer redisSetTimer;
+    private final Timer redisDeleteTimer;
+
+    // Constructor ile Timer nesnelerini tanımlıyoruz
+    public RedisCacheService(
+            ReactiveRedisTemplate<String, UserEntity> userRedisTemplate,
+            ReactiveRedisTemplate<String, UserPreference> preferenceRedisTemplate,
+            ReactiveRedisConnectionFactory redisConnectionFactory,
+            MeterRegistry meterRegistry) {
+        this.userRedisTemplate = userRedisTemplate;
+        this.preferenceRedisTemplate = preferenceRedisTemplate;
+        this.redisConnectionFactory = redisConnectionFactory;
+        this.meterRegistry = meterRegistry;
+        
+        // Timer'ları constructor içinde başlatıyoruz
+        this.redisGetTimer = Timer.builder("redis.operation.get").register(meterRegistry);
+        this.redisSetTimer = Timer.builder("redis.operation.set").register(meterRegistry);
+        this.redisDeleteTimer = Timer.builder("redis.operation.delete").register(meterRegistry);
+    }
 
     // Generic methods for UserEntity
     public Mono<UserEntity> get(String key) {

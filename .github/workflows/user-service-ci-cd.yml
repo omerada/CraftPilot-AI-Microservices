@@ -47,6 +47,11 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           logout: true
 
+      - name: Local Maven Test Build
+        run: |
+          echo "Compiling the code locally to verify build before Docker"
+          mvn clean compile -B
+
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
@@ -58,6 +63,8 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/user-service:${{ github.sha }}-arm64
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64,mode=max
+          build-args: |
+            MAVEN_BUILD_COMMAND="mvn clean package -DskipTests -e -B"
 
       - id: "auth"
         name: "Authenticate to Google Cloud"
