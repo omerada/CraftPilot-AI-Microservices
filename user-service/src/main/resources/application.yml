@@ -9,8 +9,8 @@ spring:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:13579ada}
-      connect-timeout: 30000 # Increased timeout
-      timeout: 10000
+      connect-timeout: 3000 # Düşürüldü: 30000 -> 3000
+      timeout: 3000 # Düşürüldü: 10000 -> 3000
       database: 0
       client-type: lettuce
       ssl:
@@ -21,16 +21,16 @@ spring:
           max-idle: 8
           min-idle: 4
           max-wait: -1ms
-        shutdown-timeout: 2000ms
+        shutdown-timeout: 1000ms # Düşürüldü: 2000ms -> 1000ms
         cluster:
           refresh:
             adaptive: true
             period: 30s
       retry:
-        max-attempts: 3
-        initial-interval: 1000
-        max-interval: 3000
-        multiplier: 2.0
+        max-attempts: 2 # Düşürüldü: 3 -> 2
+        initial-interval: 500 # Düşürüldü: 1000 -> 500
+        max-interval: 1500 # Düşürüldü: 3000 -> 1500
+        multiplier: 1.5 # Düşürüldü: 2.0 -> 1.5
 
   firebase:
     config:
@@ -113,24 +113,20 @@ resilience4j:
       userPreferences:
         slidingWindowSize: 10
         failureRateThreshold: 50
-        waitDurationInOpenState: 10s
-        permittedNumberOfCallsInHalfOpenState: 5
+        waitDurationInOpenState: 5s # Düşürüldü: 10s -> 5s
+        permittedNumberOfCallsInHalfOpenState: 3 # Düşürüldü: 5 -> 3
         registerHealthIndicator: true
         allowHealthIndicatorToFail: true
         automaticTransitionFromOpenToHalfOpenEnabled: true
-        recordExceptions:
-          - java.lang.Exception
   retry:
     instances:
       userPreferences:
-        maxAttempts: 3
-        waitDuration: 1000ms
-        retryExceptions:
-          - java.lang.Exception
+        maxAttempts: 2 # Düşürüldü: 3 -> 2
+        waitDuration: 500ms # Düşürüldü: 1000ms -> 500ms
   timelimiter:
     instances:
       userPreferences:
-        timeoutDuration: 5s
+        timeoutDuration: 3s # Düşürüldü: 5s -> 3s
         cancelRunningFuture: true
 
 kafka:

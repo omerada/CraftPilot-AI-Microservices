@@ -72,7 +72,7 @@ public class UserPreferenceController {
             
             return userPreferenceService.saveUserPreferences(preference)
                     .map(ResponseEntity::ok)
-                    .timeout(java.time.Duration.ofSeconds(8))
+                    .timeout(java.time.Duration.ofSeconds(3)) // 8 saniyeden 3 saniyeye düşürülmeli
                     .doOnSuccess(response -> log.info("Kullanıcı tercihleri başarıyla güncellendi: userId={}", userId))
                     .doOnError(e -> log.error("Kullanıcı tercihleri güncellenirken hata: userId={}, error={}", userId, e.getMessage()))
                     .onErrorResume(e -> {

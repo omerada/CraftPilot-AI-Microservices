@@ -142,22 +142,29 @@ public class RedisCacheService {
     }
 
     public Mono<Boolean> saveUserPreferences(UserPreference preference) {
-        String userId = preference.getUserId();
-        log.debug("Kullanıcı tercihleri Redis'e kaydediliyor: userId={}", userId);
-        return redisSetTimer.record(() -> preferenceRedisTemplate.opsForValue()
-                .set(PREFERENCE_KEY_PREFIX + userId, preference, Duration.ofHours(cacheHours))
+        log.debug("Kullanıcı tercihleri Redis'e kaydediliyor: userId={}", preference.getUserId());
+        preference.setUpdatedAt(System.currentTimeMillis());
+        
+        // Önce bağlantı durumunu kontrol et ve loglama yap
+        if (!redisHealthy.get()) {
+            log.warn("Redis bağlantısı sağlıklı değil, senkronizasyon ertelenecek: userId={}", preference.getUserId());
+        }
+        
+        return redisSetTimer.record(() -> preferenceRedisTemplate.opsForValue().set(PREFERENCE_KEY_PREFIX + preference.getUserId(), preference, 
+                Duration.ofHours(cacheHours))
                 .doOnSuccess(result -> {
-                    log.debug("Kullanıcı tercihleri Redis'e başarıyla kaydedildi: userId={}", userId);
-                    meterRegistry.counter("redis.preference.write.success").increment();
-                    redisHealthy.set(true);
+                    log.debug("Kullanıcı tercihleri Redis'e başarıyla kaydedildi: userId={}", preference.getUserId());
+                    meterRegistry.counter("redis.preference.save.success").increment();
                 })
                 .doOnError(e -> {
-                    log.error("Kullanıcı tercihleri Redis'e kaydedilirken hata: userId={}, error={}", userId, e.getMessage());
-                    meterRegistry.counter("redis.preference.write.error").increment();
+                    log.error("Kullanıcı tercihleri Redis'e kaydedilirken hata: userId={}, error={}", 
+                        preference.getUserId(), e.getMessage());
+                    meterRegistry.counter("redis.preference.save.error").increment();
                     if (e instanceof RedisConnectionFailureException) {
                         redisHealthy.set(false);
                     }
                 })
+                .timeout(Duration.ofSeconds(2))
                 .onErrorReturn(false));
     }
 
