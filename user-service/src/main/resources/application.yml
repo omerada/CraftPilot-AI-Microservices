@@ -10,17 +10,18 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:13579ada}
       connect-timeout: 30000 # Increased timeout
-      timeout: 30000 # Increased timeout
+      timeout: 10000
+      database: 0
       client-type: lettuce
       ssl:
         enabled: false
       lettuce:
         pool:
-          max-active: 8
+          max-active: 16
           max-idle: 8
-          min-idle: 2
-          max-wait: 30000ms # Added explicit max wait
-        shutdown-timeout: 5000ms
+          min-idle: 4
+          max-wait: -1ms
+        shutdown-timeout: 2000ms
         cluster:
           refresh:
             adaptive: true
@@ -84,7 +85,7 @@ management:
           show-details: always
   health:
     redis:
-      enabled: true
+      enabled: false # Set to true when you want to enable Redis health checks
     livenessState:
       enabled: true
     readinessState:

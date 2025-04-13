@@ -25,28 +25,32 @@ import java.time.Duration;
 @Configuration
 public class RedisConfig {
 
-    @Value("${spring.redis.host:localhost}")
+    // Change these property names to match the standard Spring Boot Redis properties
+    @Value("${spring.data.redis.host:redis}")
     private String redisHost;
     
-    @Value("${spring.redis.port:6379}")
+    @Value("${spring.data.redis.port:6379}")
     private int redisPort;
     
-    @Value("${spring.redis.database:0}")
+    @Value("${spring.data.redis.database:0}")
     private int redisDatabase;
     
-    @Value("${spring.redis.timeout:10000}")
+    @Value("${spring.data.redis.password:13579ada}")
+    private String redisPassword;
+    
+    @Value("${spring.data.redis.timeout:10000}")
     private long timeout;
     
-    @Value("${spring.redis.lettuce.pool.max-active:16}")
+    @Value("${spring.data.redis.lettuce.pool.max-active:16}")
     private int maxActive;
     
-    @Value("${spring.redis.lettuce.pool.max-idle:8}")
+    @Value("${spring.data.redis.lettuce.pool.max-idle:8}")
     private int maxIdle;
     
-    @Value("${spring.redis.lettuce.pool.min-idle:4}")
+    @Value("${spring.data.redis.lettuce.pool.min-idle:4}")
     private int minIdle;
     
-    @Value("${spring.redis.lettuce.pool.max-wait:-1}")
+    @Value("${spring.data.redis.lettuce.pool.max-wait:-1}")
     private long maxWait;
 
     @Bean
@@ -56,8 +60,9 @@ public class RedisConfig {
         redisConfig.setHostName(redisHost);
         redisConfig.setPort(redisPort);
         redisConfig.setDatabase(redisDatabase);
+        redisConfig.setPassword(redisPassword);
         
-        // Bağlantı havuzu yapılandırması
+        // Connection pool configuration
         GenericObjectPoolConfig poolConfig = new GenericObjectPoolConfig();
         poolConfig.setMaxTotal(maxActive);
         poolConfig.setMaxIdle(maxIdle);
@@ -68,11 +73,11 @@ public class RedisConfig {
         poolConfig.setTestWhileIdle(true);
         poolConfig.setTimeBetweenEvictionRuns(Duration.ofSeconds(30));
         
-        // Socket ve client seçenekleri
+        // Socket and client options
         SocketOptions socketOptions = SocketOptions.builder()
                 .connectTimeout(Duration.ofMillis(timeout))
                 .build();
-                
+        
         ClientOptions clientOptions = ClientOptions.builder()
                 .socketOptions(socketOptions)
                 .autoReconnect(true)
@@ -83,7 +88,7 @@ public class RedisConfig {
                 .poolConfig(poolConfig)
                 .clientOptions(clientOptions)
                 .commandTimeout(Duration.ofMillis(timeout))
-                .readFrom(ReadFrom.REPLICA_PREFERRED) // Önce replikadan okuma
+                .readFrom(ReadFrom.REPLICA_PREFERRED)
                 .build();
         
         return new LettuceConnectionFactory(redisConfig, clientConfig);
@@ -102,7 +107,7 @@ public class RedisConfig {
         
         return new ReactiveRedisTemplate<>(factory, context);
     }
-
+    
     @Bean
     public ReactiveRedisTemplate<String, UserPreference> preferenceRedisTemplate(ReactiveRedisConnectionFactory factory) {
         StringRedisSerializer keySerializer = new StringRedisSerializer();
