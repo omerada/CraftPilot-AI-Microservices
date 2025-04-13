@@ -7,4 +7,4 @@ server:
 # Remote debugging configuration
 java:
   debug: true
-  debug-port: 5005
+  debug-port: 5007

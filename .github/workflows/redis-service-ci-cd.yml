@@ -87,13 +87,14 @@ jobs:
                 -v redis-data:/data \
                 redis:latest redis-server \
                 --requirepass 13579ada \
-                --protected-mode yes \
-                --maxclients 500 \
+                --protected-mode no \
+                --bind 0.0.0.0 \
+                --maxclients 1000 \
                 --tcp-backlog 511 \
-                --timeout 300 \
-                --tcp-keepalive 300 \
+                --timeout 0 \
+                --tcp-keepalive 60 \
                 --maxmemory 800mb \
-                --maxmemory-policy allkeys-lru \
+                --maxmemory-policy volatile-lru \
                 --appendonly yes \
                 --appendfsync everysec \
                 --no-appendfsync-on-rewrite yes \
@@ -102,7 +103,19 @@ jobs:
                 --slowlog-log-slower-than 10000 \
                 --slowlog-max-len 128 \
                 --notify-keyspace-events KEA \
-                --io-threads 4
+                --io-threads 4 \
+                --save 900 1 \
+                --save 300 10 \
+                --save 60 10000
+            else
+              # Mevcut Redis container'ını yeniden yapılandır
+              echo "Reconfiguring existing Redis container..."
+              docker exec redis redis-cli -a 13579ada CONFIG SET protected-mode no
+              docker exec redis redis-cli -a 13579ada CONFIG SET bind 0.0.0.0
+              docker exec redis redis-cli -a 13579ada CONFIG SET maxclients 1000
+              docker exec redis redis-cli -a 13579ada CONFIG SET timeout 0
+              docker exec redis redis-cli -a 13579ada CONFIG SET tcp-keepalive 60
+              docker exec redis redis-cli -a 13579ada CONFIG SET maxmemory-policy volatile-lru
             fi
 
             # Redis'in hazır olmasını bekle (daha güvenilir health check)
@@ -124,6 +137,11 @@ jobs:
               docker logs redis
               exit 1
             fi
+
+            # Redis-cli ile bağlantı detaylarını göster
+            echo "Redis connection info:"
+            docker exec redis redis-cli -a 13579ada INFO | grep connected_clients
+            docker exec redis redis-cli -a 13579ada INFO | grep used_memory_human
 
             # Sistem önbelleğini optimize et
             echo "Optimizing system memory allocation..."
@@ -155,13 +173,16 @@ jobs:
               -e SPRING_REDIS_HOST=redis \
               -e SPRING_REDIS_PORT=6379 \
               -e SPRING_REDIS_PASSWORD=13579ada \
-              -e SPRING_REDIS_TIMEOUT=10000 \
-              -e SPRING_REDIS_CONNECT_TIMEOUT=10000 \
-              -e SPRING_REDIS_LETTUCE_POOL_MAX_ACTIVE=16 \
-              -e SPRING_REDIS_LETTUCE_POOL_MAX_IDLE=8 \
-              -e SPRING_REDIS_LETTUCE_POOL_MIN_IDLE=4 \
-              -e SPRING_REDIS_LETTUCE_POOL_MAX_WAIT=2000ms \
-              -e SPRING_REDIS_LETTUCE_SHUTDOWN_TIMEOUT=3000ms \
+              -e SPRING_REDIS_DATABASE=0 \
+              -e SPRING_REDIS_TIMEOUT=30000 \
+              -e SPRING_REDIS_CONNECT_TIMEOUT=30000 \
+              -e SPRING_REDIS_CLIENT_TYPE=lettuce \
+              -e SPRING_REDIS_LETTUCE_POOL_MAX_ACTIVE=32 \
+              -e SPRING_REDIS_LETTUCE_POOL_MAX_IDLE=16 \
+              -e SPRING_REDIS_LETTUCE_POOL_MIN_IDLE=8 \
+              -e SPRING_REDIS_LETTUCE_POOL_MAX_WAIT=-1ms \
+              -e SPRING_REDIS_LETTUCE_POOL_TIME_BETWEEN_EVICTION_RUNS=60000 \
+              -e SPRING_REDIS_LETTUCE_SHUTDOWN_TIMEOUT=5000ms \
               -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
@@ -172,31 +193,47 @@ jobs:
               -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e SPRING_KAFKA_CONSUMER_GROUP_ID=redis-service-group \
               -e SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET=earliest \
-              -e JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Xms256m -Xmx512m" \
+              -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
+              -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_REDIS=DEBUG \
+              -e JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Xms256m -Xmx512m -Dspring.data.redis.repositories.enabled=false" \
               ${{ secrets.DOCKERHUB_USERNAME }}/redis-service:latest-arm64
 
             # Daha kapsamlı health check
             echo "Checking service health..."
             for i in {1..30}; do
-              HEALTH_STATUS=$(curl -s http://localhost:8079/actuator/health || echo "Failed to connect")
-              echo "Health check response: $HEALTH_STATUS"
-              
-              if echo "$HEALTH_STATUS" | grep -q "UP"; then
-                echo "Service is healthy"
+              # Önce servisin ayakta olduğunu kontrol et
+              if curl -s http://localhost:8079/actuator/health/liveness | grep -q "UP"; then
+                echo "Service is responding"
                 
-                # Redis bağlantısını özel olarak kontrol et
+                # Sonra Redis bağlantısını özel olarak kontrol et
                 REDIS_HEALTH=$(curl -s http://localhost:8079/actuator/health/redis || echo "Failed to check Redis")
+                echo "Redis health check response: $REDIS_HEALTH"
+                
                 if echo "$REDIS_HEALTH" | grep -q "UP"; then
                   echo "Redis connection verified successfully"
-                  exit 0
+                  
+                  # Tam servis sağlığını kontrol et
+                  FULL_HEALTH=$(curl -s http://localhost:8079/actuator/health)
+                  if echo "$FULL_HEALTH" | grep -q "UP"; then
+                    echo "Service is fully healthy"
+                    exit 0
+                  fi
                 else
-                  echo "Redis connection issue detected in health check"
+                  # Redis bağlantı bilgilerini göster
+                  echo "Redis host info from container:"
+                  docker exec redis-service env | grep REDIS
+                  
+                  # Redis container bağlantısını doğrudan test et
+                  echo "Testing Redis connectivity directly from service container:"
+                  docker exec redis-service ping -c 2 redis
+                  docker exec redis-service nc -zv redis 6379
                 fi
               fi
               
-              if [ $i -eq 15 ]; then
+              if [ $i -eq 10 ]; then
                 echo "Mid-point container logs:"
-                docker logs redis-service
+                docker logs redis-service | tail -n 50
+                docker logs redis | tail -n 20
               fi
               
               echo "Waiting for service to be healthy... (attempt $i/30)"
