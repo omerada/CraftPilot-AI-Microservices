@@ -20,7 +20,9 @@ RUN if [ -f "/app/parent-pom.xml" ]; then \
     fi
 
 # Handle redis-client-lib if exists
-COPY ../redis-client-lib /app/redis-client-lib/ 2>/dev/null || true
+# We use COPY with an empty target directory to avoid errors if the source doesn't exist
+# The shell operator '||' doesn't work properly in this context
+COPY ["../redis-client-lib", "/app/redis-client-lib/"]
 RUN if [ -d "/app/redis-client-lib" ] && [ -f "/app/redis-client-lib/pom.xml" ]; then \
         cd /app/redis-client-lib && \
         mvn install -DskipTests; \
