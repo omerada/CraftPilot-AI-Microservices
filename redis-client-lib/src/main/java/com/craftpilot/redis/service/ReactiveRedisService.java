@@ -174,6 +174,12 @@ public class ReactiveRedisService {
     public Mono<Long> ttl(String key) {
         return Mono.defer(() -> redisTemplate.getExpire(key))
                 .transform(CircuitBreakerOperator.of(circuitBreaker))
+                .map(duration -> {
+                    if (duration == null) {
+                        return -1L;
+                    }
+                    return duration.getSeconds();
+                })
                 .onErrorResume(e -> {
                     log.error("Redis TTL sorgulama hatası: key={}, error={}", key, e.getMessage());
                     return Mono.error(new RedisOperationException("Redis TTL sorgulama hatası", e));

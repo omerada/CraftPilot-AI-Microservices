@@ -35,14 +35,14 @@ public class ReactiveRedisConnectionProvider {
             redisConfig.setPassword(properties.getPassword());
         }
         
-        GenericObjectPoolConfig poolConfig = new GenericObjectPoolConfig();
+        GenericObjectPoolConfig<?> poolConfig = new GenericObjectPoolConfig<>();
         poolConfig.setMaxTotal(properties.getPoolMaxActive());
         poolConfig.setMaxIdle(properties.getPoolMaxIdle());
         poolConfig.setMinIdle(properties.getPoolMinIdle());
         
         Duration maxWait = properties.getPoolMaxWait();
         if (maxWait.isNegative()) {
-            poolConfig.setMaxWait(-1);
+            poolConfig.setMaxWait(Duration.ofMillis(-1));
         } else {
             poolConfig.setMaxWait(maxWait);
         }

@@ -81,8 +81,8 @@ public class RedisClientAutoConfiguration {
             .setConnectionPoolSize(properties.getPoolMaxActive())
             .setRetryAttempts(3)
             .setRetryInterval(1500)
-            .setTimeout(properties.getTimeout().toMillis())
-            .setConnectTimeout(properties.getConnectTimeout().toMillis());
+            .setTimeout((int) Math.min(properties.getTimeout().toMillis(), Integer.MAX_VALUE))
+            .setConnectTimeout((int) Math.min(properties.getConnectTimeout().toMillis(), Integer.MAX_VALUE));
 
         if (StringUtils.hasText(properties.getPassword())) {
             serverConfig.setPassword(properties.getPassword());

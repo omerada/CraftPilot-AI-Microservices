@@ -1,11 +1,13 @@
 package com.craftpilot.redis.config;
 
+import lombok.Builder;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
 
 @Data
+@Builder
 @ConfigurationProperties(prefix = "craftpilot.redis")
 public class RedisClientProperties {
 
@@ -47,21 +49,25 @@ public class RedisClientProperties {
     /**
      * Bağlantı havuzu maksimum aktif bağlantı
      */
+    @Builder.Default
     private int poolMaxActive = 32;
     
     /**
      * Bağlantı havuzu maksimum boşta bağlantı
      */
+    @Builder.Default
     private int poolMaxIdle = 16;
     
     /**
      * Bağlantı havuzu minimum boşta bağlantı
      */
+    @Builder.Default
     private int poolMinIdle = 8;
     
     /**
      * Bağlantı havuzu maksimum bekleme süresi
      */
+    @Builder.Default
     private Duration poolMaxWait = Duration.ofMillis(-1);
     
     /**
