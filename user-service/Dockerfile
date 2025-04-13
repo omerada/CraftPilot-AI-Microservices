@@ -11,8 +11,8 @@ WORKDIR /app
 COPY pom.xml /app/
 
 # If parent POM exists, copy and install it first
-# Note: Parent POM should be copied into build context if needed
-COPY parent-pom.xml /app/parent-pom.xml 2>/dev/null || true
+# Use a more Docker-friendly approach for optional files
+COPY parent-pom.xml /app/parent-pom.xml || true
 RUN if [ -f "/app/parent-pom.xml" ]; then \
         mkdir -p /app/parent && \
         mv /app/parent-pom.xml /app/parent/pom.xml && \
@@ -21,7 +21,8 @@ RUN if [ -f "/app/parent-pom.xml" ]; then \
     fi
 
 # Handle redis-client-lib if exists in build context
-COPY redis-client-lib/ /app/redis-client-lib/ 2>/dev/null || true
+# Use a more Docker-friendly approach without shell redirections
+COPY redis-client-lib/ /app/redis-client-lib/ || true
 RUN if [ -d "/app/redis-client-lib" ] && [ -f "/app/redis-client-lib/pom.xml" ]; then \
         cd /app/redis-client-lib && \
         mvn install -DskipTests; \
