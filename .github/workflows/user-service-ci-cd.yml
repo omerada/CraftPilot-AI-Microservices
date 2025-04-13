@@ -37,14 +37,20 @@ jobs:
           distribution: "temurin"
           cache: maven
 
-      # Önce redis-client-lib'i build et
+      # Önce redis-client-lib'i build et - burada Maven Wrapper'ı kullanıyoruz
       - name: Build redis-client-lib
         run: |
           if [ -d "redis-client-lib" ]; then
             echo "Building redis-client-lib..."
             cd redis-client-lib
-            # mvnw yerine mvn kullan - her zaman mevcut olacak
-            mvn clean install -DskipTests
+            # Maven Wrapper yoksa, M2_HOME'u kullanarak Maven'ı çağır
+            if [ -f "./mvnw" ]; then
+              ./mvnw clean install -DskipTests
+            else
+              echo "Maven wrapper not found, using Maven from JAVA_HOME..."
+              export M2_HOME=$JAVA_HOME/../../../.m2
+              $M2_HOME/bin/mvn clean install -DskipTests || $JAVA_HOME/bin/mvn clean install -DskipTests
+            fi
             cd ..
           else
             echo "redis-client-lib directory not found, skipping"
