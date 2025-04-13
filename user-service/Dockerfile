@@ -10,9 +10,11 @@ WORKDIR /app
 # Copy POM files for dependency resolution and caching
 COPY pom.xml /app/
 
+# Basit ve Docker uyumlu yaklaşım - dosyaları kopyalamaya çalış ama yoksa devam et
+COPY parent-pom.xml /app/ || true
+COPY redis-client-lib/ /app/redis-client-lib/ || true
+
 # If parent POM exists, copy and install it first
-# Use a more Docker-friendly approach for optional files
-COPY parent-pom.xml /app/parent-pom.xml || true
 RUN if [ -f "/app/parent-pom.xml" ]; then \
         mkdir -p /app/parent && \
         mv /app/parent-pom.xml /app/parent/pom.xml && \
@@ -21,8 +23,6 @@ RUN if [ -f "/app/parent-pom.xml" ]; then \
     fi
 
 # Handle redis-client-lib if exists in build context
-# Use a more Docker-friendly approach without shell redirections
-COPY redis-client-lib/ /app/redis-client-lib/ || true
 RUN if [ -d "/app/redis-client-lib" ] && [ -f "/app/redis-client-lib/pom.xml" ]; then \
         cd /app/redis-client-lib && \
         mvn install -DskipTests; \
