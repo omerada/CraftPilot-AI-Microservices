@@ -1,39 +1,32 @@
-# Build stage
-FROM maven:3.9.6-eclipse-temurin-21 AS build
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS redis-lib-builder
 
-WORKDIR /build
+# Redis Client Lib'i derle
+WORKDIR /app/redis-client-lib
+COPY ../redis-client-lib/pom.xml .
+COPY ../redis-client-lib/src ./src
+RUN mvn clean install -DskipTests
+
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
+
+# Maven dependency optimization
+WORKDIR /app
 COPY pom.xml .
-
-# Maven dependency optimization - önce sadece bağımlılıkları indir
+# Maven repositorisi redis-client-lib'i içerecek
+COPY --from=redis-lib-builder /root/.m2/repository /root/.m2/repository
 RUN mvn dependency:go-offline
 
 # Kaynak kodları kopyala ve build et
 COPY src ./src
-RUN mvn clean package -DskipTests -Dmaven.test.skip=true
+RUN mvn package -DskipTests
 
-# Run stage
-FROM eclipse-temurin:21-jre-jammy
-
+# Runtime stage
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY --from=build /build/target/*.jar app.jar
+COPY --from=builder /app/target/*.jar app.jar
 
-# Create logs directory and set permissions
-RUN mkdir -p /app/logs && \
-    chown -R 1000:1000 /app/logs && \
-    chmod 755 /app/logs
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+  CMD wget -q --spider http://localhost:8080/actuator/health || exit 1
 
-# JVM settings
-ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseStringDeduplication -Xmx1G -Xms512m"
-ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
-
-# Health check tools
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8060/actuator/health/liveness || exit 1
-
-# Set non-root user
-USER 1000:1000
-
-EXPOSE 8060
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
