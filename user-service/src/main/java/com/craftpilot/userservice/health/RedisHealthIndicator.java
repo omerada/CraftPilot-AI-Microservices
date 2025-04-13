@@ -5,8 +5,11 @@ import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.ReactiveHealthIndicator;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import lombok.extern.slf4j.Slf4j;
+import java.time.Duration;
 
 @Component
+@Slf4j
 public class RedisHealthIndicator implements ReactiveHealthIndicator {
 
     private final RedisCacheService redisCacheService;
@@ -17,10 +20,44 @@ public class RedisHealthIndicator implements ReactiveHealthIndicator {
 
     @Override
     public Mono<Health> health() {
-        if (redisCacheService.isRedisHealthy()) {
-            return Mono.just(Health.up().withDetail("message", "Redis connection is healthy").build());
-        } else {
-            return Mono.just(Health.down().withDetail("message", "Redis connection is not healthy").build());
+        // Return cached health status immediately if Redis is known to be unhealthy
+        if (!redisCacheService.isRedisHealthy()) {
+            log.warn("Redis health check skipped - known to be unhealthy");
+            return Mono.just(Health.down()
+                .withDetail("message", "Redis connection is not healthy")
+                .withDetail("status", "DOWN")
+                .withDetail("source", "cached_status")
+                .build());
         }
+        
+        // Actively ping Redis to verify connection
+        return redisCacheService.pingRedis()
+            .timeout(Duration.ofSeconds(3))
+            .map(ping -> {
+                if (ping) {
+                    log.debug("Redis health check passed");
+                    return Health.up()
+                        .withDetail("message", "Redis connection is healthy")
+                        .withDetail("status", "UP")
+                        .withDetail("source", "active_ping")
+                        .build();
+                } else {
+                    log.warn("Redis health check failed - ping returned false");
+                    return Health.down()
+                        .withDetail("message", "Redis ping failed")
+                        .withDetail("status", "DOWN")
+                        .withDetail("source", "active_ping")
+                        .build();
+                }
+            })
+            .onErrorResume(e -> {
+                log.error("Redis health check error: {}", e.getMessage());
+                return Mono.just(Health.down()
+                    .withDetail("message", "Redis health check failed: " + e.getMessage())
+                    .withDetail("status", "DOWN")
+                    .withDetail("source", "active_ping_error")
+                    .withDetail("exception", e.getClass().getSimpleName())
+                    .build());
+            });
     }
 }

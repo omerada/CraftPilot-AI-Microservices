@@ -148,10 +148,16 @@ public class RedisCacheService {
         // Önce bağlantı durumunu kontrol et ve loglama yap
         if (!redisHealthy.get()) {
             log.warn("Redis bağlantısı sağlıklı değil, senkronizasyon ertelenecek: userId={}", preference.getUserId());
+            return Mono.just(false);
         }
         
-        return redisSetTimer.record(() -> preferenceRedisTemplate.opsForValue().set(PREFERENCE_KEY_PREFIX + preference.getUserId(), preference, 
-                Duration.ofHours(cacheHours))
+        return redisSetTimer.record(() -> {
+            // Daha belirgin loglama ekleyelim
+            log.debug("Redis'e kaydetme işlemi başlatılıyor: userId={}", preference.getUserId());
+            
+            return preferenceRedisTemplate.opsForValue()
+                .set(PREFERENCE_KEY_PREFIX + preference.getUserId(), preference, Duration.ofHours(cacheHours))
+                .doOnSubscribe(s -> log.debug("Redis kaydetme işlemi başladı: userId={}", preference.getUserId()))
                 .doOnSuccess(result -> {
                     log.debug("Kullanıcı tercihleri Redis'e başarıyla kaydedildi: userId={}", preference.getUserId());
                     meterRegistry.counter("redis.preference.save.success").increment();
@@ -164,8 +170,13 @@ public class RedisCacheService {
                         redisHealthy.set(false);
                     }
                 })
-                .timeout(Duration.ofSeconds(2))
-                .onErrorReturn(false));
+                .timeout(Duration.ofSeconds(5)) // Timeout'u 5 saniyeye çıkaralım
+                .onErrorResume(e -> {
+                    log.error("Redis kaydetme işlemi timeout veya hata: userId={}, error={}", 
+                        preference.getUserId(), e.getClass().getName() + ": " + e.getMessage());
+                    return Mono.just(false);
+                });
+        });
     }
 
     public Mono<Boolean> deleteUserPreferences(String userId) {
@@ -210,5 +221,31 @@ public class RedisCacheService {
     // Redis durumunu döndüren metot
     public boolean isRedisHealthy() {
         return redisHealthy.get();
+    }
+
+    /**
+     * Actively pings Redis to check connection
+     * @return Mono<Boolean> true if ping is successful, false otherwise
+     */
+    public Mono<Boolean> pingRedis() {
+        log.debug("Actively pinging Redis to verify connection");
+        return Mono.from(redisConnectionFactory.getReactiveConnection().ping())
+            .map(pong -> {
+                boolean pingSuccess = "PONG".equalsIgnoreCase(pong);
+                if (pingSuccess) {
+                    log.debug("Redis ping successful");
+                    redisHealthy.set(true);
+                } else {
+                    log.warn("Redis ping returned unexpected response: {}", pong);
+                    redisHealthy.set(false);
+                }
+                return pingSuccess;
+            })
+            .doOnError(e -> {
+                log.error("Redis ping failed: {}", e.getMessage());
+                redisHealthy.set(false);
+                meterRegistry.counter("redis.ping.error").increment();
+            })
+            .onErrorReturn(false);
     }
 }
