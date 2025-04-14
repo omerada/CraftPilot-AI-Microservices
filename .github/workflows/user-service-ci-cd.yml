@@ -37,30 +37,36 @@ jobs:
           distribution: "temurin"
           cache: maven
 
-      # Önce redis-client-lib'i build et ve Maven local repo'ya yükle
-      - name: Build redis-client-lib
+      # Önce redis-client-lib'i yerel olarak build et (debugging için)
+      - name: Build redis-client-lib locally
         run: |
           if [ -d "redis-client-lib" ]; then
-            echo "Building redis-client-lib..."
+            echo "Building redis-client-lib locally (for debugging)..."
             cd redis-client-lib
-            # Sistem Maven'ını kullan (wrapper olmadan)
             mvn clean install -DskipTests
             cd ..
-            # Maven local repo'nun yerini göster (debug için)
-            echo "Maven local repository location:"
-            mvn help:evaluate -Dexpression=settings.localRepository -q -DforceStdout
           else
-            echo "redis-client-lib directory not found, skipping"
+            echo "redis-client-lib directory not found, skipping local build"
           fi
 
-      # Build context'i sadece user-service için hazırla
+      # Docker build context'i hazırla - HEM user-service HEM DE redis-client-lib içermeli
       - name: Prepare build context
         run: |
-          mkdir -p build-context
-          cp -r user-service/* build-context/
-          # pom.xml dosyasını kontrol et ve görüntüle (debug için)
-          echo "Content of pom.xml in build context:"
-          cat build-context/pom.xml | grep -A 5 "redis-client-lib"
+          mkdir -p build-context/user-service
+          mkdir -p build-context/redis-client-lib
+
+          # Copy user-service files
+          cp -r user-service/* build-context/user-service/
+
+          # Copy redis-client-lib files
+          if [ -d "redis-client-lib" ]; then
+            echo "Copying redis-client-lib to build context"
+            cp -r redis-client-lib/* build-context/redis-client-lib/
+            ls -la build-context/redis-client-lib/
+          else
+            echo "redis-client-lib directory not found, cannot copy"
+            exit 1
+          fi
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -82,7 +88,8 @@ jobs:
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: ./build-context # Sadece user-service içeriği
+          context: ./build-context # Her iki projeyi de içeren context
+          file: ./build-context/user-service/Dockerfile # Dockerfile'ın konumu
           platforms: linux/arm64
           push: true
           tags: |
