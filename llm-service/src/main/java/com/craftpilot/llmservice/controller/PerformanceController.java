@@ -67,13 +67,25 @@ public class PerformanceController {
                     log.info("Performance analysis request received for URL: {}", request.getUrl());
                     
                     return performanceService.analyzeWebsite(request)
-                            .map(ResponseEntity::ok)
-                            .doOnSuccess(response -> log.info("Performance analysis completed for URL: {}", request.getUrl()))
+                            .map(response -> {
+                                // Eğer bir hata mesajı varsa, uygun HTTP durum kodu ile yanıt ver
+                                if (response.getError() != null && !response.getError().isEmpty()) {
+                                    log.warn("Performance analysis completed with error for URL: {}, Error: {}", 
+                                            request.getUrl(), response.getError());
+                                    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+                                }
+                                
+                                log.info("Performance analysis completed successfully for URL: {}", request.getUrl());
+                                return ResponseEntity.ok(response);
+                            })
                             .onErrorResume(e -> {
                                 log.error("Error during performance analysis", e);
-                                return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                                        .body(PerformanceAnalysisResponse.builder()
-                                                .build()));
+                                PerformanceAnalysisResponse errorResponse = PerformanceAnalysisResponse.builder()
+                                        .url(request.getUrl())
+                                        .error("Analiz sırasında beklenmeyen bir hata oluştu: " + e.getMessage())
+                                        .build();
+                                return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                        .body(errorResponse));
                             });
                 });
     }
