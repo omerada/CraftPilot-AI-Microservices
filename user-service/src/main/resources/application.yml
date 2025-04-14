@@ -92,15 +92,22 @@ springdoc:
 
 resilience4j:
   circuitbreaker:
-    instances:
-      userPreferences:
+    configs:
+      default:
         slidingWindowSize: 10
         failureRateThreshold: 50
-        waitDurationInOpenState: 5s
+        waitDurationInOpenState: 10s
         permittedNumberOfCallsInHalfOpenState: 3
-        registerHealthIndicator: true
-        allowHealthIndicatorToFail: true
-        automaticTransitionFromOpenToHalfOpenEnabled: true
+    instances:
+      userPreferences:
+        baseConfig: default
+      userRedis: # UserService için özel Redis devre kesici
+        baseConfig: default
+      redisCircuitBreaker: # Kütüphane için ortak Redis devre kesici
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
   retry:
     instances:
       userPreferences:
@@ -133,16 +140,16 @@ craftpilot:
     port: ${REDIS_PORT:6379}
     password: ${REDIS_PASSWORD:13579ada}
     database: 0
-    connect-timeout: 3000
-    timeout: 3000
-    cache-ttl-hours: 1
-    pool-max-active: 16
-    pool-max-idle: 8
-    pool-min-idle: 4
+    connect-timeout: 2000ms
+    timeout: 1000ms
+    cache-ttl-hours: 24
+    pool-max-active: 32
+    pool-max-idle: 16
+    pool-min-idle: 8
     pool-max-wait: 1000ms
     circuit-breaker-enabled: true
     circuit-breaker-failure-rate-threshold: 50.0
-    circuit-breaker-wait-duration-in-open-state: 30s
+    circuit-breaker-wait-duration-in-open-state: 10s
     circuit-breaker-permitted-calls-in-half-open-state: 3
     retry-enabled: true
     max-retry-attempts: 2

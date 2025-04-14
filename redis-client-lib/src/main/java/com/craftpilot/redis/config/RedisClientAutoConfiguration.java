@@ -57,6 +57,7 @@ public class RedisClientAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public CircuitBreakerRegistry circuitBreakerRegistry(RedisClientProperties properties) {
+        // Bu konfigürasyon, tüm projeler için merkezi devre kesici konfigürasyonu olacak
         CircuitBreakerConfig circuitBreakerConfig = CircuitBreakerConfig.custom()
                 .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
                 .slidingWindowSize(10)
@@ -98,6 +99,8 @@ public class RedisClientAutoConfiguration {
             ReactiveStringRedisTemplate redisTemplate,
             CircuitBreakerRegistry circuitBreakerRegistry,
             RedisClientProperties properties) {
+        // "redis" ismindeki devre kesici burada yaratılıyor
+        // Bu isim, tüm mikroservislerde tek bir isim olacak
         return new ReactiveRedisService(
                 redisTemplate, 
                 circuitBreakerRegistry,

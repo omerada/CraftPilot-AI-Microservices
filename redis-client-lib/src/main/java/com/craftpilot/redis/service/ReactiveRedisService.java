@@ -16,15 +16,17 @@ public class ReactiveRedisService {
 
     protected final ReactiveStringRedisTemplate redisTemplate;
     protected final CircuitBreaker circuitBreaker;
-    protected final AtomicBoolean redisHealthy = new AtomicBoolean(true);
     protected final Duration defaultTtl;
+    protected final AtomicBoolean redisHealthy = new AtomicBoolean(true);
+    private static final String CIRCUIT_BREAKER_NAME = "redisCircuitBreaker"; // Sabit bir isim kullanıyoruz
 
     public ReactiveRedisService(
             ReactiveStringRedisTemplate redisTemplate,
             CircuitBreakerRegistry circuitBreakerRegistry,
             Duration defaultTtl) {
         this.redisTemplate = redisTemplate;
-        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("redis");
+        // Burada sabit bir isim kullanıyoruz ve bu sayede çakışmaları önlüyoruz
+        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker(CIRCUIT_BREAKER_NAME);
         this.defaultTtl = defaultTtl;
         
         // Devre kesici durumu değişim olaylarını dinle

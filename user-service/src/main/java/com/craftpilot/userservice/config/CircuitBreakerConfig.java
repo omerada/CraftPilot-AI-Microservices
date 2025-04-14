@@ -43,10 +43,11 @@ public class CircuitBreakerConfig {
             );
     }
     
+    // Redis devre kesicisi için özel bir isim kullanalım (userRedis)
     @Bean
-    public CircuitBreakerConfigCustomizer redisCircuitBreakerConfig() {
+    public CircuitBreakerConfigCustomizer userRedisCircuitBreakerConfig() {
         return CircuitBreakerConfigCustomizer
-            .of("redis", builder -> builder
+            .of("userRedis", builder -> builder
                 .slidingWindowSize(10)
                 .slidingWindowType(SlidingWindowType.COUNT_BASED)
                 .waitDurationInOpenState(Duration.ofSeconds(30))
