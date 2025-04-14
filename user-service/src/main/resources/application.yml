@@ -5,9 +5,18 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:dev}
     include: kafka-base
   autoconfigure:
-    exclude: org.redisson.spring.starter.RedissonAutoConfiguration
+    # Spring Boot'un kendi Redis ve Redisson yapılandırmalarını devre dışı bırakıyoruz
+    exclude:
+      - org.redisson.spring.starter.RedissonAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration
   main:
     allow-bean-definition-overriding: true
+  # Spring Redis yapılandırmasını devre dışı bırakıyoruz - redis-client-lib kullanacağız
+  data:
+    redis:
+      repositories:
+        enabled: false
   firebase:
     config:
       path: ${FIREBASE_CONFIG_PATH:/etc/gcp/credentials/gcp-credentials.json}

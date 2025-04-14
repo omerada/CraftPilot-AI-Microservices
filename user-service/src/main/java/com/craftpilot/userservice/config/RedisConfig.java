@@ -1,29 +1,24 @@
 package com.craftpilot.userservice.config;
 
-import com.craftpilot.redis.service.ReactiveCacheService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.craftpilot.redis.RedisClientAutoConfiguration;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.common.circuitbreaker.configuration.CircuitBreakerConfigCustomizer;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
-import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+import org.springframework.context.annotation.Import;
 
 import java.time.Duration;
 
 /**
  * Redis özelleştirmeleri için konfigürasyon sınıfı.
  * 
- * Not: Bu sınıf redis-client-lib tarafından otomatik olarak sağlanan
- * beanlerle birlikte çalışacak şekilde yapılandırılmıştır.
+ * Not: Bu sınıf redis-client-lib kütüphanesinin otomatik yapılandırmasını import eder
+ * ve sadece özel ayarları içerir. Tüm temel Redis bağlantısı ve yapılandırması
+ * RedisClientAutoConfiguration tarafından sağlanmaktadır.
  */
 @Configuration
+@Import(RedisClientAutoConfiguration.class)
 public class RedisConfig {
-
-    @Value("${craftpilot.redis.cache-ttl-hours:1}")
-    private long cacheTtlHours;
 
     /**
      * Redis için devre kesici (circuit breaker) özelleştirmesi
@@ -40,22 +35,5 @@ public class RedisConfig {
                 .minimumNumberOfCalls(5)
                 .recordExceptions(Exception.class)
             );
-    }
-    
-    /**
-     * ReactiveCacheService için manuel bean tanımı
-     * Bu, redis-client-lib'in otomatik yapılandırması çalışmadığında fallback olarak kullanılır
-     */
-    @Bean
-    @Primary
-    public ReactiveCacheService reactiveCacheService(
-            ReactiveStringRedisTemplate reactiveStringRedisTemplate,
-            CircuitBreakerRegistry circuitBreakerRegistry,
-            ObjectMapper objectMapper) {
-        return new ReactiveCacheService(
-                reactiveStringRedisTemplate,
-                circuitBreakerRegistry,
-                Duration.ofHours(cacheTtlHours),
-                objectMapper);
     }
 }
