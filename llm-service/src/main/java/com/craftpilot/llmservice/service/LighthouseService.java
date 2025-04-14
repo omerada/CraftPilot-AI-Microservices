@@ -42,12 +42,11 @@ public class LighthouseService {
             try {
                 // Lighthouse komut satırı aracını çağır
                 ProcessBuilder processBuilder = new ProcessBuilder(
-                        "npm", "exec", "--", 
                         lighthousePath, 
                         url,
                         "--output=json", 
                         "--output-path=stdout",
-                        "--chrome-flags=\"--headless --no-sandbox --disable-gpu\"",
+                        "--chrome-flags=--headless --no-sandbox --disable-gpu",
                         "--only-categories=performance,accessibility,best-practices,seo"
                 );
                 
@@ -68,6 +67,20 @@ public class LighthouseService {
                     while ((line = reader.readLine()) != null) {
                         output.append(line);
                     }
+                }
+
+                // Çıktının boş olup olmadığını kontrol et
+                if (output.length() == 0) {
+                    // Hata çıktısını da oku
+                    StringBuilder errorOutput = new StringBuilder();
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            errorOutput.append(line).append("\n");
+                        }
+                    }
+                    log.error("Lighthouse process returned empty output. Error: {}", errorOutput.toString());
+                    throw new RuntimeException("Lighthouse analizi boş sonuç döndürdü. Hata: " + errorOutput);
                 }
                 
                 // Lighthouse hatası mı kontrol et
