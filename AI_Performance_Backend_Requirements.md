@@ -1,3 +1,8 @@
+Merhaba, Ben frontend projemde yeni bir AI Performance Fixer modülü sayfası geliştirdim bu ekran için backendde yeni endpoint geliştirme ihtiyaçlarımız oluştu. Şimdi sana bir döküman paylaşacağım buna göre modern, performanslı ve clean bir yaklaşım ile bu dökümandaki endpointlerin backend tarafını geliştireceğiz kullanımına açacağız bu endpointleri llm-service micro-serviceim altında geliştirelim istiyorum. Light houseda tespit edilen performans sorunlarına çözüm için mevcut ai endpointlerimizi kullanabiliriz. Endpointler ve geliştirme detayları ekteki belge içerisinde yer almaktadır.
+
+Bana her zaman türkçe yanıt ver.
+
+
 # AI Performance Fixer Backend Gereksinimleri
 
 ## Temel Endpointler
