@@ -1,57 +1,49 @@
-# 1. Redis-client-lib build stage
-FROM maven:3.9.6-eclipse-temurin-21-alpine AS redis-lib-builder
+# Redis Client Library Build Stage
+FROM maven:3.9.6-eclipse-temurin-21 AS redis-lib-build
 
-# Set working directory for redis-client-lib
-WORKDIR /redis-client-lib
+# Clone/copy the redis-client-lib source
+WORKDIR /build-lib
+COPY redis-client-lib ./redis-client-lib
 
-# Copy redis-client-lib files
-COPY redis-client-lib/pom.xml ./
-COPY redis-client-lib/src ./src/
+# Build and install the redis-client-lib to local Maven repository
+RUN cd redis-client-lib && mvn clean install -DskipTests
 
-# Build and install redis-client-lib to local Maven repository
-RUN mvn clean install -DskipTests
+# User Service Build stage
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 
-# 2. User-service build stage
-FROM maven:3.9.6-eclipse-temurin-21-alpine AS user-service-builderent-lib/ /app/redis-client-lib/ || true
+WORKDIR /build
+COPY pom.xml .
+COPY src ./src
 
-# Maven build optimizationnstall it first
-ENV MAVEN_OPTS="-XX:+TieredCompilation -XX:TieredStopAtLevel=1"
-parent && \
-# Set working directory for user-servicerent/pom.xml && \
+# Copy Maven local repository from previous stage
+COPY --from=redis-lib-build /root/.m2 /root/.m2
+
+# Maven build
+RUN mvn clean package -DskipTests
+
+# Run stage
+FROM eclipse-temurin:21-jre-jammy
+
 WORKDIR /app
-kipTests; \
-# Copy the local Maven repository from redis-lib-builder
-COPY --from=redis-lib-builder /root/.m2/repository/com/craftpilot /root/.m2/repository/com/craftpilot/
-client-lib if exists in build context
-# Copy user-service POM filep/redis-client-lib/pom.xml" ]; then \
-COPY user-service/pom.xml ./
-DskipTests; \
-# Download dependencies
-RUN mvn dependency:go-offline -DskipTests || echo "Some dependencies may not be available, continuing with build"
+COPY --from=build /build/target/*.jar app.jar
 
-# Copy user-service source codeecho "Some dependencies may not be available, continuing with build"
-COPY user-service/src ./src/
+# Create logs directory and set permissions
+RUN mkdir -p /app/logs && \
+    chown -R 1000:1000 /app/logs && \
+    chmod 755 /app/logs
 
-# Package the application
-RUN mvn package -DskipTests
+# JVM settings
+ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseStringDeduplication -Xmx1G -Xms512m"
+ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
 
-# 3. Runtime stage
-FROM eclipse-temurin:21-jre-alpine
+# Health check tools
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /appin:21-jre-alpine
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8060/actuator/health/liveness || exit 1
 
-# Copy the built jar fileWORKDIR /app
-COPY --from=user-service-builder /app/target/*.jar app.jar
-# Copy the built jar file
-# Add curl for health checksCOPY --from=builder /app/target/*.jar app.jar
-RUN apk add --no-cache curl
-# Add curl for health checks
-# Configure health checkRUN apk add --no-cache curl
-HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8080/actuator/health || exit 1# Configure health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-# Expose the application port  CMD curl -f http://localhost:8080/actuator/health || exit 1
-EXPOSE 8080
-# Expose the application port
-# Start the applicationEXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Set non-root user
+USER 1000:1000
+
+EXPOSE 8060
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]

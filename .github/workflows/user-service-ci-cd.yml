@@ -5,7 +5,7 @@ on:
     branches: [master]
     paths:
       - "user-service/**"
-      - "redis-client-lib/**" # Redis client lib değişikliklerinde de tetikle
+      - "redis-client-lib/**"
       - ".github/workflows/user-service-ci-cd.yml"
   pull_request:
     branches: [master]
@@ -26,218 +26,185 @@ on:
 jobs:
   build-and-deploy:
     runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: ./user-service
     steps:
       - uses: actions/checkout@v3
 
-      # Maven local cache için
-      - name: Set up JDK
-        uses: actions/setup-java@v3
-        with:
-          java-version: "21"
-          distribution: "temurin"
-          cache: maven
-
-      # Önce redis-client-lib'i yerel olarak build et (debugging için)anıyoruz
-      - name: Build redis-client-lib locally
-        run: |
-          if [ -d "redis-client-lib" ]; then
-            echo "Building redis-client-lib locally (for debugging)..."
-            cd redis-client-lib
-            mvn clean install -DskipTestsE'u kullanarak Maven'ı çağır
-            cd .. -f "./mvnw" ]; then
-          else./mvnw clean install -DskipTests
-            echo "redis-client-lib directory not found, skipping local build"
-          fi  echo "Maven wrapper not found, using Maven from JAVA_HOME..."
-              export M2_HOME=$JAVA_HOME/../../../.m2
-      # Docker build context'i hazırlall -DskipTests
-      - name: Prepare build context
-        run: | ..
-          # Dockerfile her iki projeyi de kullanacak şekilde ayarlanmıştır
-          echo "Preparing Docker build context"found, skipping"
-                    fi
-          # Dockerfile'ın redis-client-lib ve user-service klasörlerine erişebilmesi için
-          # bunları build context'e dahil etmeliyiz
-                - name: Prepare build context
-          # Repo kök dizinini build context olarak kullanacağız, böylece
-          # Dockerfile hem redis-client-lib hem de user-service dizinlerine erişebilire
-          echo "Build context will be project root directory"
-
-      - name: Set up QEMUb
-        uses: docker/setup-qemu-action@v2 -r redis-client-lib/* build-context/redis-client-lib/
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
         with:
           platforms: arm64
-: Set up QEMU
-      - name: Set up Docker Buildx        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:
           platforms: linux/arm64
-r Buildx
-      - name: Login to DockerHub        uses: docker/setup-buildx-action@v2
+
+      - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          logout: true        uses: docker/login-action@v2
+          logout: true
 
-      - name: Build and Push Docker imageERHUB_USERNAME }}
-        uses: docker/build-push-action@v4sword: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v4
         with:
-          # Repo kök dizinini build context olarak kullan
-          context: .d Push Docker image
-          # Dockerfile'ın yolunu doğrudan belirt        uses: docker/build-push-action@v4
-          file: ./user-service/Dockerfile
-          platforms: linux/arm64ervice # Doğru bağlam
-          push: truetforms: linux/arm64
+          context: .
+          platforms: linux/arm64
+          push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
-            ${{ secrets.DOCKERHUB_USERNAME }}/user-service:${{ github.sha }}-arm64B_USERNAME }}/user-service:latest-arm64
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64ets.DOCKERHUB_USERNAME }}/user-service:${{ github.sha }}-arm64
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64,mode=maxrom: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64
-/user-service:buildcache-arm64,mode=max
+            ${{ secrets.DOCKERHUB_USERNAME }}/user-service:${{ github.sha }}-arm64
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64,mode=max
+
       - id: "auth"
         name: "Authenticate to Google Cloud"
         uses: "google-github-actions/auth@v1"
-        with:        uses: "google-github-actions/auth@v1"
+        with:
           credentials_json: "${{ secrets.GCP_SA_KEY }}"
-_SA_KEY }}"
+
       - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1" "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v1"
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.VPS_HOST }}        with:
-          username: ${{ secrets.SSH_USERNAME }}.VPS_HOST }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}NAME }}
-          command_timeout: "20m": ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: "20m"
           debug: true
           script: |
             set -e  # Exit on any error
-y error
+
             echo "=== Testing SSH Connection ==="
-            whoami== Testing SSH Connection ==="
+            whoami
             pwd
-            pwd
+
             echo "=== System Architecture ==="
-            uname -m=== System Architecture ==="
-me -m
+            uname -m
+
             echo "=== Testing Directory Access ==="
-            mkdir -p /opt/craftpilot ==="
- /opt/craftpilot
+            mkdir -p /opt/craftpilot
+
             echo "=== Continuing with Deployment ==="
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json="
-            chmod 600 /opt/craftpilot/gcp-credentials.json_KEY }}' > /opt/craftpilot/gcp-credentials.json
+            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
             chmod 600 /opt/craftpilot/gcp-credentials.json
+
             echo "=== Verifying Docker Status ==="
             if ! systemctl is-active --quiet docker; then
               echo "Docker is not running. Starting Docker..."
-              sudo systemctl start docker              echo "Docker is not running. Starting Docker..."
+              sudo systemctl start docker
             fi
 
             echo "=== Deploying User Service ==="
-            # Force pull latest imageice ==="
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64Force pull latest image
+            # Force pull latest image
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
+
             echo "=== Stopping Old Container ==="
-            docker rm -f user-service || truentainer ==="
+            docker rm -f user-service || true
 
             echo "=== Starting User Service ==="
             if [[ "${{ github.event.inputs.environment }}" == "debug" ]]; then
-              docker run -d \vironment }}" == "debug" ]]; then
-                --name user-service \              docker run -d \
-                --network craftpilot-network \
-                --restart unless-stopped \
-                -p 8060:8060 \ess-stopped \
-                -p 5007:5007 \
-                -v /opt/craftpilot/gcp/credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
-                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \dentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
-                -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \ICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
-                -e SPRING_PROFILES_ACTIVE=prod \NFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
-                -e SERVER_PORT=8060 \
-                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-                -e EUREKA_INSTANCE_HOSTNAME=user-service \eureka-server:8761/eureka/ \
-                -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \-service \
-                -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \EFER_IP_ADDRESS=false \
-                -e REDIS_HOST=redis \
-                -e REDIS_PORT=6379 \
-                -e REDIS_PASSWORD=13579ada \
-                -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
-                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \VALIDATE_GROUP_MEMBERSHIP=false \
-                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \NT_HEALTH_PROBES_ENABLED=true \
-                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \SSTATE_ENABLED=true \
-                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics,loggers,env" \
-                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \h,info,metrics,loggers,env" \
-                -e SPRING_APPLICATION_NAME=user-service \ \
-                -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
-                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_NETFLIX_EUREKA=DEBUG \
-                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_REDIS=DEBUG \EUREKA=DEBUG \
-                -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5007" \_REDIS=DEBUG \
-                --health-cmd="curl -f http://localhost:8060/actuator/health || exit 1" \Support -XX:MaxRAMPercentage=75.0 -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5007" \
-                --health-interval=10s \it 1" \
-                --health-retries=10 \
-                --health-timeout=5s \
-                --health-start-period=60s \
-                ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm640s \
-            else_USERNAME }}/user-service:latest-arm64
               docker run -d \
                 --name user-service \
                 --network craftpilot-network \
-                --restart unless-stopped \--network craftpilot-network \
-                -p 8060:8060 \ess-stopped \
+                --restart unless-stopped \
+                -p 8060:8060 \
+                -p 5007:5007 \
                 -v /opt/craftpilot/gcp/credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
-                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \ials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
-                -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \ENTIALS=/etc/gcp/credentials/gcp-credentials.json \
-                -e SPRING_PROFILES_ACTIVE=prod \NFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
+                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
+                -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
+                -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=8060 \
                 -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-                -e EUREKA_INSTANCE_HOSTNAME=user-service \eureka-server:8761/eureka/ \
-                -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \-service \
-                -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \EFER_IP_ADDRESS=false \
+                -e EUREKA_INSTANCE_HOSTNAME=user-service \
+                -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+                -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
                 -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
-                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \VALIDATE_GROUP_MEMBERSHIP=false \
-                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \NT_HEALTH_PROBES_ENABLED=true \
-                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \SSTATE_ENABLED=true \
-                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics" \
-                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \h,info,metrics" \
-                -e SPRING_APPLICATION_NAME=user-service \ \
+                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics,loggers,env" \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e SPRING_APPLICATION_NAME=user-service \
+                -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_NETFLIX_EUREKA=DEBUG \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_REDIS=DEBUG \
+                -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5007" \
                 --health-cmd="curl -f http://localhost:8060/actuator/health || exit 1" \
-                --health-interval=10s \1" \
+                --health-interval=10s \
+                --health-retries=10 \
+                --health-timeout=5s \
+                --health-start-period=60s \
+                ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
+            else
+              docker run -d \
+                --name user-service \
+                --network craftpilot-network \
+                --restart unless-stopped \
+                -p 8060:8060 \
+                -v /opt/craftpilot/gcp/credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
+                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
+                -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e SERVER_PORT=8060 \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_INSTANCE_HOSTNAME=user-service \
+                -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+                -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+                -e REDIS_HOST=redis \
+                -e REDIS_PORT=6379 \
+                -e REDIS_PASSWORD=13579ada \
+                -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics" \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e SPRING_APPLICATION_NAME=user-service \
+                --health-cmd="curl -f http://localhost:8060/actuator/health || exit 1" \
+                --health-interval=10s \
                 --health-retries=10 \
                 --health-timeout=5s \
                 --health-start-period=40s \
-                ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm640s \
-            fi_USERNAME }}/user-service:latest-arm64
+                ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
+            fi
 
             echo "=== Waiting for Service to Start ==="
             max_attempts=30
-            counter=0x_attempts=30
             counter=0
+
             while [ $counter -lt $max_attempts ]; do
-              echo "Health check attempt $((counter + 1))/$max_attempts"r -lt $max_attempts ]; do
-              ealth check attempt $((counter + 1))/$max_attempts"
-              # Container durumu kontrolü              
+              echo "Health check attempt $((counter + 1))/$max_attempts"
+              
+              # Container durumu kontrolü
               if ! docker ps --filter "name=user-service" --format '{{.Status}}' | grep -q "Up"; then
-                echo "Container is not running anymore. Checking logs..."tatus}}' | grep -q "Up"; then
-                docker logs user-service --tail 300  echo "Container is not running anymore. Checking logs..."
-                exit 1--tail 300
+                echo "Container is not running anymore. Checking logs..."
+                docker logs user-service --tail 300
+                exit 1
               fi
               
               # Application log kontrolü
-              if docker logs user-service 2>&1 | grep -q "Started UserserviceApplication"; thenation log kontrolü
-                echo "Application startup completed" docker logs user-service 2>&1 | grep -q "Started UserserviceApplication"; then
-                  echo "Application startup completed"
+              if docker logs user-service 2>&1 | grep -q "Started UserserviceApplication"; then
+                echo "Application startup completed"
+                
                 # Eureka registration kontrolü
                 if docker logs user-service 2>&1 | grep -q "DiscoveryClient.*registration status: 204"; then
-                  echo "Successfully registered with Eureka"rep -q "DiscoveryClient.*registration status: 204"; then
-                    echo "Successfully registered with Eureka"
+                  echo "Successfully registered with Eureka"
+                  
                   # Final health check
                   HEALTH_CHECK=$(curl -s http://localhost:8060/actuator/health)
-                  if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then60/actuator/health)
-                    echo "✓ Service is healthy: $HEALTH_CHECK"if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
-                    echo "=== Deployment completed successfully ===" healthy: $HEALTH_CHECK"
+                  if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
+                    echo "✓ Service is healthy: $HEALTH_CHECK"
+                    echo "=== Deployment completed successfully ==="
                     exit 0
                   else
                     echo "Health check response: $HEALTH_CHECK"
@@ -245,32 +212,32 @@ me -m
                 else
                   # Ekstra Eureka log bilgisi
                   echo "Waiting for Eureka registration..."
-                  docker logs user-service 2>&1 | grep -i "eureka" | tail -10ho "Waiting for Eureka registration..."
-                ficker logs user-service 2>&1 | grep -i "eureka" | tail -10
+                  docker logs user-service 2>&1 | grep -i "eureka" | tail -10
+                fi
               else
                 # Başlangıç loglarını kontrol et
                 echo "Waiting for application startup..."
-                docker logs user-service 2>&1 | grep -i "userservice\|error\|exception" | tail -10ho "Waiting for application startup..."
-              ficker logs user-service 2>&1 | grep -i "userservice\|error\|exception" | tail -10
+                docker logs user-service 2>&1 | grep -i "userservice\|error\|exception" | tail -10
+              fi
               
               echo "Waiting for service to start... ($((counter + 1))/$max_attempts)"
               sleep 10
-              counter=$((counter + 1))eep 10
-            donecounter=$((counter + 1))
+              counter=$((counter + 1))
+            done
 
             echo "=== Service Failed to Start - Debug Information ==="
-            echo "Docker Container Status:"o Start - Debug Information ==="
-            docker ps -a | grep user-service "Docker Container Status:"
-            echo "Container Logs (son 500 satır):"            docker ps -a | grep user-service
+            echo "Docker Container Status:"
+            docker ps -a | grep user-service
+            echo "Container Logs (son 500 satır):"
             docker logs user-service --tail 500
-            echo "Hata Mesajları ve İstisnalar:" 500
-            docker logs user-service 2>&1 | grep -i "error\|exception\|failed" | tail -50ar:"
-            echo "Eureka Kayıt Bilgileri:"i "error\|exception\|failed" | tail -50
+            echo "Hata Mesajları ve İstisnalar:"
+            docker logs user-service 2>&1 | grep -i "error\|exception\|failed" | tail -50
+            echo "Eureka Kayıt Bilgileri:"
             docker logs user-service 2>&1 | grep -i "eureka\|discovery" | tail -30
-            echo "Redis Bağlantı Bilgileri:" -i "eureka\|discovery" | tail -30
+            echo "Redis Bağlantı Bilgileri:"
             docker logs user-service 2>&1 | grep -i "redis" | tail -20
-            echo "Network Information:"| grep -i "redis" | tail -20
+            echo "Network Information:"
             docker network inspect craftpilot-network
-            echo "Health Check Response:"t-network
+            echo "Health Check Response:"
             curl -v http://localhost:8060/actuator/health || true
-            exit 160/actuator/health || true
+            exit 1
