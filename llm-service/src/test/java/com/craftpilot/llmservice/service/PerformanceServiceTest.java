@@ -1,25 +1,30 @@
 package com.craftpilot.llmservice.service;
 
 import com.craftpilot.llmservice.cache.PerformanceAnalysisCache;
+import com.craftpilot.llmservice.model.AIRequest;
+import com.craftpilot.llmservice.model.AIResponse;
 import com.craftpilot.llmservice.model.performance.PerformanceAnalysisRequest;
 import com.craftpilot.llmservice.model.performance.PerformanceAnalysisResponse;
 import com.craftpilot.llmservice.model.performance.SuggestionsRequest;
 import com.craftpilot.llmservice.repository.PerformanceAnalysisRepository;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class PerformanceServiceTest {
     
     private PerformanceService performanceService;
@@ -34,22 +39,27 @@ class PerformanceServiceTest {
     private PerformanceAnalysisCache performanceAnalysisCache;
     
     @Mock
-    private AiService aiService;
+    private LLMService llmService;
     
     @Mock
     private PromptService promptService;
     
+    @Mock
+    private MeterRegistry meterRegistry;
+    
+    @Mock
+    private ObjectMapper objectMapper;
+    
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
-        
         performanceService = new PerformanceService(
-                lighthouseService, 
-                performanceAnalysisRepository, 
-                performanceAnalysisCache, 
-                aiService, 
+                lighthouseService,
+                performanceAnalysisRepository,
+                performanceAnalysisCache,
                 promptService,
-                new SimpleMeterRegistry()
+                meterRegistry,
+                llmService,
+                objectMapper
         );
     }
     
@@ -104,13 +114,20 @@ class PerformanceServiceTest {
     }
     
     @Test
-    void generateSuggestions_ReturnsAiResponse() {
+    void generateSuggestions_ReturnsAiResponse() throws Exception {
         // Arrange
         SuggestionsRequest request = new SuggestionsRequest();
         request.setAnalysisData(new HashMap<String, Object>());
+        request.setUserId("test-user");
+        request.setLanguage("tr");
         
-        when(promptService.getPerformanceAnalysisPrompt(any())).thenReturn("test prompt");
-        when(aiService.generateAiResponse(anyString())).thenReturn(Mono.just("AI response"));
+        AIResponse aiResponse = AIResponse.builder()
+                .response("AI response")
+                .success(true)
+                .build();
+        
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        when(llmService.processChatCompletion(any(AIRequest.class))).thenReturn(Mono.just(aiResponse));
         
         // Act & Assert
         StepVerifier.create(performanceService.generateSuggestions(request))

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.function.Function;
 
 @Component
 @Slf4j
@@ -23,10 +24,14 @@ public class PerformanceAnalysisCache {
     }
     
     public Mono<PerformanceAnalysisResponse> getAnalysisResult(String url) {
-        return Mono.justOrEmpty(cache.getIfPresent(url))
-                .doOnSubscribe(subscription -> log.debug("Looking up URL in cache: {}", url))
-                .doOnNext(result -> log.debug("Cache hit for URL: {}", url))
-                .doOnEmpty(() -> log.debug("Cache miss for URL: {}", url));
+        PerformanceAnalysisResponse cachedResult = cache.getIfPresent(url);
+        if (cachedResult != null) {
+            log.debug("Cache hit for performance analysis: {}", url);
+            return Mono.just(cachedResult);
+        } else {
+            log.debug("Cache miss for performance analysis: {}", url);
+            return Mono.empty();
+        }
     }
     
     public void cacheAnalysisResult(String url, PerformanceAnalysisResponse result) {
