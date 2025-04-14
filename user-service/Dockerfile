@@ -12,8 +12,8 @@ RUN cd redis-client-lib && mvn clean install -DskipTests
 FROM maven:3.9.6-eclipse-temurin-21 AS build
 
 WORKDIR /build
-COPY pom.xml .
-COPY src ./src
+COPY user-service/pom.xml .
+COPY user-service/src ./src
 
 # Copy Maven local repository from previous stage
 COPY --from=redis-lib-build /root/.m2 /root/.m2
@@ -34,6 +34,7 @@ RUN mkdir -p /app/logs && \
 
 # JVM settings
 ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseStringDeduplication -Xmx1G -Xms512m"
+# Güvenli bir şekilde kullanın, ENV olarak belirtildi ama güvenlik uyarısı oluşturabilir
 ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
 
 # Health check tools
