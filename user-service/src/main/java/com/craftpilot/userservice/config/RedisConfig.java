@@ -1,6 +1,7 @@
 package com.craftpilot.userservice.config;
 
 import com.craftpilot.redis.config.RedisClientAutoConfiguration;
+import com.craftpilot.redis.health.RedisHealthIndicator;
 import com.craftpilot.redis.metrics.RedisMetricsService;
 import com.craftpilot.redis.service.ReactiveRedisService;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -9,7 +10,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 
 /**
  * Redis özelleştirmeleri için konfigürasyon sınıfı.
@@ -23,11 +23,10 @@ import org.springframework.context.annotation.Primary;
 public class RedisConfig {
     
     /**
-     * ReactiveRedisService için primary bean tanımı.
-     * Bu, ReactiveCacheService ile çakışmaları önler.
+     * ReactiveRedisService için özel bean tanımı.
+     * Bu artık @Primary olarak işaretlenmemiştir, çünkü birden fazla Primary bean olması çakışmalara yol açıyor.
      */
     @Bean 
-    @Primary
     public ReactiveRedisService primaryRedisService(ReactiveRedisService reactiveRedisService) {
         return reactiveRedisService;
     }
@@ -44,5 +43,15 @@ public class RedisConfig {
             MeterRegistry meterRegistry, 
             ReactiveRedisService primaryRedisService) {
         return new RedisMetricsService(meterRegistry, primaryRedisService);
+    }
+    
+    /**
+     * RedisHealthIndicator için özel bir bean tanımı yapıyoruz
+     * ve primaryRedisService bean'ini açıkça belirtiyoruz.
+     */
+    @Bean
+    @ConditionalOnMissingBean(name = "redisHealthIndicator")
+    public RedisHealthIndicator redisHealthIndicator(ReactiveRedisService primaryRedisService) {
+        return new RedisHealthIndicator(primaryRedisService);
     }
 }
