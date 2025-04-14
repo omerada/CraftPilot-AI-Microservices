@@ -53,7 +53,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          dockerfile: ./user-service/Dockerfile
+          file: ./user-service/Dockerfile
           platforms: linux/arm64
           push: true
           tags: |
