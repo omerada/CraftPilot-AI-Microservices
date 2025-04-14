@@ -42,4 +42,18 @@ public class CircuitBreakerConfig {
                 .timeoutDuration(Duration.ofSeconds(3))
             );
     }
+    
+    @Bean
+    public CircuitBreakerConfigCustomizer redisCircuitBreakerConfig() {
+        return CircuitBreakerConfigCustomizer
+            .of("redis", builder -> builder
+                .slidingWindowSize(10)
+                .slidingWindowType(SlidingWindowType.COUNT_BASED)
+                .waitDurationInOpenState(Duration.ofSeconds(30))
+                .permittedNumberOfCallsInHalfOpenState(2)
+                .minimumNumberOfCalls(5)
+                .failureRateThreshold(50.0f)
+                .recordExceptions(Exception.class)
+            );
+    }
 }
