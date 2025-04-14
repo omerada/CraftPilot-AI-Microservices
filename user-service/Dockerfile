@@ -10,26 +10,21 @@ WORKDIR /app
 # Copy POM files for dependency resolution and caching
 COPY pom.xml /app/
 
-# Basit ve Docker uyumlu yaklaşım - dosyaları kopyalamaya çalış ama yoksa devam et
-COPY parent-pom.xml /app/ || true
+# redis-client-lib'i kopyala
 COPY redis-client-lib/ /app/redis-client-lib/ || true
 
-# If parent POM exists, copy and install it first
-RUN if [ -f "/app/parent-pom.xml" ]; then \
-        mkdir -p /app/parent && \
-        mv /app/parent-pom.xml /app/parent/pom.xml && \
-        cd /app/parent && \
-        mvn install -DskipTests; \
-    fi
-
-# Handle redis-client-lib if exists in build context
+# Önce redis-client-lib'i build et
 RUN if [ -d "/app/redis-client-lib" ] && [ -f "/app/redis-client-lib/pom.xml" ]; then \
+        echo "Building redis-client-lib..." && \
         cd /app/redis-client-lib && \
-        mvn install -DskipTests; \
+        mvn clean install -DskipTests && \
+        cd /app; \
+    else \
+        echo "redis-client-lib not found in build context"; \
     fi
 
 # Cache Maven dependencies
-RUN mvn dependency:go-offline || echo "Some dependencies may not be available, continuing with build"
+RUN mvn dependency:go-offline -DskipTests || echo "Some dependencies may not be available, continuing with build"
 
 # Copy source code
 COPY src /app/src/
