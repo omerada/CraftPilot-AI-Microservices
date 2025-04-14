@@ -47,8 +47,9 @@ public class KafkaService {
         }
         
         try {
+            // KafkaTemplate.send() doğrudan CompletableFuture döner
             CompletableFuture<SendResult<String, UserEvent>> future = 
-                kafkaTemplate.send(userEventsTopic, event.getUserId(), event).completable();
+                kafkaTemplate.send(userEventsTopic, event.getUserId(), event);
                 
             // Asenkron işlemi timeout ile sınırlayalım
             future.orTimeout(kafkaTimeout, TimeUnit.SECONDS)
