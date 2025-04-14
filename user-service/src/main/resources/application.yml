@@ -4,7 +4,10 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
     include: kafka-base
-
+  autoconfigure:
+    exclude: org.redisson.spring.starter.RedissonAutoConfiguration
+  main:
+    allow-bean-definition-overriding: true
   firebase:
     config:
       path: ${FIREBASE_CONFIG_PATH:/etc/gcp/credentials/gcp-credentials.json}
