@@ -133,6 +133,15 @@ resilience4j:
         cancelRunningFuture: true
 
 kafka:
+  producer:
+    timeout: 5
+    enabled: true
+  retry:
+    backoff:
+      initial-interval: 1000
+      max-interval: 10000
+      multiplier: 2.0
+    max-attempts: 3
   topics:
     user-preferences: user-preferences
     user-events: user-events
