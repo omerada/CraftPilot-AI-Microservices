@@ -28,7 +28,7 @@ public class LighthouseService {
     private final MeterRegistry meterRegistry;
     
     // Lighthouse komut yolunu özelleştirmek için bir değişken ekleyin
-    private String lighthousePath = "lighthouse"; // Varsayılan olarak PATH'ten alınan lighthouse
+    private String lighthousePath = "/usr/local/bin/lighthouse"; // Server'daki doğru yol - which lighthouse komutunun çıktısı
     
     public Mono<PerformanceAnalysisResponse> analyzeSite(String url) {
         return Mono.fromCallable(() -> {
@@ -40,17 +40,16 @@ public class LighthouseService {
             long startTime = System.currentTimeMillis();
             
             try {
-                // Lighthouse komut satırı aracını çağır
+                // Lighthouse komut satırı aracını çağır - shell üzerinden çalıştırma
                 ProcessBuilder processBuilder = new ProcessBuilder(
-                        lighthousePath, 
-                        url,
-                        "--output=json", 
-                        "--output-path=stdout",
-                        "--chrome-flags=--headless --no-sandbox --disable-gpu",
-                        "--only-categories=performance,accessibility,best-practices,seo"
+                        "/bin/sh", "-c", 
+                        lighthousePath + " " + url + 
+                        " --output=json --output-path=stdout" + 
+                        " --chrome-flags=\"--headless --no-sandbox --disable-gpu\"" +
+                        " --only-categories=performance,accessibility,best-practices,seo"
                 );
                 
-                log.debug("Running Lighthouse command: {}", String.join(" ", processBuilder.command()));
+                log.debug("Running Lighthouse command: {}", processBuilder.command());
                 processBuilder.redirectErrorStream(true);
                 Process process = processBuilder.start();
                 
