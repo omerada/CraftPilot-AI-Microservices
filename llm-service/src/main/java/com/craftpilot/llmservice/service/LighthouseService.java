@@ -28,21 +28,7 @@ public class LighthouseService {
     private final MeterRegistry meterRegistry;
     
     // Lighthouse komut yolunu özelleştirmek için bir değişken ekleyin
-    // Bu, sisteminize özgü tam yolu belirtmek için kullanılabilir
     private String lighthousePath = "lighthouse"; // Varsayılan olarak PATH'ten alınan lighthouse
-    
-    // Lighthouse'un sistemde kurulu olup olmadığını kontrol eden metod
-    private boolean isLighthouseInstalled() {
-        try {
-            ProcessBuilder processBuilder = new ProcessBuilder("which", lighthousePath);
-            Process process = processBuilder.start();
-            int exitCode = process.waitFor();
-            return exitCode == 0;
-        } catch (Exception e) {
-            log.warn("Lighthouse installation check failed: {}", e.getMessage());
-            return false;
-        }
-    }
     
     public Mono<PerformanceAnalysisResponse> analyzeSite(String url) {
         return Mono.fromCallable(() -> {
@@ -51,17 +37,12 @@ public class LighthouseService {
             // URL'i doğrula
             urlValidator.validate(url);
             
-            // Lighthouse'un kurulu olup olmadığını kontrol et
-            if (!isLighthouseInstalled()) {
-                log.error("Lighthouse is not installed or not found in PATH. Please install Lighthouse using npm install -g lighthouse");
-                throw new RuntimeException("Lighthouse not installed or not found in system PATH");
-            }
-            
             long startTime = System.currentTimeMillis();
             
             try {
                 // Lighthouse komut satırı aracını çağır
                 ProcessBuilder processBuilder = new ProcessBuilder(
+                        "npm", "exec", "--", 
                         lighthousePath, 
                         url,
                         "--output=json", 
@@ -70,6 +51,7 @@ public class LighthouseService {
                         "--only-categories=performance,accessibility,best-practices,seo"
                 );
                 
+                log.debug("Running Lighthouse command: {}", String.join(" ", processBuilder.command()));
                 processBuilder.redirectErrorStream(true);
                 Process process = processBuilder.start();
                 
