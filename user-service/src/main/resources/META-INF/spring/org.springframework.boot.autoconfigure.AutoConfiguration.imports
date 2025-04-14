@@ -1,2 +1,1 @@
 com.craftpilot.redis.RedisClientAutoConfiguration
-com.craftpilot.userservice.config.RedisClientFixConfiguration

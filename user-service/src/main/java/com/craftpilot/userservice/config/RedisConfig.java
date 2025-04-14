@@ -44,7 +44,7 @@ public class RedisConfig {
     }
     
     /**
-     * ReactiveRedisService için primary bean tanımı.
+     * ReactiveRedisService bean'i için primary tanımlaması.
      * Bu, ReactiveCacheService ile çakışmaları önler.
      */
     @Bean 
@@ -54,9 +54,9 @@ public class RedisConfig {
     }
     
     /**
-     * RedisMetricsService için özel bir bean tanımı yapmak yerine
-     * varolan RedisMetricsService bean'ini override ediyoruz ve doğrudan
-     * primary olan ReactiveRedisService bean'ini kullanmasını sağlıyoruz.
+     * RedisMetricsService bean'i için özelleştirilmiş yapılandırma.
+     * Bu, birden fazla ReactiveRedisService tipindeki bean çakışmasını önlemek için
+     * primary olan ReactiveRedisService bean'ini kullanmasını sağlar.
      */
     @Bean
     @ConditionalOnBean(MeterRegistry.class)
