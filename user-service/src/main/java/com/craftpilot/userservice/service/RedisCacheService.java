@@ -67,7 +67,16 @@ public class RedisCacheService {
     public Mono<Boolean> saveUserPreferences(UserPreference preference) {
         log.debug("Kullanıcı tercihleri Redis'e kaydediliyor: userId={}", preference.getUserId());
         preference.setUpdatedAt(System.currentTimeMillis());
-        return cacheService.cache(PREFERENCE_KEY_PREFIX + preference.getUserId(), preference);
+        return cacheService.cache(PREFERENCE_KEY_PREFIX + preference.getUserId(), preference)
+            .doOnSuccess(result -> {
+                if (Boolean.TRUE.equals(result)) {
+                    log.debug("Kullanıcı tercihleri başarıyla kaydedildi: userId={}", preference.getUserId());
+                } else {
+                    log.warn("Kullanıcı tercihleri kaydedilemedi: userId={}", preference.getUserId());
+                }
+            })
+            .doOnError(err -> log.error("Kullanıcı tercihleri kaydedilirken hata: userId={}, error={}", 
+                preference.getUserId(), err.getMessage()));
     }
 
     public Mono<Boolean> deleteUserPreferences(String userId) {

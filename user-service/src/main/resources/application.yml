@@ -96,23 +96,36 @@ resilience4j:
       default:
         slidingWindowSize: 10
         failureRateThreshold: 50
-        waitDurationInOpenState: 10s
+        waitDurationInOpenState: 10s # 30s yerine 10s
         permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
     instances:
       userPreferences:
         baseConfig: default
+        slidingWindowSize: 8
+        waitDurationInOpenState: 5s # Daha hızlı toparlanması için
       userRedis: # UserService için özel Redis devre kesici
         baseConfig: default
       redisCircuitBreaker: # Kütüphane için ortak Redis devre kesici
+        slidingWindowType: COUNT_BASED
         slidingWindowSize: 10
         failureRateThreshold: 50
-        waitDurationInOpenState: 10s
+        waitDurationInOpenState: 5s
         permittedNumberOfCallsInHalfOpenState: 3
+        recordExceptions:
+          - java.util.concurrent.TimeoutException
+          - java.io.IOException
   retry:
     instances:
       userPreferences:
         maxAttempts: 2
         waitDuration: 500ms
+      redis:
+        maxAttempts: 2
+        waitDuration: 250ms
+        retryExceptions:
+          - java.util.concurrent.TimeoutException
+          - java.io.IOException
   timelimiter:
     instances:
       userPreferences:
@@ -129,10 +142,12 @@ logging:
   level:
     root: INFO
     com.craftpilot: DEBUG
+    com.craftpilot.userservice: DEBUG
+    com.craftpilot.redis: INFO # DEBUG yerine INFO seviyesi
     org.springframework.data.redis: DEBUG
     org.springframework.boot.actuate: DEBUG
     org.springframework.web: INFO
-    io.lettuce: DEBUG
+    io.lettuce: INFO # DEBUG yerine INFO seviyesi
 
 craftpilot:
   redis:
@@ -140,18 +155,24 @@ craftpilot:
     port: ${REDIS_PORT:6379}
     password: ${REDIS_PASSWORD:13579ada}
     database: 0
-    connect-timeout: 2000ms
-    timeout: 1000ms
+    connect-timeout: 1000ms # 2000ms'den 1000ms'e düşürüldü
+    timeout: 800ms # 1000ms'den 800ms'e düşürüldü
     cache-ttl-hours: 24
-    pool-max-active: 32
-    pool-max-idle: 16
-    pool-min-idle: 8
-    pool-max-wait: 1000ms
+    pool-max-active: 16 # 32'den 16'ya düşürüldü - daha verimli
+    pool-max-idle: 8 # 16'dan 8'e düşürüldü
+    pool-min-idle: 4 # 8'den 4'e düşürüldü
+    pool-max-wait: 500ms # 1000ms'den 500ms'e düşürüldü
     circuit-breaker-enabled: true
     circuit-breaker-failure-rate-threshold: 50.0
-    circuit-breaker-wait-duration-in-open-state: 10s
+    circuit-breaker-wait-duration-in-open-state: 10s # 30s yerine 10s
     circuit-breaker-permitted-calls-in-half-open-state: 3
+    circuit-breaker-minimum-number-of-calls: 3
     retry-enabled: true
     max-retry-attempts: 2
-    retry-wait-duration: 500ms
+    retry-wait-duration: 250ms # 500ms'den 250ms'e düşürüldü
     health-indicator-enabled: true
+
+# Kullanıcı tercihleri operasyon timeout değeri
+user-preference:
+  operation:
+    timeout: 1000 # 1 saniye timeout

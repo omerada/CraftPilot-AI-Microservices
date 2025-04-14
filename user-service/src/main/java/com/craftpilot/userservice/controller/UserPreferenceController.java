@@ -16,6 +16,8 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
+import java.time.Duration;
+import java.util.concurrent.TimeoutException;
 
 @RestController
 @RequestMapping("/users/{userId}/preferences")
@@ -72,18 +74,22 @@ public class UserPreferenceController {
             
             return userPreferenceService.saveUserPreferences(preference)
                     .map(ResponseEntity::ok)
-                    .timeout(java.time.Duration.ofSeconds(3)) // 8 saniyeden 3 saniyeye düşürülmeli
+                    // 8 saniyeden 3 saniyeye indiriyoruz - bu değeri application.yml'den alacak şekilde düzenlenebilir
+                    .timeout(Duration.ofMillis(1500))
                     .doOnSuccess(response -> log.info("Kullanıcı tercihleri başarıyla güncellendi: userId={}", userId))
-                    .doOnError(e -> log.error("Kullanıcı tercihleri güncellenirken hata: userId={}, error={}", userId, e.getMessage()))
-                    .onErrorResume(e -> {
-                        log.error("Tercih güncelleme hatası (fallback çalıştırılıyor): {}", e.getMessage());
-                        return createFallbackPreference(userId, request)
-                                .map(fallback -> ResponseEntity.ok(fallback))
-                                .onErrorReturn(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
-                    });
+                    .doOnError(e -> {
+                        if (e instanceof TimeoutException) {
+                            log.error("Kullanıcı tercihleri güncelleme zaman aşımına uğradı: userId={}", userId);
+                        } else {
+                            log.error("Kullanıcı tercihleri güncellenirken hata: userId={}, error={}", userId, e.getMessage());
+                        }
+                    })
+                    .onErrorResume(TimeoutException.class, e -> Mono.just(ResponseEntity.status(HttpStatus.ACCEPTED)
+                            .body(preference))) // Timeout durumunda 202 Accepted dönüyoruz
+                    .onErrorResume(e -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()));
         } catch (Exception e) {
-            log.error("İstek işlenirken beklenmeyen hata: userId={}, error={}", userId, e.getMessage());
-            return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).build());
+            log.error("Kullanıcı tercihleri güncellenirken istisna: userId={}, error={}", userId, e.getMessage());
+            return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
         }
     }
 

@@ -78,17 +78,38 @@ public class RedisClientProperties {
     /**
      * Devre kesici başarısızlık eşiği yüzdesi
      */
+    @Builder.Default
     private float circuitBreakerFailureRateThreshold = 50.0f;
     
     /**
      * Devre kesici açık durumda bekleme süresi
      */
+    @Builder.Default
     private Duration circuitBreakerWaitDurationInOpenState = Duration.ofSeconds(10);
     
     /**
      * Devre kesici yarı açık durumda izin verilen çağrı sayısı
      */
+    @Builder.Default
     private int circuitBreakerPermittedCallsInHalfOpenState = 3;
+    
+    /**
+     * Devre kesici izleme penceresi türü
+     */
+    @Builder.Default
+    private String circuitBreakerSlidingWindowType = "COUNT_BASED";
+    
+    /**
+     * Devre kesici izleme penceresi boyutu
+     */
+    @Builder.Default
+    private int circuitBreakerSlidingWindowSize = 10;
+    
+    /**
+     * Devre kesici minimum çağrı sayısı
+     */
+    @Builder.Default
+    private int circuitBreakerMinimumNumberOfCalls = 3;
     
     /**
      * Retry etkin

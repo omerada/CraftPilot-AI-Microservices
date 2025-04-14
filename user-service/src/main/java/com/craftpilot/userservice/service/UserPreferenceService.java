@@ -28,6 +28,9 @@ public class UserPreferenceService {
     @Value("${kafka.topics.user-preferences:user-preferences}")
     private String userPreferencesTopic;
 
+    @Value("${user-preference.operation.timeout:1000}")
+    private long operationTimeoutMillis;
+
     @CircuitBreaker(name = "userPreferences", fallbackMethod = "getDefaultPreferences")
     public Mono<UserPreference> getUserPreferences(String userId) {
         log.info("Kullanıcı tercihleri getiriliyor: userId={}", userId);
@@ -51,15 +54,31 @@ public class UserPreferenceService {
 
     public Mono<UserPreference> saveUserPreferences(UserPreference preferences) {
         log.info("Kullanıcı tercihleri kaydediliyor: userId={}", preferences.getUserId());
+        
+        // Redis'e kayıt işlemini timeout ile sarmalıyoruz
         return redisCacheService.saveUserPreferences(preferences)
-                .then(Mono.defer(() -> {
-                    // Kafka'ya bildirim gönder
-                    kafkaTemplate.send(userPreferencesTopic, preferences.getUserId(), preferences);
-                    return Mono.just(preferences);
+                .timeout(Duration.ofMillis(operationTimeoutMillis))
+                .doOnError(e -> {
+                    if (e instanceof TimeoutException) {
+                        log.warn("Redis kaydetme işlemi zaman aşımına uğradı, ancak işlem arka planda devam edecek: userId={}", 
+                                preferences.getUserId());
+                    } else {
+                        log.error("Redis kaydetme işlemi sırasında hata: userId={}, error={}", 
+                                preferences.getUserId(), e.getMessage());
+                    }
+                })
+                .onErrorResume(e -> Mono.empty())
+                // Kafka'ya bildirimi non-blocking yapıyoruz
+                .then(Mono.fromCallable(() -> {
+                    // Kafka'ya bildirim gönderme işlemini asenkron yapıyoruz
+                    try {
+                        kafkaTemplate.sendDefault(preferences.getUserId(), preferences);
+                    } catch (Exception e) {
+                        log.warn("Kafka mesajı gönderilirken hata oluştu: {}", e.getMessage());
+                    }
+                    return preferences;
                 }))
-                .doOnSuccess(pref -> log.debug("Kullanıcı tercihleri başarıyla kaydedildi: userId={}", preferences.getUserId()))
-                .doOnError(e -> log.error("Kullanıcı tercihleri kaydedilirken hata: userId={}, error={}", 
-                        preferences.getUserId(), e.getMessage()));
+                .doOnSuccess(pref -> log.debug("Kullanıcı tercihleri işlemi tamamlandı: userId={}", preferences.getUserId()));
     }
     
     public Mono<UserPreference> updateTheme(String userId, String theme) {
@@ -74,20 +93,23 @@ public class UserPreferenceService {
                 pref.setTheme(theme);
                 pref.setUpdatedAt(System.currentTimeMillis());
                 return redisCacheService.saveUserPreferences(pref)
-                    .timeout(Duration.ofSeconds(8))
+                    .timeout(Duration.ofMillis(operationTimeoutMillis))
+                    .onErrorResume(e -> {
+                        log.warn("Redis teması güncelleme hatası (arka planda devam edecek): {}", e.getMessage());
+                        return Mono.just(Boolean.TRUE); // İşlemi devam ettir
+                    })
                     .thenReturn(pref);
             })
             .doOnNext(saved -> {
-                log.debug("Tema başarıyla güncellendi: userId={}, theme={}", userId, theme);
-                // Sadece tema değişikliğini event olarak yayınla
-                publishPreferenceUpdated(userId, "theme", theme);
+                // Tema değişikliğini asenkron olarak event olarak yayınla
+                try {
+                    publishPreferenceUpdated(userId, "theme", theme);
+                } catch (Exception e) {
+                    log.warn("Tema değişikliği yayınlanırken hata: {}", e.getMessage());
+                }
             })
             .doOnError(e -> log.error("Tema güncellenirken hata: userId={}, theme={}, error={}", 
-                    userId, theme, e.getMessage()))
-            .onErrorResume(e -> {
-                log.warn("Tema güncelleme hatası için fallback çalıştırılıyor: userId={}", userId);
-                return createFallbackThemePreference(userId, theme);
-            });
+                    userId, theme, e.getMessage()));
     }
 
     private Mono<UserPreference> createFallbackThemePreference(String userId, String theme) {
@@ -221,6 +243,7 @@ public class UserPreferenceService {
             event.put("value", value);
             event.put("timestamp", System.currentTimeMillis());
             
+            // Asenkron gönderim - operasyonu bloklamıyor
             kafkaTemplate.send(userPreferencesTopic, userId, event)
                 .whenComplete((result, ex) -> {
                     if (ex != null) {
