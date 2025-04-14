@@ -1,6 +1,6 @@
 package com.craftpilot.userservice.config;
 
-import com.craftpilot.redis.RedisClientAutoConfiguration;
+import com.craftpilot.redis.config.RedisClientAutoConfiguration;
 import com.craftpilot.redis.metrics.RedisMetricsService;
 import com.craftpilot.redis.service.ReactiveRedisService;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -10,9 +10,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
-import java.time.Duration;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
-import io.github.resilience4j.circuitbreaker.configure.CircuitBreakerConfigCustomizer;
 
 /**
  * Redis özelleştirmeleri için konfigürasyon sınıfı.
@@ -24,23 +21,6 @@ import io.github.resilience4j.circuitbreaker.configure.CircuitBreakerConfigCusto
 @Configuration
 @Import(RedisClientAutoConfiguration.class)
 public class RedisConfig {
-
-    /**
-     * Redis için devre kesici (circuit breaker) özelleştirmesi
-     */
-    @Bean
-    public CircuitBreakerConfigCustomizer redisCircuitBreakerCustomizer() {
-        return CircuitBreakerConfigCustomizer
-            .of("redisCircuitBreaker", builder -> builder
-                .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
-                .slidingWindowSize(10)
-                .failureRateThreshold(50.0f)
-                .waitDurationInOpenState(Duration.ofSeconds(10)) // 30 saniyeden 10'a düşürüldü
-                .permittedNumberOfCallsInHalfOpenState(3)
-                .minimumNumberOfCalls(3) // 5'ten 3'e düşürüldü daha hızlı tepki vermesi için
-                .recordExceptions(Exception.class)
-            );
-    }
     
     /**
      * ReactiveRedisService için primary bean tanımı.
