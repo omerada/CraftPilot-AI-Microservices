@@ -10,20 +10,8 @@ WORKDIR /app
 # Copy POM files for dependency resolution and caching
 COPY pom.xml /app/
 
-# redis-client-lib'i kopyala
-COPY redis-client-lib/ /app/redis-client-lib/ || true
-
-# Önce redis-client-lib'i build et
-RUN if [ -d "/app/redis-client-lib" ] && [ -f "/app/redis-client-lib/pom.xml" ]; then \
-        echo "Building redis-client-lib..." && \
-        cd /app/redis-client-lib && \
-        mvn clean install -DskipTests && \
-        cd /app; \
-    else \
-        echo "redis-client-lib not found in build context"; \
-    fi
-
-# Cache Maven dependencies
+# redis-client-lib kopyalama işleminden vazgeç ve doğrudan Maven repositorydeki bağımlılığa güven
+# Önbellekleme için bağımlılıkları indir
 RUN mvn dependency:go-offline -DskipTests || echo "Some dependencies may not be available, continuing with build"
 
 # Copy source code

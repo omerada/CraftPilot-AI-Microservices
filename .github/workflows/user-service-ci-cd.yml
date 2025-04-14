@@ -37,7 +37,7 @@ jobs:
           distribution: "temurin"
           cache: maven
 
-      # Önce redis-client-lib'i build et - system maven kullanarak
+      # Önce redis-client-lib'i build et ve Maven local repo'ya yükle
       - name: Build redis-client-lib
         run: |
           if [ -d "redis-client-lib" ]; then
@@ -46,19 +46,21 @@ jobs:
             # Sistem Maven'ını kullan (wrapper olmadan)
             mvn clean install -DskipTests
             cd ..
+            # Maven local repo'nun yerini göster (debug için)
+            echo "Maven local repository location:"
+            mvn help:evaluate -Dexpression=settings.localRepository -q -DforceStdout
           else
             echo "redis-client-lib directory not found, skipping"
           fi
 
-      # Sonra build context'i hazırla
+      # Build context'i sadece user-service için hazırla
       - name: Prepare build context
         run: |
-          mkdir -p build-context/user-service
-          cp -r user-service/* build-context/user-service/
-          if [ -d "redis-client-lib" ]; then
-            mkdir -p build-context/redis-client-lib
-            cp -r redis-client-lib/* build-context/redis-client-lib/
-          fi
+          mkdir -p build-context
+          cp -r user-service/* build-context/
+          # pom.xml dosyasını kontrol et ve görüntüle (debug için)
+          echo "Content of pom.xml in build context:"
+          cat build-context/pom.xml | grep -A 5 "redis-client-lib"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -80,7 +82,7 @@ jobs:
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: ./build-context/user-service # Doğru bağlam
+          context: ./build-context # Sadece user-service içeriği
           platforms: linux/arm64
           push: true
           tags: |
