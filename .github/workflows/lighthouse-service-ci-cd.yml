@@ -114,7 +114,7 @@ jobs:
                 --ulimit nofile=65536:65536 \
                 --cap-drop ALL \
                 --security-opt no-new-privileges \
-                --health-cmd="curl -f http://localhost:8085/actuator/health/liveness || exit 1" \
+                --health-cmd="curl -f http://localhost:8085/health || exit 1" \
                 --health-interval=30s \
                 --health-timeout=10s \
                 --health-retries=3 \
@@ -148,7 +148,7 @@ jobs:
                 --ulimit nofile=65536:65536 \
                 --cap-drop ALL \
                 --security-opt no-new-privileges \
-                --health-cmd="curl -f http://localhost:8085/actuator/health/liveness || exit 1" \
+                --health-cmd="curl -f http://localhost:8085/health || exit 1" \
                 --health-interval=30s \
                 --health-timeout=10s \
                 --health-retries=3 \
@@ -179,7 +179,7 @@ jobs:
                   echo "Successfully registered with Eureka"
                   
                   # Final health check
-                  HEALTH_CHECK=$(curl -s http://localhost:8085/actuator/health)
+                  HEALTH_CHECK=$(curl -s http://localhost:8085/health)
                   if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
                     echo "✓ Service is healthy"
                     echo "=== Deployment completed successfully ==="
@@ -199,5 +199,5 @@ jobs:
             echo "Container Logs:"
             docker logs lighthouse-service --tail 100
             echo "Health Check Response:"
-            curl -v http://localhost:8085/actuator/health || true
+            curl -v http://localhost:8085/health || true
             exit 1

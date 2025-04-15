@@ -96,6 +96,8 @@ GET /health
 }
 ```
 
+Servisin sağlıklı çalışıp çalışmadığını kontrol etmek için kullanılan endpoint. "status" değeri "UP" ise servis çalışıyor demektir.
+
 ### Spring Boot Actuator Health
 
 ```
