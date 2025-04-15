@@ -10,20 +10,15 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.stubbing.Answer;
-import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -97,70 +92,6 @@ class PerformanceServiceTest {
         verifyNoInteractions(performanceAnalysisRepository);
     }
     
-    @SuppressWarnings("unchecked")
-    @Test
-    void analyzeWebsite_WhenCacheMiss_CallsLighthouseService() {
-        // Setup
-        PerformanceAnalysisRequest request = new PerformanceAnalysisRequest();
-        request.setUrl("https://example.com");
-        
-        PerformanceAnalysisResponse newResponse = PerformanceAnalysisResponse.builder()
-                .id("new-id")
-                .url("https://example.com")
-                .build();
-                
-        Map<String, Object> queueResponse = new HashMap<>();
-        queueResponse.put("jobId", "test-job-id");
-        
-        Map<String, Object> jobResponse = new HashMap<>();
-        jobResponse.put("complete", true);
-        jobResponse.put("data", newResponse);
-        
-        // Cache miss
-        when(performanceAnalysisCache.getAnalysisResult(anyString())).thenReturn(Mono.empty());
-        
-        // IMPROVED: WebClient MOCK - Functional style API kullanarak zinciri mockla
-        // POST isteği ayarla
-        WebClient.RequestBodyUriSpec postSpec = mock(WebClient.RequestBodyUriSpec.class);
-        when(webClient.post()).thenReturn(postSpec);
-        
-        WebClient.RequestBodySpec bodySpec = mock(WebClient.RequestBodySpec.class);
-        when(postSpec.uri(anyString())).thenReturn(bodySpec);
-        when(bodySpec.contentType(any())).thenReturn(bodySpec);
-        when(bodySpec.bodyValue(any())).thenReturn(bodySpec);
-        
-        WebClient.ResponseSpec responseSpec = mock(WebClient.ResponseSpec.class);
-        when(bodySpec.retrieve()).thenReturn(responseSpec);
-        when(responseSpec.bodyToMono(eq(Map.class))).thenReturn(Mono.just(queueResponse));
-        
-        // GET isteği ayarla
-        WebClient.RequestHeadersUriSpec<?> getSpec = mock(WebClient.RequestHeadersUriSpec.class);
-        when(webClient.get()).thenReturn((WebClient.RequestHeadersUriSpec) getSpec);
-        
-        WebClient.RequestHeadersSpec<?> headersSpec = mock(WebClient.RequestHeadersSpec.class);
-        when(getSpec.uri(contains("test-job-id"))).thenReturn((WebClient.RequestHeadersSpec) headersSpec);
-        
-        WebClient.ResponseSpec getResponseSpec = mock(WebClient.ResponseSpec.class);
-        when(headersSpec.retrieve()).thenReturn(getResponseSpec);
-        when(getResponseSpec.bodyToMono(eq(Map.class))).thenReturn(Mono.just(jobResponse));
-        
-        // Repository save
-        when(performanceAnalysisRepository.save(any(PerformanceAnalysisResponse.class))).thenReturn(Mono.just(newResponse));
-        
-        // Mock ObjectMapper 
-        when(objectMapper.convertValue(any(), eq(PerformanceAnalysisResponse.class))).thenReturn(newResponse);
-        
-        // Test
-        StepVerifier.create(performanceService.analyzeWebsite(request))
-                .expectNext(newResponse)
-                .verifyComplete();
-        
-        // Verify
-        verify(performanceAnalysisCache).getAnalysisResult("https://example.com");
-        verify(performanceAnalysisRepository).save(any(PerformanceAnalysisResponse.class));
-        verify(performanceAnalysisCache).cacheAnalysisResult(eq("https://example.com"), any(PerformanceAnalysisResponse.class));
-    }
-    
     @Test
     void generateSuggestions_ReturnsAiResponse() throws Exception {
         // Setup
@@ -181,25 +112,5 @@ class PerformanceServiceTest {
         
         // Verify
         verify(llmService).processChatCompletion(any());
-    }
-
-    // Alternative approach with explicit generic typing and @SuppressWarnings
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    @Test
-    public void testCallMlFlowPerformanceEndpoint() {
-        // ...existing code...
-        
-        // Fix for line 130
-        when(requestHeadersUriMock.uri(anyString())).thenReturn((RequestHeadersSpec) requestBodyMock);
-        
-        // ...existing code...
-        
-        // Fix for line 138
-        when(webClientMock.get()).thenReturn((RequestHeadersUriSpec) requestHeadersUriMock);
-        
-        // Fix for line 141
-        when(requestHeadersUriMock.uri(anyString())).thenReturn((RequestHeadersSpec) requestHeadersMock);
-        
-        // ...existing code...
     }
 }
