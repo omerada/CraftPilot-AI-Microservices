@@ -66,12 +66,60 @@ public class LighthouseQueueService {
             })
             .switchIfEmpty(Mono.defer(() -> 
                 redisTemplate.opsForValue().get(resultsPrefix + "status:" + jobId)
-                    .map(obj -> (JobStatusResponse) obj)
+                    .flatMap(obj -> {
+                        // Deserialize etmek için doğru tip kontrolü yap
+                        if (obj instanceof JobStatusResponse) {
+                            return Mono.just((JobStatusResponse) obj);
+                        } else if (obj instanceof Map) {
+                            // Map'ten JobStatusResponse'a dönüştür
+                            return Mono.just(convertMapToJobStatusResponse((Map<String, Object>) obj, jobId));
+                        } else {
+                            log.warn("Unexpected object type returned from Redis: {}", obj.getClass());
+                            return Mono.just(JobStatusResponse.builder()
+                                .jobId(jobId)
+                                .complete(false)
+                                .status("UNKNOWN")
+                                .error("Invalid response format")
+                                .build());
+                        }
+                    })
                     .switchIfEmpty(Mono.just(JobStatusResponse.builder()
                         .jobId(jobId)
                         .complete(false)
                         .status("UNKNOWN")
                         .build()))
             ));
+    }
+    
+    /**
+     * Map formatındaki nesneyi JobStatusResponse nesnesine dönüştürür
+     */
+    @SuppressWarnings("unchecked")
+    private JobStatusResponse convertMapToJobStatusResponse(Map<String, Object> map, String jobId) {
+        log.debug("Converting Map to JobStatusResponse: {}", map);
+        
+        JobStatusResponse.JobStatusResponseBuilder builder = JobStatusResponse.builder();
+        
+        // JobId bilgisini ekle
+        builder.jobId(jobId);
+        
+        // Map'ten değerleri çıkar ve builder'a ekle
+        if (map.containsKey("complete")) {
+            builder.complete((Boolean) map.get("complete"));
+        }
+        
+        if (map.containsKey("status")) {
+            builder.status((String) map.get("status"));
+        }
+        
+        if (map.containsKey("error")) {
+            builder.error((String) map.get("error"));
+        }
+        
+        if (map.containsKey("data") && map.get("data") instanceof Map) {
+            builder.data((Map<String, Object>) map.get("data"));
+        }
+        
+        return builder.build();
     }
 }
