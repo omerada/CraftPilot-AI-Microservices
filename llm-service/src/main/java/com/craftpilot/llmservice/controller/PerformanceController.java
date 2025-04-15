@@ -98,6 +98,43 @@ public class PerformanceController {
      * Belirli bir analiz işinin durumunu veya sonucunu getirir
      * @param jobId İş kimliği
      * @return İş durumu veya analiz sonuçları
+     * 
+     * Yanıt formatı:
+     * 1. İşlem tamamlandıysa:
+     * {
+     *   "complete": true,
+     *   "data": {
+     *     "performance": 0.85,
+     *     "audits": {
+     *       "first-contentful-paint": { "score": 0.9, "displayValue": "1.2s", ... },
+     *       "largest-contentful-paint": { "score": 0.8, "displayValue": "2.5s", ... },
+     *       ...
+     *     },
+     *     "url": "https://example.com",
+     *     "categories": {
+     *       "performance": { "score": 0.85 },
+     *       "accessibility": { "score": 0.92 },
+     *       ...
+     *     },
+     *     ...
+     *   }
+     * }
+     * 
+     * 2. İşlem hala devam ediyorsa:
+     * {
+     *   "complete": false,
+     *   "status": "PENDING",
+     *   "jobId": "job-abc123",
+     *   "message": "Analiz devam ediyor, lütfen daha sonra tekrar deneyin",
+     *   "url": "https://example.com"
+     * }
+     * 
+     * 3. Bir hata oluşmuşsa:
+     * {
+     *   "error": "Failed to retrieve report: 404",
+     *   "message": "Job not found",
+     *   "jobId": "job-abc123"
+     * }
      */
     @GetMapping("/report/{jobId}")
     public Mono<Map<String, Object>> getAnalysisReport(@PathVariable String jobId) {
