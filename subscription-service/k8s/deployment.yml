@@ -22,7 +22,7 @@ spec:
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/path: "/actuator/prometheus"
-        prometheus.io/port: "8052"
+        prometheus.io/port: "8092"
     spec:
       affinity:
         podAntiAffinity:
@@ -41,7 +41,7 @@ spec:
           image: craftpilot/subscription-service:latest-arm64
           imagePullPolicy: Always
           ports:
-            - containerPort: 8052
+            - containerPort: 8092
               name: http
           env:
             - name: SPRING_PROFILES_ACTIVE
@@ -66,7 +66,7 @@ spec:
             - name: SPRING_CLOUD_CONFIG_URI
               value: "http://config-server:8888"
             - name: SERVER_PORT
-              value: "8052"
+              value: "8092"
             - name: SPRING_CLOUD_KUBERNETES_ENABLED
               value: "true"
             - name: GOOGLE_APPLICATION_CREDENTIALS
@@ -103,14 +103,14 @@ spec:
           startupProbe:
             httpGet:
               path: /actuator/health
-              port: 8052
+              port: 8092
             initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 30
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
-              port: 8052
+              port: 8092
             initialDelaySeconds: 60
             periodSeconds: 15
             timeoutSeconds: 3
@@ -118,7 +118,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
-              port: 8052
+              port: 8092
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 3

@@ -1,5 +1,5 @@
 server:
-  port: 8052
+  port: 8092
   shutdown: graceful
 
 spring:
@@ -7,7 +7,7 @@ spring:
     name: subscription-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:local}
-    include: kafka-base 
+    include: kafka-base
   redis:
     host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}
@@ -77,7 +77,7 @@ management:
     readinessState:
       enabled: true
   server:
-    port: 8052
+    port: 8092
 
 springdoc:
   api-docs:

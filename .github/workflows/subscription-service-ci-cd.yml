@@ -128,7 +128,7 @@ jobs:
               --name subscription-service \
               --network craftpilot-network \
               --restart unless-stopped \
-              -p 8052:8052 \
+              -p 8092:8092 \
               -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
@@ -146,56 +146,20 @@ jobs:
               ${{ secrets.DOCKERHUB_USERNAME }}/subscription-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 120  # Artırdık: servisin tam başlaması için daha fazla süre veriyoruz
+            sleep 60
 
             echo "=== Container Logs ==="
             docker logs subscription-service
 
             echo "=== Health Check ==="
-            # Önce container'ın çalıştığını kontrol et
-            if ! docker ps | grep subscription-service; then
-              echo "Container is not running!"
-              docker logs subscription-service
-              exit 1
-            fi
-
-            # TCP port kontrolü - doğru porta (8052) yönelik kontrol yapılıyor
-            echo "Checking if port 8092 is open..."
-            if nc -z localhost 8092; thenin alternatif yaklaşım kullanıyoruz
-              echo "Port 8092 is open"v/tcp/localhost/8052"; then
-            elseho "Port 8052 is open"
-              echo "Port 8092 is not open, service might not be ready"
-            fiecho "Port 8052 is not open, service might not be ready"
-            fi
-            # Health check - hem container içinden hem de dışından dene
-            echo "Attempting health checks..."nden hem de dışından dene
-            for i in {1..10}; dolth checks..."
-              echo "Attempt $i: External health check..."
-              if curl -v --max-time 5 -f http://localhost:8092/actuator/health; then
-                echo "Service is healthy (external check)"8052/actuator/health; then
-                exit 0Service is healthy (external check)"
-              fiexit 0
-              fi
-              echo "Attempt $i: Internal health check..."
-              if docker exec subscription-service wget -q -O- http://localhost:8092/actuator/health || \
-                 docker exec subscription-service curl -f http://localhost:8092/actuator/health; then| \
-                echo "Service is healthy (internal check)"http://localhost:8052/actuator/health; then
-                exit 0Service is healthy (internal check)"
-              fiexit 0
-              fi
-              echo "Attempt $i: Raw connection check..."
-              if docker exec subscription-service nc -z localhost 8092; then
-                echo "Service port is accessible inside container" 1 bash -c '</dev/tcp/localhost/8052'"; then
-              fiecho "Service port is accessible inside container"
+            for i in {1..10}; do
+              if curl -f http://localhost:8092/actuator/health; then
+                echo "Service is healthy"
+                exit 0
               fi
               echo "Attempt $i: Service not healthy yet, waiting..."
-              docker logs --tail 20 subscription-service waiting..."
-              sleep 30ogs --tail 20 subscription-service
-            doneeep 30
+              sleep 30
             done
-            echo "Service failed health check after all attempts"
-            docker logs subscription-servicek after all attempts"
-            echo "Printing environment variables and configurations..."
-            docker exec subscription-service env | grep -E 'SPRING|EUREKA'
-            exit 1 exec subscription-service env | grep -E 'SPRING|EUREKA'
+            echo "Service failed health check"
+            docker logs subscription-service
             exit 1

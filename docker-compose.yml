@@ -145,8 +145,6 @@ services:
     volumes:
       - ./firebase-service-account.json:/app/firebase-service-account.json
 
-
-
   # LLM Service
   llm-service:
     build:
@@ -221,7 +219,7 @@ services:
     container_name: subscription-service
     image: ${DOCKERHUB_USERNAME}/subscription-service:latest-arm64
     ports:
-      - "8052:8052"
+      - "8092:8092"
     environment:
       <<: *common-variables
       EUREKA_INSTANCE_HOSTNAME: subscription-service
@@ -237,7 +235,7 @@ services:
         condition: service_healthy
     <<: *common-deploy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8052/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8092/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3

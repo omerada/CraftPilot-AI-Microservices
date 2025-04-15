@@ -29,7 +29,7 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport \
     -XX:+UseStringDeduplication \
     -XX:+ExitOnOutOfMemoryError \
     -Djava.security.egd=file:/dev/./urandom \
-    -Dserver.port=8052 \
+    -Dserver.port=8092 \
     -Dspring.profiles.active=prod \
     -Deureka.instance.preferIpAddress=true \
     -Dspring.cloud.service-registry.auto-registration.enabled=true \
@@ -37,7 +37,7 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport \
 
 # Healthcheck yapılandırması
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8052/actuator/health || exit 1
+    CMD curl -f http://localhost:8092/actuator/health || exit 1
 
-EXPOSE 8052
+EXPOSE 8092
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
