@@ -146,20 +146,55 @@ jobs:
               ${{ secrets.DOCKERHUB_USERNAME }}/subscription-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 60
+            sleep 120  # Artırdık: servisin tam başlaması için daha fazla süre veriyoruz
 
             echo "=== Container Logs ==="
             docker logs subscription-service
 
             echo "=== Health Check ==="
+            # Önce container'ın çalıştığını kontrol et
+            if ! docker ps | grep subscription-service; then
+              echo "Container is not running!"
+              docker logs subscription-service
+              exit 1
+            fi
+
+            # TCP port kontrolü
+            echo "Checking if port 8092 is open..."
+            if nc -z localhost 8092; then
+              echo "Port 8092 is open"
+            else
+              echo "Port 8092 is not open, service might not be ready"
+            fi
+
+            # Health check - hem container içinden hem de dışından dene
+            echo "Attempting health checks..."
             for i in {1..10}; do
-              if curl -f http://localhost:8092/actuator/health; then
-                echo "Service is healthy"
+              echo "Attempt $i: External health check..."
+              if curl -v --max-time 5 -f http://localhost:8092/actuator/health; then
+                echo "Service is healthy (external check)"
                 exit 0
               fi
+              
+              echo "Attempt $i: Internal health check..."
+              if docker exec subscription-service wget -q -O- http://localhost:8092/actuator/health || \
+                 docker exec subscription-service curl -f http://localhost:8092/actuator/health; then
+                echo "Service is healthy (internal check)"
+                exit 0
+              fi
+              
+              echo "Attempt $i: Raw connection check..."
+              if docker exec subscription-service nc -z localhost 8092; then
+                echo "Service port is accessible inside container"
+              fi
+              
               echo "Attempt $i: Service not healthy yet, waiting..."
+              docker logs --tail 20 subscription-service
               sleep 30
             done
-            echo "Service failed health check"
+
+            echo "Service failed health check after all attempts"
             docker logs subscription-service
+            echo "Printing environment variables and configurations..."
+            docker exec subscription-service env | grep -E 'SPRING|EUREKA'
             exit 1
