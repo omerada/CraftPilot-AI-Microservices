@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class StreamSuggestionsResponse {
+    private String requestId;
     private String content;
     private boolean done;
     private boolean error;

@@ -153,7 +153,7 @@ jobs:
 
             echo "=== Health Check ==="
             for i in {1..10}; do
-              if curl -f http://localhost:8052/actuator/health; then
+              if curl -f http://localhost:8092/actuator/health; then
                 echo "Service is healthy"
                 exit 0
               fi

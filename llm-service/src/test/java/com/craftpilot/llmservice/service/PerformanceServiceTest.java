@@ -10,16 +10,20 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.stubbing.Answer;
+import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -44,15 +48,6 @@ class PerformanceServiceTest {
     @Mock
     private WebClient webClient;
     
-    @Mock
-    private WebClient.RequestBodyUriSpec requestBodyUriSpec;
-    
-    @Mock
-    private WebClient.RequestBodySpec requestBodySpec;
-    
-    @Mock
-    private WebClient.ResponseSpec responseSpec;
-    
     private MeterRegistry meterRegistry;
     
     @Mock
@@ -71,8 +66,11 @@ class PerformanceServiceTest {
                 objectMapper
         );
         
-        // WebClient MockUp
+        // WebClient'ı test sınıfına enjekte et
         ReflectionTestUtils.setField(performanceService, "webClient", webClient);
+        
+        // Lighthouse servis URL'ini test için geçersiz kıl
+        ReflectionTestUtils.setField(performanceService, "lighthouseServiceUrl", "http://test-url");
     }
     
     @Test
@@ -99,6 +97,7 @@ class PerformanceServiceTest {
         verifyNoInteractions(performanceAnalysisRepository);
     }
     
+    @SuppressWarnings("unchecked")
     @Test
     void analyzeWebsite_WhenCacheMiss_CallsLighthouseService() {
         // Setup
@@ -120,25 +119,36 @@ class PerformanceServiceTest {
         // Cache miss
         when(performanceAnalysisCache.getAnalysisResult(anyString())).thenReturn(Mono.empty());
         
-        // WebClient mocking chain
-        when(webClient.post()).thenReturn(requestBodyUriSpec);
-        when(requestBodyUriSpec.uri(anyString())).thenReturn(requestBodySpec);
-        when(requestBodySpec.contentType(any())).thenReturn(requestBodySpec);
-        when(requestBodySpec.bodyValue(any())).thenReturn(requestBodySpec);
-        when(requestBodySpec.retrieve()).thenReturn(responseSpec);
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(queueResponse), Mono.just(jobResponse));
+        // IMPROVED: WebClient MOCK - Functional style API kullanarak zinciri mockla
+        // POST isteği ayarla
+        WebClient.RequestBodyUriSpec postSpec = mock(WebClient.RequestBodyUriSpec.class);
+        when(webClient.post()).thenReturn(postSpec);
         
-        // WebClient mocking for GET (polling)
-        when(webClient.get()).thenReturn(requestBodyUriSpec);
+        WebClient.RequestBodySpec bodySpec = mock(WebClient.RequestBodySpec.class);
+        when(postSpec.uri(anyString())).thenReturn(bodySpec);
+        when(bodySpec.contentType(any())).thenReturn(bodySpec);
+        when(bodySpec.bodyValue(any())).thenReturn(bodySpec);
+        
+        WebClient.ResponseSpec responseSpec = mock(WebClient.ResponseSpec.class);
+        when(bodySpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.bodyToMono(eq(Map.class))).thenReturn(Mono.just(queueResponse));
+        
+        // GET isteği ayarla
+        WebClient.RequestHeadersUriSpec<?> getSpec = mock(WebClient.RequestHeadersUriSpec.class);
+        when(webClient.get()).thenReturn(getSpec);
+        
+        WebClient.RequestHeadersSpec<?> headersSpec = mock(WebClient.RequestHeadersSpec.class);
+        when(getSpec.uri(contains("test-job-id"))).thenReturn(headersSpec);
+        
+        WebClient.ResponseSpec getResponseSpec = mock(WebClient.ResponseSpec.class);
+        when(headersSpec.retrieve()).thenReturn(getResponseSpec);
+        when(getResponseSpec.bodyToMono(eq(Map.class))).thenReturn(Mono.just(jobResponse));
         
         // Repository save
         when(performanceAnalysisRepository.save(any(PerformanceAnalysisResponse.class))).thenReturn(Mono.just(newResponse));
         
-        // Mock ObjectMapper to return the actual instance for `convertValue` call
+        // Mock ObjectMapper 
         when(objectMapper.convertValue(any(), eq(PerformanceAnalysisResponse.class))).thenReturn(newResponse);
-        
-        // Override retry behavior for test
-        ReflectionTestUtils.setField(performanceService, "lighthouseServiceUrl", "http://test-url");
         
         // Test
         StepVerifier.create(performanceService.analyzeWebsite(request))

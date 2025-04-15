@@ -17,12 +17,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.craftpilot.llmservice.model.performance.PerformanceHistoryResponse.PerformanceHistoryEntry;
 
 @Service
 @RequiredArgsConstructor
@@ -78,13 +80,12 @@ public class PerformanceService {
         final Duration INITIAL_BACKOFF = Duration.ofSeconds(2);
         
         return Mono.defer(() -> pollForResults(jobId))
-            .retryWhen(retrySpec -> retrySpec
+            .retryWhen(Retry.backoff(MAX_RETRIES, INITIAL_BACKOFF)
                 .filter(e -> e instanceof RuntimeException && 
                         e.getMessage() != null && 
                         e.getMessage().contains("Job not completed yet"))
-                .exponentialBackoff(INITIAL_BACKOFF, Duration.ofSeconds(20))
-                .take(MAX_RETRIES)
-                .doOnRetry(retrySignal -> 
+                .maxBackoff(Duration.ofSeconds(20))
+                .doAfterRetry(retrySignal -> 
                     log.info("Retrying poll for job {}, attempt {}", 
                         jobId, retrySignal.totalRetries() + 1))
             );
@@ -188,4 +189,55 @@ public class PerformanceService {
                 "Verilen URL'yi analiz et ve spesifik iyileştirmeler öner. " +
                 "Her sorun için şunları belirt: problem açıklaması, önem derecesi (kritik/önemli/düşük), çözüm, " +
                 "kod örneği, faydalı kaynaklar ve uygulama zorluğu (kolay/orta/zor). " +
-                "Yanıtını geçerli bir JSON diz
+                "Yanıtını geçerli bir JSON dizisi olarak formatla.";
+                
+        aiRequest.setSystemPrompt(systemPrompt);
+        
+        // URL'le prompt oluştur
+        String prompt = "Bu URL için performans ve kullanıcı deneyimi sorunlarını analiz et: " + request.getUrl() + 
+                "\n\nHer bir sorun için şu bilgileri içeren bir JSON dizisi oluştur:\n" +
+                "1. problem: Sorunun açıklaması\n" +
+                "2. severity: Önem derecesi (critical, major, minor)\n" +
+                "3. solution: Çözüm önerisi\n" +
+                "4. codeExample: Kod örneği\n" +
+                "5. resources: Faydalı kaynakların URL'lerini içeren bir dizi\n" +
+                "6. implementationDifficulty: Uygulama zorluğu (easy, medium, hard)";
+        
+        aiRequest.setPrompt(prompt);
+        
+        return llmService.streamChatCompletion(aiRequest)
+                .map(chunk -> {
+                    StreamSuggestionsResponse response = new StreamSuggestionsResponse();
+                    response.setRequestId(requestId);
+                    response.setContent(chunk.getContent());
+                    response.setDone(chunk.isDone());
+                    response.setError(chunk.isError());
+                    response.setPing(chunk.isPing());
+                    return response;
+                })
+                .doOnError(error -> log.error("Stream suggestions error: {}", error.getMessage(), error));
+    }
+    
+    /**
+     * URL için performans analiz geçmişini getirir
+     */
+    public Mono<PerformanceHistoryResponse> getPerformanceHistory(PerformanceHistoryRequest request) {
+        log.info("Getting performance history for URL: {}", request.getUrl());
+        
+        return performanceAnalysisRepository.findByUrl(request.getUrl())
+                .map(analysis -> {
+                    return PerformanceHistoryEntry.builder()
+                        .id(analysis.getId())
+                        .url(analysis.getUrl())
+                        .timestamp(analysis.getTimestamp())
+                        .performance(analysis.getPerformance())
+                        .build();
+                })
+                .collectList()
+                .map(entries -> {
+                    return PerformanceHistoryResponse.builder()
+                        .history(entries)
+                        .build();
+                });
+    }
+}
