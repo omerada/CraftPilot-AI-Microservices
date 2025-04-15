@@ -6,7 +6,7 @@ metadata:
 data:
   application.yml: |
     server:
-      port: 8092
+      port: 8052
 
     spring:
       application:
