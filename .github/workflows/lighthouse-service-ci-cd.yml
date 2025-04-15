@@ -36,9 +36,13 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
-      - name: Grant execute permission for mvnw
+      - name: Generate Maven Wrapper if not exists
         run: |
           cd lighthouse-service
+          if [ ! -f "mvnw" ]; then
+            echo "Maven Wrapper not found, generating it..."
+            mvn -N wrapper:wrapper -Dmaven=3.9.5
+          fi
           chmod +x mvnw
 
       - name: Build

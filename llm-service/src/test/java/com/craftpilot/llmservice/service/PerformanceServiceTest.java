@@ -135,10 +135,10 @@ class PerformanceServiceTest {
         
         // GET isteği ayarla
         WebClient.RequestHeadersUriSpec<?> getSpec = mock(WebClient.RequestHeadersUriSpec.class);
-        when(webClient.get()).thenReturn(getSpec);
+        when(webClient.get()).thenReturn((WebClient.RequestHeadersUriSpec) getSpec);
         
         WebClient.RequestHeadersSpec<?> headersSpec = mock(WebClient.RequestHeadersSpec.class);
-        when(getSpec.uri(contains("test-job-id"))).thenReturn(headersSpec);
+        when(getSpec.uri(contains("test-job-id"))).thenReturn((WebClient.RequestHeadersSpec) headersSpec);
         
         WebClient.ResponseSpec getResponseSpec = mock(WebClient.ResponseSpec.class);
         when(headersSpec.retrieve()).thenReturn(getResponseSpec);
@@ -181,5 +181,25 @@ class PerformanceServiceTest {
         
         // Verify
         verify(llmService).processChatCompletion(any());
+    }
+
+    // Alternative approach with explicit generic typing and @SuppressWarnings
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @Test
+    public void testCallMlFlowPerformanceEndpoint() {
+        // ...existing code...
+        
+        // Fix for line 130
+        when(requestHeadersUriMock.uri(anyString())).thenReturn((RequestHeadersSpec) requestBodyMock);
+        
+        // ...existing code...
+        
+        // Fix for line 138
+        when(webClientMock.get()).thenReturn((RequestHeadersUriSpec) requestHeadersUriMock);
+        
+        // Fix for line 141
+        when(requestHeadersUriMock.uri(anyString())).thenReturn((RequestHeadersSpec) requestHeadersMock);
+        
+        // ...existing code...
     }
 }
