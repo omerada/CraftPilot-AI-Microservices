@@ -1,8 +1,10 @@
 package com.craftpilot.lighthouseservice.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -22,20 +24,21 @@ public class RedisConfig {
     @Value("${spring.data.redis.port}")
     private int redisPort;
 
-    @Bean
+    @Primary
+    @Bean(name = "redisConnectionFactory")
     public RedisConnectionFactory redisConnectionFactory() {
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration(redisHost, redisPort);
         return new LettuceConnectionFactory(config);
     }
     
-    @Bean
+    @Bean(name = "reactiveRedisConnectionFactory")
     public ReactiveRedisConnectionFactory reactiveRedisConnectionFactory() {
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration(redisHost, redisPort);
         return new LettuceConnectionFactory(config);
     }
 
     @Bean
-    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
+    public RedisTemplate<String, Object> redisTemplate(@Qualifier("redisConnectionFactory") RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
         template.setKeySerializer(new StringRedisSerializer());
@@ -48,7 +51,7 @@ public class RedisConfig {
 
     @Bean
     public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
-            ReactiveRedisConnectionFactory factory) {
+            @Qualifier("reactiveRedisConnectionFactory") ReactiveRedisConnectionFactory factory) {
         
         StringRedisSerializer keySerializer = new StringRedisSerializer();
         Jackson2JsonRedisSerializer<Object> valueSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
