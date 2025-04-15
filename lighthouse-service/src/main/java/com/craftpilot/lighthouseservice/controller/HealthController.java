@@ -105,13 +105,14 @@ public class HealthController {
                 return redisConnectionFactory.getReactiveConnection()
                     .ping()
                     .map(ping -> true)
-                    .timeout(Duration.ofMillis(500))
+                    .timeout(Duration.ofMillis(2000)) // 500ms -> 2000ms olarak arttırıldı
                     .onErrorResume(e -> {
-                        log.warn("Redis connection check failed", e);
+                        log.warn("Redis connection check failed: {}", e.getMessage());
                         return Mono.just(false);
-                    });
+                    })
+                    .retry(3); // 3 kez tekrar deneme eklendi
             } catch (Exception e) {
-                log.warn("Redis connection check failed", e);
+                log.warn("Redis connection check failed: {}", e.getMessage());
                 return Mono.just(false);
             }
         });

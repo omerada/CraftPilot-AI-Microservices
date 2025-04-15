@@ -14,6 +14,7 @@ import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -84,9 +85,10 @@ public class LighthouseWorkerService {
                 
                 while (running.get()) {
                     try {
-                        // Redis'ten bir job al
+                        // Redis'ten bir job al - blok yerine reactive ile düzeltildi
                         redisTemplate.opsForList().leftPop(queueName)
                             .subscribeOn(Schedulers.boundedElastic())
+                            .timeout(Duration.ofSeconds(5)) // 5 saniye timeout
                             .doOnNext(job -> {
                                 try {
                                     if (job instanceof Map) {
@@ -108,10 +110,21 @@ public class LighthouseWorkerService {
                                     log.error("{} error processing job: {}", workerName, e.getMessage(), e);
                                 }
                             })
-                            .block(Duration.ofSeconds(30));
+                            .onErrorResume(e -> {
+                                // Timeout veya diğer hatalar sessizce işlensin
+                                if (!(e instanceof java.util.concurrent.TimeoutException)) {
+                                    log.error("{} error polling jobs: {}", workerName, e.getMessage(), e);
+                                }
+                                return Mono.empty();
+                            })
+                            .subscribe(); // Non-blocking subscription
                         
                         // Yeni bir iş yoksa biraz bekle
                         Thread.sleep(pollInterval);
+                    } catch (InterruptedException ie) {
+                        log.warn("{} was interrupted", workerName);
+                        Thread.currentThread().interrupt();
+                        break;
                     } catch (Exception e) {
                         log.error("{} error in worker loop: {}", workerName, e.getMessage(), e);
                         
@@ -137,7 +150,12 @@ public class LighthouseWorkerService {
             log.info("{} processing job {} for URL: {}", workerName, jobId, url);
             
             // PROCESSING durumuna güncelle
-            updateJobStatus(jobId, "PROCESSING", null);
+            updateJobStatus(jobId, "PROCESSING", null)
+                .timeout(Duration.ofSeconds(3))
+                .subscribe(
+                    success -> log.debug("Updated job {} status to PROCESSING", jobId),
+                    error -> log.error("Failed to update job {} status: {}", jobId, error.getMessage())
+                );
             
             // Burada gerçek Lighthouse analiz işlemi yapılır
             // Simüle edelim ve bazı sonuçlar oluşturalım
@@ -147,27 +165,35 @@ public class LighthouseWorkerService {
             
             // Sonuçları Redis'e kaydet
             saveJobResults(jobId, results)
-                .doOnSuccess(saved -> {
-                    if (Boolean.TRUE.equals(saved)) {
-                        log.info("{} completed job {} successfully", workerName, jobId);
-                    } else {
-                        log.warn("{} failed to save results for job {}", workerName, jobId);
-                        updateJobStatus(jobId, "FAILED", "Failed to save results");
+                .timeout(Duration.ofSeconds(5))
+                .subscribe(
+                    saved -> {
+                        if (Boolean.TRUE.equals(saved)) {
+                            log.info("{} completed job {} successfully", workerName, jobId);
+                        } else {
+                            log.warn("{} failed to save results for job {}", workerName, jobId);
+                            updateJobStatus(jobId, "FAILED", "Failed to save results")
+                                .subscribe();
+                        }
+                    },
+                    error -> {
+                        log.error("{} error saving results for job {}: {}", 
+                            workerName, jobId, error.getMessage(), error);
+                        updateJobStatus(jobId, "FAILED", "Error saving results: " + error.getMessage())
+                            .subscribe();
                     }
-                })
-                .doOnError(error -> {
-                    log.error("{} error saving results for job {}: {}", 
-                        workerName, jobId, error.getMessage(), error);
-                    updateJobStatus(jobId, "FAILED", "Error saving results: " + error.getMessage());
-                })
-                .block();
+                );
                 
             // İşlem tamamlandı, kaydı temizle
             processingJobs.remove(jobId);
             
         } catch (Exception e) {
             log.error("{} error processing job {}: {}", workerName, jobId, e.getMessage(), e);
-            updateJobStatus(jobId, "FAILED", "Processing error: " + e.getMessage());
+            updateJobStatus(jobId, "FAILED", "Processing error: " + e.getMessage())
+                .subscribe(
+                    success -> log.debug("Updated job {} status to FAILED", jobId),
+                    error -> log.error("Failed to update job {} status: {}", jobId, error.getMessage())
+                );
             processingJobs.remove(jobId);
         }
     }
@@ -175,20 +201,33 @@ public class LighthouseWorkerService {
     private Mono<Boolean> updateJobStatus(String jobId, String status, String errorMessage) {
         log.debug("Updating job {} status to: {}", jobId, status);
         
-        JobStatusResponse jobStatus = JobStatusResponse.builder()
-            .jobId(jobId)
-            .complete("COMPLETED".equals(status) || "FAILED".equals(status))
-            .status(status)
-            .error(errorMessage)
-            .build();
+        Map<String, Object> jobStatus = Map.of(
+            "jobId", jobId,
+            "complete", "COMPLETED".equals(status) || "FAILED".equals(status),
+            "status", status,
+            "error", errorMessage != null ? errorMessage : "",
+            "timestamp", System.currentTimeMillis()
+        );
             
-        return redisTemplate.opsForValue().set(resultsPrefix + "status:" + jobId, jobStatus);
+        return redisTemplate.opsForValue()
+            .set(resultsPrefix + "status:" + jobId, jobStatus, Duration.ofMinutes(30))
+            .timeout(Duration.ofSeconds(3))
+            .onErrorResume(e -> {
+                log.error("Failed to update job status: {}", e.getMessage(), e);
+                return Mono.just(false);
+            });
     }
     
     private Mono<Boolean> saveJobResults(String jobId, Map<String, Object> results) {
         // Önce job sonuçlarını kaydet
-        return redisTemplate.opsForValue().set(resultsPrefix + jobId, results, Duration.ofDays(1))
-            .then(updateJobStatus(jobId, "COMPLETED", null));
+        return redisTemplate.opsForValue()
+            .set(resultsPrefix + jobId, results, Duration.ofDays(1))
+            .then(updateJobStatus(jobId, "COMPLETED", null))
+            .timeout(Duration.ofSeconds(5))
+            .onErrorResume(e -> {
+                log.error("Failed to save job results: {}", e.getMessage(), e);
+                return Mono.just(false);
+            });
     }
     
     // Bu yalnızca test amaçlı bir metot, gerçek implementasyonda Lighthouse analiz sonuçları kullanılır
@@ -197,7 +236,7 @@ public class LighthouseWorkerService {
         double performanceScore = Math.random() * 0.5 + 0.5; // 0.5-1.0 arası rastgele bir değer
         
         return Map.of(
-            "id", java.util.UUID.randomUUID().toString(),
+            "id", UUID.randomUUID().toString(),
             "url", url,
             "timestamp", System.currentTimeMillis(),
             "performance", performanceScore,
@@ -236,13 +275,15 @@ public class LighthouseWorkerService {
                 log.warn("Job {} appears to be stuck (processing for {} ms)", jobId, now - startTime);
                 // İsteğe bağlı olarak takılan işleri güncelleyebiliriz
                 updateJobStatus(jobId, "FAILED", "Job timed out after " + (now - startTime) / 1000 + " seconds")
-                    .doOnSuccess(updated -> {
-                        if (Boolean.TRUE.equals(updated)) {
-                            log.info("Marked stuck job {} as failed", jobId);
-                            processingJobs.remove(jobId);
-                        }
-                    })
-                    .subscribe();
+                    .subscribe(
+                        updated -> {
+                            if (Boolean.TRUE.equals(updated)) {
+                                log.info("Marked stuck job {} as failed", jobId);
+                                processingJobs.remove(jobId);
+                            }
+                        },
+                        error -> log.error("Failed to mark job {} as failed: {}", jobId, error.getMessage())
+                    );
             }
         });
     }
