@@ -127,55 +127,8 @@ public class PerformanceController {
                         "jobId", jobId
                 )));
     }
-
-    @PostMapping("/performance/analyze")
-    @Operation(summary = "Web sitesi performans analizi yap")
-    public Mono<ResponseEntity<PerformanceAnalysisResponse>> analyzeWebsite(
-            @Valid @RequestBody PerformanceAnalysisRequest request,
-            ServerWebExchange exchange
-    ) {
-        return checkRateLimit(exchange)
-                .flatMap(allowed -> {
-                    if (!allowed) {
-                        log.warn("Rate limit exceeded for IP: {}", exchange.getRequest().getRemoteAddress());
-                        return Mono.just(ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build());
-                    }
-
-                    log.info("Performance analysis request received for URL: {}", request.getUrl());
-
-                    return performanceService.analyzeWebsite(request)
-                            .map(response -> {
-                                // Eğer bir hata mesajı varsa, uygun HTTP durum kodu ile yanıt ver
-                                if (response.getError() != null && !response.getError().isEmpty()) {
-                                    log.warn("Performance analysis completed with error for URL: {}, Error: {}",
-                                            request.getUrl(), response.getError());
-                                    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
-                                }
-
-                                log.info("Performance analysis completed successfully for URL: {}", request.getUrl());
-                                return ResponseEntity.ok(response);
-                            })
-                            .onErrorResume(e -> {
-                                log.error("Error during performance analysis: {}", e.getMessage(), e);
-
-                                // Lighthouse servis erişim hatası için özel mesaj
-                                String errorMessage = e.getMessage();
-                                if (e instanceof org.springframework.web.reactive.function.client.WebClientResponseException) {
-                                    errorMessage = "Lighthouse servisi şu anda erişilebilir değil. Lütfen daha sonra tekrar deneyin.";
-                                    log.error("Lighthouse service connection error: {}", e.getMessage());
-                                }
-
-                                PerformanceAnalysisResponse errorResponse = PerformanceAnalysisResponse.builder()
-                                        .url(request.getUrl())
-                                        .error(errorMessage)
-                                        .build();
-                                return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                                        .body(errorResponse));
-                            });
-                });
-    }
-
-    @PostMapping("/performance/suggestions")
+ 
+    @PostMapping("/suggestions")
     @Operation(summary = "Generate performance improvement suggestions")
     public Mono<SuggestionsResponse> generateSuggestions(@RequestBody SuggestionsRequest request) {
         log.info("Generating performance suggestions for request");
@@ -207,7 +160,7 @@ public class PerformanceController {
         return performanceService.streamSuggestions(request);
     }
 
-    @PostMapping("/performance/history")
+    @PostMapping("/history")
     @Operation(summary = "Web sitesi performans analiz geçmişini getir")
     public Mono<ResponseEntity<PerformanceHistoryResponse>> getPerformanceHistory(
             @Valid @RequestBody PerformanceHistoryRequest request,
