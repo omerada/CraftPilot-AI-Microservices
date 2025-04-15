@@ -83,6 +83,41 @@ GET /api/v1/report/{jobId}
 GET /health
 ```
 
+**Response:**
+
+```json
+{
+  "status": "UP",
+  "redis": "UP",
+  "timestamp": 1680123456789,
+  "details": {
+    "connection": "successful"
+  }
+}
+```
+
+### Spring Boot Actuator Health
+
+```
+GET /actuator/health
+```
+
+**Response:**
+
+```json
+{
+  "status": "UP",
+  "components": {
+    "diskSpace": {
+      "status": "UP"
+    },
+    "redis": {
+      "status": "UP"
+    }
+  }
+}
+```
+
 ## Redis Anahtarları
 
 - `{bull:lighthouse-jobs}` - BullMQ kuyruk anahtarı
