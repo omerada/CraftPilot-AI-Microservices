@@ -1,55 +1,99 @@
 package com.craftpilot.lighthouseservice.controller;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.availability.ApplicationAvailability;
+import org.springframework.boot.availability.LivenessState;
+import org.springframework.boot.availability.ReadinessState;
+import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
+import lombok.extern.slf4j.Slf4j;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/health")
-@RequiredArgsConstructor
 @Slf4j
 public class HealthController {
 
-    private final RedisConnectionFactory redisConnectionFactory;
+    private final ReactiveRedisConnectionFactory redisConnectionFactory;
+    private final ApplicationAvailability applicationAvailability;
 
-    @GetMapping
+    @Autowired
+    public HealthController(ReactiveRedisConnectionFactory redisConnectionFactory, 
+                           ApplicationAvailability applicationAvailability) {
+        this.redisConnectionFactory = redisConnectionFactory;
+        this.applicationAvailability = applicationAvailability;
+    }
+
+    @GetMapping("/health")
     public Mono<ResponseEntity<Map<String, Object>>> healthCheck() {
-        return Mono.fromCallable(() -> {
-            Map<String, Object> status = new HashMap<>();
-            Map<String, Object> details = new HashMap<>();
-            boolean redisConnected = false;
-            String errorMessage = null;
-            
+        return checkRedisConnection()
+            .map(redisStatus -> {
+                Map<String, Object> health = new HashMap<>();
+                
+                // Application state
+                LivenessState livenessState = applicationAvailability.getLivenessState();
+                ReadinessState readinessState = applicationAvailability.getReadinessState();
+                
+                boolean isSystemUp = readinessState == ReadinessState.ACCEPTING_TRAFFIC && 
+                                     livenessState == LivenessState.CORRECT;
+                                     
+                String overallStatus = isSystemUp && redisStatus ? "UP" : "DOWN";
+                
+                health.put("status", overallStatus);
+                health.put("application", isSystemUp ? "UP" : "DOWN");
+                health.put("redis", redisStatus ? "UP" : "DOWN");
+                health.put("timestamp", System.currentTimeMillis());
+                
+                Map<String, Object> details = new HashMap<>();
+                details.put("liveness", livenessState.toString());
+                details.put("readiness", readinessState.toString());
+                details.put("connection", redisStatus ? "successful" : "failed");
+                health.put("details", details);
+                
+                HttpStatus status = "UP".equals(overallStatus) ? 
+                    HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE;
+                
+                return new ResponseEntity<>(health, status);
+            })
+            .onErrorResume(e -> {
+                log.warn("Health check failed", e);
+                
+                Map<String, Object> health = new HashMap<>();
+                health.put("status", "DOWN");
+                health.put("application", "UP");
+                health.put("redis", "DOWN");
+                health.put("timestamp", System.currentTimeMillis());
+                
+                Map<String, Object> details = new HashMap<>();
+                details.put("error", e.getClass().getSimpleName());
+                details.put("message", e.getMessage());
+                health.put("details", details);
+                
+                return Mono.just(new ResponseEntity<>(health, HttpStatus.SERVICE_UNAVAILABLE));
+            });
+    }
+
+    private Mono<Boolean> checkRedisConnection() {
+        return Mono.defer(() -> {
             try {
-                log.debug("Checking Redis connection...");
-                redisConnected = redisConnectionFactory.getConnection().ping() != null;
-                log.debug("Redis connection check result: {}", redisConnected);
+                return redisConnectionFactory.getReactiveConnection()
+                    .ping()
+                    .map(ping -> true)
+                    .timeout(Duration.ofMillis(1000))
+                    .onErrorResume(e -> {
+                        log.warn("Redis connection check failed", e);
+                        return Mono.just(false);
+                    });
             } catch (Exception e) {
                 log.warn("Redis connection check failed", e);
-                errorMessage = e.getMessage();
+                return Mono.just(false);
             }
-            
-            if (errorMessage != null) {
-                details.put("connection", "error");
-                details.put("error", errorMessage);
-            } else {
-                details.put("connection", redisConnected ? "successful" : "failed");
-            }
-            
-            status.put("status", redisConnected ? "UP" : "DOWN");
-            status.put("redis", redisConnected ? "UP" : "DOWN");
-            status.put("timestamp", System.currentTimeMillis());
-            status.put("details", details);
-            
-            return ResponseEntity.ok(status);
         });
     }
 }

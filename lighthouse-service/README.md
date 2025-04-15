@@ -7,9 +7,10 @@ Bu servis, web sitesi performans analizlerini BullMQ ile uyumlu bir Redis kuyruk
 - Spring WebFlux tabanlı reaktif API
 - BullMQ ile uyumlu Redis kuyruklama sistemi
 - Docker üzerinde çalışabilirlik
-- Health check ve metrikler
+- Gelişmiş health check ve metrikler
 - Rate limiting (IP bazlı)
 - CORS yapılandırması
+- Redis bağlantı hatalarına karşı dayanıklılık
 
 ## API Endpoints
 
@@ -88,9 +89,12 @@ GET /health
 ```json
 {
   "status": "UP",
+  "application": "UP",
   "redis": "UP",
   "timestamp": 1680123456789,
   "details": {
+    "liveness": "CORRECT",
+    "readiness": "ACCEPTING_TRAFFIC",
     "connection": "successful"
   }
 }
@@ -114,6 +118,9 @@ GET /actuator/health
       "status": "UP"
     },
     "redis": {
+      "status": "UP"
+    },
+    "ping": {
       "status": "UP"
     }
   }
@@ -145,7 +152,11 @@ docker-compose up -d
 ## Ortam Değişkenleri
 
 - `PORT`: Uygulama port numarası (varsayılan: 8085)
-- `REDIS_HOST`: Redis sunucu adresi (varsayılan: localhost)
+- `REDIS_HOST`: Redis sunucu adresi (varsayılan: redis)
 - `REDIS_PORT`: Redis port numarası (varsayılan: 6379)
+- `REDIS_PASSWORD`: Redis şifresi (varsayılan: 13579ada)
+- `REDIS_CONNECT_TIMEOUT`: Redis bağlantı zaman aşımı (varsayılan: 2000ms)
 - `LIGHTHOUSE_QUEUE_NAME`: BullMQ kuyruk adı (varsayılan: lighthouse-jobs)
 - `LIGHTHOUSE_RESULTS_PREFIX`: Sonuç anahtarı öneki (varsayılan: lighthouse-results:)
+- `LIGHTHOUSE_REDIS_CONNECTION_MAX_ATTEMPTS`: Redis bağlantı deneme sayısı (varsayılan: 5)
+- `LIGHTHOUSE_REDIS_CONNECTION_RETRY_DELAY_MS`: Bağlantı denemeleri arası bekleme süresi (varsayılan: 3000ms)

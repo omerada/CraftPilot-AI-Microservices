@@ -3,8 +3,11 @@ spring:
     name: lighthouse-service
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:13579ada}
+      connect-timeout: 2000
+      timeout: 1000
 
 server:
   port: ${PORT:8085}
@@ -14,17 +17,39 @@ lighthouse:
     name: ${LIGHTHOUSE_QUEUE_NAME:lighthouse-jobs}
   results:
     prefix: ${LIGHTHOUSE_RESULTS_PREFIX:lighthouse-results:}
+  redis:
+    connection:
+      max-attempts: 5
+      retry-delay-ms: 3000
 
 logging:
   level:
     root: INFO
     com.craftpilot: DEBUG
+    org.springframework.data.redis: DEBUG
+    io.lettuce: DEBUG
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,loggers
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: redis,diskSpace
+          show-details: always
+        liveness:
+          include: ping
+          show-details: always
+  health:
+    redis:
+      enabled: true
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true

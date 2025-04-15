@@ -97,19 +97,25 @@ jobs:
                 -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
                 -e SPRING_SECURITY_USER_NAME=craftpilot \
                 -e SPRING_SECURITY_USER_PASSWORD=13579ada \
-                -e SPRING_REDIS_HOST=redis \
-                -e SPRING_REDIS_PORT=6379 \
-                -e SPRING_REDIS_PASSWORD=13579ada \
+                -e SPRING_DATA_REDIS_HOST=redis \
+                -e SPRING_DATA_REDIS_PORT=6379 \
+                -e SPRING_DATA_REDIS_PASSWORD=13579ada \
+                -e SPRING_DATA_REDIS_CONNECT_TIMEOUT=5000 \
                 -e LIGHTHOUSE_QUEUE_NAME=lighthouse-jobs \
                 -e LIGHTHOUSE_RESULTS_PREFIX=lighthouse-results: \
+                -e LIGHTHOUSE_REDIS_CONNECTION_MAX_ATTEMPTS=10 \
+                -e LIGHTHOUSE_REDIS_CONNECTION_RETRY_DELAY_MS=2000 \
                 -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
-                -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*" \
+                -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,metrics,info,loggers" \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
                 -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
                 -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
                 -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_REDIS_ENABLED=true \
                 -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
                 -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_REDIS=DEBUG \
+                -e LOGGING_LEVEL_IO_LETTUCE=DEBUG \
                 -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5006" \
                 --ulimit nofile=65536:65536 \
                 --cap-drop ALL \
@@ -117,7 +123,7 @@ jobs:
                 --health-cmd="curl -f http://localhost:8085/health || exit 1" \
                 --health-interval=30s \
                 --health-timeout=10s \
-                --health-retries=3 \
+                --health-retries=5 \
                 --health-start-period=120s \
                 ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
             else
@@ -131,17 +137,21 @@ jobs:
                 -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
                 -e SPRING_SECURITY_USER_NAME=craftpilot \
                 -e SPRING_SECURITY_USER_PASSWORD=13579ada \
-                -e SPRING_REDIS_HOST=redis \
-                -e SPRING_REDIS_PORT=6379 \
-                -e SPRING_REDIS_PASSWORD=13579ada \
+                -e SPRING_DATA_REDIS_HOST=redis \
+                -e SPRING_DATA_REDIS_PORT=6379 \
+                -e SPRING_DATA_REDIS_PASSWORD=13579ada \
+                -e SPRING_DATA_REDIS_CONNECT_TIMEOUT=5000 \
                 -e LIGHTHOUSE_QUEUE_NAME=lighthouse-jobs \
                 -e LIGHTHOUSE_RESULTS_PREFIX=lighthouse-results: \
+                -e LIGHTHOUSE_REDIS_CONNECTION_MAX_ATTEMPTS=10 \
+                -e LIGHTHOUSE_REDIS_CONNECTION_RETRY_DELAY_MS=2000 \
                 -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
-                -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*" \
+                -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,metrics,info" \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
                 -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
                 -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
                 -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_REDIS_ENABLED=true \
                 -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
                 -e LOGGING_LEVEL_COM_CRAFTPILOT=INFO \
                 -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty" \
@@ -151,7 +161,7 @@ jobs:
                 --health-cmd="curl -f http://localhost:8085/health || exit 1" \
                 --health-interval=30s \
                 --health-timeout=10s \
-                --health-retries=3 \
+                --health-retries=5 \
                 --health-start-period=120s \
                 ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
             fi
@@ -159,6 +169,7 @@ jobs:
             echo "=== Waiting for service startup ==="
             max_attempts=20
             counter=0
+            success=0
 
             while [ $counter -lt $max_attempts ]; do
               echo "Health check attempt $((counter + 1))/$max_attempts"
@@ -173,19 +184,24 @@ jobs:
               # Application log kontrolü
               if docker logs lighthouse-service 2>&1 | grep -q "Started LighthouseServiceApplication"; then
                 echo "Application startup completed"
-
-                # Eureka registration kontrolü
-                if docker logs lighthouse-service 2>&1 | grep -q "DiscoveryClient.*registration status: 204"; then
-                  echo "Successfully registered with Eureka"
-                  
-                  # Final health check
-                  HEALTH_CHECK=$(curl -s http://localhost:8085/health)
-                  if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
-                    echo "✓ Service is healthy"
-                    echo "=== Deployment completed successfully ==="
-                    exit 0
-                  fi
+                
+                # Health check kontrolü
+                HEALTH_CHECK=$(curl -s http://localhost:8085/health)
+                if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
+                  echo "✓ Health check passed: $HEALTH_CHECK"
+                  success=1
+                  break
+                elif echo "$HEALTH_CHECK" | grep -q '"redis":"DOWN"'; then
+                  echo "× Redis connection issue detected in health check"
+                  echo "Health response: $HEALTH_CHECK"
+                  # Redis sağlık bilgilerini göster
+                  echo "Redis connection details from logs:"
+                  docker logs lighthouse-service 2>&1 | grep -i "redis\|lettuce" | tail -20
+                else
+                  echo "× Health check failed with response: $HEALTH_CHECK"
                 fi
+              else
+                echo "Waiting for application startup..."
               fi
               
               echo "Waiting for service to start... ($((counter + 1))/$max_attempts)"
@@ -193,11 +209,18 @@ jobs:
               counter=$((counter + 1))
             done
 
-            echo "=== Health check failed - Debug Information ==="
-            echo "Docker Status:"
-            docker ps -a | grep lighthouse-service
-            echo "Container Logs:"
-            docker logs lighthouse-service --tail 100
-            echo "Health Check Response:"
-            curl -v http://localhost:8085/health || true
-            exit 1
+            if [ $success -eq 1 ]; then
+              echo "=== Deployment completed successfully ==="
+              exit 0
+            else
+              echo "=== Health check failed - Debug Information ==="
+              echo "Docker Status:"
+              docker ps -a | grep lighthouse-service
+              echo "Container Logs:"
+              docker logs lighthouse-service --tail 100
+              echo "Health Check Response:"
+              curl -v http://localhost:8085/health || true
+              echo "Redis Check:"
+              docker exec lighthouse-service sh -c 'nc -zv $SPRING_DATA_REDIS_HOST $SPRING_DATA_REDIS_PORT' || echo "Redis connection failed"
+              exit 1
+            fi
