@@ -1,0 +1,199 @@
+name: Lighthouse Service CI/CD
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "lighthouse-service/**"
+      - ".github/workflows/lighthouse-service-ci-cd.yml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy to"
+        required: true
+        default: "prod"
+        type: choice
+        options:
+          - prod
+          - debug
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Grant execute permission for mvnw
+        run: |
+          cd lighthouse-service
+          chmod +x mvnw
+
+      - name: Build
+        run: |
+          cd lighthouse-service
+          ./mvnw clean package -DskipTests
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./lighthouse-service
+          platforms: linux/arm64
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            mkdir -p /opt/craftpilot/tmp/netty
+
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
+            docker stop lighthouse-service || true
+            docker rm lighthouse-service || true
+
+            if [[ "${{ github.event.inputs.environment }}" == "debug" ]]; then
+              docker run -d \
+                --name lighthouse-service \
+                --network craftpilot-network \
+                --restart unless-stopped \
+                -p 8085:8085 \
+                -p 5006:5006 \
+                -v /opt/craftpilot/tmp/netty:/tmp/netty \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e SPRING_SECURITY_USER_NAME=craftpilot \
+                -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+                -e SPRING_REDIS_HOST=redis \
+                -e SPRING_REDIS_PORT=6379 \
+                -e SPRING_REDIS_PASSWORD=13579ada \
+                -e LIGHTHOUSE_QUEUE_NAME=lighthouse-jobs \
+                -e LIGHTHOUSE_RESULTS_PREFIX=lighthouse-results: \
+                -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
+                -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*" \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
+                -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
+                -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5006" \
+                --ulimit nofile=65536:65536 \
+                --cap-drop ALL \
+                --security-opt no-new-privileges \
+                --health-cmd="curl -f http://localhost:8085/actuator/health/liveness || exit 1" \
+                --health-interval=30s \
+                --health-timeout=10s \
+                --health-retries=3 \
+                --health-start-period=120s \
+                ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
+            else
+              docker run -d \
+                --name lighthouse-service \
+                --network craftpilot-network \
+                --restart unless-stopped \
+                -p 8085:8085 \
+                -v /opt/craftpilot/tmp/netty:/tmp/netty \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e SPRING_SECURITY_USER_NAME=craftpilot \
+                -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+                -e SPRING_REDIS_HOST=redis \
+                -e SPRING_REDIS_PORT=6379 \
+                -e SPRING_REDIS_PASSWORD=13579ada \
+                -e LIGHTHOUSE_QUEUE_NAME=lighthouse-jobs \
+                -e LIGHTHOUSE_RESULTS_PREFIX=lighthouse-results: \
+                -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
+                -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*" \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
+                -e LOGGING_LEVEL_COM_CRAFTPILOT=INFO \
+                -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty" \
+                --ulimit nofile=65536:65536 \
+                --cap-drop ALL \
+                --security-opt no-new-privileges \
+                --health-cmd="curl -f http://localhost:8085/actuator/health/liveness || exit 1" \
+                --health-interval=30s \
+                --health-timeout=10s \
+                --health-retries=3 \
+                --health-start-period=120s \
+                ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
+            fi
+
+            echo "=== Waiting for service startup ==="
+            max_attempts=20
+            counter=0
+
+            while [ $counter -lt $max_attempts ]; do
+              echo "Health check attempt $((counter + 1))/$max_attempts"
+              
+              # Container durumu kontrolü
+              if ! docker ps --filter "name=lighthouse-service" --format '{{.Status}}' | grep -q "Up"; then
+                echo "Container is not running anymore. Checking logs..."
+                docker logs lighthouse-service
+                exit 1
+              fi
+              
+              # Application log kontrolü
+              if docker logs lighthouse-service 2>&1 | grep -q "Started LighthouseServiceApplication"; then
+                echo "Application startup completed"
+
+                # Eureka registration kontrolü
+                if docker logs lighthouse-service 2>&1 | grep -q "DiscoveryClient.*registration status: 204"; then
+                  echo "Successfully registered with Eureka"
+                  
+                  # Final health check
+                  HEALTH_CHECK=$(curl -s http://localhost:8085/actuator/health)
+                  if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
+                    echo "✓ Service is healthy"
+                    echo "=== Deployment completed successfully ==="
+                    exit 0
+                  fi
+                fi
+              fi
+              
+              echo "Waiting for service to start... ($((counter + 1))/$max_attempts)"
+              sleep 15
+              counter=$((counter + 1))
+            done
+
+            echo "=== Health check failed - Debug Information ==="
+            echo "Docker Status:"
+            docker ps -a | grep lighthouse-service
+            echo "Container Logs:"
+            docker logs lighthouse-service --tail 100
+            echo "Health Check Response:"
+            curl -v http://localhost:8085/actuator/health || true
+            exit 1

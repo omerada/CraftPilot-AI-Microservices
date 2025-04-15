@@ -11,11 +11,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -23,33 +28,87 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class PerformanceService {
-    private final LighthouseService lighthouseService;
     private final PerformanceAnalysisRepository performanceAnalysisRepository;
     private final PerformanceAnalysisCache performanceAnalysisCache;
-    // AiService referansını kaldırdık, artık sadece LLMService kullanıyoruz
     private final PromptService promptService;
     private final MeterRegistry meterRegistry;
     private final LLMService llmService;
     private final ObjectMapper objectMapper;
 
+    @Value("${lighthouse.service.url:http://lighthouse-service:8085}")
+    private String lighthouseServiceUrl;
+
+    private final WebClient webClient = WebClient.builder().build();
+
     public Mono<PerformanceAnalysisResponse> analyzeWebsite(PerformanceAnalysisRequest request) {
         // URL'i önbellekte ara
         return performanceAnalysisCache.getAnalysisResult(request.getUrl())
                 .switchIfEmpty(
-                        // Önbellekte yoksa yeni analiz yap
-                        lighthouseService.analyzeSite(request.getUrl())
-                                .flatMap(response -> {
-                                    // Veritabanına kaydet
-                                    return performanceAnalysisRepository.save(response)
-                                            .doOnSuccess(saved -> {
-                                                // Önbelleğe ekle
-                                                performanceAnalysisCache.cacheAnalysisResult(request.getUrl(), saved);
-                                                
-                                                // Metrikleri kaydet
-                                                meterRegistry.counter("performance.analysis.completed").increment();
-                                            });
-                                })
+                    // Önbellekte yoksa lighthouse-service'e istek gönder
+                    webClient.post()
+                        .uri(lighthouseServiceUrl + "/api/v1/analyze")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(Map.of("url", request.getUrl()))
+                        .retrieve()
+                        .bodyToMono(Map.class)
+                        .flatMap(response -> {
+                            String jobId = (String) response.get("jobId");
+                            log.info("Analysis job queued with ID: {}", jobId);
+                            
+                            // Job sonucunu polling ile bekle
+                            return pollForResultsWithRetry(jobId);
+                        })
+                        .flatMap(response -> {
+                            // Veritabanına kaydet
+                            return performanceAnalysisRepository.save(response)
+                                .doOnSuccess(saved -> {
+                                    // Önbelleğe ekle
+                                    performanceAnalysisCache.cacheAnalysisResult(request.getUrl(), saved);
+                                    
+                                    // Metrikleri kaydet
+                                    meterRegistry.counter("performance.analysis.completed").increment();
+                                });
+                        })
                 );
+    }
+    
+    private Mono<PerformanceAnalysisResponse> pollForResultsWithRetry(String jobId) {
+        // Maksimum deneme sayısı ve bekleme süresi
+        final int MAX_RETRIES = 10;
+        final Duration INITIAL_BACKOFF = Duration.ofSeconds(2);
+        
+        return Mono.defer(() -> pollForResults(jobId))
+            .retryWhen(retrySpec -> retrySpec
+                .filter(e -> e instanceof RuntimeException && 
+                        e.getMessage() != null && 
+                        e.getMessage().contains("Job not completed yet"))
+                .exponentialBackoff(INITIAL_BACKOFF, Duration.ofSeconds(20))
+                .take(MAX_RETRIES)
+                .doOnRetry(retrySignal -> 
+                    log.info("Retrying poll for job {}, attempt {}", 
+                        jobId, retrySignal.totalRetries() + 1))
+            );
+    }
+    
+    private Mono<PerformanceAnalysisResponse> pollForResults(String jobId) {
+        return webClient.get()
+            .uri(lighthouseServiceUrl + "/api/v1/report/" + jobId)
+            .retrieve()
+            .bodyToMono(Map.class)
+            .flatMap(response -> {
+                Boolean isComplete = (Boolean) response.getOrDefault("complete", false);
+                
+                if (Boolean.TRUE.equals(isComplete) && response.get("data") != null) {
+                    // Sonucu PerformanceAnalysisResponse'a dönüştür
+                    Object data = response.get("data");
+                    return Mono.just(objectMapper.convertValue(data, PerformanceAnalysisResponse.class));
+                } else {
+                    // İş henüz tamamlanmamış, hata döndür
+                    String status = (String) response.getOrDefault("status", "unknown");
+                    String error = (String) response.getOrDefault("error", "Job not completed yet");
+                    return Mono.error(new RuntimeException("Job status: " + status + ", Error: " + error));
+                }
+            });
     }
     
     /**
@@ -129,53 +188,4 @@ public class PerformanceService {
                 "Verilen URL'yi analiz et ve spesifik iyileştirmeler öner. " +
                 "Her sorun için şunları belirt: problem açıklaması, önem derecesi (kritik/önemli/düşük), çözüm, " +
                 "kod örneği, faydalı kaynaklar ve uygulama zorluğu (kolay/orta/zor). " +
-                "Yanıtını geçerli bir JSON dizisi olarak formatla.";
-        
-        aiRequest.setSystemPrompt(systemPrompt);
-        
-        // URL ile prompt oluştur
-        String prompt = "Bu web sitesini analiz et: " + request.getUrl() + "\n\n" +
-                "Web sitesi performansını iyileştirmek için detaylı öneriler sun. Önce en etkili değişikliklere odaklan. " +
-                "Yanıtını her biri için şu özelliklere sahip bir JSON dizisi olarak formatla: " +
-                "problem, severity, solution, codeExample, resources (URL'ler dizisi), implementationDifficulty";
-        
-        aiRequest.setPrompt(prompt);
-        
-        // LLMService'in streaming özelliğini kullan
-        return llmService.streamChatCompletion(aiRequest)
-                .map(streamResponse -> {
-                    if (streamResponse.isPing()) {
-                        return StreamSuggestionsResponse.ping();
-                    } else if (streamResponse.isError()) {
-                        log.warn("Stream yanıtında hata oluştu: {}", streamResponse.getContent());
-                        return StreamSuggestionsResponse.error(streamResponse.getContent());
-                    } else {
-                        return StreamSuggestionsResponse.content(
-                                streamResponse.getContent(),
-                                streamResponse.isDone()
-                        );
-                    }
-                })
-                .doOnComplete(() -> log.info("URL {} için performans önerileri stream'i tamamlandı", request.getUrl()))
-                .doOnError(error -> log.error("Stream sırasında hata: {}", error.getMessage(), error));
-    }
-    
-    public Mono<PerformanceHistoryResponse> getPerformanceHistory(PerformanceHistoryRequest request) {
-        return performanceAnalysisRepository.findByUrl(request.getUrl())
-                .collectList()
-                .map(analysisList -> {
-                    List<PerformanceHistoryResponse.PerformanceHistoryEntry> historyEntries = analysisList.stream()
-                            .map(analysis -> PerformanceHistoryResponse.PerformanceHistoryEntry.builder()
-                                    .id(analysis.getId())
-                                    .url(analysis.getUrl())
-                                    .timestamp(analysis.getTimestamp())
-                                    .performance(analysis.getPerformance())
-                                    .build())
-                            .collect(Collectors.toList());
-                    
-                    return PerformanceHistoryResponse.builder()
-                            .history(historyEntries)
-                            .build();
-                });
-    }
-}
+                "Yanıtını geçerli bir JSON diz

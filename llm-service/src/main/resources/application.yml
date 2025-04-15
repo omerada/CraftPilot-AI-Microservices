@@ -153,3 +153,7 @@ resilience4j:
       llmService:
         limitForPeriod: 50
         limitRefreshPeriod: 1s
+
+lighthouse:
+  service:
+    url: ${LIGHTHOUSE_SERVICE_URL:http://lighthouse-service:8085}

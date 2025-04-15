@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: lighthouse-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+server:
+  port: ${PORT:8085}
+
+lighthouse:
+  queue:
+    name: ${LIGHTHOUSE_QUEUE_NAME:lighthouse-jobs}
+  results:
+    prefix: ${LIGHTHOUSE_RESULTS_PREFIX:lighthouse-results:}
+
+logging:
+  level:
+    root: INFO
+    com.craftpilot: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

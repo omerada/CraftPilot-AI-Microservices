@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  lighthouse-service:
+    build: .
+    ports:
+      - "8085:8085"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - LIGHTHOUSE_QUEUE_NAME=lighthouse-jobs
+      - LIGHTHOUSE_RESULTS_PREFIX=lighthouse-results:
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  redis-data:
