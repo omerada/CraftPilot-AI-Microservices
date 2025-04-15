@@ -79,12 +79,20 @@ public class PerformanceController {
                                 return ResponseEntity.ok(response);
                             })
                             .onErrorResume(e -> {
-                                log.error("Error during performance analysis", e);
+                                log.error("Error during performance analysis: {}", e.getMessage(), e);
+                                
+                                // Lighthouse servis erişim hatası için özel mesaj
+                                String errorMessage = e.getMessage();
+                                if (e instanceof org.springframework.web.reactive.function.client.WebClientResponseException) {
+                                    errorMessage = "Lighthouse servisi şu anda erişilebilir değil. Lütfen daha sonra tekrar deneyin.";
+                                    log.error("Lighthouse service connection error: {}", e.getMessage());
+                                }
+                                
                                 PerformanceAnalysisResponse errorResponse = PerformanceAnalysisResponse.builder()
                                         .url(request.getUrl())
-                                        .error("Analiz sırasında beklenmeyen bir hata oluştu: " + e.getMessage())
+                                        .error(errorMessage)
                                         .build();
-                                return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                                         .body(errorResponse));
                             });
                 });
@@ -140,8 +148,15 @@ public class PerformanceController {
                             .map(ResponseEntity::ok)
                             .doOnSuccess(response -> log.info("Performance history retrieved for URL: {}", request.getUrl()))
                             .onErrorResume(e -> {
-                                log.error("Error retrieving performance history", e);
-                                return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
+                                log.error("Error retrieving performance history: {}", e.getMessage(), e);
+                                
+                                PerformanceHistoryResponse errorResponse = PerformanceHistoryResponse.builder()
+                                        .url(request.getUrl())
+                                        .error("Performans geçmişi getirilemedi: " + e.getMessage())
+                                        .build();
+                                
+                                return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                        .body(errorResponse));
                             });
                 });
     }
