@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.availability.ApplicationAvailability;
 import org.springframework.boot.availability.LivenessState;
 import org.springframework.boot.availability.ReadinessState;
+import org.springframework.context.ApplicationContext;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 import lombok.extern.slf4j.Slf4j;
 
+import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,17 +24,22 @@ public class HealthController {
 
     private final ReactiveRedisConnectionFactory redisConnectionFactory;
     private final ApplicationAvailability applicationAvailability;
+    private final ApplicationContext applicationContext;
 
     @Autowired
     public HealthController(ReactiveRedisConnectionFactory redisConnectionFactory, 
-                           ApplicationAvailability applicationAvailability) {
+                           ApplicationAvailability applicationAvailability,
+                           ApplicationContext applicationContext) {
         this.redisConnectionFactory = redisConnectionFactory;
         this.applicationAvailability = applicationAvailability;
+        this.applicationContext = applicationContext;
     }
 
     @GetMapping("/health")
     public Mono<ResponseEntity<Map<String, Object>>> healthCheck() {
         return checkRedisConnection()
+            .timeout(Duration.ofSeconds(1))
+            .onErrorReturn(false)
             .map(redisStatus -> {
                 Map<String, Object> health = new HashMap<>();
                 
@@ -54,6 +61,19 @@ public class HealthController {
                 details.put("liveness", livenessState.toString());
                 details.put("readiness", readinessState.toString());
                 details.put("connection", redisStatus ? "successful" : "failed");
+                
+                // Worker durumunu ekle
+                try {
+                    if (applicationContext.containsBean("lighthouseWorkerService")) {
+                        Object workerService = applicationContext.getBean("lighthouseWorkerService");
+                        Method method = workerService.getClass().getMethod("getActiveWorkerCount");
+                        int activeWorkers = (int) method.invoke(workerService);
+                        details.put("activeWorkers", activeWorkers);
+                    }
+                } catch (Exception e) {
+                    log.warn("Could not retrieve worker status", e);
+                }
+                
                 health.put("details", details);
                 
                 HttpStatus status = "UP".equals(overallStatus) ? 
@@ -85,7 +105,7 @@ public class HealthController {
                 return redisConnectionFactory.getReactiveConnection()
                     .ping()
                     .map(ping -> true)
-                    .timeout(Duration.ofMillis(1000))
+                    .timeout(Duration.ofMillis(500))
                     .onErrorResume(e -> {
                         log.warn("Redis connection check failed", e);
                         return Mono.just(false);

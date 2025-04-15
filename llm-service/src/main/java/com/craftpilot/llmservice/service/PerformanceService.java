@@ -78,20 +78,41 @@ public class PerformanceService {
     }
     
     private Mono<PerformanceAnalysisResponse> pollForResultsWithRetry(String jobId) {
-        // Maksimum deneme sayısı ve bekleme süresi
-        final int MAX_RETRIES = 10;
-        final Duration INITIAL_BACKOFF = Duration.ofSeconds(2);
+        // Maksimum deneme sayısı ve bekleme süresi (optimize edilmiş)
+        final int MAX_RETRIES = 15; // Önceki 10 değerinden artırıldı
+        final Duration INITIAL_BACKOFF = Duration.ofSeconds(1); // Daha hızlı başla (önceki 2'den)
         
         return Mono.defer(() -> pollForResults(jobId))
             .retryWhen(Retry.backoff(MAX_RETRIES, INITIAL_BACKOFF)
                 .filter(e -> e instanceof RuntimeException && 
                         e.getMessage() != null && 
-                        e.getMessage().contains("Job not completed yet"))
-                .maxBackoff(Duration.ofSeconds(20))
-                .doAfterRetry(retrySignal -> 
-                    log.info("Retrying poll for job {}, attempt {}", 
-                        jobId, retrySignal.totalRetries() + 1))
-            );
+                        (e.getMessage().contains("Job not completed yet") || 
+                         e.getMessage().contains("PENDING")))
+                .maxBackoff(Duration.ofSeconds(10)) // Önceki 20'den azaltıldı
+                .doAfterRetry(retrySignal -> {
+                    int attempt = retrySignal.totalRetries() + 1;
+                    if (attempt % 3 == 0) {  // Her 3 denemede bir log yaz
+                        log.info("Retrying poll for job {}, attempt {}/{}",
+                            jobId, attempt, MAX_RETRIES);
+                    }
+                })
+            )
+            .timeout(Duration.ofSeconds(60)) // 60 saniye sonra timeout
+            .onErrorResume(e -> {
+                if (e instanceof RuntimeException && e.getMessage() != null && 
+                    (e.getMessage().contains("Job not completed yet") || e.getMessage().contains("PENDING"))) {
+                    log.warn("Job {} timed out after {} attempts, returning TIMEOUT status", jobId, MAX_RETRIES);
+                    return Mono.just(PerformanceAnalysisResponse.builder()
+                        .id(UUID.randomUUID().toString())
+                        .jobId(jobId)
+                        .url("")
+                        .status("TIMEOUT")
+                        .message("Analysis job timed out after 60 seconds, please try again later")
+                        .timestamp(System.currentTimeMillis())
+                        .build());
+                }
+                return Mono.error(e);
+            });
     }
     
     private Mono<PerformanceAnalysisResponse> pollForResults(String jobId) {
@@ -101,29 +122,36 @@ public class PerformanceService {
             .bodyToMono(Map.class)
             .flatMap(response -> {
                 Boolean isComplete = (Boolean) response.getOrDefault("complete", false);
+                String status = (String) response.getOrDefault("status", "UNKNOWN");
+                
+                log.debug("Job {} status: complete={}, status={}", jobId, isComplete, status);
                 
                 if (Boolean.TRUE.equals(isComplete) && response.get("data") != null) {
                     // Sonucu PerformanceAnalysisResponse'a dönüştür
                     Object data = response.get("data");
                     return Mono.just(objectMapper.convertValue(data, PerformanceAnalysisResponse.class));
+                } else if (Boolean.TRUE.equals(isComplete) && "FAILED".equals(status)) {
+                    // İş başarısız oldu
+                    String error = (String) response.getOrDefault("error", "Unknown error");
+                    log.warn("Job {} failed: {}", jobId, error);
+                    
+                    return Mono.just(PerformanceAnalysisResponse.builder()
+                        .id(UUID.randomUUID().toString())
+                        .jobId(jobId)
+                        .url((String) response.getOrDefault("url", ""))
+                        .status("FAILED")
+                        .message("Analysis failed: " + error)
+                        .timestamp(System.currentTimeMillis())
+                        .build());
+                } else if ("NOT_FOUND".equals(status)) {
+                    // İş bulunamadı
+                    log.warn("Job {} not found", jobId);
+                    return Mono.error(new RuntimeException("Job not found: " + jobId));
                 } else {
-                    // İş henüz tamamlanmamış
-                    String status = (String) response.getOrDefault("status", "unknown");
-                    
                     // "PENDING" durumu için özel bir yanıt döndür
-                    if ("PENDING".equals(status)) {
-                        // Boş bir cevap oluştur ancak durum bilgisiyle birlikte
-                        return Mono.just(PerformanceAnalysisResponse.builder()
-                            .url((String) response.getOrDefault("url", ""))
-                            .status("PENDING") // Durumu ekle
-                            .message("Analiz devam ediyor, lütfen daha sonra tekrar deneyin")
-                            .jobId(jobId) // İşlem ID'sini ekle
-                            .build());
-                    }
-                    
-                    // Diğer hatalar için
-                    String error = (String) response.getOrDefault("error", "İşlem henüz tamamlanmadı");
-                    return Mono.error(new RuntimeException("Job status: " + status + ", Error: " + error));
+                    log.debug("Job {} is still pending", jobId);
+                    // Boş bir cevap oluştur ancak durum bilgisiyle birlikte
+                    return Mono.error(new RuntimeException("Job not completed yet: " + status));
                 }
             });
     }

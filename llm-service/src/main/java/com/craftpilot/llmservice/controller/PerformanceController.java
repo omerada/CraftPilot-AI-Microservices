@@ -72,26 +72,72 @@ public class PerformanceController {
     public Mono<Map<String, Object>> analyzeWebsite(@RequestBody PerformanceAnalysisRequest request) {
         log.info("Performing performance analysis for URL: {}", request.getUrl());
 
-        return webClientBuilder.build()
-                .post()
-                .uri(lighthouseServiceUrl + "/api/v1/analyze")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>(){})
-                .doOnSuccess(response -> log.info("Performance analysis response received: jobId={}", response.get("jobId")))
-                .doOnError(error -> log.error("Error during performance analysis: {}", error.getMessage()))
-                .onErrorResume(WebClientResponseException.class, e -> {
-                    log.error("Web client error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+        // Önce health check yap
+        return healthCheck()
+            .flatMap(isHealthy -> {
+                if (!isHealthy) {
+                    log.warn("Lighthouse service health check failed");
                     return Mono.just(Map.of(
-                            "error", "Performance analysis service error: " + e.getStatusCode(),
-                            "message", e.getResponseBodyAsString()
+                        "error", "Lighthouse service is currently unavailable",
+                        "status", "SERVICE_UNAVAILABLE"
                     ));
-                })
-                .onErrorResume(e -> Mono.just(Map.of(
-                        "error", "Performance analysis failed",
-                        "message", e.getMessage()
-                )));
+                }
+                
+                // Servis sağlıklı, analiz isteğini gönder
+                return webClientBuilder.build()
+                    .post()
+                    .uri(lighthouseServiceUrl + "/api/v1/analyze")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>(){})
+                    .doOnSuccess(response -> log.info("Performance analysis response received: jobId={}", response.get("jobId")))
+                    .doOnError(error -> log.error("Error during performance analysis: {}", error.getMessage()));
+            })
+            .onErrorResume(error -> {
+                log.error("Error analyzing website: {}", error.getMessage());
+                return Mono.just(Map.of(
+                    "error", "Failed to analyze website",
+                    "message", error.getMessage(),
+                    "status", "ERROR"
+                ));
+            });
+    }
+
+    @GetMapping("/status/{jobId}")
+    @Operation(summary = "Check job status", description = "Check the status of a Lighthouse analysis job")
+    public Mono<Map<String, Object>> checkStatus(@PathVariable String jobId) {
+        log.info("Checking status for job: {}", jobId);
+        
+        return webClientBuilder.build()
+            .get()
+            .uri(lighthouseServiceUrl + "/api/v1/report/" + jobId)
+            .retrieve()
+            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>(){})
+            .timeout(Duration.ofSeconds(5))
+            .doOnSuccess(response -> {
+                Boolean complete = (Boolean) response.getOrDefault("complete", false);
+                String status = (String) response.getOrDefault("status", "UNKNOWN");
+                log.info("Status for job {}: complete={}, status={}", jobId, complete, status);
+            })
+            .doOnError(error -> log.error("Error checking job status: {}", error.getMessage()))
+            .onErrorResume(error -> Mono.just(Map.of(
+                "jobId", jobId,
+                "status", "ERROR",
+                "error", "Failed to check status: " + error.getMessage()
+            )));
+    }
+
+    private Mono<Boolean> healthCheck() {
+        return webClientBuilder.build()
+            .get()
+            .uri(lighthouseServiceUrl + "/health")
+            .retrieve()
+            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>(){})
+            .map(response -> "UP".equals(response.get("status")))
+            .onErrorReturn(false)
+            .timeout(Duration.ofSeconds(2))
+            .onErrorReturn(false);
     }
 
     /**
