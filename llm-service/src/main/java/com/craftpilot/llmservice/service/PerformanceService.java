@@ -107,9 +107,22 @@ public class PerformanceService {
                     Object data = response.get("data");
                     return Mono.just(objectMapper.convertValue(data, PerformanceAnalysisResponse.class));
                 } else {
-                    // İş henüz tamamlanmamış, hata döndür
+                    // İş henüz tamamlanmamış
                     String status = (String) response.getOrDefault("status", "unknown");
-                    String error = (String) response.getOrDefault("error", "Job not completed yet");
+                    
+                    // "PENDING" durumu için özel bir yanıt döndür
+                    if ("PENDING".equals(status)) {
+                        // Boş bir cevap oluştur ancak durum bilgisiyle birlikte
+                        return Mono.just(PerformanceAnalysisResponse.builder()
+                            .url((String) response.getOrDefault("url", ""))
+                            .status("PENDING") // Durumu ekle
+                            .message("Analiz devam ediyor, lütfen daha sonra tekrar deneyin")
+                            .jobId(jobId) // İşlem ID'sini ekle
+                            .build());
+                    }
+                    
+                    // Diğer hatalar için
+                    String error = (String) response.getOrDefault("error", "İşlem henüz tamamlanmadı");
                     return Mono.error(new RuntimeException("Job status: " + status + ", Error: " + error));
                 }
             });
