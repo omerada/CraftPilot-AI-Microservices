@@ -77,7 +77,7 @@ public class PerformanceController {
             .flatMap(isHealthy -> {
                 if (!isHealthy) {
                     log.warn("Lighthouse service health check failed");
-                    return Mono.just(Map.of(
+                    return Mono.<Map<String, Object>>just(Map.of(
                         "error", "Lighthouse service is currently unavailable",
                         "status", "SERVICE_UNAVAILABLE"
                     ));
@@ -96,7 +96,7 @@ public class PerformanceController {
             })
             .onErrorResume(error -> {
                 log.error("Error analyzing website: {}", error.getMessage());
-                return Mono.just(Map.of(
+                return Mono.<Map<String, Object>>just(Map.of(
                     "error", "Failed to analyze website",
                     "message", error.getMessage(),
                     "status", "ERROR"

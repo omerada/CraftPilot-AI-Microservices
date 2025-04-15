@@ -90,7 +90,7 @@ public class PerformanceService {
                          e.getMessage().contains("PENDING")))
                 .maxBackoff(Duration.ofSeconds(10)) // Önceki 20'den azaltıldı
                 .doAfterRetry(retrySignal -> {
-                    int attempt = retrySignal.totalRetries() + 1;
+                    long attempt = retrySignal.totalRetries() + 1;
                     if (attempt % 3 == 0) {  // Her 3 denemede bir log yaz
                         log.info("Retrying poll for job {}, attempt {}/{}",
                             jobId, attempt, MAX_RETRIES);
