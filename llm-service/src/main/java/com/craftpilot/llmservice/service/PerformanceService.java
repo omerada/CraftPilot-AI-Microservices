@@ -25,6 +25,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import com.craftpilot.llmservice.model.performance.PerformanceHistoryResponse.PerformanceHistoryEntry;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Service
 @RequiredArgsConstructor
@@ -225,19 +228,18 @@ public class PerformanceService {
         log.info("Getting performance history for URL: {}", request.getUrl());
         
         return performanceAnalysisRepository.findByUrl(request.getUrl())
-                .map(analysis -> {
-                    return PerformanceHistoryEntry.builder()
-                        .id(analysis.getId())
-                        .url(analysis.getUrl())
-                        .timestamp(analysis.getTimestamp())
-                        .performance(analysis.getPerformance())
-                        .build();
-                })
+                .map(analysis -> PerformanceHistoryEntry.builder()
+                    .id(analysis.getId())
+                    .url(analysis.getUrl())
+                    .timestamp(LocalDateTime.ofInstant(
+                        Instant.ofEpochMilli(analysis.getTimestamp()), 
+                        ZoneId.systemDefault()))
+                    .performance(analysis.getPerformance())
+                    .build())
                 .collectList()
-                .map(entries -> {
-                    return PerformanceHistoryResponse.builder()
-                        .history(entries)
-                        .build();
-                });
+                .map(entries -> PerformanceHistoryResponse.builder()
+                    .url(request.getUrl())
+                    .history(entries)
+                    .build());
     }
 }
