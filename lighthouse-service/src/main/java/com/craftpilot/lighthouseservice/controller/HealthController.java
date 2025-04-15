@@ -102,17 +102,27 @@ public class HealthController {
     private Mono<Boolean> checkRedisConnection() {
         return Mono.defer(() -> {
             try {
+                // HealthController metodundaki timeout ve retry konfigürasyonunu düzelttim
+                // İlk olarak bağlantı alın
                 return redisConnectionFactory.getReactiveConnection()
+                    // Ping komutunu çalıştırın
                     .ping()
-                    .map(ping -> true)
-                    .timeout(Duration.ofMillis(2000)) // 500ms -> 2000ms olarak arttırıldı
+                    // Ping başarılı olursa true döndürün
+                    .map(ping -> {
+                        log.debug("Redis ping successful: {}", ping);
+                        return true;
+                    })
+                    // Timeout değerini yükselt (500ms -> 2000ms)
+                    .timeout(Duration.ofMillis(2000))
+                    // Hata durumunda false döndürün ve hata mesajını loglayın
                     .onErrorResume(e -> {
                         log.warn("Redis connection check failed: {}", e.getMessage());
                         return Mono.just(false);
                     })
-                    .retry(3); // 3 kez tekrar deneme eklendi
+                    // 3 kez deneme yapın
+                    .retry(3);
             } catch (Exception e) {
-                log.warn("Redis connection check failed: {}", e.getMessage());
+                log.warn("Redis connection initialization failed: {}", e.getMessage());
                 return Mono.just(false);
             }
         });

@@ -6,8 +6,8 @@ spring:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:13579ada}
-      connect-timeout: 5000 # 2000ms'den 5000ms'ye artırıldı
-      timeout: 3000 # 1000ms'den 3000ms'ye artırıldı
+      connect-timeout: 5000 # Bağlantı zaman aşımı
+      timeout: 3000 # Komut zaman aşımı
       lettuce:
         pool:
           max-active: 8
@@ -39,8 +39,9 @@ lighthouse:
   job:
     timeout: ${LIGHTHOUSE_JOB_TIMEOUT:120} # 2 dakika (saniye olarak)
   worker:
-    count: ${LIGHTHOUSE_WORKER_COUNT:3} # Worker thread sayısı
-    poll-interval: ${LIGHTHOUSE_WORKER_POLL_INTERVAL:1000} # ms
+    count: ${LIGHTHOUSE_WORKER_COUNT:3} # Worker sayısı
+    poll-interval: 1000 # Poll aralığı (ms)
+    check-interval: 10000 # Worker kontrol aralığı (ms)
 
 logging:
   level:
