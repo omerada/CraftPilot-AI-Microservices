@@ -49,17 +49,29 @@ public class LighthouseWorkerService {
     @Value("${lighthouse.worker.poll-interval:1000}")
     private int pollInterval; // ms
 
-    @Value("${lighthouse.cli.path:lighthouse}")
-    private String lighthousePath; // Lighthouse CLI yolunu yapılandırmadan ayarlama imkanı
-    
-    @Value("${lighthouse.temp.dir:/tmp}")
-    private String tempDir; // Geçici dosyalar için dizin
+    @Value("${lighthouse.cli.path:/usr/local/bin/lighthouse}")
+    private String lighthousePath;
+
+    @Value("${lighthouse.cli.timeout:300}")
+    private int lighthouseTimeout;
     
     @Value("${lighthouse.cli.max-retries:2}")
-    private int lighthouseMaxRetries; // Lighthouse CLI yeniden deneme sayısı
+    private int lighthouseMaxRetries;
     
     @Value("${lighthouse.cli.retry-delay:5000}")
-    private int lighthouseRetryDelay; // Lighthouse CLI yeniden deneme gecikmesi (ms)
+    private int lighthouseRetryDelay;
+    
+    @Value("${lighthouse.cli.chrome-flags:--headless --no-sandbox --disable-gpu --disable-dev-shm-usage}")
+    private String chromeFlags;
+    
+    @Value("${lighthouse.cli.categories.basic:performance}")
+    private String basicCategories;
+    
+    @Value("${lighthouse.cli.categories.detailed:performance,accessibility,best-practices,seo}")
+    private String detailedCategories;
+    
+    @Value("${lighthouse.temp.dir:/tmp/lighthouse}")
+    private String tempDir; // Geçici dosyalar için dizin
     
     @Value("${lighthouse.cli.enable-error-reporting:true}")
     private boolean enableErrorReporting; // Hata raporlama etkin mi
@@ -287,6 +299,22 @@ public class LighthouseWorkerService {
             });
     }
     
+    // Yeniden deneme yapılıp yapılmayacağını belirle
+    private boolean shouldRetry(Throwable throwable) {
+        if (throwable instanceof IOException) {
+            return true;
+        }
+        
+        String message = throwable.getMessage();
+        return message != null && (
+            message.contains("ECONNREFUSED") || 
+            message.contains("ETIMEDOUT") || 
+            message.contains("Connection refused") || 
+            message.contains("Connection reset") ||
+            message.contains("Chrome could not be found")
+        );
+    }
+    
     // Lighthouse CLI komutunu çalıştırma
     private Map<String, Object> executeCliCommand(String url, String analysisType, String jobId) throws Exception {
         log.info("Starting Lighthouse CLI analysis for URL: {} with type: {}", url, analysisType);
@@ -309,17 +337,11 @@ public class LighthouseWorkerService {
         // Lighthouse CLI komut parametrelerini hazırla
         final List<String> command = buildLighthouseCommand(url, outputFilePath, analysisType);
         
-        // Komutu çalıştır - ProcessBuilder yerine daha direkt erişim için Runtime kullanıyoruz
+        // Komutu çalıştır
         log.info("Executing command: {}", String.join(" ", command));
         
         ProcessBuilder processBuilder = new ProcessBuilder(command);
         processBuilder.redirectErrorStream(true); // Hata çıktılarını birleştir
-        
-        // NODE_PATH çevre değişkenini ayarlayarak modul bulma sorunlarını çöz
-        Map<String, String> env = processBuilder.environment();
-        String nodePath = env.getOrDefault("NODE_PATH", "");
-        // Node modüllerinin bulunabileceği standart konumlar ekle
-        env.put("NODE_PATH", nodePath + ":/usr/local/lib/node_modules:/usr/lib/node_modules");
         
         // İşlemi başlat
         final Process process = processBuilder.start();
@@ -330,7 +352,7 @@ public class LighthouseWorkerService {
             String line;
             while ((line = reader.readLine()) != null) {
                 output.append(line).append("\n");
-                log.info("Lighthouse CLI output: {}", line);
+                log.debug("Lighthouse CLI output: {}", line);
             }
         }
         
@@ -340,11 +362,8 @@ public class LighthouseWorkerService {
         // Eğer çıkış kodu başarısız ise
         if (exitCode != 0) {
             log.error("Lighthouse CLI process exited with code: {}, Output: {}", exitCode, output.toString());
-            
-            // Çıktıdaki hata mesajlarını incele
-            String errorDetails = analyzeCliOutput(output.toString());
-            throw new RuntimeException("Lighthouse CLI failed with exit code: " + exitCode + 
-                (errorDetails != null ? ". Details: " + errorDetails : ""));
+            throw new RuntimeException("Lighthouse CLI failed with exit code: " + exitCode + ". Details: " + 
+                analyzeCliOutput(output.toString()));
         }
         
         // JSON çıktı dosyasını kontrol et
@@ -386,15 +405,14 @@ public class LighthouseWorkerService {
     private List<String> buildLighthouseCommand(String url, String outputFilePath, String analysisType) {
         final List<String> command = new ArrayList<>();
         
-        // Lighthouse CLI için NPX kullan - NPX modülü bulamama sorunlarını çözebilir
-        command.add("npx");
+        // Doğrudan lighthouse komutunu kullan (npx olmadan)
         command.add(lighthousePath);
         command.add(url);
         command.add("--output=json");
         command.add("--output-path=" + outputFilePath);
         
-        // Chrome flags düzeltildi - çift tırnak sorunlarını kaldır
-        command.add("--chrome-flags=--headless --no-sandbox --disable-gpu --disable-dev-shm-usage");
+        // Chrome flags ekle
+        command.add("--chrome-flags=" + chromeFlags);
         
         // Analiz tipini normalize et
         final String normalizedAnalysisType = (analysisType == null || analysisType.trim().isEmpty()) 
@@ -404,14 +422,13 @@ public class LighthouseWorkerService {
         // Analiz tipine göre ek parametreler ekle
         switch (normalizedAnalysisType) {
             case "detailed":
-                // Detaylı analiz için tüm kategorileri kontrol et
+                command.add("--only-categories=" + detailedCategories);
                 command.add("--throttling.cpuSlowdownMultiplier=4");
                 command.add("--throttling-method=devtools");
                 break;
             case "basic":
             default:
-                // Temel analiz için sadece performans kategorisini kontrol et
-                command.add("--only-categories=performance");
+                command.add("--only-categories=" + basicCategories);
                 command.add("--throttling-method=simulate");
                 command.add("--max-wait-for-load=30000");  // Daha kısa bekleme süresi
                 break;
@@ -422,22 +439,19 @@ public class LighthouseWorkerService {
     
     // Gerekli araçları kontrol et
     private void checkRequiredTools() throws Exception {
-        // Lighthouse varlığını kontrol et - npx ile çalıştırılacak
-        Process npmCheck = Runtime.getRuntime().exec("which npm");
-        int npmExitCode = npmCheck.waitFor();
-        
-        if (npmExitCode != 0) {
-            log.error("npm not found on system path. Lighthouse CLI cannot run.");
-            throw new RuntimeException("Required tool npm is not installed or not accessible");
+        // Lighthouse varlığını kontrol et
+        Path lighthouseExecutable = Path.of(lighthousePath);
+        if (!Files.exists(lighthouseExecutable)) {
+            log.error("Lighthouse CLI not found at: {}", lighthousePath);
+            throw new RuntimeException("Lighthouse CLI not found at: " + lighthousePath);
         }
         
         // Chrome/Chromium varlığını kontrol et
-        String[] browsers = {"chromium", "google-chrome", "chrome"};
+        String[] browsers = {"/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome", "/usr/bin/chrome"};
         boolean foundBrowser = false;
         
         for (String browser : browsers) {
-            Process browserCheck = Runtime.getRuntime().exec("which " + browser);
-            if (browserCheck.waitFor() == 0) {
+            if (Files.exists(Path.of(browser))) {
                 log.info("Found browser: {}", browser);
                 foundBrowser = true;
                 break;
@@ -445,7 +459,7 @@ public class LighthouseWorkerService {
         }
         
         if (!foundBrowser) {
-            log.error("No Chrome/Chromium browser found on system path");
+            log.error("No Chrome/Chromium browser found on system");
             throw new RuntimeException("Required browser (Chrome/Chromium) is not installed or not accessible");
         }
     }
@@ -453,7 +467,7 @@ public class LighthouseWorkerService {
     // CLI çıktısını analiz eder ve hata mesajlarını çıkarır
     private String analyzeCliOutput(String output) {
         if (output == null || output.isEmpty()) {
-            return null;
+            return "Unknown error - no output";
         }
         
         // Node.js/NPM modül hatalarını tespit et
@@ -484,7 +498,7 @@ public class LighthouseWorkerService {
         // Son 5 satır genellikle en önemli hata mesajlarını içerir
         String[] lines = output.split("\n");
         if (lines.length > 0) {
-            StringBuilder lastLines = new StringBuilder("Last lines: ");
+            StringBuilder lastLines = new StringBuilder("Last output lines: ");
             for (int i = Math.max(0, lines.length - 5); i < lines.length; i++) {
                 if (!lines[i].trim().isEmpty()) {
                     lastLines.append(lines[i].trim()).append("; ");
@@ -493,7 +507,7 @@ public class LighthouseWorkerService {
             return lastLines.toString();
         }
         
-        return null;
+        return "Unknown error occurred";
     }
     
     // Modül adı çıkarma yardımcı metodu

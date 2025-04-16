@@ -1,60 +1,46 @@
-# Chrome ve Lighthouse kurulumu için temel imaj - daha güncel Node sürümü
+# Lighthouse başlangıç imajı
 FROM node:18-slim AS node-base
 
-ARG TARGETARCH
-ARG CHROME_ARCH=${TARGETARCH:-amd64}
-
-# Gerekli sistem paketlerini yükle ve Lighthouse kurulumu
+# Gerekli sistem paketlerini yükle
 RUN apt-get update && apt-get install -y \
     chromium \
-    libxss1 \
+    fonts-ipafont-gothic \
+    fonts-wqy-zenhei \
+    fonts-thai-tlwg \
+    fonts-kacst \
+    fonts-symbola \
+    fonts-noto \
+    fonts-noto-color-emoji \
+    fonts-freefont-ttf \
     ca-certificates \
-    wget \
-    gnupg \
-    apt-transport-https \
-    procps \
-    netcat-traditional \
     curl \
-    dumb-init \
-    # Ek Chrome bağımlılıkları
-    libnss3 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    && npm install -g lighthouse@10.0.0 puppeteer@19.7.0 \
-    # Lighthouse çalışması için gerekli global modülleri ekle
-    && npm install -g chrome-launcher \
-    && npm install -g axe-core \
-    && npm cache clean --force \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    gnupg \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
 
-# Chromium alias'ını oluştur (Lighthouse'un kullanabilmesi için)
-RUN ln -s /usr/bin/chromium /usr/bin/google-chrome && \
-    # Lighthouse'un çalışabilmesi için gerekli dizinleri oluştur
-    mkdir -p /home/node/.cache/puppeteer && \
-    mkdir -p /home/node/.config/configstore && \
-    chmod -R 777 /home/node
+# Lighthouse ve gerekli modülleri global olarak kur
+RUN npm install -g lighthouse@11.1.0 \
+                    chrome-launcher@0.15.2 \
+                    axe-core@4.7.0 \
+                    puppeteer@21.3.8 \
+                    && npm cache clean --force
 
-# Chrome versiyonunu kontrol et
-RUN chromium --version || echo "Chrome not working properly"
-
-# Lighthouse CLI'ı test et
-RUN lighthouse --version || echo "Lighthouse CLI not working properly"
+# Lighthouse çalıştırılabilir olduğunu doğrula
+RUN ln -s /usr/bin/chromium /usr/bin/chromium-browser \
+    && ln -s /usr/bin/chromium /usr/bin/google-chrome \
+    && mkdir -p /root/.config \
+    && chmod -R 777 /root/.config \
+    && lighthouse --version
 
 # Java uygulaması için builder aşaması
-FROM eclipse-temurin:17-jdk AS builder
+FROM eclipse-temurin:21-jdk AS builder
 WORKDIR /app
 
 # Maven wrapper ve bağımlılıkları önce kopyalayıp önbelleği etkin kullan
-COPY mvnw ./ 
+COPY mvnw ./
 COPY .mvn .mvn
 COPY pom.xml ./
+
 # Bağımlılıkları önce indirerek build katmanını optimize et
 RUN ./mvnw dependency:go-offline
 
@@ -65,73 +51,67 @@ RUN ./mvnw clean package -DskipTests
 # Final imaj (sadece çalışma için gerekli her şey)
 FROM eclipse-temurin:21-jre
 
-# Node ve Lighthouse CLI
+# Node.js ve Lighthouse CLI kurulumu için gerekli bağımlılıklar
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    fonts-ipafont-gothic \
+    fonts-wqy-zenhei \
+    fonts-thai-tlwg \
+    fonts-kacst \
+    fonts-symbola \
+    fonts-noto \
+    fonts-noto-color-emoji \
+    fonts-freefont-ttf \
+    ca-certificates \
+    curl \
+    wget \
+    gnupg \
+    dumb-init \
+    procps \
+    netcat-traditional \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node.js kurulumu
 COPY --from=node-base /usr/local/bin/node /usr/local/bin/
 COPY --from=node-base /usr/local/bin/npm /usr/local/bin/
-COPY --from=node-base /usr/local/bin/npx /usr/local/bin/
-COPY --from=node-base /usr/local/bin/lighthouse /usr/local/bin/
+
+# Lighthouse CLI ve bağımlılıkları
 COPY --from=node-base /usr/local/lib/node_modules /usr/local/lib/node_modules
 COPY --from=node-base /usr/bin/chromium /usr/bin/chromium
 COPY --from=node-base /usr/bin/google-chrome /usr/bin/google-chrome
-COPY --from=node-base /usr/bin/dumb-init /usr/bin/dumb-init
+COPY --from=node-base /usr/bin/chromium-browser /usr/bin/chromium-browser
 
-# Chrome için gerekli sistem paketlerini ekle
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    procps \
-    curl \
-    netcat-traditional \
-    libxss1 \
-    # Chrome için gerekli ek kütüphaneler
-    libnss3 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Lighthouse CLI sembolik link oluştur
+RUN ln -s /usr/local/lib/node_modules/lighthouse/cli/index.js /usr/local/bin/lighthouse \
+    && chmod +x /usr/local/bin/lighthouse
 
-# Gerekli NodeJS modüllerinin sembolik linklerini oluştur
-RUN ln -s /usr/local/lib/node_modules/lighthouse/cli/index.js /usr/local/bin/lighthouse && \
-    chmod +x /usr/local/bin/lighthouse
+# Lighthouse ve Chrome versiyonlarını kontrol et
+RUN lighthouse --version && chromium --version
 
 # Java uygulaması
 COPY --from=builder /app/target/*.jar /app/app.jar
 
-# Geçici klasör, kullanıcı ayarları ve Chrome için dizinleri oluştur
-RUN mkdir -p /tmp/lighthouse && \
-    mkdir -p /tmp/.X11-unix && \
-    mkdir -p /tmp/.lighthouse && \
-    mkdir -p /var/cache/chromium && \
-    useradd -m -d /home/appuser -s /bin/bash appuser && \
-    # Chrome ve Lighthouse için gerekli dizinleri oluştur
-    mkdir -p /home/appuser/.cache/puppeteer && \
-    mkdir -p /home/appuser/.config/configstore && \
-    # Tüm izinleri ayarla
-    chown -R appuser:appuser /app /tmp/lighthouse /tmp/.X11-unix /tmp/.lighthouse /var/cache/chromium && \
-    chown -R appuser:appuser /home/appuser/.cache /home/appuser/.config && \
-    chmod -R 777 /tmp/lighthouse /tmp/.X11-unix /tmp/.lighthouse /var/cache/chromium /home/appuser/.cache /home/appuser/.config
+# Geçici klasör ve kullanıcı ayarları
+RUN mkdir -p /tmp/lighthouse /tmp/node_modules /home/appuser/.config \
+    && useradd -m -d /home/appuser -s /bin/bash appuser \
+    && chown -R appuser:appuser /app /tmp/lighthouse /tmp/node_modules /home/appuser/.config \
+    && chmod -R 777 /tmp/lighthouse /tmp/node_modules /home/appuser/.config
 
-# Chrome ve Lighthouse CLI'ın düzgün çalıştığını kontrol et
+# Çalışma sırasında kullanılacak kullanıcı
 USER appuser
-RUN chromium --version || echo "Chrome check failed" && \
-    lighthouse --version || echo "Lighthouse check failed" && \
-    node -e "console.log('Node.js ' + process.version)"
 
-# Çalışma dizini ve port ayarları
+# Çalışma ortamı değişkenleri
+ENV HOME=/home/appuser \
+    NODE_PATH=/usr/local/lib/node_modules \
+    CHROME_PATH=/usr/bin/chromium \
+    LIGHTHOUSE_CHROMIUM_PATH=/usr/bin/chromium \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+    LIGHTHOUSE_CI_CACHE_PATH=/tmp/lighthouse
+
 WORKDIR /app
 EXPOSE 8085
 
-# Çevre değişkenlerini ayarla
-ENV HOME=/home/appuser \
-    CHROME_PATH=/usr/bin/chromium \
-    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-    NODE_PATH=/usr/local/lib/node_modules
-
-# dumb-init ile process yönetimini iyileştir
+# dumb-init ile process yönetimi
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["java", "-jar", "app.jar"]

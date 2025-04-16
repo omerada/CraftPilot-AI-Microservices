@@ -51,14 +51,20 @@ lighthouse:
     check-interval: 10000 # Worker kontrol aralığı (ms)
     restart-attempts: ${LIGHTHOUSE_WORKER_RESTART_ATTEMPTS:3} # Worker yeniden başlatma deneme sayısı
   cli:
-    path: ${LIGHTHOUSE_CLI_PATH:lighthouse} # Lighthouse CLI yolu
+    path: ${LIGHTHOUSE_CLI_PATH:/usr/local/bin/lighthouse} # Lighthouse CLI'ın tam yolu
     timeout: ${LIGHTHOUSE_CLI_TIMEOUT:300} # CLI işlem zaman aşımı (sn)
     # Lighthouse CLI için ek ayarlar
     enable-error-reporting: ${LIGHTHOUSE_ENABLE_ERROR_REPORTING:true} # Hata raporlamayı etkinleştir
     max-retries: ${LIGHTHOUSE_CLI_MAX_RETRIES:2} # Başarısızlık durumunda yeniden deneme sayısı
     retry-delay: ${LIGHTHOUSE_CLI_RETRY_DELAY:5000} # Yeniden denemeler arasındaki bekleme süresi (ms)
-    # Lighthouse CLI çalıştırma stratejisi - doğrudan veya npx ile
-    use-npx: ${LIGHTHOUSE_USE_NPX:true} # NPX kullanarak lighthouse çalıştır
+    # Lighthouse CLI çalıştırma stratejisi - artık doğrudan kullanılacak
+    use-npx: false # NPX kullanımını devre dışı bırak
+    # Chrome bayrağı ayarları
+    chrome-flags: "--headless --no-sandbox --disable-gpu --disable-dev-shm-usage"
+    # Kategoriler ve yapılandırma
+    categories:
+      basic: "performance"
+      detailed: "performance,accessibility,best-practices,seo"
   temp:
     dir: ${LIGHTHOUSE_TEMP_DIR:/tmp/lighthouse} # Geçici dosyalar için dizin
     cleanup: ${LIGHTHOUSE_TEMP_CLEANUP:true} # Geçici dosyaların temizlenmesi
