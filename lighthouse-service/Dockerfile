@@ -17,6 +17,7 @@ RUN apt-get update && \
     libgdk-pixbuf2.0-0 libnspr4 libnss3 libx11-xcb1 libxcomposite1 \
     libxdamage1 libxrandr2 libgbm1 libgtk-3-0 libxshmfence1 libxss1 libxtst6 \
     --no-install-recommends && \
+    chmod +x /usr/bin/chromium && \
     ln -sf /usr/bin/chromium /usr/bin/google-chrome && \
     ln -sf /usr/bin/chromium /usr/bin/chromium-browser && \
     rm -rf /var/lib/apt/lists/*
