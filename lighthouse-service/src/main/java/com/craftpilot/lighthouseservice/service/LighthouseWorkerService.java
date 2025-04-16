@@ -464,12 +464,33 @@ public class LighthouseWorkerService {
         // Sistem ortam değişkenlerini logla
         logEnvironmentInfo();
         
-        // Java yolunu doğrudan PATH'den bulmaya çalış
+        // Java'yı kontrol et ve bulunamaması durumunda alternatif stratejiler uygula
+        boolean javaFound = false;
+        
+        // İlk strateji: PATH'de Java'yı aramak
         String javaPath = findExecutableInPath("java");
         if (javaPath != null) {
             logger.info("Java found in PATH at: {}", javaPath);
+            javaFound = true;
+        } else {
+            logger.warn("Java not found in PATH. Checking known locations.");
             
-            // Java kontrolü
+            // İkinci strateji: Bilinen konumları kontrol et
+            javaPath = checkJavaInKnownLocations();
+            if (javaPath != null) {
+                javaFound = true;
+                // Bulunduğunda ortam değişkenlerini güncelle
+                try {
+                    System.setProperty("java.home", new File(javaPath).getParent());
+                    logger.info("Set java.home to: {}", System.getProperty("java.home"));
+                } catch (Exception e) {
+                    logger.warn("Error setting java.home: {}", e.getMessage());
+                }
+            }
+        }
+        
+        // Üçüncü strateji: manuel olarak yürütülebilir olup olmadığını kontrol et
+        if (javaFound) {
             try {
                 ProcessBuilder processBuilder = new ProcessBuilder(javaPath, "-version");
                 processBuilder.redirectErrorStream(true);
@@ -486,15 +507,53 @@ public class LighthouseWorkerService {
                 int exitCode = process.waitFor();
                 if (exitCode != 0) {
                     logger.error("Java check failed with exit code: {}, Output: {}", exitCode, output);
+                    javaFound = false;
                 } else {
                     logger.info("Java check passed: {}", output.toString().trim());
                 }
             } catch (Exception e) {
                 logger.error("Error checking Java: {}", e.getMessage());
+                javaFound = false;
             }
-        } else {
-            logger.error("Java not found in PATH. Checking known locations.");
-            checkJavaInKnownLocations();
+        }
+        
+        if (!javaFound) {
+            // Dördüncü strateji: Container belirli bir konumdaysa mevcut dizini araştır
+            logger.error("Java not found with standard methods, attempting emergency lookup");
+            String[] emergencyPaths = {
+                "/opt/java/openjdk/bin/java",
+                "/usr/lib/jvm/java-17-openjdk/bin/java",
+                "/usr/lib/jvm/default-java/bin/java",
+                "./jre/bin/java",
+                "../jre/bin/java",
+                "/jre/bin/java"
+            };
+            
+            for (String path : emergencyPaths) {
+                File javaFile = new File(path);
+                if (javaFile.exists() && javaFile.canExecute()) {
+                    logger.info("Emergency: Found Java at {}", path);
+                    System.setProperty("java.home", javaFile.getParent());
+                    // Ortam değişkenlerini güncelle
+                    try {
+                        // Bu, Java uygulaması içinde PATH'i değiştirmez ancak
+                        // bu nesne için ortam değişkenini geçici olarak ayarlar
+                        Map<String, String> env = new HashMap<>(System.getenv());
+                        String pathVal = env.getOrDefault("PATH", "");
+                        env.put("PATH", javaFile.getParent() + ":" + pathVal);
+                        javaFound = true;
+                        break;
+                    } catch (Exception e) {
+                        logger.warn("Error updating environment PATH: {}", e.getMessage());
+                    }
+                }
+            }
+        }
+        
+        if (!javaFound) {
+            logger.error("Critical: Java could not be found. Lighthouse service may fail to operate correctly.");
+            // Burada hata fırlatılmıyor, böylece servis başlamaya devam edebilir ve
+            // Container için kendini düzeltme veya hata raporlama stratejileri uygulanabilir
         }
         
         // Tarayıcı kontrolü - Linux dağıtımlarında tipik olarak bulunanlar
@@ -507,6 +566,56 @@ public class LighthouseWorkerService {
         checkNodeAndNpm();
     }
     
+    private String checkJavaInKnownLocations() {
+        // Java için bilinen konumları kontrol et
+        String[] knownJavaLocations = {
+            "/usr/bin/java",
+            "/usr/local/bin/java",
+            "/opt/java/openjdk/bin/java",
+            "/opt/jdk/bin/java",
+            "/opt/openjdk-17/bin/java",
+            "/opt/java/bin/java",
+            "/usr/lib/jvm/java-*/bin/java",
+            "/usr/lib/jvm/default-java/bin/java"
+        };
+        
+        for (String location : knownJavaLocations) {
+            if (location.contains("*")) {
+                // Joker karakter içeren yol için glob deseni kullan
+                try {
+                    File jvmDir = new File(location.substring(0, location.indexOf("*")));
+                    if (jvmDir.exists() && jvmDir.isDirectory()) {
+                        File[] dirs = jvmDir.listFiles();
+                        if (dirs != null) {
+                            for (File dir : dirs) {
+                                if (dir.isDirectory()) {
+                                    String potentialJava = dir.getPath() + location.substring(location.indexOf("*") + 1);
+                                    File javaFile = new File(potentialJava);
+                                    if (javaFile.exists() && javaFile.canExecute()) {
+                                        logger.info("Java found at: {}", potentialJava);
+                                        return potentialJava;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.warn("Error checking Java wildcard path: {}", e.getMessage());
+                }
+                continue;
+            }
+            
+            File javaFile = new File(location);
+            if (javaFile.exists() && javaFile.canExecute()) {
+                logger.info("Java found at: {}", location);
+                return location;
+            }
+        }
+        
+        logger.error("Java not found in any known location. Container might need Java installed.");
+        return null;
+    }
+
     private String findExecutableInPath(String executable) {
         try {
             ProcessBuilder processBuilder = new ProcessBuilder("which", executable);
