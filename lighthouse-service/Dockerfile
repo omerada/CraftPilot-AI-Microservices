@@ -1,87 +1,55 @@
-# Build stage - Maven ve Java kullanarak derleme
+# Build stage
 FROM maven:3.9.5-eclipse-temurin-17 AS builder
 WORKDIR /app
-
-# POM dosyasını kopyala
 COPY pom.xml .
-
-# Bağımlılıkları indir (pom.xml değişmediği sürece önbelleğe alınır)
 RUN mvn dependency:go-offline -B
-
-# Kaynak kodları kopyala
 COPY src ./src
-
-# Uygulamayı derle
 RUN mvn clean package -DskipTests -B
 
-# Final imaj - Debian tabanlı imaj
+# Runtime stage
 FROM eclipse-temurin:17-jre
 
-# Temel araçları kur
-RUN apt-get update && apt-get install -y \
-    nodejs \
-    npm \
-    curl \
-    wget \
-    gnupg \
-    procps \
-    lsof \
-    chromium \
-    --no-install-recommends && \
-    # Node.js ve NPM sürümlerini kontrol et
-    node --version && \
-    npm --version && \
-    # Lighthouse CLI kurulumu
-    npm install -g lighthouse@11.1.0 && \
-    npm cache clean --force && \
-    # Lighthouse CLI'yı doğrula
-    lighthouse --version
+# Gerekli araçlar: nodejs, npm, curl
+RUN apt-get update && \
+    apt-get install -y nodejs npm curl && \
+    rm -rf /var/lib/apt/lists/*
 
-# Gerekli dizinleri oluştur
-RUN mkdir -p /tmp/lighthouse /home/appuser /tmp/netty
+# Google Chrome stable yükle (daha kararlı ve Lighthouse ile uyumlu)
+RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-linux.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-linux.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
+    apt-get update && \
+    apt-get install -y google-chrome-stable && \
+    rm -rf /var/lib/apt/lists/*
 
-# Ortam değişkenlerini yapılandır
-ENV NODE_PATH=/usr/local/lib/node_modules \
-    CHROME_PATH=/usr/bin/chromium \
-    LIGHTHOUSE_CHROMIUM_PATH=/usr/bin/chromium \
-    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    JAVA_HOME=/opt/java/openjdk \
-    PATH="${JAVA_HOME}/bin:/usr/local/bin:/usr/bin:${PATH}" \
-    SPRING_PROFILES_ACTIVE=prod
+# Lighthouse CLI yükle
+RUN npm install -g lighthouse@11.1.0 && npm cache clean --force
 
-# Güvenlik için non-root kullanıcı oluştur
-RUN groupadd -r appuser && \
-    useradd -r -g appuser -d /home/appuser appuser && \
-    chown -R appuser:appuser /tmp/lighthouse /tmp/netty /home/appuser
+# Gerekli dizinler
+RUN mkdir -p /tmp/lighthouse /tmp/netty
+
+# Non-root kullanıcı
+RUN groupadd -r appuser && useradd -r -g appuser -d /home/appuser appuser && \
+    mkdir -p /home/appuser && chown -R appuser:appuser /tmp/lighthouse /tmp/netty /home/appuser
 
 # JAR dosyasını kopyala
 COPY --from=builder /app/target/*.jar /app/app.jar
 RUN chown appuser:appuser /app/app.jar
 
-# Healthcheck script ekle
+# Healthcheck script
 COPY healthcheck.sh /app/healthcheck.sh
-RUN chmod +x /app/healthcheck.sh && \
-    chown appuser:appuser /app/healthcheck.sh
+RUN chmod +x /app/healthcheck.sh && chown appuser:appuser /app/healthcheck.sh
 
-# Kurulumu doğrula
-RUN java -version && \
-    node --version && \
-    npm --version && \
-    chromium --version || echo "Chromium version check failed" && \
-    lighthouse --version && \
-    ls -la /app/app.jar && \
-    which java && \
-    which node && \
-    which npm && \
-    which lighthouse
+# Ortam değişkenleri
+ENV NODE_PATH=/usr/local/lib/node_modules \
+    CHROME_PATH=/usr/bin/google-chrome \
+    LIGHTHOUSE_CHROMIUM_PATH=/usr/bin/google-chrome \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-# Non-root kullanıcıya geç
 USER appuser
 WORKDIR /app
 EXPOSE 8085
 
-# Healthcheck yapılandır
-HEALTHCHECK --interval=30s --timeout=20s --start-period=90s --retries=3 CMD [ "bash", "/app/healthcheck.sh" ]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 CMD [ "bash", "/app/healthcheck.sh" ]
 
-# Uygulamayı çalıştır
 CMD ["java", "-jar", "app.jar"]

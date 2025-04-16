@@ -52,7 +52,7 @@ lighthouse:
     count: ${LIGHTHOUSE_WORKER_COUNT:2} # Daha az worker kullan
     poll-interval: 5000 # Poll aralığını arttır
     check-interval: 30000 # Worker kontrol aralığı (ms)
-    restart-attempts: ${LIGHTHOUSE_WORKER_RESTART_ATTEMPTS:5} # Worker yeniden başlatma deneme sayısı
+    restart-attempts: ${LIGHTHOUSE_WORKER_RESTART_ATTEMPTS:3} # Worker yeniden başlatma deneme sayısı
   cli:
     path: ${LIGHTHOUSE_CLI_PATH:/usr/local/bin/lighthouse} # Lighthouse CLI'ın tam yolu
     timeout: ${LIGHTHOUSE_CLI_TIMEOUT:600} # CLI işlem zaman aşımı (sn)
@@ -76,8 +76,8 @@ logging:
   level:
     root: INFO
     com.craftpilot: INFO
-    org.springframework.data.redis: INFO
-    io.lettuce: INFO
+    org.springframework.data.redis: WARN
+    io.lettuce: WARN
 
 management:
   endpoints:

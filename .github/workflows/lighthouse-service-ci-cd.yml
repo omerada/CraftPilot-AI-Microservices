@@ -93,102 +93,28 @@ jobs:
             docker pull --platform linux/arm64 ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
 
             echo "Starting container with proper environment variables"
-            if [[ "${{ github.event.inputs.environment }}" == "debug" ]]; then
-              docker run -d \
-                --platform linux/arm64 \
-                --name lighthouse-service \
-                --network craftpilot-network \
-                --restart unless-stopped \
-                -p 8085:8085 \
-                -p 5008:5008 \
-                -v /opt/craftpilot/tmp/lighthouse:/tmp/lighthouse \
-                -v /opt/craftpilot/tmp/netty:/tmp/netty \
-                -e SPRING_PROFILES_ACTIVE=prod \
-                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-                -e SPRING_SECURITY_USER_NAME=craftpilot \
-                -e SPRING_SECURITY_USER_PASSWORD=13579ada \
-                -e SPRING_DATA_REDIS_HOST=redis \
-                -e SPRING_DATA_REDIS_PORT=6379 \
-                -e SPRING_DATA_REDIS_PASSWORD=13579ada \
-                -e SPRING_DATA_REDIS_CONNECT_TIMEOUT=5000 \
-                -e LIGHTHOUSE_QUEUE_NAME=lighthouse-jobs \
-                -e LIGHTHOUSE_RESULTS_PREFIX=lighthouse-results: \
-                -e LIGHTHOUSE_REDIS_CONNECTION_MAX_ATTEMPTS=10 \
-                -e LIGHTHOUSE_REDIS_CONNECTION_RETRY_DELAY_MS=5000 \
-                -e LIGHTHOUSE_CLI_PATH=/usr/local/bin/lighthouse \
-                -e LIGHTHOUSE_WORKER_COUNT=2 \
-                -e PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-                -e NODE_PATH=/usr/local/lib/node_modules \
-                -e PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-                -e CHROME_PATH=/usr/bin/chromium \
-                -e LIGHTHOUSE_CHROMIUM_PATH=/usr/bin/chromium \
-                -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
-                -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,metrics,info,loggers" \
-                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
-                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
-                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
-                -e MANAGEMENT_HEALTH_REDIS_ENABLED=true \
-                -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
-                -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
-                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_REDIS=DEBUG \
-                -e LOGGING_LEVEL_IO_LETTUCE=DEBUG \
-                -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5008" \
-                --ulimit nofile=65536:65536 \
-                --security-opt no-new-privileges \
-                --health-cmd="curl -f http://localhost:8085/health || exit 1" \
-                --health-interval=30s \
-                --health-timeout=20s \
-                --health-retries=5 \
-                --health-start-period=120s \
-                ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
-            else
-              docker run -d \
-                --platform linux/arm64 \
-                --name lighthouse-service \
-                --network craftpilot-network \
-                --restart unless-stopped \
-                -p 8085:8085 \
-                -v /opt/craftpilot/tmp/lighthouse:/tmp/lighthouse \
-                -v /opt/craftpilot/tmp/netty:/tmp/netty \
-                -e SPRING_PROFILES_ACTIVE=prod \
-                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-                -e SPRING_SECURITY_USER_NAME=craftpilot \
-                -e SPRING_SECURITY_USER_PASSWORD=13579ada \
-                -e SPRING_DATA_REDIS_HOST=redis \
-                -e SPRING_DATA_REDIS_PORT=6379 \
-                -e SPRING_DATA_REDIS_PASSWORD=13579ada \
-                -e SPRING_DATA_REDIS_CONNECT_TIMEOUT=5000 \
-                -e LIGHTHOUSE_QUEUE_NAME=lighthouse-jobs \
-                -e LIGHTHOUSE_RESULTS_PREFIX=lighthouse-results: \
-                -e LIGHTHOUSE_REDIS_CONNECTION_MAX_ATTEMPTS=10 \
-                -e LIGHTHOUSE_REDIS_CONNECTION_RETRY_DELAY_MS=5000 \
-                -e LIGHTHOUSE_CLI_PATH=/usr/local/bin/lighthouse \
-                -e LIGHTHOUSE_WORKER_COUNT=2 \
-                -e PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-                -e NODE_PATH=/usr/local/lib/node_modules \
-                -e PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-                -e CHROME_PATH=/usr/bin/chromium \
-                -e LIGHTHOUSE_CHROMIUM_PATH=/usr/bin/chromium \
-                -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
-                -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,metrics,info" \
-                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
-                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
-                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
-                -e MANAGEMENT_HEALTH_REDIS_ENABLED=true \
-                -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
-                -e LOGGING_LEVEL_COM_CRAFTPILOT=INFO \
-                -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty" \
-                --ulimit nofile=65536:65536 \
-                --security-opt no-new-privileges \
-                --health-cmd="curl -f http://localhost:8085/health || exit 1" \
-                --health-interval=30s \
-                --health-timeout=20s \
-                --health-retries=5 \
-                --health-start-period=120s \
-                ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
-            fi
+            docker run -d \
+              --platform linux/arm64 \
+              --name lighthouse-service \
+              --network craftpilot-network \
+              --restart unless-stopped \
+              -p 8085:8085 \
+              -v /opt/craftpilot/tmp/lighthouse:/tmp/lighthouse \
+              -v /opt/craftpilot/tmp/netty:/tmp/netty \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e SPRING_DATA_REDIS_HOST=redis \
+              -e SPRING_DATA_REDIS_PASSWORD=13579ada \
+              -e LIGHTHOUSE_CLI_PATH=/usr/local/bin/lighthouse \
+              -e CHROME_PATH=/usr/bin/google-chrome \
+              -e LIGHTHOUSE_CHROMIUM_PATH=/usr/bin/google-chrome \
+              --ulimit nofile=65536:65536 \
+              --security-opt no-new-privileges \
+              --health-cmd="curl -f http://localhost:8085/health || exit 1" \
+              --health-interval=30s \
+              --health-timeout=10s \
+              --health-retries=5 \
+              --health-start-period=60s \
+              ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
 
             # Verify available tools in the container
             echo "Waiting for container to start (10 seconds)..."
