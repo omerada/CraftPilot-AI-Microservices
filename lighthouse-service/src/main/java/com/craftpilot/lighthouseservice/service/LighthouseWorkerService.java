@@ -461,37 +461,169 @@ public class LighthouseWorkerService {
     private void checkRequiredTools() throws Exception {
         logger.info("Checking required tools");
         
-        // Java kontrolü
+        // Sistem ortam değişkenlerini logla
+        logEnvironmentInfo();
+        
+        // Java yolunu doğrudan PATH'den bulmaya çalış
+        String javaPath = findExecutableInPath("java");
+        if (javaPath != null) {
+            logger.info("Java found in PATH at: {}", javaPath);
+            
+            // Java kontrolü
+            try {
+                ProcessBuilder processBuilder = new ProcessBuilder(javaPath, "-version");
+                processBuilder.redirectErrorStream(true);
+                Process process = processBuilder.start();
+                
+                StringBuilder output = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        output.append(line).append("\n");
+                    }
+                }
+                
+                int exitCode = process.waitFor();
+                if (exitCode != 0) {
+                    logger.error("Java check failed with exit code: {}, Output: {}", exitCode, output);
+                } else {
+                    logger.info("Java check passed: {}", output.toString().trim());
+                }
+            } catch (Exception e) {
+                logger.error("Error checking Java: {}", e.getMessage());
+            }
+        } else {
+            logger.error("Java not found in PATH. Checking known locations.");
+            checkJavaInKnownLocations();
+        }
+        
+        // Tarayıcı kontrolü - Linux dağıtımlarında tipik olarak bulunanlar
+        findAndConfigureBrowser();
+        
+        // Lighthouse kontrolü ve yapılandırması
+        configureLighthouse();
+        
+        // Node.js ve NPM kontrolü
+        checkNodeAndNpm();
+    }
+    
+    private String findExecutableInPath(String executable) {
         try {
-            Process process = new ProcessBuilder("java", "-version")
-                .redirectErrorStream(true)
-                .start();
+            ProcessBuilder processBuilder = new ProcessBuilder("which", executable);
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();
             
             StringBuilder output = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    output.append(line).append("\n");
+                    output.append(line);
                 }
             }
             
             int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                logger.error("Java check failed with exit code: {}, Output: {}", exitCode, output);
-            } else {
-                logger.info("Java check passed: {}", output.toString().trim());
+            if (exitCode == 0) {
+                String path = output.toString().trim();
+                if (!path.isEmpty()) {
+                    return path;
+                }
+            }
+            
+            // Windows için
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                processBuilder = new ProcessBuilder("where", executable);
+                processBuilder.redirectErrorStream(true);
+                process = processBuilder.start();
+                
+                output = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        output.append(line).append("\n");
+                    }
+                }
+                
+                exitCode = process.waitFor();
+                if (exitCode == 0) {
+                    String[] lines = output.toString().trim().split("\n");
+                    if (lines.length > 0) {
+                        return lines[0].trim();
+                    }
+                }
             }
         } catch (Exception e) {
-            logger.error("Error checking Java: {}", e.getMessage());
+            logger.warn("Error finding {} in PATH: {}", executable, e.getMessage());
+        }
+        return null;
+    }
+    
+    private void logEnvironmentInfo() {
+        try {
+            // Sistem bilgilerini logla
+            logger.info("OS: {}, Arch: {}", System.getProperty("os.name"), System.getProperty("os.arch"));
+            
+            // PATH değişkenini logla
+            String path = System.getenv("PATH");
+            logger.info("PATH: {}", path);
+            
+            // JAVA_HOME değişkenini kontrol et
+            String javaHome = System.getenv("JAVA_HOME");
+            logger.info("JAVA_HOME: {}", javaHome != null ? javaHome : "not set");
+            
+            // Çalışma dizinini logla
+            logger.info("Working directory: {}", System.getProperty("user.dir"));
+            
+            // Lighthouse CLI yolunu logla
+            logger.info("Configured Lighthouse path: {}", lighthousePath);
+        } catch (Exception e) {
+            logger.warn("Error logging environment info: {}", e.getMessage());
+        }
+    }
+    
+    private void checkJavaInKnownLocations() {
+        // Java için bilinen konumları kontrol et
+        String[] knownJavaLocations = {
+            "/usr/bin/java",
+            "/usr/local/bin/java",
+            "/opt/java/openjdk/bin/java",
+            "/opt/jdk/bin/java",
+            "/opt/openjdk-17/bin/java",
+            "/opt/java/bin/java"
+        };
+        
+        for (String location : knownJavaLocations) {
+            File javaFile = new File(location);
+            if (javaFile.exists() && javaFile.canExecute()) {
+                logger.info("Java found at: {}", location);
+                
+                // Mevcut PATH'e Java dizinini ekle
+                try {
+                    String binDir = new File(location).getParent();
+                    String currentPath = System.getenv("PATH");
+                    String newPath = binDir + ":" + currentPath;
+                    
+                    // PATH'i güncelleyemeyiz ama log edebiliriz
+                    logger.info("Suggested PATH update: {}", newPath);
+                } catch (Exception e) {
+                    logger.warn("Error suggesting PATH update: {}", e.getMessage());
+                }
+                
+                return;
+            }
         }
         
+        logger.error("Java not found in any known location. Container might need Java installed.");
+    }
+    
+    private void findAndConfigureBrowser() {
         // Tarayıcı yolları - Linux dağıtımlarında tipik olarak bulunanlar
         String[] possibleBrowserPaths = {
             "/usr/bin/chromium-browser",
             "/usr/bin/chromium", 
             "/usr/bin/google-chrome",
             "/usr/local/bin/chromium",
-            "/snap/bin/chromium"
+            "/snap/bin/chromium",
+            "/usr/bin/chrome"
         };
         
         try {
@@ -508,42 +640,90 @@ public class LighthouseWorkerService {
             }
             
             if (!browserFound) {
-                logger.warn("No Chrome/Chromium browser found in standard locations");
-                // Sistem PATH'inde arama yap
-                try {
-                    Process process = new ProcessBuilder("which", "chromium")
-                        .redirectErrorStream(true)
-                        .start();
-                    
-                    StringBuilder output = new StringBuilder();
-                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            output.append(line);
-                        }
-                    }
-                    
-                    int exitCode = process.waitFor();
-                    if (exitCode == 0) {
-                        String chromePath = output.toString().trim();
-                        System.setProperty("CHROME_PATH", chromePath);
-                        logger.info("Found Chromium in PATH: {}", chromePath);
-                        browserFound = true;
-                    }
-                } catch (Exception e) {
-                    logger.warn("Error while searching for Chromium in PATH: {}", e.getMessage());
+                // PATH'den tarayıcıyı bulmaya çalış
+                String chromePath = findExecutableInPath("chromium");
+                if (chromePath == null) {
+                    chromePath = findExecutableInPath("google-chrome");
+                }
+                if (chromePath == null) {
+                    chromePath = findExecutableInPath("chrome");
+                }
+                
+                if (chromePath != null) {
+                    System.setProperty("CHROME_PATH", chromePath);
+                    logger.info("Found Chrome/Chromium in PATH: {}", chromePath);
+                    browserFound = true;
                 }
                 
                 if (!browserFound) {
-                    logger.warn("Using default system Chrome");
+                    logger.warn("No Chrome/Chromium browser found. Lighthouse analysis may fail.");
                 }
             }
+        } catch (Exception e) {
+            logger.warn("Error during browser check: {}", e.getMessage());
+        }
+    }
+    
+    private void configureLighthouse() {
+        try {
+            // Önce yapılandırılmış lighthouse yolunu kontrol et
+            String configuredLighthousePath = lighthousePath.split("\\s+")[0];
+            File lighthouseFile = new File(configuredLighthousePath);
             
-            // Lighthouse kontrolü
-            try {
-                Process process = new ProcessBuilder("which", lighthousePath.split("\\s+")[0])
-                    .redirectErrorStream(true)
-                    .start();
+            if (!lighthouseFile.exists() || !lighthouseFile.canExecute()) {
+                // PATH'den lighthouse'u bulmaya çalış
+                String lighthouseInPath = findExecutableInPath("lighthouse");
+                
+                if (lighthouseInPath != null) {
+                    logger.info("Found Lighthouse in PATH: {}", lighthouseInPath);
+                    lighthousePath = lighthouseInPath;
+                } else {
+                    // Global olarak NPX ile lighthouse kullanmayı dene
+                    String npxPath = findExecutableInPath("npx");
+                    
+                    if (npxPath != null) {
+                        logger.info("Found NPX at: {}. Will use 'npx lighthouse'", npxPath);
+                        lighthousePath = npxPath + " lighthouse";
+                    } else {
+                        logger.warn("Neither Lighthouse nor NPX found. Analysis will likely fail.");
+                        
+                        // Ortam değişkenleri ve Node.js modülleri hakkında daha fazla bilgi topla
+                        try {
+                            ProcessBuilder processBuilder = new ProcessBuilder("ls", "-la", "/usr/local/lib/node_modules");
+                            processBuilder.redirectErrorStream(true);
+                            Process process = processBuilder.start();
+                            
+                            StringBuilder output = new StringBuilder();
+                            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                                String line;
+                                while ((line = reader.readLine()) != null) {
+                                    output.append(line).append("\n");
+                                }
+                            }
+                            
+                            int exitCode = process.waitFor();
+                            logger.info("Node.js modules (exit code: {}): {}", exitCode, output);
+                        } catch (Exception e) {
+                            logger.warn("Error checking Node.js modules: {}", e.getMessage());
+                        }
+                    }
+                }
+            } else {
+                logger.info("Using configured Lighthouse path: {}", lighthousePath);
+            }
+        } catch (Exception e) {
+            logger.warn("Error configuring Lighthouse: {}", e.getMessage());
+        }
+    }
+    
+    private void checkNodeAndNpm() {
+        try {
+            // Node.js kontrolü
+            String nodePath = findExecutableInPath("node");
+            if (nodePath != null) {
+                ProcessBuilder processBuilder = new ProcessBuilder(nodePath, "--version");
+                processBuilder.redirectErrorStream(true);
+                Process process = processBuilder.start();
                 
                 StringBuilder output = new StringBuilder();
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
@@ -554,42 +734,33 @@ public class LighthouseWorkerService {
                 }
                 
                 int exitCode = process.waitFor();
-                if (exitCode != 0) {
-                    logger.warn("Lighthouse not found at: {} (exit code: {})", lighthousePath, exitCode);
-                    
-                    // NPX kullanarak lighthouse'u çalıştırmayı dene
-                    logger.info("Trying to use npx lighthouse");
-                    lighthousePath = "npx lighthouse";
-                    
-                    // NPX kontrolü
-                    Process npxProcess = new ProcessBuilder("which", "npx")
-                        .redirectErrorStream(true)
-                        .start();
-                    
-                    StringBuilder npxOutput = new StringBuilder();
-                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(npxProcess.getInputStream()))) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            npxOutput.append(line);
-                        }
+                logger.info("Node.js version (exit code: {}): {}", exitCode, output);
+            } else {
+                logger.warn("Node.js not found in PATH");
+            }
+            
+            // NPM kontrolü
+            String npmPath = findExecutableInPath("npm");
+            if (npmPath != null) {
+                ProcessBuilder processBuilder = new ProcessBuilder(npmPath, "--version");
+                processBuilder.redirectErrorStream(true);
+                Process process = processBuilder.start();
+                
+                StringBuilder output = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        output.append(line);
                     }
-                    
-                    int npxExitCode = npxProcess.waitFor();
-                    if (npxExitCode == 0) {
-                        logger.info("Will use NPX to run lighthouse: {}", npxOutput.toString().trim());
-                    } else {
-                        logger.warn("NPX not found in PATH, lighthouse may not work properly");
-                    }
-                } else {
-                    logger.info("Lighthouse found: {}", output.toString().trim());
                 }
-            } catch (Exception e) {
-                logger.warn("Could not check lighthouse path: {}", e.getMessage());
-                // Continue anyway
+                
+                int exitCode = process.waitFor();
+                logger.info("NPM version (exit code: {}): {}", exitCode, output);
+            } else {
+                logger.warn("NPM not found in PATH");
             }
         } catch (Exception e) {
-            logger.warn("Error during tool check: {}", e.getMessage());
-            // Just log and continue - don't throw exceptions
+            logger.warn("Error checking Node.js and NPM: {}", e.getMessage());
         }
     }
 
