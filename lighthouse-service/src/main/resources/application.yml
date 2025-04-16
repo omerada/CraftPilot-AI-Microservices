@@ -63,7 +63,7 @@ lighthouse:
     # Lighthouse CLI çalıştırma stratejisi
     use-npx: false # NPX kullanımını devre dışı bırak
     # Chrome bayrağı ayarları
-    chrome-flags: "--headless --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer"
+    chrome-flags: "--headless --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer --chrome-path=/usr/bin/google-chrome"
     # Kategoriler ve yapılandırma
     categories:
       basic: "performance"

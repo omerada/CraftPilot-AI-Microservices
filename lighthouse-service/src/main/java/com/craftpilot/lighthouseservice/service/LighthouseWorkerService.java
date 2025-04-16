@@ -64,7 +64,7 @@ public class LighthouseWorkerService {
     @Value("${lighthouse.cli.retry-delay:5000}")
     private int lighthouseRetryDelay;
     
-    @Value("${lighthouse.cli.chrome-flags:--headless --no-sandbox --disable-gpu --disable-dev-shm-usage}")
+    @Value("${lighthouse.cli.chrome-flags:--headless --no-sandbox --disable-gpu --disable-dev-shm-usage --chrome-path=/usr/bin/google-chrome}")
     private String chromeFlags;
     
     @Value("${lighthouse.cli.categories.basic:performance}")
