@@ -444,7 +444,6 @@ public class LighthouseWorkerService {
         switch (normalizedAnalysisType) {
             case "detailed":
                 command.add("--only-categories=" + detailedCategories);
-                command.add("--throttling.cpuSlowdownMultiplier=4");
                 command.add("--throttling-method=devtools");
                 break;
             case "basic":
@@ -458,80 +457,65 @@ public class LighthouseWorkerService {
         return command;
     }
     
-    // Gerekli araçları kontrol et - minimalist versiyon
+    // Gerekli araçları kontrol et - süper basitleştirilmiş versiyon
     private void checkRequiredTools() throws Exception {
-        // Tüm hataları yakalayarak çalışmaya devam etmeye çalış
+        logger.info("Checking required tools in simplified mode");
+        
+        // Tarayıcı yolları - Alpine Linux'ta tipik olarak bulunanlar
+        String[] possibleBrowserPaths = {
+            "/usr/bin/chromium-browser",
+            "/usr/bin/chromium", 
+            "/usr/local/bin/chromium",
+            "/usr/bin/google-chrome"
+        };
+        
         try {
-            // Tarayıcı için platform bağımsız kontrolü
-            String[] possibleBrowserPaths = {
-                "/usr/bin/chromium-browser",
-                "/usr/bin/chromium", 
-                "/usr/bin/google-chrome",
-                "/usr/bin/chrome"
-            };
-            
+            // Tarayıcı kontrolü
             boolean browserFound = false;
-            for (String browserPath : possibleBrowserPaths) {
-                if (new File(browserPath).exists()) {
-                    System.setProperty("CHROME_PATH", browserPath);
-                    logger.info("Browser found: {}", browserPath);
+            for (String path : possibleBrowserPaths) {
+                File browserFile = new File(path);
+                if (browserFile.exists() && browserFile.canExecute()) {
+                    System.setProperty("CHROME_PATH", path);
+                    logger.info("Using Chrome/Chromium at: {}", path);
                     browserFound = true;
                     break;
                 }
             }
             
-            // Lighthouse CLI varlığını kontrol et
-            boolean lighthouseFound = new File(lighthousePath).exists();
-            
-            if (!lighthouseFound) {
-                // Alternatif yolları kontrol et
-                if (new File("/usr/local/bin/lighthouse").exists()) {
-                    lighthousePath = "/usr/local/bin/lighthouse";
-                    lighthouseFound = true;
-                } else if (new File("/usr/bin/lighthouse").exists()) {
-                    lighthousePath = "/usr/bin/lighthouse";
-                    lighthouseFound = true;
-                }
-            }
-            
-            // PATH içinde lighthouse var mı diye kontrol et
-            if (!lighthouseFound) {
-                try {
-                    Process process = Runtime.getRuntime().exec("which lighthouse");
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                    String line = reader.readLine();
-                    if (line != null && !line.isEmpty()) {
-                        lighthousePath = line.trim();
-                        lighthouseFound = true;
-                        logger.info("Found lighthouse in PATH: {}", lighthousePath);
-                    }
-                } catch (Exception e) {
-                    logger.debug("Error checking lighthouse in PATH", e);
-                }
-            }
-            
-            // Lighthouse CLI'yi npx ile çalıştırmayı dene (fallback)
-            if (!lighthouseFound) {
-                try {
-                    Process process = Runtime.getRuntime().exec("which npx");
-                    int exitCode = process.waitFor();
-                    if (exitCode == 0) {
-                        lighthousePath = "npx lighthouse";
-                        logger.info("Using npx lighthouse as fallback");
-                    } else {
-                        logger.warn("Neither Lighthouse CLI nor npx found!");
-                    }
-                } catch (Exception e) {
-                    logger.debug("Error checking npx", e);
-                }
-            }
-            
             if (!browserFound) {
-                logger.warn("No browser found in standard locations. Lighthouse may fail.");
+                logger.warn("No Chrome/Chromium browser found - using default system Chrome");
+            }
+            
+            // Lighthouse kontrolü - basit "which" kontrolü
+            try {
+                Process process = new ProcessBuilder("which", lighthousePath.split("\\s+")[0])
+                    .redirectErrorStream(true)
+                    .start();
+                
+                StringBuilder output = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        output.append(line);
+                    }
+                }
+                
+                int exitCode = process.waitFor();
+                if (exitCode != 0) {
+                    logger.warn("Lighthouse not found at: {} (exit code: {})", lighthousePath, exitCode);
+                    // Defaults to npx if not found
+                    lighthousePath = "npx lighthouse";
+                    logger.info("Using npx as fallback: {}", lighthousePath);
+                } else {
+                    logger.info("Lighthouse found: {}", output.toString().trim());
+                }
+            } catch (Exception e) {
+                logger.warn("Could not check lighthouse path: {}", e.getMessage());
+                // Continue anyway
             }
         } catch (Exception e) {
-            logger.warn("Error checking tools: {}", e.getMessage());
-            // Continue anyway and hope for the best
+            logger.warn("Error during tool check: {}", e.getMessage());
+            // Just log and continue - don't throw exceptions
         }
     }
 
