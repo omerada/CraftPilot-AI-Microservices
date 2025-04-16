@@ -2,7 +2,7 @@
 FROM node:16-slim AS node-base
 
 ARG TARGETARCH
-ARG CHROME_ARCH=${TARGETARCH:-arm64}
+ARG CHROME_ARCH=${TARGETARCH:-amd64}
 
 # Gerekli sistem paketlerini yükle ve Lighthouse kurulumu
 RUN apt-get update && apt-get install -y \
@@ -16,18 +16,22 @@ RUN apt-get update && apt-get install -y \
     && npm install -g lighthouse@9.6.8 puppeteer@13.5.1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Chromium alias’ı oluştur (Lighthouse’un kullanabilmesi için)
+# Chromium alias'ı oluştur (Lighthouse'un kullanabilmesi için)
 RUN ln -s /usr/bin/chromium /usr/bin/google-chrome
 
 # Java uygulaması için builder aşaması
 FROM eclipse-temurin:17-jdk AS builder
 WORKDIR /app
 
+# Maven wrapper ve bağımlılıkları önce kopyalayıp önbelleği etkin kullan
 COPY mvnw ./
 COPY .mvn .mvn
 COPY pom.xml ./
-COPY src ./src
+# Bağımlılıkları önce indirerek build katmanını optimize et
+RUN ./mvnw dependency:go-offline
 
+# Kaynak kodu kopyala ve derle
+COPY src ./src
 RUN ./mvnw clean package -DskipTests
 
 # Final imaj (sadece çalışma için gerekli her şey)
@@ -40,6 +44,13 @@ COPY --from=node-base /usr/local/bin/lighthouse /usr/local/bin/
 COPY --from=node-base /usr/local/lib/node_modules /usr/local/lib/node_modules
 COPY --from=node-base /usr/bin/chromium /usr/bin/chromium
 COPY --from=node-base /usr/bin/google-chrome /usr/bin/google-chrome
+
+# Gerekli sistem paketlerini ekle
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    procps \
+    dumb-init \
+    libxss1 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Java uygulaması
 COPY --from=builder /app/target/*.jar /app/app.jar
@@ -55,4 +66,6 @@ USER appuser
 WORKDIR /app
 EXPOSE 8085
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# dumb-init ile process yönetimini iyileştir
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["java", "-jar", "app.jar"]

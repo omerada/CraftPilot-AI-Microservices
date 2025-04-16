@@ -15,6 +15,11 @@ spring:
           min-idle: 2
           max-wait: 2000ms
         shutdown-timeout: 500ms
+        # Ekstra dayanıklılık ayarları
+        client-name: lighthouse-service
+        client-options:
+          disconnect-timeout: 3000ms
+          auto-reconnect: true
   task:
     execution:
       pool:
@@ -37,15 +42,20 @@ lighthouse:
       max-attempts: 5
       retry-delay-ms: 3000
   job:
-    timeout: ${LIGHTHOUSE_JOB_TIMEOUT:300} # 5 dakikaya çıkarıldı
+    timeout: ${LIGHTHOUSE_JOB_TIMEOUT:300} # 5 dakika
+    # Ekstra zaman aşımı koruma mekanizması
+    max-processing-time: ${LIGHTHOUSE_MAX_PROCESSING_TIME:600} # 10 dakika
   worker:
     count: ${LIGHTHOUSE_WORKER_COUNT:3} # Worker sayısı
     poll-interval: 1000 # Poll aralığı (ms)
     check-interval: 10000 # Worker kontrol aralığı (ms)
+    restart-attempts: ${LIGHTHOUSE_WORKER_RESTART_ATTEMPTS:3} # Worker yeniden başlatma deneme sayısı
   cli:
     path: ${LIGHTHOUSE_CLI_PATH:lighthouse} # Lighthouse CLI yolu
+    timeout: ${LIGHTHOUSE_CLI_TIMEOUT:300} # CLI işlem zaman aşımı (sn)
   temp:
     dir: ${LIGHTHOUSE_TEMP_DIR:/tmp/lighthouse} # Geçici dosyalar için dizin
+    cleanup: ${LIGHTHOUSE_TEMP_CLEANUP:true} # Geçici dosyaların temizlenmesi
 
 logging:
   level:

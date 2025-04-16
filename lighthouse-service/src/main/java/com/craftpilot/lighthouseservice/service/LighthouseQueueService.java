@@ -176,6 +176,21 @@ public class LighthouseQueueService {
             
         return redisTemplate.opsForValue().set(resultsPrefix + "status:" + jobId, jobStatus);
     }
+
+    // Job durumunu güncelle (worker tarafından kullanılabilir)
+    public Mono<Boolean> updateJobStatus(String jobId, String status, String errorMessage, Map<String, Object> data) {
+        log.info("Updating job {} status to: {}", jobId, status);
+        
+        JobStatusResponse jobStatus = JobStatusResponse.builder()
+            .jobId(jobId)
+            .complete("COMPLETED".equals(status) || "FAILED".equals(status))
+            .status(status)
+            .error(errorMessage)
+            .data(data)
+            .build();
+            
+        return redisTemplate.opsForValue().set(resultsPrefix + "status:" + jobId, jobStatus);
+    }
     
     // Redis'teki job sayısını kontrol et
     public Mono<Long> getQueueLength() {

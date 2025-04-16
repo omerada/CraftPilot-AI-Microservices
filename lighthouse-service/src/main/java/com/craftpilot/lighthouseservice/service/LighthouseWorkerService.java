@@ -259,8 +259,8 @@ public class LighthouseWorkerService {
             command.add("--output=json");
             command.add("--output-path=" + outputFilePath);
             
-            // Chrome flags düzeltildi - daha esnek ve güvenilir konfigürasyon
-            command.add("--chrome-flags=\"--headless --no-sandbox --disable-gpu --disable-dev-shm-usage\"");
+            // Chrome flags düzeltildi - çift tırnak içindeki tırnak işaretleri hatalıydı
+            command.add("--chrome-flags=--headless --no-sandbox --disable-gpu --disable-dev-shm-usage");
             
             // Analiz tipine göre ek parametreler ekle
             if ("basic".equals(analysisType)) {
