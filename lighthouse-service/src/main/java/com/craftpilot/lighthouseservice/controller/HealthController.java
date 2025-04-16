@@ -21,110 +21,111 @@ import java.util.Map;
 @RestController
 @Slf4j
 public class HealthController {
-
-    private final ReactiveRedisConnectionFactory redisConnectionFactory;
+    
     private final ApplicationAvailability applicationAvailability;
     private final ApplicationContext applicationContext;
-
-    @Autowired
-    public HealthController(ReactiveRedisConnectionFactory redisConnectionFactory, 
-                           ApplicationAvailability applicationAvailability,
-                           ApplicationContext applicationContext) {
-        this.redisConnectionFactory = redisConnectionFactory;
+    private ReactiveRedisConnectionFactory redisConnectionFactory;
+    
+    public HealthController(ApplicationAvailability applicationAvailability, ApplicationContext applicationContext) {
         this.applicationAvailability = applicationAvailability;
         this.applicationContext = applicationContext;
+        
+        try {
+            this.redisConnectionFactory = applicationContext.getBean(ReactiveRedisConnectionFactory.class);
+        } catch (Exception e) {
+            log.warn("Redis connection factory not available: {}", e.getMessage());
+        }
     }
-
+    
     @GetMapping("/health")
-    public Mono<ResponseEntity<Map<String, Object>>> healthCheck() {
+    public Mono<ResponseEntity<Map<String, Object>>> checkHealth() {
+        Map<String, Object> healthStatus = new HashMap<>();
+        healthStatus.put("status", "UP");
+        
+        // Liveness check
+        LivenessState livenessState = applicationAvailability.getLivenessState();
+        healthStatus.put("liveness", livenessState.toString());
+        
+        // Readiness check
+        ReadinessState readinessState = applicationAvailability.getReadinessState();
+        healthStatus.put("readiness", readinessState.toString());
+        
+        // JVM ve sistem bilgilerini ekle
+        healthStatus.put("jvm", getJvmInfo());
+        
+        // Redis bağlantı kontrolü
         return checkRedisConnection()
-            .timeout(Duration.ofSeconds(1))
-            .onErrorReturn(false)
-            .map(redisStatus -> {
-                Map<String, Object> health = new HashMap<>();
-                
-                // Application state
-                LivenessState livenessState = applicationAvailability.getLivenessState();
-                ReadinessState readinessState = applicationAvailability.getReadinessState();
-                
-                boolean isSystemUp = readinessState == ReadinessState.ACCEPTING_TRAFFIC && 
-                                     livenessState == LivenessState.CORRECT;
-                                     
-                String overallStatus = isSystemUp && redisStatus ? "UP" : "DOWN";
-                
-                health.put("status", overallStatus);
-                health.put("application", isSystemUp ? "UP" : "DOWN");
-                health.put("redis", redisStatus ? "UP" : "DOWN");
-                health.put("timestamp", System.currentTimeMillis());
-                
-                Map<String, Object> details = new HashMap<>();
-                details.put("liveness", livenessState.toString());
-                details.put("readiness", readinessState.toString());
-                details.put("connection", redisStatus ? "successful" : "failed");
-                
-                // Worker durumunu ekle
-                try {
-                    if (applicationContext.containsBean("lighthouseWorkerService")) {
-                        Object workerService = applicationContext.getBean("lighthouseWorkerService");
-                        Method method = workerService.getClass().getMethod("getActiveWorkerCount");
-                        int activeWorkers = (int) method.invoke(workerService);
-                        details.put("activeWorkers", activeWorkers);
-                    }
-                } catch (Exception e) {
-                    log.warn("Could not retrieve worker status", e);
-                }
-                
-                health.put("details", details);
-                
-                HttpStatus status = "UP".equals(overallStatus) ? 
-                    HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE;
-                
-                return new ResponseEntity<>(health, status);
-            })
+            .doOnNext(redisStatus -> healthStatus.put("redis", redisStatus))
+            .thenReturn(new ResponseEntity<>(healthStatus, HttpStatus.OK))
             .onErrorResume(e -> {
-                log.warn("Health check failed", e);
-                
-                Map<String, Object> health = new HashMap<>();
-                health.put("status", "DOWN");
-                health.put("application", "UP");
-                health.put("redis", "DOWN");
-                health.put("timestamp", System.currentTimeMillis());
-                
-                Map<String, Object> details = new HashMap<>();
-                details.put("error", e.getClass().getSimpleName());
-                details.put("message", e.getMessage());
-                health.put("details", details);
-                
-                return Mono.just(new ResponseEntity<>(health, HttpStatus.SERVICE_UNAVAILABLE));
+                log.error("Health check error: {}", e.getMessage());
+                healthStatus.put("status", "DOWN");
+                healthStatus.put("error", e.getMessage());
+                return Mono.just(new ResponseEntity<>(healthStatus, HttpStatus.SERVICE_UNAVAILABLE));
             });
     }
-
-    private Mono<Boolean> checkRedisConnection() {
-        return Mono.defer(() -> {
-            try {
-                // HealthController metodundaki timeout ve retry konfigürasyonunu düzelttim
-                // İlk olarak bağlantı alın
-                return redisConnectionFactory.getReactiveConnection()
-                    // Ping komutunu çalıştırın
-                    .ping()
-                    // Ping başarılı olursa true döndürün
-                    .map(ping -> {
-                        log.debug("Redis ping successful: {}", ping);
-                        return true;
-                    })
-                    // Timeout değerini yükselt (500ms -> 2000ms)
-                    .timeout(Duration.ofMillis(2000))
-                    // Hata durumunda false döndürün ve hata mesajını loglayın
-                    .onErrorResume(e -> {
-                        log.warn("Redis connection check failed: {}", e.getMessage());
-                        return Mono.just(false);
-                    })
-                    // 3 kez deneme yapın
-                    .retry(3);
-            } catch (Exception e) {
-                log.warn("Redis connection initialization failed: {}", e.getMessage());
-                return Mono.just(false);
-            }
-        });
+    
+    private Map<String, Object> getJvmInfo() {
+        Map<String, Object> jvmInfo = new HashMap<>();
+        Runtime runtime = Runtime.getRuntime();
+        
+        long maxMemory = runtime.maxMemory() / (1024 * 1024);
+        long allocatedMemory = runtime.totalMemory() / (1024 * 1024);
+        long freeMemory = runtime.freeMemory() / (1024 * 1024);
+        
+        jvmInfo.put("version", System.getProperty("java.version"));
+        jvmInfo.put("vendor", System.getProperty("java.vendor"));
+        jvmInfo.put("max_memory_mb", maxMemory);
+        jvmInfo.put("allocated_memory_mb", allocatedMemory);
+        jvmInfo.put("free_memory_mb", freeMemory);
+        jvmInfo.put("available_processors", runtime.availableProcessors());
+        
+        // JVM çalışma süresi
+        try {
+            Class<?> managementFactoryClass = Class.forName("java.lang.management.ManagementFactory");
+            Method runtimeMXBean = managementFactoryClass.getMethod("getRuntimeMXBean");
+            Object bean = runtimeMXBean.invoke(null);
+            Method uptime = bean.getClass().getMethod("getUptime");
+            long uptimeMs = (long) uptime.invoke(bean);
+            jvmInfo.put("uptime_ms", uptimeMs);
+        } catch (Exception e) {
+            log.error("Error getting JVM uptime: {}", e.getMessage());
+            jvmInfo.put("uptime_ms", -1);
+        }
+        
+        return jvmInfo;
+    }
+    
+    private Mono<Map<String, Object>> checkRedisConnection() {
+        if (redisConnectionFactory == null) {
+            Map<String, Object> result = new HashMap<>();
+            result.put("status", "UNKNOWN");
+            result.put("message", "Redis connection factory not available");
+            return Mono.just(result);
+        }
+        
+        return redisConnectionFactory.getReactiveConnection().ping()
+            .timeout(Duration.ofSeconds(2))
+            .map(pong -> {
+                Map<String, Object> result = new HashMap<>();
+                result.put("status", "UP");
+                result.put("ping", pong);
+                return result;
+            })
+            .onErrorResume(e -> {
+                log.error("Redis connection error: {}", e.getMessage());
+                Map<String, Object> result = new HashMap<>();
+                result.put("status", "DOWN");
+                result.put("error", e.getMessage());
+                return Mono.just(result);
+            });
+    }
+    
+    @GetMapping("/")
+    public Mono<Map<String, String>> root() {
+        Map<String, String> response = new HashMap<>();
+        response.put("service", "Lighthouse Analysis Service");
+        response.put("status", "UP");
+        return Mono.just(response);
     }
 }

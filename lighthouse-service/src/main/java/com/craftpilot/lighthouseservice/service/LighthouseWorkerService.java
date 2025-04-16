@@ -689,41 +689,6 @@ public class LighthouseWorkerService {
         }
     }
     
-    private void checkJavaInKnownLocations() {
-        // Java için bilinen konumları kontrol et
-        String[] knownJavaLocations = {
-            "/usr/bin/java",
-            "/usr/local/bin/java",
-            "/opt/java/openjdk/bin/java",
-            "/opt/jdk/bin/java",
-            "/opt/openjdk-17/bin/java",
-            "/opt/java/bin/java"
-        };
-        
-        for (String location : knownJavaLocations) {
-            File javaFile = new File(location);
-            if (javaFile.exists() && javaFile.canExecute()) {
-                logger.info("Java found at: {}", location);
-                
-                // Mevcut PATH'e Java dizinini ekle
-                try {
-                    String binDir = new File(location).getParent();
-                    String currentPath = System.getenv("PATH");
-                    String newPath = binDir + ":" + currentPath;
-                    
-                    // PATH'i güncelleyemeyiz ama log edebiliriz
-                    logger.info("Suggested PATH update: {}", newPath);
-                } catch (Exception e) {
-                    logger.warn("Error suggesting PATH update: {}", e.getMessage());
-                }
-                
-                return;
-            }
-        }
-        
-        logger.error("Java not found in any known location. Container might need Java installed.");
-    }
-    
     private void findAndConfigureBrowser() {
         // Tarayıcı yolları - Linux dağıtımlarında tipik olarak bulunanlar
         String[] possibleBrowserPaths = {

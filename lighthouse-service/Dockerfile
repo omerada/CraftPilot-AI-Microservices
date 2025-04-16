@@ -57,6 +57,10 @@ RUN groupadd -r appuser && \
 COPY --from=builder /app/target/*.jar /app/app.jar
 RUN chown appuser:appuser /app/app.jar
 
+# Healthcheck script ekle
+COPY healthcheck.sh /app/healthcheck.sh
+RUN chmod +x /app/healthcheck.sh
+
 # Kurulumu doğrula
 RUN java -version && \
     node --version && \
@@ -69,10 +73,6 @@ RUN java -version && \
     ls -la /app/app.jar && \
     echo "Checking Java PATH:" && \
     which java
-
-# Healthcheck için basic script ekle
-COPY healthcheck.sh /app/healthcheck.sh
-RUN chmod +x /app/healthcheck.sh
 
 # Non-root kullanıcıya geç
 USER appuser
