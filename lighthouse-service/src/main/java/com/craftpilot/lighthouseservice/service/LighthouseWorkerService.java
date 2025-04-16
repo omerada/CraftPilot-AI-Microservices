@@ -1,7 +1,6 @@
 package com.craftpilot.lighthouseservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
@@ -9,6 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Scheduled;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
@@ -31,9 +32,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class LighthouseWorkerService {
+    // Slf4j Logger'ın manuel tanımlanması (Lombok hatası durumunda kullanılır)
+    private static final Logger logger = LoggerFactory.getLogger(LighthouseWorkerService.class);
+    
     private final ReactiveRedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
     
@@ -80,16 +83,21 @@ public class LighthouseWorkerService {
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final Map<String, Long> processingJobs = new ConcurrentHashMap<>();
     
+    public LighthouseWorkerService(ReactiveRedisTemplate<String, Object> redisTemplate, ObjectMapper objectMapper) {
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
+    }
+
     @PostConstruct
     public void init() {
-        log.info("Initializing Lighthouse worker service with {} workers", workerCount);
+        logger.info("Initializing Lighthouse worker service with {} workers", workerCount);
         // Worker'ları başlat
         startWorkers();
     }
     
     @PreDestroy
     public void shutdown() {
-        log.info("Shutting down Lighthouse worker service");
+        logger.info("Shutting down Lighthouse worker service");
         running.set(false);
     }
     
@@ -106,7 +114,7 @@ public class LighthouseWorkerService {
     public void checkAndRestartWorkers() {
         // Worker sayısını kontrol et ve gerekirse yeni worker'lar başlat
         if (activeWorkers.get() < workerCount && running.get()) {
-            log.debug("Active workers: {}/{}, starting more workers", activeWorkers.get(), workerCount);
+            logger.debug("Active workers: {}/{}, starting more workers", activeWorkers.get(), workerCount);
             for (int i = activeWorkers.get(); i < workerCount; i++) {
                 startWorker(i);
             }
@@ -116,20 +124,20 @@ public class LighthouseWorkerService {
     private void startWorker(int workerId) {
         final String workerName = "worker-" + workerId;
         
-        log.info("Starting Lighthouse worker: {}", workerName);
+        logger.info("Starting Lighthouse worker: {}", workerName);
         activeWorkers.incrementAndGet();
-        log.info("{} started, active workers: {}/{}", workerName, activeWorkers.get(), workerCount);
+        logger.info("{} started, active workers: {}/{}", workerName, activeWorkers.get(), workerCount);
         
         // Sürekli olarak kuyruktan işleri alan ve işleyen bir flux
         Flux.interval(Duration.ofMillis(pollInterval))
             .takeWhile(i -> running.get())
             .flatMap(i -> pollJob(workerName))
             .onErrorContinue((error, obj) -> {
-                log.error("{} error in job processing: {}", workerName, error.getMessage(), error);
+                logger.error("{} error in job processing: {}", workerName, error.getMessage(), error);
             })
             .doFinally(signal -> {
                 activeWorkers.decrementAndGet();
-                log.info("{} stopped, remaining active workers: {}", workerName, activeWorkers.get());
+                logger.info("{} stopped, remaining active workers: {}", workerName, activeWorkers.get());
             })
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe();
@@ -148,16 +156,16 @@ public class LighthouseWorkerService {
                         String url = (String) jobMap.get("url");
                         
                         if (jobId != null && url != null) {
-                            log.info("{} received job {} for URL: {}", workerName, jobId, url);
+                            logger.info("{} received job {} for URL: {}", workerName, jobId, url);
                             return processJob(jobId, url, jobMap, workerName);
                         } else {
-                            log.warn("{} received invalid job: {}", workerName, jobMap);
+                            logger.warn("{} received invalid job: {}", workerName, jobMap);
                         }
                     } catch (Exception e) {
-                        log.error("{} error processing job: {}", workerName, e.getMessage(), e);
+                        logger.error("{} error processing job: {}", workerName, e.getMessage(), e);
                     }
                 } else if (job != null) {
-                    log.warn("{} received job of unexpected type: {}", workerName, 
+                    logger.warn("{} received job of unexpected type: {}", workerName, 
                         job.getClass().getName());
                 }
                 return Mono.empty();
@@ -165,7 +173,7 @@ public class LighthouseWorkerService {
             .onErrorResume(e -> {
                 // TimeoutException'ları sessizce işle, diğer hataları logla
                 if (!(e instanceof java.util.concurrent.TimeoutException)) {
-                    log.error("{} error polling jobs: {}", workerName, e.getMessage(), e);
+                    logger.error("{} error polling jobs: {}", workerName, e.getMessage(), e);
                 }
                 return Mono.empty();
             })
@@ -179,16 +187,16 @@ public class LighthouseWorkerService {
         // Analiz tipini belirle (varsayılan olarak "basic")
         final String analysisType = determineAnalysisType(jobMap);
         
-        log.info("{} processing job {} for URL: {} with analysisType: {}", workerName, jobId, url, analysisType);
+        logger.info("{} processing job {} for URL: {} with analysisType: {}", workerName, jobId, url, analysisType);
         
         // İlk olarak job durumunu PROCESSING olarak güncelleyelim
         return updateJobStatus(jobId, "PROCESSING", null)
             .timeout(Duration.ofSeconds(5))
             .flatMap(success -> {
                 if (Boolean.TRUE.equals(success)) {
-                    log.debug("{} updated job {} status to PROCESSING", workerName, jobId);
+                    logger.debug("{} updated job {} status to PROCESSING", workerName, jobId);
                 } else {
-                    log.warn("{} failed to update job {} status to PROCESSING", workerName, jobId);
+                    logger.warn("{} failed to update job {} status to PROCESSING", workerName, jobId);
                 }
                 
                 // Gerçek Lighthouse CLI çağrısı yap
@@ -198,21 +206,21 @@ public class LighthouseWorkerService {
                         .timeout(Duration.ofSeconds(5))
                         .flatMap(saved -> {
                             if (Boolean.TRUE.equals(saved)) {
-                                log.info("{} completed job {} successfully", workerName, jobId);
+                                logger.info("{} completed job {} successfully", workerName, jobId);
                                 return Mono.empty();
                             } else {
-                                log.warn("{} failed to save results for job {}", workerName, jobId);
+                                logger.warn("{} failed to save results for job {}", workerName, jobId);
                                 return updateJobStatus(jobId, "FAILED", "Failed to save results");
                             }
                         })
                         .onErrorResume(error -> {
-                            log.error("{} error saving results for job {}: {}", 
+                            logger.error("{} error saving results for job {}: {}", 
                                 workerName, jobId, error.getMessage(), error);
                             return updateJobStatus(jobId, "FAILED", "Error saving results: " + error.getMessage());
                         })
                     )
                     .onErrorResume(error -> {
-                        log.error("{} error processing job {}: {}", 
+                        logger.error("{} error processing job {}: {}", 
                             workerName, jobId, error.getMessage(), error);
                         return updateJobStatus(jobId, "FAILED", "Processing error: " + error.getMessage());
                     })
@@ -232,7 +240,7 @@ public class LighthouseWorkerService {
     }
     
     private Mono<Boolean> updateJobStatus(String jobId, String status, String errorMessage) {
-        log.debug("Updating job {} status to: {}", jobId, status);
+        logger.debug("Updating job {} status to: {}", jobId, status);
         
         // Hata varsa durumu FAILED olarak güncelle
         String finalStatus = status;
@@ -252,7 +260,7 @@ public class LighthouseWorkerService {
             .set(resultsPrefix + "status:" + jobId, jobStatus, Duration.ofMinutes(30))
             .timeout(Duration.ofSeconds(3))
             .onErrorResume(e -> {
-                log.error("Failed to update job status: {}", e.getMessage(), e);
+                logger.error("Failed to update job status: {}", e.getMessage(), e);
                 return Mono.just(false);
             });
     }
@@ -264,7 +272,7 @@ public class LighthouseWorkerService {
             .then(updateJobStatus(jobId, "COMPLETED", null))
             .timeout(Duration.ofSeconds(5))
             .onErrorResume(e -> {
-                log.error("Failed to save job results: {}", e.getMessage(), e);
+                logger.error("Failed to save job results: {}", e.getMessage(), e);
                 return Mono.just(false);
             });
     }
@@ -273,14 +281,14 @@ public class LighthouseWorkerService {
     private Mono<Map<String, Object>> runLighthouseAnalysis(String url, String analysisType, String jobId) {
         return Mono.fromCallable(() -> executeCliCommand(url, analysisType, jobId))
             .retryWhen(Retry.backoff(lighthouseMaxRetries, Duration.ofMillis(lighthouseRetryDelay))
-                .filter(e -> shouldRetry(e))
+                .filter(this::shouldRetry)
                 .doBeforeRetry(retrySignal -> {
-                    log.warn("Retrying Lighthouse analysis after error. Attempt: {}, URL: {}", 
+                    logger.warn("Retrying Lighthouse analysis after error. Attempt: {}, URL: {}", 
                         retrySignal.totalRetries() + 1, url);
                 }))
             .subscribeOn(Schedulers.boundedElastic())
             .onErrorResume(e -> {
-                log.error("Error running Lighthouse analysis: {}", e.getMessage(), e);
+                logger.error("Error running Lighthouse analysis: {}", e.getMessage(), e);
                 Map<String, Object> errorResult = new HashMap<>();
                 errorResult.put("error", e.getMessage());
                 errorResult.put("url", url);
@@ -291,7 +299,7 @@ public class LighthouseWorkerService {
                 updateJobStatus(jobId, "FAILED", e.getMessage())
                     .subscribe(updated -> {
                         if (Boolean.TRUE.equals(updated)) {
-                            log.info("Updated job {} status to FAILED due to error", jobId);
+                            logger.info("Updated job {} status to FAILED due to error", jobId);
                         }
                     });
                 
@@ -317,7 +325,7 @@ public class LighthouseWorkerService {
     
     // Lighthouse CLI komutunu çalıştırma
     private Map<String, Object> executeCliCommand(String url, String analysisType, String jobId) throws Exception {
-        log.info("Starting Lighthouse CLI analysis for URL: {} with type: {}", url, analysisType);
+        logger.info("Starting Lighthouse CLI analysis for URL: {} with type: {}", url, analysisType);
         
         // Lighthouse CLI ve gerekli programların varlığını kontrol et
         checkRequiredTools();
@@ -325,9 +333,9 @@ public class LighthouseWorkerService {
         // Geçici dizin varlığını kontrol et ve oluştur
         File tempDirFile = new File(tempDir);
         if (!tempDirFile.exists()) {
-            log.info("Creating temp directory: {}", tempDir);
+            logger.info("Creating temp directory: {}", tempDir);
             if (!tempDirFile.mkdirs()) {
-                log.warn("Failed to create temp directory: {}", tempDir);
+                logger.warn("Failed to create temp directory: {}", tempDir);
             }
         }
         
@@ -338,7 +346,7 @@ public class LighthouseWorkerService {
         final List<String> command = buildLighthouseCommand(url, outputFilePath, analysisType);
         
         // Komutu çalıştır
-        log.info("Executing command: {}", String.join(" ", command));
+        logger.info("Executing command: {}", String.join(" ", command));
         
         ProcessBuilder processBuilder = new ProcessBuilder(command);
         processBuilder.redirectErrorStream(true); // Hata çıktılarını birleştir
@@ -352,7 +360,7 @@ public class LighthouseWorkerService {
             String line;
             while ((line = reader.readLine()) != null) {
                 output.append(line).append("\n");
-                log.debug("Lighthouse CLI output: {}", line);
+                logger.debug("Lighthouse CLI output: {}", line);
             }
         }
         
@@ -361,7 +369,7 @@ public class LighthouseWorkerService {
         
         // Eğer çıkış kodu başarısız ise
         if (exitCode != 0) {
-            log.error("Lighthouse CLI process exited with code: {}, Output: {}", exitCode, output.toString());
+            logger.error("Lighthouse CLI process exited with code: {}, Output: {}", exitCode, output.toString());
             throw new RuntimeException("Lighthouse CLI failed with exit code: " + exitCode + ". Details: " + 
                 analyzeCliOutput(output.toString()));
         }
@@ -369,7 +377,7 @@ public class LighthouseWorkerService {
         // JSON çıktı dosyasını kontrol et
         final File outputFile = new File(outputFilePath);
         if (!outputFile.exists() || outputFile.length() == 0) {
-            log.error("Output file does not exist or is empty: {}, Command output: {}", outputFilePath, output);
+            logger.error("Output file does not exist or is empty: {}, Command output: {}", outputFilePath, output);
             throw new RuntimeException("Lighthouse CLI failed to generate output file");
         }
         
@@ -381,8 +389,8 @@ public class LighthouseWorkerService {
         try {
             result = objectMapper.readValue(jsonContent, Map.class);
         } catch (Exception e) {
-            log.error("Failed to parse Lighthouse JSON: {}", e.getMessage());
-            log.debug("JSON content: {}", jsonContent.substring(0, Math.min(500, jsonContent.length())));
+            logger.error("Failed to parse Lighthouse JSON: {}", e.getMessage());
+            logger.debug("JSON content: {}", jsonContent.substring(0, Math.min(500, jsonContent.length())));
             throw new RuntimeException("Failed to parse Lighthouse output: " + e.getMessage());
         }
         
@@ -395,7 +403,7 @@ public class LighthouseWorkerService {
         try {
             Files.deleteIfExists(Path.of(outputFilePath));
         } catch (IOException e) {
-            log.warn("Could not delete temporary file: {}", outputFilePath);
+            logger.warn("Could not delete temporary file: {}", outputFilePath);
         }
         
         return result;
@@ -442,7 +450,7 @@ public class LighthouseWorkerService {
         // Lighthouse varlığını kontrol et
         Path lighthouseExecutable = Path.of(lighthousePath);
         if (!Files.exists(lighthouseExecutable)) {
-            log.error("Lighthouse CLI not found at: {}", lighthousePath);
+            logger.error("Lighthouse CLI not found at: {}", lighthousePath);
             throw new RuntimeException("Lighthouse CLI not found at: " + lighthousePath);
         }
         
@@ -452,14 +460,14 @@ public class LighthouseWorkerService {
         
         for (String browser : browsers) {
             if (Files.exists(Path.of(browser))) {
-                log.info("Found browser: {}", browser);
+                logger.info("Found browser: {}", browser);
                 foundBrowser = true;
                 break;
             }
         }
         
         if (!foundBrowser) {
-            log.error("No Chrome/Chromium browser found on system");
+            logger.error("No Chrome/Chromium browser found on system");
             throw new RuntimeException("Required browser (Chrome/Chromium) is not installed or not accessible");
         }
     }
@@ -524,18 +532,6 @@ public class LighthouseWorkerService {
         return "unknown module";
     }
     
-    // Hangi hataların yeniden denenmesi gerektiğini belirle
-    private boolean shouldRetry(Throwable error) {
-        String message = error.getMessage() != null ? error.getMessage().toLowerCase() : "";
-        // Chrome başlatma hatalarını yeniden dene,
-        // Ağ hatalarını yeniden dene, 
-        // Ancak çıktı dosyası yazma izni gibi kalıcı hataları deneme
-        return message.contains("chrome") || 
-               message.contains("connection") || 
-               message.contains("timeout") ||
-               message.contains("refused");
-    }
-    
     // Aktif çalışan worker sayısını döndürür - sağlık kontrolü için kullanılır
     public int getActiveWorkerCount() {
         return activeWorkers.get();
@@ -549,16 +545,16 @@ public class LighthouseWorkerService {
         
         processingJobs.forEach((jobId, startTime) -> {
             if (now - startTime > stuckThresholdMs) {
-                log.warn("Job {} appears to be stuck (processing for {} ms)", jobId, now - startTime);
+                logger.warn("Job {} appears to be stuck (processing for {} ms)", jobId, now - startTime);
                 updateJobStatus(jobId, "FAILED", "Job timed out after " + (now - startTime) / 1000 + " seconds")
                     .subscribe(
                         updated -> {
                             if (Boolean.TRUE.equals(updated)) {
-                                log.info("Marked stuck job {} as failed", jobId);
+                                logger.info("Marked stuck job {} as failed", jobId);
                                 processingJobs.remove(jobId);
                             }
                         },
-                        error -> log.error("Failed to mark job {} as failed: {}", jobId, error.getMessage())
+                        error -> logger.error("Failed to mark job {} as failed: {}", jobId, error.getMessage())
                     );
             }
         });
@@ -570,7 +566,7 @@ public class LighthouseWorkerService {
     public void checkAndProcessQueue() {
         // Worker sayısını kontrol et ve gerekirse yeni worker'lar başlat
         if (activeWorkers.get() < workerCount && running.get()) {
-            log.debug("Checking and starting workers for queue processing");
+            logger.debug("Checking and starting workers for queue processing");
             for (int i = activeWorkers.get(); i < workerCount; i++) {
                 startWorker(i);
             }

@@ -42,7 +42,7 @@ COPY .mvn .mvn
 COPY pom.xml ./
 
 # Bağımlılıkları önce indirerek build katmanını optimize et
-RUN ./mvnw dependency:go-offline
+RUN chmod +x ./mvnw && ./mvnw dependency:go-offline
 
 # Kaynak kodu kopyala ve derle
 COPY src ./src
