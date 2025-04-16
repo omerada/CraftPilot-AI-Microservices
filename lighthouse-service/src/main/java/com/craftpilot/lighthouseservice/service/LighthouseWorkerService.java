@@ -458,52 +458,80 @@ public class LighthouseWorkerService {
         return command;
     }
     
-    // Gerekli araçları kontrol et - daha hafif versiyon
+    // Gerekli araçları kontrol et - minimalist versiyon
     private void checkRequiredTools() throws Exception {
-        // Basit kontrol yap ve devam et
+        // Tüm hataları yakalayarak çalışmaya devam etmeye çalış
         try {
-            // Lighthouse CLI varlığını basitçe kontrol et
-            File lighthouseFile = new File(lighthousePath);
-            if (!lighthouseFile.exists()) {
-                // Node.js'in varlığını kontrol et
-                ProcessBuilder nodeCheck = new ProcessBuilder("node", "--version");
-                Process nodeProcess = nodeCheck.start();
-                int nodeExitCode = nodeProcess.waitFor();
-                
-                if (nodeExitCode != 0) {
-                    logger.error("Node.js not found on the system");
-                } else {
-                    // NPX ile lighthouse'u çalıştırmayı dene
-                    lighthousePath = "npx";
-                    logger.info("Lighthouse executable not found. Using npx as fallback.");
-                }
-            } else {
-                logger.info("Lighthouse executable found at {}", lighthousePath);
-            }
-            
-            // Chrome browser varlığını kontrol et
-            String[] browserPaths = {
-                "/usr/bin/chromium", 
+            // Tarayıcı için platform bağımsız kontrolü
+            String[] possibleBrowserPaths = {
                 "/usr/bin/chromium-browser",
-                "/usr/bin/google-chrome"
+                "/usr/bin/chromium", 
+                "/usr/bin/google-chrome",
+                "/usr/bin/chrome"
             };
             
             boolean browserFound = false;
-            for (String browserPath : browserPaths) {
+            for (String browserPath : possibleBrowserPaths) {
                 if (new File(browserPath).exists()) {
                     System.setProperty("CHROME_PATH", browserPath);
-                    logger.info("Found Chrome/Chromium at: {}", browserPath);
+                    logger.info("Browser found: {}", browserPath);
                     browserFound = true;
                     break;
                 }
             }
             
+            // Lighthouse CLI varlığını kontrol et
+            boolean lighthouseFound = new File(lighthousePath).exists();
+            
+            if (!lighthouseFound) {
+                // Alternatif yolları kontrol et
+                if (new File("/usr/local/bin/lighthouse").exists()) {
+                    lighthousePath = "/usr/local/bin/lighthouse";
+                    lighthouseFound = true;
+                } else if (new File("/usr/bin/lighthouse").exists()) {
+                    lighthousePath = "/usr/bin/lighthouse";
+                    lighthouseFound = true;
+                }
+            }
+            
+            // PATH içinde lighthouse var mı diye kontrol et
+            if (!lighthouseFound) {
+                try {
+                    Process process = Runtime.getRuntime().exec("which lighthouse");
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                    String line = reader.readLine();
+                    if (line != null && !line.isEmpty()) {
+                        lighthousePath = line.trim();
+                        lighthouseFound = true;
+                        logger.info("Found lighthouse in PATH: {}", lighthousePath);
+                    }
+                } catch (Exception e) {
+                    logger.debug("Error checking lighthouse in PATH", e);
+                }
+            }
+            
+            // Lighthouse CLI'yi npx ile çalıştırmayı dene (fallback)
+            if (!lighthouseFound) {
+                try {
+                    Process process = Runtime.getRuntime().exec("which npx");
+                    int exitCode = process.waitFor();
+                    if (exitCode == 0) {
+                        lighthousePath = "npx lighthouse";
+                        logger.info("Using npx lighthouse as fallback");
+                    } else {
+                        logger.warn("Neither Lighthouse CLI nor npx found!");
+                    }
+                } catch (Exception e) {
+                    logger.debug("Error checking npx", e);
+                }
+            }
+            
             if (!browserFound) {
-                logger.warn("Chrome/Chromium not found in standard locations. Lighthouse may fail.");
+                logger.warn("No browser found in standard locations. Lighthouse may fail.");
             }
         } catch (Exception e) {
-            // Logu al ama uygulamanın çalışmasına izin ver
-            logger.warn("Error checking for required tools: {}. Will attempt to continue.", e.getMessage());
+            logger.warn("Error checking tools: {}", e.getMessage());
+            // Continue anyway and hope for the best
         }
     }
 
