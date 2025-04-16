@@ -38,11 +38,12 @@ COPY healthcheck.sh /app/healthcheck.sh
 RUN chmod +x /app/healthcheck.sh && chown appuser:appuser /app/healthcheck.sh
 
 # Ortam değişkenleri
-ENV NODE_PATH=/usr/local/lib/node_modules \
+ENV JAVA_HOME=/opt/java/openjdk \
+    NODE_PATH=/usr/local/lib/node_modules \
     CHROME_PATH=/usr/bin/chromium \
     LIGHTHOUSE_CHROMIUM_PATH=/usr/bin/chromium \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    PATH="/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 USER appuser
 WORKDIR /app
