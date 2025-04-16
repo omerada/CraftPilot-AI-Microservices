@@ -50,4 +50,5 @@ EXPOSE 8085
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 CMD [ "bash", "/app/healthcheck.sh" ]
 
-CMD ["java", "-jar", "app.jar"]
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
