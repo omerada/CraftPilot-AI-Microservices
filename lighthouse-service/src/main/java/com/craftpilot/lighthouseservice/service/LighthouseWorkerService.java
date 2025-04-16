@@ -457,16 +457,41 @@ public class LighthouseWorkerService {
         return command;
     }
     
-    // Gerekli araçları kontrol et - süper basitleştirilmiş versiyon
+    // Gerekli araçları daha kapsamlı kontrol et
     private void checkRequiredTools() throws Exception {
-        logger.info("Checking required tools in simplified mode");
+        logger.info("Checking required tools");
         
-        // Tarayıcı yolları - Alpine Linux'ta tipik olarak bulunanlar
+        // Java kontrolü
+        try {
+            Process process = new ProcessBuilder("java", "-version")
+                .redirectErrorStream(true)
+                .start();
+            
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            }
+            
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                logger.error("Java check failed with exit code: {}, Output: {}", exitCode, output);
+            } else {
+                logger.info("Java check passed: {}", output.toString().trim());
+            }
+        } catch (Exception e) {
+            logger.error("Error checking Java: {}", e.getMessage());
+        }
+        
+        // Tarayıcı yolları - Linux dağıtımlarında tipik olarak bulunanlar
         String[] possibleBrowserPaths = {
             "/usr/bin/chromium-browser",
             "/usr/bin/chromium", 
+            "/usr/bin/google-chrome",
             "/usr/local/bin/chromium",
-            "/usr/bin/google-chrome"
+            "/snap/bin/chromium"
         };
         
         try {
@@ -483,10 +508,38 @@ public class LighthouseWorkerService {
             }
             
             if (!browserFound) {
-                logger.warn("No Chrome/Chromium browser found - using default system Chrome");
+                logger.warn("No Chrome/Chromium browser found in standard locations");
+                // Sistem PATH'inde arama yap
+                try {
+                    Process process = new ProcessBuilder("which", "chromium")
+                        .redirectErrorStream(true)
+                        .start();
+                    
+                    StringBuilder output = new StringBuilder();
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            output.append(line);
+                        }
+                    }
+                    
+                    int exitCode = process.waitFor();
+                    if (exitCode == 0) {
+                        String chromePath = output.toString().trim();
+                        System.setProperty("CHROME_PATH", chromePath);
+                        logger.info("Found Chromium in PATH: {}", chromePath);
+                        browserFound = true;
+                    }
+                } catch (Exception e) {
+                    logger.warn("Error while searching for Chromium in PATH: {}", e.getMessage());
+                }
+                
+                if (!browserFound) {
+                    logger.warn("Using default system Chrome");
+                }
             }
             
-            // Lighthouse kontrolü - basit "which" kontrolü
+            // Lighthouse kontrolü
             try {
                 Process process = new ProcessBuilder("which", lighthousePath.split("\\s+")[0])
                     .redirectErrorStream(true)
@@ -503,9 +556,30 @@ public class LighthouseWorkerService {
                 int exitCode = process.waitFor();
                 if (exitCode != 0) {
                     logger.warn("Lighthouse not found at: {} (exit code: {})", lighthousePath, exitCode);
-                    // Defaults to npx if not found
+                    
+                    // NPX kullanarak lighthouse'u çalıştırmayı dene
+                    logger.info("Trying to use npx lighthouse");
                     lighthousePath = "npx lighthouse";
-                    logger.info("Using npx as fallback: {}", lighthousePath);
+                    
+                    // NPX kontrolü
+                    Process npxProcess = new ProcessBuilder("which", "npx")
+                        .redirectErrorStream(true)
+                        .start();
+                    
+                    StringBuilder npxOutput = new StringBuilder();
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(npxProcess.getInputStream()))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            npxOutput.append(line);
+                        }
+                    }
+                    
+                    int npxExitCode = npxProcess.waitFor();
+                    if (npxExitCode == 0) {
+                        logger.info("Will use NPX to run lighthouse: {}", npxOutput.toString().trim());
+                    } else {
+                        logger.warn("NPX not found in PATH, lighthouse may not work properly");
+                    }
                 } else {
                     logger.info("Lighthouse found: {}", output.toString().trim());
                 }

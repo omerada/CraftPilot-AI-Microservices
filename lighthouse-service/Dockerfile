@@ -1,4 +1,4 @@
-# Build stage - Official Maven image kullan
+# Build stage - Maven ve Java kullanarak derleme
 FROM maven:3.9.5-eclipse-temurin-21 AS builder
 WORKDIR /app
 
@@ -14,28 +14,23 @@ COPY src ./src
 # Uygulamayı derle
 RUN mvn clean package -DskipTests -B
 
-# Final imaj
-FROM eclipse-temurin:21-jre-alpine
+# Final imaj - Alpine yerine tam Debian tabanlı imaj kullan
+FROM eclipse-temurin:21-jre
 
 # Temel araçları kur
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y \
     nodejs \
     npm \
-    chromium \
     curl \
-    bash
+    chromium \
+    wget \
+    gnupg \
+    --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
 
 # Lighthouse CLI kurulumu
 RUN npm install -g lighthouse@11.1.0 && \
     npm cache clean --force
-
-# Chromium için sembolik bağlantılar oluştur (güvenli şekilde)
-RUN if [ -e /usr/bin/chromium-browser ] && [ ! -e /usr/bin/chromium ]; then \
-        ln -sf /usr/bin/chromium-browser /usr/bin/chromium; \
-    fi && \
-    if [ -e /usr/bin/chromium-browser ] && [ ! -e /usr/bin/google-chrome ]; then \
-        ln -sf /usr/bin/chromium-browser /usr/bin/google-chrome; \
-    fi
 
 # Gerekli dizinleri oluştur
 RUN mkdir -p /tmp/lighthouse /home/appuser
@@ -45,11 +40,12 @@ ENV NODE_PATH=/usr/local/lib/node_modules \
     CHROME_PATH=/usr/bin/chromium \
     LIGHTHOUSE_CHROMIUM_PATH=/usr/bin/chromium \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/java/openjdk/bin"
+    JAVA_HOME=/opt/java/openjdk \
+    PATH="/opt/java/openjdk/bin:${PATH}"
 
 # Güvenlik için non-root kullanıcı oluştur
-RUN addgroup -S appuser && \
-    adduser -S -G appuser appuser && \
+RUN groupadd -r appuser && \
+    useradd -r -g appuser -d /home/appuser appuser && \
     chown -R appuser:appuser /tmp/lighthouse /home/appuser
 
 # JAR dosyasını kopyala
@@ -59,9 +55,13 @@ RUN chown appuser:appuser /app/app.jar
 # Kurulumu doğrula
 RUN java -version && \
     node --version && \
-    echo "Checking Chrome:" && ls -la /usr/bin/chrom* && \
-    echo "Checking Lighthouse:" && which lighthouse && \
-    echo "Checking JAR file:" && ls -la /app/app.jar
+    npm --version && \
+    echo "Checking Chrome:" && \
+    chromium --version || echo "Chromium version check failed" && \
+    echo "Checking Lighthouse:" && \
+    lighthouse --version && \
+    echo "Checking JAR file:" && \
+    ls -la /app/app.jar
 
 # Non-root kullanıcıya geç
 USER appuser
