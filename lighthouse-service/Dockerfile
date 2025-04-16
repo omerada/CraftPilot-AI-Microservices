@@ -1,20 +1,20 @@
-# Maven build stage
-FROM maven:3.9-eclipse-temurin-21-jammy AS builder
+# Build stage - Official Maven image kullan
+FROM maven:3.9.5-eclipse-temurin-21 AS builder
 WORKDIR /app
 
-# Maven wrapper ve bağımlılıkları kopyala
-COPY mvnw ./
-COPY .mvn .mvn
-COPY pom.xml ./
+# POM dosyasını kopyala
+COPY pom.xml .
 
-# Bağımlılıkları indir
-RUN chmod +x ./mvnw && ./mvnw dependency:go-offline -B
+# Bağımlılıkları indir (pom.xml değişmediği sürece önbelleğe alınır)
+RUN mvn dependency:go-offline -B
 
-# Kodu kopyala ve derle
+# Kaynak kodları kopyala
 COPY src ./src
-RUN ./mvnw clean package -DskipTests -B
 
-# Final image
+# Uygulamayı derle
+RUN mvn clean package -DskipTests -B
+
+# Final imaj
 FROM eclipse-temurin:21-jre-alpine
 
 # Temel araçları kur
@@ -23,47 +23,49 @@ RUN apk add --no-cache \
     npm \
     chromium \
     curl \
-    bash \
-    # Gerekli fontları ekle
-    ttf-freefont \
-    # Gerekli araçları ekle
-    dumb-init
+    bash
 
 # Lighthouse CLI kurulumu
-RUN npm install -g lighthouse@11.1.0 --unsafe-perm && \
-    npm cache clean --force && \
-    # Basit sembolik link ekle
-    ln -sf $(which chromium-browser) /usr/bin/chromium || true && \
-    ln -sf $(which chromium-browser) /usr/bin/google-chrome || true
+RUN npm install -g lighthouse@11.1.0 && \
+    npm cache clean --force
 
-# Çevre değişkenleri
+# Chromium için sembolik bağlantılar oluştur (güvenli şekilde)
+RUN if [ -e /usr/bin/chromium-browser ] && [ ! -e /usr/bin/chromium ]; then \
+        ln -sf /usr/bin/chromium-browser /usr/bin/chromium; \
+    fi && \
+    if [ -e /usr/bin/chromium-browser ] && [ ! -e /usr/bin/google-chrome ]; then \
+        ln -sf /usr/bin/chromium-browser /usr/bin/google-chrome; \
+    fi
+
+# Gerekli dizinleri oluştur
+RUN mkdir -p /tmp/lighthouse /home/appuser
+
+# Ortam değişkenlerini yapılandır
 ENV NODE_PATH=/usr/local/lib/node_modules \
-    CHROME_PATH=/usr/bin/chromium-browser \
+    CHROME_PATH=/usr/bin/chromium \
+    LIGHTHOUSE_CHROMIUM_PATH=/usr/bin/chromium \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/java/openjdk/bin"
 
-# Geçici klasörleri oluştur
-RUN mkdir -p /tmp/lighthouse /home/appuser && \
-    addgroup -S appuser && adduser -S -G appuser appuser && \
+# Güvenlik için non-root kullanıcı oluştur
+RUN addgroup -S appuser && \
+    adduser -S -G appuser appuser && \
     chown -R appuser:appuser /tmp/lighthouse /home/appuser
 
-# Uygulamayı kopyala
+# JAR dosyasını kopyala
 COPY --from=builder /app/target/*.jar /app/app.jar
-RUN chown appuser:appuser /app/app.jar
+RUN chown appuser:appuser /app.app.jar
 
-# Test et
-RUN echo "Checking Java installation" && \
-    java -version && \
-    echo "Checking Node installation" && \
+# Kurulumu doğrula
+RUN java -version && \
     node --version && \
-    echo "Checking Lighthouse CLI" && \
-    which lighthouse || echo "Lighthouse CLI not in PATH" && \
-    lighthouse --version || echo "Lighthouse version check failed, continuing anyway"
+    echo "Checking Chrome:" && ls -la /usr/bin/chrom* && \
+    echo "Checking Lighthouse:" && which lighthouse
 
-# Kullanıcı değiştir
+# Non-root kullanıcıya geç
 USER appuser
 WORKDIR /app
-
-# Portu aç ve uygulamayı başlat
 EXPOSE 8085
-ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+
+# Uygulamayı çalıştır
 CMD ["java", "-jar", "app.jar"]
