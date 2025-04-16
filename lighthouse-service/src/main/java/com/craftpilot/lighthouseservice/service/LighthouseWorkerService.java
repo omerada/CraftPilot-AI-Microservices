@@ -458,122 +458,52 @@ public class LighthouseWorkerService {
         return command;
     }
     
-    // Gerekli araçları kontrol et
+    // Gerekli araçları kontrol et - daha hafif versiyon
     private void checkRequiredTools() throws Exception {
-        // Daha esnek kontrol - Lighthouse CLI için doğrudan "which" yerine farklı kontroller dene
-        boolean lighthouseFound = false;
-        
-        // 1. Doğrudan "lighthouse" komutuyla test et
+        // Basit kontrol yap ve devam et
         try {
-            ProcessBuilder processBuilder = new ProcessBuilder(lighthousePath, "--version");
-            Process process = processBuilder.start();
-            int exitCode = process.waitFor();
-            
-            if (exitCode == 0) {
-                lighthouseFound = true;
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                    String version = reader.readLine();
-                    logger.info("Found Lighthouse CLI version: {}", version);
+            // Lighthouse CLI varlığını basitçe kontrol et
+            File lighthouseFile = new File(lighthousePath);
+            if (!lighthouseFile.exists()) {
+                // Node.js'in varlığını kontrol et
+                ProcessBuilder nodeCheck = new ProcessBuilder("node", "--version");
+                Process nodeProcess = nodeCheck.start();
+                int nodeExitCode = nodeProcess.waitFor();
+                
+                if (nodeExitCode != 0) {
+                    logger.error("Node.js not found on the system");
+                } else {
+                    // NPX ile lighthouse'u çalıştırmayı dene
+                    lighthousePath = "npx";
+                    logger.info("Lighthouse executable not found. Using npx as fallback.");
                 }
+            } else {
+                logger.info("Lighthouse executable found at {}", lighthousePath);
             }
-        } catch (Exception e) {
-            logger.debug("Error checking Lighthouse with direct command: {}", e.getMessage());
-        }
-        
-        // 2. which komutunu dene
-        if (!lighthouseFound) {
-            try {
-                ProcessBuilder processBuilder = new ProcessBuilder("which", lighthousePath);
-                Process process = processBuilder.start();
-                int exitCode = process.waitFor();
-                lighthouseFound = (exitCode == 0);
-            } catch (Exception e) {
-                logger.debug("Error checking Lighthouse with 'which': {}", e.getMessage());
-            }
-        }
-        
-        // 3. Dosya varlığını kontrol et
-        if (!lighthouseFound) {
-            try {
-                lighthouseFound = Files.exists(Path.of(lighthousePath));
-                logger.debug("Checking Lighthouse file existence: {}", lighthouseFound);
-            } catch (Exception e) {
-                logger.debug("Error checking Lighthouse file: {}", e.getMessage());
-            }
-        }
-        
-        // Eğer hiçbir şekilde bulunamadıysa hata fırlat
-        if (!lighthouseFound) {
-            logger.error("Lighthouse CLI not found at: {}", lighthousePath);
-            throw new RuntimeException("Lighthouse CLI not found or not accessible. Please check installation.");
-        } else {
-            logger.info("Lighthouse CLI verified successfully");
-        }
-        
-        // Chrome/Chromium varlığını kontrol et - daha esnek yaklaşım
-        String[] browsers = {
-            "/usr/bin/chromium", 
-            "/usr/bin/chromium-browser", 
-            "/usr/bin/google-chrome", 
-            "/usr/bin/chrome",
-            "/opt/google/chrome/chrome"
-        };
-        boolean foundBrowser = false;
-        String foundBrowserPath = null;
-        
-        for (String browser : browsers) {
-            // 1. Dosya varlığını kontrol et
-            try {
-                if (Files.exists(Path.of(browser))) {
-                    logger.info("Found browser (file exists): {}", browser);
-                    foundBrowser = true;
-                    foundBrowserPath = browser;
+            
+            // Chrome browser varlığını kontrol et
+            String[] browserPaths = {
+                "/usr/bin/chromium", 
+                "/usr/bin/chromium-browser",
+                "/usr/bin/google-chrome"
+            };
+            
+            boolean browserFound = false;
+            for (String browserPath : browserPaths) {
+                if (new File(browserPath).exists()) {
+                    System.setProperty("CHROME_PATH", browserPath);
+                    logger.info("Found Chrome/Chromium at: {}", browserPath);
+                    browserFound = true;
                     break;
                 }
-            } catch (Exception e) {
-                logger.debug("Error checking browser file {}: {}", browser, e.getMessage());
             }
             
-            // 2. which ile kontrol et
-            if (!foundBrowser) {
-                try {
-                    ProcessBuilder processBuilder = new ProcessBuilder("which", browser);
-                    Process process = processBuilder.start();
-                    int exitCode = process.waitFor();
-                    
-                    if (exitCode == 0) {
-                        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                            foundBrowserPath = reader.readLine().trim();
-                            if (!foundBrowserPath.isEmpty()) {
-                                logger.info("Found browser (using which): {}", foundBrowserPath);
-                                foundBrowser = true;
-                                break;
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-                    logger.debug("Error checking browser with 'which' {}: {}", browser, e.getMessage());
-                }
+            if (!browserFound) {
+                logger.warn("Chrome/Chromium not found in standard locations. Lighthouse may fail.");
             }
-        }
-        
-        if (foundBrowser && foundBrowserPath != null) {
-            // Çevresel değişkenleri ayarla
-            System.setProperty("CHROME_PATH", foundBrowserPath);
-            logger.info("Set CHROME_PATH environment variable to: {}", foundBrowserPath);
-            
-            // Dosyaya erişim ve çalıştırma izinlerini kontrol et
-            try {
-                File browserFile = new File(foundBrowserPath);
-                if (!browserFile.canExecute()) {
-                    logger.warn("Browser exists but may not be executable: {}", foundBrowserPath);
-                }
-            } catch (Exception e) {
-                logger.warn("Error checking browser permissions: {}", e.getMessage());
-            }
-        } else {
-            logger.error("No Chrome/Chromium browser found on system");
-            throw new RuntimeException("Required browser (Chrome/Chromium) is not installed or not accessible");
+        } catch (Exception e) {
+            // Logu al ama uygulamanın çalışmasına izin ver
+            logger.warn("Error checking for required tools: {}. Will attempt to continue.", e.getMessage());
         }
     }
 

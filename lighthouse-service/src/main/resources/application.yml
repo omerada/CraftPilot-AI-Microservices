@@ -23,14 +23,17 @@ spring:
   task:
     execution:
       pool:
-        core-size: 5
-        max-size: 10
-        queue-capacity: 25
+        core-size: 4
+        max-size: 8
+        queue-capacity: 20
         keep-alive: 60s
         allow-core-thread-timeout: true
 
 server:
   port: ${PORT:8085}
+  tomcat:
+    max-threads: 50
+    min-spare-threads: 10
 
 lighthouse:
   queue:
@@ -46,8 +49,8 @@ lighthouse:
     # Ekstra zaman aşımı koruma mekanizması
     max-processing-time: ${LIGHTHOUSE_MAX_PROCESSING_TIME:600} # 10 dakika
   worker:
-    count: ${LIGHTHOUSE_WORKER_COUNT:3} # Worker sayısı
-    poll-interval: 1000 # Poll aralığı (ms)
+    count: ${LIGHTHOUSE_WORKER_COUNT:2} # Daha az worker kullan
+    poll-interval: 2000 # Poll aralığını arttır
     check-interval: 10000 # Worker kontrol aralığı (ms)
     restart-attempts: ${LIGHTHOUSE_WORKER_RESTART_ATTEMPTS:3} # Worker yeniden başlatma deneme sayısı
   cli:
