@@ -53,6 +53,10 @@ lighthouse:
   cli:
     path: ${LIGHTHOUSE_CLI_PATH:lighthouse} # Lighthouse CLI yolu
     timeout: ${LIGHTHOUSE_CLI_TIMEOUT:300} # CLI işlem zaman aşımı (sn)
+    # Lighthouse CLI için ek ayarlar
+    enable-error-reporting: ${LIGHTHOUSE_ENABLE_ERROR_REPORTING:true} # Hata raporlamayı etkinleştir
+    max-retries: ${LIGHTHOUSE_CLI_MAX_RETRIES:2} # Başarısızlık durumunda yeniden deneme sayısı
+    retry-delay: ${LIGHTHOUSE_CLI_RETRY_DELAY:5000} # Yeniden denemeler arasındaki bekleme süresi (ms)
   temp:
     dir: ${LIGHTHOUSE_TEMP_DIR:/tmp/lighthouse} # Geçici dosyalar için dizin
     cleanup: ${LIGHTHOUSE_TEMP_CLEANUP:true} # Geçici dosyaların temizlenmesi

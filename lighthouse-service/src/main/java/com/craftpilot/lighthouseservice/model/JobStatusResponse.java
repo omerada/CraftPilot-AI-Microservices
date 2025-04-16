@@ -17,4 +17,8 @@ public class JobStatusResponse {
     private String status;
     private String error;
     private Map<String, Object> data;
+    private Long timestamp;
+    
+    // Debug ve izleme amaçlı yardımcı alan
+    private String debugInfo;
 }

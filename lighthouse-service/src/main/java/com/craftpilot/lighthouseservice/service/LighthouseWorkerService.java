@@ -55,6 +55,15 @@ public class LighthouseWorkerService {
     @Value("${lighthouse.temp.dir:/tmp}")
     private String tempDir; // Geçici dosyalar için dizin
     
+    @Value("${lighthouse.cli.max-retries:2}")
+    private int lighthouseMaxRetries; // Lighthouse CLI yeniden deneme sayısı
+    
+    @Value("${lighthouse.cli.retry-delay:5000}")
+    private int lighthouseRetryDelay; // Lighthouse CLI yeniden deneme gecikmesi (ms)
+    
+    @Value("${lighthouse.cli.enable-error-reporting:true}")
+    private boolean enableErrorReporting; // Hata raporlama etkin mi
+    
     private final AtomicInteger activeWorkers = new AtomicInteger(0);
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final Map<String, Long> processingJobs = new ConcurrentHashMap<>();
@@ -213,10 +222,16 @@ public class LighthouseWorkerService {
     private Mono<Boolean> updateJobStatus(String jobId, String status, String errorMessage) {
         log.debug("Updating job {} status to: {}", jobId, status);
         
+        // Hata varsa durumu FAILED olarak güncelle
+        String finalStatus = status;
+        if (errorMessage != null && !errorMessage.isEmpty() && "COMPLETED".equals(status)) {
+            finalStatus = "FAILED";
+        }
+        
         Map<String, Object> jobStatus = Map.of(
             "jobId", jobId,
-            "complete", "COMPLETED".equals(status) || "FAILED".equals(status),
-            "status", status,
+            "complete", "COMPLETED".equals(finalStatus) || "FAILED".equals(finalStatus),
+            "status", finalStatus,
             "error", errorMessage != null ? errorMessage : "",
             "timestamp", System.currentTimeMillis()
         );
@@ -244,115 +259,181 @@ public class LighthouseWorkerService {
     
     // Gerçek Lighthouse CLI ile analiz yapan metod
     private Mono<Map<String, Object>> runLighthouseAnalysis(String url, String analysisType, String jobId) {
-        return Mono.fromCallable(() -> {
-            log.info("Starting Lighthouse CLI analysis for URL: {} with type: {}", url, analysisType);
-            
-            // Geçici dosya oluştur - final olarak işaretle
-            final String outputFilePath = tempDir + File.separator + "lighthouse-" + jobId + ".json";
-            
-            // Lighthouse CLI komut parametrelerini hazırla
-            final List<String> command = new ArrayList<>();
-            
-            // Docker'da node ve lighthouse'u direkt çalıştır
-            command.add(lighthousePath);
-            command.add(url);
-            command.add("--output=json");
-            command.add("--output-path=" + outputFilePath);
-            
-            // Chrome flags düzeltildi - çift tırnak içindeki tırnak işaretleri hatalıydı
-            command.add("--chrome-flags=--headless --no-sandbox --disable-gpu --disable-dev-shm-usage");
-            
-            // Analiz tipini normalize et - null ya da boş değerler için "basic" varsayılanını kullan
-            final String normalizedAnalysisType = (analysisType == null || analysisType.trim().isEmpty()) 
-                                               ? "basic" 
-                                               : analysisType.trim().toLowerCase();
-            
-            // Analiz tipine göre ek parametreler ekle
-            switch (normalizedAnalysisType) {
-                case "detailed":
-                    // Detaylı analiz için tüm kategorileri kontrol et ve gerçek throttling kullan
-                    command.add("--throttling.cpuSlowdownMultiplier=4");
-                    command.add("--throttling-method=devtools");
-                    break;
-                    
-                case "basic":
-                default:
-                    // Temel analiz için sadece performans kategorisini kontrol et ve daha hızlı çalıştır
-                    command.add("--only-categories=performance");
-                    command.add("--throttling-method=simulate");
-                    command.add("--quiet"); // Daha az log için
-                    break;
+        return Mono.fromCallable(() -> executeCliCommand(url, analysisType, jobId))
+            .retryWhen(Retry.backoff(lighthouseMaxRetries, Duration.ofMillis(lighthouseRetryDelay))
+                .filter(e -> shouldRetry(e))
+                .doBeforeRetry(retrySignal -> {
+                    log.warn("Retrying Lighthouse analysis after error. Attempt: {}, URL: {}", 
+                        retrySignal.totalRetries() + 1, url);
+                }))
+            .subscribeOn(Schedulers.boundedElastic())
+            .onErrorResume(e -> {
+                log.error("Error running Lighthouse analysis: {}", e.getMessage(), e);
+                Map<String, Object> errorResult = new HashMap<>();
+                errorResult.put("error", e.getMessage());
+                errorResult.put("url", url);
+                errorResult.put("analysisType", analysisType);
+                errorResult.put("timestamp", System.currentTimeMillis());
+                
+                // Hata durumunda job durumunu FAILED olarak güncelle
+                updateJobStatus(jobId, "FAILED", e.getMessage())
+                    .subscribe(updated -> {
+                        if (Boolean.TRUE.equals(updated)) {
+                            log.info("Updated job {} status to FAILED due to error", jobId);
+                        }
+                    });
+                
+                return Mono.just(errorResult);
+            });
+    }
+    
+    // Hangi hataların yeniden denenmesi gerektiğini belirle
+    private boolean shouldRetry(Throwable error) {
+        String message = error.getMessage() != null ? error.getMessage().toLowerCase() : "";
+        // Chrome başlatma hatalarını yeniden dene,
+        // Ağ hatalarını yeniden dene, 
+        // Ancak çıktı dosyası yazma izni gibi kalıcı hataları deneme
+        return message.contains("chrome") || 
+               message.contains("connection") || 
+               message.contains("timeout") ||
+               message.contains("refused");
+    }
+    
+    // Lighthouse CLI komutunu çalıştırma
+    private Map<String, Object> executeCliCommand(String url, String analysisType, String jobId) throws Exception {
+        log.info("Starting Lighthouse CLI analysis for URL: {} with type: {}", url, analysisType);
+        
+        // Geçici dizin varlığını kontrol et ve oluştur
+        File tempDirFile = new File(tempDir);
+        if (!tempDirFile.exists()) {
+            log.info("Creating temp directory: {}", tempDir);
+            if (!tempDirFile.mkdirs()) {
+                log.warn("Failed to create temp directory: {}", tempDir);
             }
-            
-            // Komutu çalıştır
-            final ProcessBuilder processBuilder = new ProcessBuilder(command);
-            processBuilder.redirectErrorStream(true); // Hata çıktılarını birleştir
-            
-            log.debug("Executing command: {}", String.join(" ", command));
-            final Process process = processBuilder.start();
-            
-            // Çıktıyı oku ve logla
-            final StringBuilder output = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    output.append(line).append("\n");
-                    log.debug("Lighthouse CLI output: {}", line);
-                }
+        }
+        
+        // Geçici dosya oluştur
+        final String outputFilePath = tempDir + File.separator + "lighthouse-" + jobId + ".json";
+        
+        // Lighthouse CLI komut parametrelerini hazırla
+        final List<String> command = new ArrayList<>();
+        
+        command.add(lighthousePath);
+        command.add(url);
+        command.add("--output=json");
+        command.add("--output-path=" + outputFilePath);
+        
+        // Chrome flags düzeltildi
+        command.add("--chrome-flags=--headless --no-sandbox --disable-gpu --disable-dev-shm-usage");
+        
+        // Analiz tipini normalize et
+        final String normalizedAnalysisType = (analysisType == null || analysisType.trim().isEmpty())
+                                           ? "basic" 
+                                           : analysisType.trim().toLowerCase();
+        
+        // Analiz tipine göre ek parametreler ekle
+        switch (normalizedAnalysisType) {
+            case "detailed":
+                // Detaylı analiz için tüm kategorileri kontrol et ve gerçek throttling kullan
+                command.add("--throttling.cpuSlowdownMultiplier=4");
+                command.add("--throttling-method=devtools");
+                break;
+            case "basic":
+            default:
+                // Temel analiz için sadece performans kategorisini kontrol et ve daha hızlı çalıştır
+                command.add("--only-categories=performance");
+                command.add("--throttling-method=simulate");
+                break;
+        }
+        
+        // Komutu çalıştır
+        final ProcessBuilder processBuilder = new ProcessBuilder(command);
+        processBuilder.redirectErrorStream(true); // Hata çıktılarını birleştir
+        
+        log.info("Executing command: {}", String.join(" ", command));
+        final Process process = processBuilder.start();
+        
+        // Çıktıyı oku ve logla
+        final StringBuilder output = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.append(line).append("\n");
+                log.info("Lighthouse CLI output: {}", line); // Daha görünür olması için INFO seviyesine çıkarıldı
             }
+        }
+        
+        // İşlemin tamamlanmasını bekle
+        final int exitCode = process.waitFor();
+        
+        // Eğer çıkış kodu başarısız ise
+        if (exitCode != 0) {
+            log.error("Lighthouse CLI process exited with code: {}, Output: {}", exitCode, output.toString());
             
-            // İşlemin tamamlanmasını bekle
-            final int exitCode = process.waitFor();
-            
-            // Eğer çıkış kodu başarısız ve çıktı dosyası yoksa
-            if (exitCode != 0) {
-                log.error("Lighthouse CLI process exited with code: {}, Output: {}", exitCode, output.toString());
-                throw new RuntimeException("Lighthouse CLI failed with exit code: " + exitCode);
-            }
-            
-            // JSON çıktı dosyasını kontrol et
-            final File outputFile = new File(outputFilePath);
-            if (!outputFile.exists() || outputFile.length() == 0) {
-                log.error("Output file does not exist or is empty: {}, Command output: {}", outputFilePath, output);
-                throw new RuntimeException("Lighthouse CLI failed to generate output file");
-            }
-            
-            // JSON çıktıyı oku
-            final String jsonContent = Files.readString(Path.of(outputFilePath));
-            
-            // JSON'ı Map'e dönüştür - hata yönetimi eklendi
-            Map<String, Object> result;
-            try {
-                result = objectMapper.readValue(jsonContent, Map.class);
-            } catch (Exception e) {
-                log.error("Failed to parse Lighthouse JSON: {}", e.getMessage());
-                log.debug("JSON content: {}", jsonContent.substring(0, Math.min(500, jsonContent.length())));
-                throw new RuntimeException("Failed to parse Lighthouse output: " + e.getMessage());
-            }
-            
-            // Ek bilgileri ekle
-            result.put("analysisType", analysisType);
-            result.put("timestamp", System.currentTimeMillis());
-            
-            // Geçici dosyayı temizle
-            try {
-                Files.deleteIfExists(Path.of(outputFilePath));
-            } catch (IOException e) {
-                log.warn("Could not delete temporary file: {}", outputFilePath);
-            }
-            
-            return result;
-        })
-        .subscribeOn(Schedulers.boundedElastic())
-        .onErrorResume(e -> {
-            log.error("Error running Lighthouse analysis: {}", e.getMessage(), e);
-            Map<String, Object> errorResult = new HashMap<>();
-            errorResult.put("error", e.getMessage());
-            errorResult.put("url", url);
-            errorResult.put("analysisType", analysisType);
-            errorResult.put("timestamp", System.currentTimeMillis());
-            return Mono.just(errorResult);
-        });
+            // Çıktıdaki hata mesajlarını incele
+            String errorDetails = analyzeCliOutput(output.toString());
+            throw new RuntimeException("Lighthouse CLI failed with exit code: " + exitCode + 
+                (errorDetails != null ? ". Details: " + errorDetails : ""));
+        }
+        
+        // JSON çıktı dosyasını kontrol et
+        final File outputFile = new File(outputFilePath);
+        if (!outputFile.exists() || outputFile.length() == 0) {
+            log.error("Output file does not exist or is empty: {}, Command output: {}", outputFilePath, output);
+            throw new RuntimeException("Lighthouse CLI failed to generate output file");
+        }
+        
+        // JSON çıktıyı oku
+        final String jsonContent = Files.readString(Path.of(outputFilePath));
+        
+        // JSON'ı Map'e dönüştür
+        Map<String, Object> result;
+        try {
+            result = objectMapper.readValue(jsonContent, Map.class);
+        } catch (Exception e) {
+            log.error("Failed to parse Lighthouse JSON: {}", e.getMessage());
+            log.debug("JSON content: {}", jsonContent.substring(0, Math.min(500, jsonContent.length())));
+            throw new RuntimeException("Failed to parse Lighthouse output: " + e.getMessage());
+        }
+        
+        // Ek bilgileri ekle
+        result.put("analysisType", analysisType);
+        result.put("timestamp", System.currentTimeMillis());
+        result.put("url", url);
+        
+        // Geçici dosyayı temizle
+        try {
+            Files.deleteIfExists(Path.of(outputFilePath));
+        } catch (IOException e) {
+            log.warn("Could not delete temporary file: {}", outputFilePath);
+        }
+        
+        return result;
+    }
+    
+    // CLI çıktısını analiz eder ve hata mesajlarını çıkarır
+    private String analyzeCliOutput(String output) {
+        if (output.contains("no such file or directory")) {
+            return "Lighthouse CLI not found or not executable";
+        }
+        if (output.contains("chrome not found")) {
+            return "Chrome browser could not be found";
+        }
+        if (output.contains("permission denied")) {
+            return "Permission denied when trying to access resources";
+        }
+        if (output.contains("ERR_CONNECTION_REFUSED") || output.contains("ERR_NAME_NOT_RESOLVED")) {
+            return "Failed to connect to the target URL";
+        }
+        
+        // Son 5 satır genellikle en önemli hata mesajlarını içerir
+        String[] lines = output.split("\n");
+        StringBuilder lastLines = new StringBuilder("Last lines: ");
+        for (int i = Math.max(0, lines.length - 5); i < lines.length; i++) {
+            lastLines.append(lines[i].trim()).append("; ");
+        }
+        
+        return lastLines.toString();
     }
     
     // Aktif çalışan worker sayısını döndürür - sağlık kontrolü için kullanılır

@@ -75,8 +75,9 @@ public class LighthouseQueueService {
                     JobStatusResponse timeoutStatus = JobStatusResponse.builder()
                         .jobId(jobId)
                         .complete(true)
-                        .status("FAILED")
+                        .status("FAILED") // Timeout durumunu FAILED olarak değiştirdik
                         .error("Job timed out after " + jobTimeoutSeconds + " seconds")
+                        .timestamp(currentTime)
                         .build();
                     
                     // Durumu Redis'e kaydet ve yanıt olarak döndür
@@ -95,11 +96,17 @@ public class LighthouseQueueService {
         return redisTemplate.opsForValue().get(resultsPrefix + jobId)
             .flatMap(result -> {
                 log.debug("Job result found for ID {}: {}", jobId, result);
+                // Sonuç içinde hata kontrolü yap
+                Map<String, Object> resultMap = (Map<String, Object>) result;
+                boolean hasError = resultMap.containsKey("error") && resultMap.get("error") != null;
+                
                 return Mono.just(JobStatusResponse.builder()
                     .jobId(jobId)
                     .complete(true)
-                    .status("COMPLETED")
-                    .data((Map<String, Object>) result)
+                    .status(hasError ? "FAILED" : "COMPLETED") // Hata durumuna göre FAILED durumu döndür
+                    .error(hasError ? (String) resultMap.get("error") : null)
+                    .data(resultMap)
+                    .timestamp(System.currentTimeMillis())
                     .build());
             })
             .switchIfEmpty(Mono.defer(() -> 
@@ -119,6 +126,7 @@ public class LighthouseQueueService {
                                 .complete(false)
                                 .status("UNKNOWN")
                                 .error("Invalid response format")
+                                .timestamp(System.currentTimeMillis())
                                 .build());
                         }
                     })
@@ -127,6 +135,7 @@ public class LighthouseQueueService {
                         .complete(false)
                         .status("NOT_FOUND")
                         .error("Job not found or expired")
+                        .timestamp(System.currentTimeMillis())
                         .build()))
             ));
     }
@@ -143,6 +152,9 @@ public class LighthouseQueueService {
         // JobId bilgisini ekle
         builder.jobId(jobId);
         
+        // Timestamp ekle
+        builder.timestamp(System.currentTimeMillis());
+        
         // Map'ten değerleri çıkar ve builder'a ekle
         if (map.containsKey("complete")) {
             builder.complete((Boolean) map.get("complete"));
@@ -153,7 +165,14 @@ public class LighthouseQueueService {
         }
         
         if (map.containsKey("error")) {
-            builder.error((String) map.get("error"));
+            String errorMsg = (String) map.get("error");
+            builder.error(errorMsg);
+            
+            // Eğer hata varsa ve durum COMPLETED ise, FAILED olarak düzelt
+            if (errorMsg != null && !errorMsg.isEmpty() && 
+                (map.containsKey("status") && "COMPLETED".equals(map.get("status")))) {
+                builder.status("FAILED");
+            }
         }
         
         if (map.containsKey("data") && map.get("data") instanceof Map) {
