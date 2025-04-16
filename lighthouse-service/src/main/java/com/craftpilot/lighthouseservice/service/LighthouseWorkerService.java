@@ -262,16 +262,26 @@ public class LighthouseWorkerService {
             // Chrome flags düzeltildi - çift tırnak içindeki tırnak işaretleri hatalıydı
             command.add("--chrome-flags=--headless --no-sandbox --disable-gpu --disable-dev-shm-usage");
             
+            // Analiz tipini normalize et - null ya da boş değerler için "basic" varsayılanını kullan
+            final String normalizedAnalysisType = (analysisType == null || analysisType.trim().isEmpty()) 
+                                               ? "basic" 
+                                               : analysisType.trim().toLowerCase();
+            
             // Analiz tipine göre ek parametreler ekle
-            if ("basic".equals(analysisType)) {
-                // Temel analiz için sadece performans kategorisini kontrol et ve daha hızlı çalıştır
-                command.add("--only-categories=performance");
-                command.add("--throttling-method=simulate");
-                command.add("--quiet"); // Daha az log için
-            } else if ("detailed".equals(analysisType)) {
-                // Detaylı analiz için tüm kategorileri kontrol et ve gerçek 3G throttling kullan
-                command.add("--throttling.cpuSlowdownMultiplier=4");
-                command.add("--throttling-method=devtools");
+            switch (normalizedAnalysisType) {
+                case "detailed":
+                    // Detaylı analiz için tüm kategorileri kontrol et ve gerçek throttling kullan
+                    command.add("--throttling.cpuSlowdownMultiplier=4");
+                    command.add("--throttling-method=devtools");
+                    break;
+                    
+                case "basic":
+                default:
+                    // Temel analiz için sadece performans kategorisini kontrol et ve daha hızlı çalıştır
+                    command.add("--only-categories=performance");
+                    command.add("--throttling-method=simulate");
+                    command.add("--quiet"); // Daha az log için
+                    break;
             }
             
             // Komutu çalıştır

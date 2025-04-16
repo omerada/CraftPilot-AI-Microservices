@@ -26,6 +26,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
 
 /**
  * Performans analizi için dış dünya endpointlerini sağlar.
@@ -70,7 +71,7 @@ public class PerformanceController {
      */
     @PostMapping("/analyze")
     public Mono<Map<String, Object>> analyzeWebsite(@RequestBody PerformanceAnalysisRequest request) {
-        log.info("Performing performance analysis for URL: {}", request.getUrl());
+        log.info("Performing performance analysis for URL: {} with type: {}", request.getUrl(), request.getAnalysisType());
 
         // Önce health check yap
         return healthCheck()
@@ -84,11 +85,16 @@ public class PerformanceController {
                 }
                 
                 // Servis sağlıklı, analiz isteğini gönder
+                // analysisType parametresini de Lighthouse servisine aktar
+                Map<String, Object> requestBody = new HashMap<>();
+                requestBody.put("url", request.getUrl());
+                requestBody.put("analysisType", request.getAnalysisType());
+                
                 return webClientBuilder.build()
                     .post()
                     .uri(lighthouseServiceUrl + "/api/v1/analyze")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(request)
+                    .bodyValue(requestBody) // Map olarak gönderip tüm parametreleri içerir
                     .retrieve()
                     .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>(){})
                     .doOnSuccess(response -> log.info("Performance analysis response received: jobId={}", response.get("jobId")))
