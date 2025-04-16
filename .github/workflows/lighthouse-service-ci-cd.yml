@@ -70,6 +70,7 @@ jobs:
           context: ./lighthouse-service
           platforms: linux/arm64
           push: true
+          provenance: false
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
 
       - name: Deploy to VPS
