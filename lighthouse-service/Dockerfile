@@ -54,13 +54,14 @@ RUN addgroup -S appuser && \
 
 # JAR dosyasını kopyala
 COPY --from=builder /app/target/*.jar /app/app.jar
-RUN chown appuser:appuser /app.app.jar
+RUN chown appuser:appuser /app/app.jar
 
 # Kurulumu doğrula
 RUN java -version && \
     node --version && \
     echo "Checking Chrome:" && ls -la /usr/bin/chrom* && \
-    echo "Checking Lighthouse:" && which lighthouse
+    echo "Checking Lighthouse:" && which lighthouse && \
+    echo "Checking JAR file:" && ls -la /app/app.jar
 
 # Non-root kullanıcıya geç
 USER appuser
