@@ -9,16 +9,14 @@ RUN mvn clean package -DskipTests -B
 # Runtime stage
 FROM eclipse-temurin:17-jre
 
-# Gerekli araçlar: nodejs, npm, curl
+# Gerekli araçlar ve Chromium (ARM64 uyumlu, headless için gerekli bağımlılıklarla)
 RUN apt-get update && \
-    apt-get install -y nodejs npm curl && \
-    rm -rf /var/lib/apt/lists/*
-
-# Google Chrome stable yükle (daha kararlı ve Lighthouse ile uyumlu)
-RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-linux.gpg && \
-    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-linux.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
-    apt-get update && \
-    apt-get install -y google-chrome-stable && \
+    apt-get install -y nodejs npm curl \
+    chromium \
+    fonts-liberation libappindicator3-1 libasound2 libatk-bridge2.0-0 libatk1.0-0 \
+    libcups2 libdbus-1-3 libgdk-pixbuf2.0-0 libnspr4 libnss3 libx11-xcb1 libxcomposite1 \
+    libxdamage1 libxrandr2 libgbm1 libgtk-3-0 libxshmfence1 libxss1 libxtst6 \
+    --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
 # Lighthouse CLI yükle
@@ -41,8 +39,8 @@ RUN chmod +x /app/healthcheck.sh && chown appuser:appuser /app/healthcheck.sh
 
 # Ortam değişkenleri
 ENV NODE_PATH=/usr/local/lib/node_modules \
-    CHROME_PATH=/usr/bin/google-chrome \
-    LIGHTHOUSE_CHROMIUM_PATH=/usr/bin/google-chrome \
+    CHROME_PATH=/usr/bin/chromium \
+    LIGHTHOUSE_CHROMIUM_PATH=/usr/bin/chromium \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
