@@ -26,7 +26,7 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
-          java-version: "21"
+          java-version: "17"
           distribution: "temurin"
 
       - name: Cache Maven packages
@@ -81,18 +81,27 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             mkdir -p /opt/craftpilot/tmp/netty
+            mkdir -p /opt/craftpilot/tmp/lighthouse
 
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
+            # Stop and remove previous container
+            echo "Stopping and removing previous container if it exists"
             docker stop lighthouse-service || true
             docker rm lighthouse-service || true
 
+            # Pull the latest image with explicit platform for ARM64
+            echo "Pulling latest ARM64 image"
+            docker pull --platform linux/arm64 ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
+
+            echo "Starting container with proper environment variables"
             if [[ "${{ github.event.inputs.environment }}" == "debug" ]]; then
               docker run -d \
+                --platform linux/arm64 \
                 --name lighthouse-service \
                 --network craftpilot-network \
                 --restart unless-stopped \
                 -p 8085:8085 \
                 -p 5008:5008 \
+                -v /opt/craftpilot/tmp/lighthouse:/tmp/lighthouse \
                 -v /opt/craftpilot/tmp/netty:/tmp/netty \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
@@ -105,12 +114,14 @@ jobs:
                 -e LIGHTHOUSE_QUEUE_NAME=lighthouse-jobs \
                 -e LIGHTHOUSE_RESULTS_PREFIX=lighthouse-results: \
                 -e LIGHTHOUSE_REDIS_CONNECTION_MAX_ATTEMPTS=10 \
-                -e LIGHTHOUSE_REDIS_CONNECTION_RETRY_DELAY_MS=2000 \
-                -e LIGHTHOUSE_CLI_PATH=lighthouse \
-                -e LIGHTHOUSE_USE_NPX=false \
-                -e PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/bin/node:/usr/local/bin/npm \
+                -e LIGHTHOUSE_REDIS_CONNECTION_RETRY_DELAY_MS=5000 \
+                -e LIGHTHOUSE_CLI_PATH=/usr/local/bin/lighthouse \
+                -e LIGHTHOUSE_WORKER_COUNT=2 \
+                -e PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
                 -e NODE_PATH=/usr/local/lib/node_modules \
                 -e PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+                -e CHROME_PATH=/usr/bin/chromium \
+                -e LIGHTHOUSE_CHROMIUM_PATH=/usr/bin/chromium \
                 -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
                 -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,metrics,info,loggers" \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
@@ -124,20 +135,21 @@ jobs:
                 -e LOGGING_LEVEL_IO_LETTUCE=DEBUG \
                 -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5008" \
                 --ulimit nofile=65536:65536 \
-                --cap-drop ALL \
                 --security-opt no-new-privileges \
                 --health-cmd="curl -f http://localhost:8085/health || exit 1" \
                 --health-interval=30s \
-                --health-timeout=10s \
+                --health-timeout=20s \
                 --health-retries=5 \
                 --health-start-period=120s \
                 ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
             else
               docker run -d \
+                --platform linux/arm64 \
                 --name lighthouse-service \
                 --network craftpilot-network \
                 --restart unless-stopped \
                 -p 8085:8085 \
+                -v /opt/craftpilot/tmp/lighthouse:/tmp/lighthouse \
                 -v /opt/craftpilot/tmp/netty:/tmp/netty \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
@@ -150,12 +162,14 @@ jobs:
                 -e LIGHTHOUSE_QUEUE_NAME=lighthouse-jobs \
                 -e LIGHTHOUSE_RESULTS_PREFIX=lighthouse-results: \
                 -e LIGHTHOUSE_REDIS_CONNECTION_MAX_ATTEMPTS=10 \
-                -e LIGHTHOUSE_REDIS_CONNECTION_RETRY_DELAY_MS=2000 \
-                -e LIGHTHOUSE_CLI_PATH=lighthouse \
-                -e LIGHTHOUSE_USE_NPX=false \
-                -e PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/bin/node:/usr/local/bin/npm \
+                -e LIGHTHOUSE_REDIS_CONNECTION_RETRY_DELAY_MS=5000 \
+                -e LIGHTHOUSE_CLI_PATH=/usr/local/bin/lighthouse \
+                -e LIGHTHOUSE_WORKER_COUNT=2 \
+                -e PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
                 -e NODE_PATH=/usr/local/lib/node_modules \
                 -e PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+                -e CHROME_PATH=/usr/bin/chromium \
+                -e LIGHTHOUSE_CHROMIUM_PATH=/usr/bin/chromium \
                 -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
                 -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,metrics,info" \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
@@ -167,25 +181,31 @@ jobs:
                 -e LOGGING_LEVEL_COM_CRAFTPILOT=INFO \
                 -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty" \
                 --ulimit nofile=65536:65536 \
-                --cap-drop ALL \
                 --security-opt no-new-privileges \
                 --health-cmd="curl -f http://localhost:8085/health || exit 1" \
                 --health-interval=30s \
-                --health-timeout=10s \
+                --health-timeout=20s \
                 --health-retries=5 \
                 --health-start-period=120s \
                 ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
             fi
 
-            # Container başlatıldıktan hemen sonra node ve npm versiyonlarını kontrol et
-            echo "Checking Node.js and NPM versions in container..."
-            docker exec lighthouse-service node --version || echo "Node.js not found"
-            docker exec lighthouse-service npm --version || echo "NPM not found"
-            docker exec lighthouse-service which lighthouse || echo "Lighthouse CLI not found"
-            docker exec lighthouse-service ls -la /usr/local/bin/ || echo "Cannot list /usr/local/bin"
+            # Verify available tools in the container
+            echo "Waiting for container to start (10 seconds)..."
+            sleep 10
+
+            echo "Verifying critical tools in container..."
+            docker exec lighthouse-service java -version || echo "Java check failed"
+            docker exec lighthouse-service node --version || echo "Node.js check failed"
+            docker exec lighthouse-service npm --version || echo "NPM check failed"
+            docker exec lighthouse-service which lighthouse || echo "Lighthouse CLI check failed"
+            docker exec lighthouse-service lighthouse --version || echo "Lighthouse version check failed"
+
+            echo "Validating container environment variables..."
+            docker exec lighthouse-service printenv | grep -E "PATH|NODE_PATH|JAVA_HOME|CHROME"
 
             echo "=== Waiting for service startup ==="
-            max_attempts=20
+            max_attempts=30
             counter=0
             success=0
 
@@ -195,7 +215,7 @@ jobs:
               # Container durumu kontrolü
               if ! docker ps --filter "name=lighthouse-service" --format '{{.Status}}' | grep -q "Up"; then
                 echo "Container is not running anymore. Checking logs..."
-                docker logs lighthouse-service
+                docker logs lighthouse-service | tail -n 100
                 exit 1
               fi
               
@@ -223,7 +243,7 @@ jobs:
               fi
               
               echo "Waiting for service to start... ($((counter + 1))/$max_attempts)"
-              sleep 15
+              sleep 10
               counter=$((counter + 1))
             done
 

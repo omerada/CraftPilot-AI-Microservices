@@ -426,14 +426,14 @@ public class LighthouseWorkerService {
     private List<String> buildLighthouseCommand(String url, String outputFilePath, String analysisType) {
         final List<String> command = new ArrayList<>();
         
-        // Doğrudan lighthouse komutunu kullan (npx olmadan)
+        // Lighthouse CLI'yi doğrudan çalıştır (configured path)
         command.add(lighthousePath);
         command.add(url);
         command.add("--output=json");
         command.add("--output-path=" + outputFilePath);
         
         // Chrome flags ekle
-        command.add("--chrome-flags=" + chromeFlags);
+        command.add("--chrome-flags=\"" + chromeFlags + "\"");
         
         // Analiz tipini normalize et
         final String normalizedAnalysisType = (analysisType == null || analysisType.trim().isEmpty()) 
@@ -454,7 +454,82 @@ public class LighthouseWorkerService {
                 break;
         }
         
+        logger.info("Lighthouse command: {}", String.join(" ", command));
         return command;
+    }
+    
+    private void configureLighthouse() {
+        try {
+            // Önce yapılandırılmış lighthouse yolunu kontrol et
+            String configuredLighthousePath = lighthousePath.split("\\s+")[0];
+            File lighthouseFile = new File(configuredLighthousePath);
+            
+            if (!lighthouseFile.exists() || !lighthouseFile.canExecute()) {
+                // PATH'den lighthouse'u bulmaya çalış
+                String lighthouseInPath = findExecutableInPath("lighthouse");
+                
+                if (lighthouseInPath != null) {
+                    logger.info("Found Lighthouse in PATH: {}", lighthouseInPath);
+                    lighthousePath = lighthouseInPath;
+                } else {
+                    // NPX ile lighthouse kullanmayı dene
+                    String npxPath = findExecutableInPath("npx");
+                    
+                    if (npxPath != null) {
+                        logger.info("Found NPX at: {}, will use NPX to run Lighthouse", npxPath);
+                        lighthousePath = npxPath + " lighthouse";
+                    } else {
+                        // Hiçbir şekilde bulunamazsa global npm modülü yolunu dene
+                        lighthousePath = "/usr/local/bin/lighthouse";
+                        logger.info("Using default Lighthouse path: {}", lighthousePath);
+                        
+                        // Lighthouse versiyonunu kontrol et
+                        try {
+                            ProcessBuilder processBuilder = new ProcessBuilder(lighthousePath, "--version");
+                            processBuilder.redirectErrorStream(true);
+                            Process process = processBuilder.start();
+                            
+                            StringBuilder output = new StringBuilder();
+                            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                                String line;
+                                while ((line = reader.readLine()) != null) {
+                                    output.append(line).append("\n");
+                                }
+                            }
+                            
+                            int exitCode = process.waitFor();
+                            logger.info("Lighthouse version check (exit code: {}): {}", exitCode, output.toString().trim());
+                        } catch (Exception e) {
+                            logger.warn("Failed to check Lighthouse version: {}", e.getMessage());
+                        }
+                    }
+                }
+            } else {
+                logger.info("Using configured Lighthouse path: {}", lighthousePath);
+                
+                // Lighthouse versiyonunu kontrol et
+                try {
+                    ProcessBuilder processBuilder = new ProcessBuilder(lighthousePath, "--version");
+                    processBuilder.redirectErrorStream(true);
+                    Process process = processBuilder.start();
+                    
+                    StringBuilder output = new StringBuilder();
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            output.append(line).append("\n");
+                        }
+                    }
+                    
+                    int exitCode = process.waitFor();
+                    logger.info("Lighthouse version check (exit code: {}): {}", exitCode, output.toString().trim());
+                } catch (Exception e) {
+                    logger.warn("Failed to check Lighthouse version: {}", e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Error configuring Lighthouse: {}", e.getMessage());
+        }
     }
     
     // Gerekli araçları daha kapsamlı kontrol et
@@ -735,58 +810,6 @@ public class LighthouseWorkerService {
             }
         } catch (Exception e) {
             logger.warn("Error during browser check: {}", e.getMessage());
-        }
-    }
-    
-    private void configureLighthouse() {
-        try {
-            // Önce yapılandırılmış lighthouse yolunu kontrol et
-            String configuredLighthousePath = lighthousePath.split("\\s+")[0];
-            File lighthouseFile = new File(configuredLighthousePath);
-            
-            if (!lighthouseFile.exists() || !lighthouseFile.canExecute()) {
-                // PATH'den lighthouse'u bulmaya çalış
-                String lighthouseInPath = findExecutableInPath("lighthouse");
-                
-                if (lighthouseInPath != null) {
-                    logger.info("Found Lighthouse in PATH: {}", lighthouseInPath);
-                    lighthousePath = lighthouseInPath;
-                } else {
-                    // Global olarak NPX ile lighthouse kullanmayı dene
-                    String npxPath = findExecutableInPath("npx");
-                    
-                    if (npxPath != null) {
-                        logger.info("Found NPX at: {}. Will use 'npx lighthouse'", npxPath);
-                        lighthousePath = npxPath + " lighthouse";
-                    } else {
-                        logger.warn("Neither Lighthouse nor NPX found. Analysis will likely fail.");
-                        
-                        // Ortam değişkenleri ve Node.js modülleri hakkında daha fazla bilgi topla
-                        try {
-                            ProcessBuilder processBuilder = new ProcessBuilder("ls", "-la", "/usr/local/lib/node_modules");
-                            processBuilder.redirectErrorStream(true);
-                            Process process = processBuilder.start();
-                            
-                            StringBuilder output = new StringBuilder();
-                            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                                String line;
-                                while ((line = reader.readLine()) != null) {
-                                    output.append(line).append("\n");
-                                }
-                            }
-                            
-                            int exitCode = process.waitFor();
-                            logger.info("Node.js modules (exit code: {}): {}", exitCode, output);
-                        } catch (Exception e) {
-                            logger.warn("Error checking Node.js modules: {}", e.getMessage());
-                        }
-                    }
-                }
-            } else {
-                logger.info("Using configured Lighthouse path: {}", lighthousePath);
-            }
-        } catch (Exception e) {
-            logger.warn("Error configuring Lighthouse: {}", e.getMessage());
         }
     }
     

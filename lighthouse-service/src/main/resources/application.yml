@@ -42,28 +42,28 @@ lighthouse:
     prefix: ${LIGHTHOUSE_RESULTS_PREFIX:lighthouse-results:}
   redis:
     connection:
-      max-attempts: 5
-      retry-delay-ms: 3000
+      max-attempts: 10
+      retry-delay-ms: 5000
   job:
-    timeout: ${LIGHTHOUSE_JOB_TIMEOUT:300} # 5 dakika
+    timeout: ${LIGHTHOUSE_JOB_TIMEOUT:600} # 10 dakika
     # Ekstra zaman aşımı koruma mekanizması
-    max-processing-time: ${LIGHTHOUSE_MAX_PROCESSING_TIME:600} # 10 dakika
+    max-processing-time: ${LIGHTHOUSE_MAX_PROCESSING_TIME:900} # 15 dakika
   worker:
     count: ${LIGHTHOUSE_WORKER_COUNT:2} # Daha az worker kullan
-    poll-interval: 2000 # Poll aralığını arttır
-    check-interval: 10000 # Worker kontrol aralığı (ms)
-    restart-attempts: ${LIGHTHOUSE_WORKER_RESTART_ATTEMPTS:3} # Worker yeniden başlatma deneme sayısı
+    poll-interval: 5000 # Poll aralığını arttır
+    check-interval: 30000 # Worker kontrol aralığı (ms)
+    restart-attempts: ${LIGHTHOUSE_WORKER_RESTART_ATTEMPTS:5} # Worker yeniden başlatma deneme sayısı
   cli:
     path: ${LIGHTHOUSE_CLI_PATH:/usr/local/bin/lighthouse} # Lighthouse CLI'ın tam yolu
-    timeout: ${LIGHTHOUSE_CLI_TIMEOUT:300} # CLI işlem zaman aşımı (sn)
+    timeout: ${LIGHTHOUSE_CLI_TIMEOUT:600} # CLI işlem zaman aşımı (sn)
     # Lighthouse CLI için ek ayarlar
     enable-error-reporting: ${LIGHTHOUSE_ENABLE_ERROR_REPORTING:true} # Hata raporlamayı etkinleştir
-    max-retries: ${LIGHTHOUSE_CLI_MAX_RETRIES:2} # Başarısızlık durumunda yeniden deneme sayısı
-    retry-delay: ${LIGHTHOUSE_CLI_RETRY_DELAY:5000} # Yeniden denemeler arasındaki bekleme süresi (ms)
-    # Lighthouse CLI çalıştırma stratejisi - artık doğrudan kullanılacak
+    max-retries: ${LIGHTHOUSE_CLI_MAX_RETRIES:3} # Başarısızlık durumunda yeniden deneme sayısı
+    retry-delay: ${LIGHTHOUSE_CLI_RETRY_DELAY:10000} # Yeniden denemeler arasındaki bekleme süresi (ms)
+    # Lighthouse CLI çalıştırma stratejisi
     use-npx: false # NPX kullanımını devre dışı bırak
     # Chrome bayrağı ayarları
-    chrome-flags: "--headless --no-sandbox --disable-gpu --disable-dev-shm-usage"
+    chrome-flags: "--headless --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer"
     # Kategoriler ve yapılandırma
     categories:
       basic: "performance"
@@ -75,9 +75,9 @@ lighthouse:
 logging:
   level:
     root: INFO
-    com.craftpilot: DEBUG
-    org.springframework.data.redis: DEBUG
-    io.lettuce: DEBUG
+    com.craftpilot: INFO
+    org.springframework.data.redis: INFO
+    io.lettuce: INFO
 
 management:
   endpoints:
