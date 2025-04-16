@@ -57,6 +57,8 @@ lighthouse:
     enable-error-reporting: ${LIGHTHOUSE_ENABLE_ERROR_REPORTING:true} # Hata raporlamayı etkinleştir
     max-retries: ${LIGHTHOUSE_CLI_MAX_RETRIES:2} # Başarısızlık durumunda yeniden deneme sayısı
     retry-delay: ${LIGHTHOUSE_CLI_RETRY_DELAY:5000} # Yeniden denemeler arasındaki bekleme süresi (ms)
+    # Lighthouse CLI çalıştırma stratejisi - doğrudan veya npx ile
+    use-npx: ${LIGHTHOUSE_USE_NPX:true} # NPX kullanarak lighthouse çalıştır
   temp:
     dir: ${LIGHTHOUSE_TEMP_DIR:/tmp/lighthouse} # Geçici dosyalar için dizin
     cleanup: ${LIGHTHOUSE_TEMP_CLEANUP:true} # Geçici dosyaların temizlenmesi

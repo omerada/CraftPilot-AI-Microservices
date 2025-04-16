@@ -287,21 +287,12 @@ public class LighthouseWorkerService {
             });
     }
     
-    // Hangi hataların yeniden denenmesi gerektiğini belirle
-    private boolean shouldRetry(Throwable error) {
-        String message = error.getMessage() != null ? error.getMessage().toLowerCase() : "";
-        // Chrome başlatma hatalarını yeniden dene,
-        // Ağ hatalarını yeniden dene, 
-        // Ancak çıktı dosyası yazma izni gibi kalıcı hataları deneme
-        return message.contains("chrome") || 
-               message.contains("connection") || 
-               message.contains("timeout") ||
-               message.contains("refused");
-    }
-    
     // Lighthouse CLI komutunu çalıştırma
     private Map<String, Object> executeCliCommand(String url, String analysisType, String jobId) throws Exception {
         log.info("Starting Lighthouse CLI analysis for URL: {} with type: {}", url, analysisType);
+        
+        // Lighthouse CLI ve gerekli programların varlığını kontrol et
+        checkRequiredTools();
         
         // Geçici dizin varlığını kontrol et ve oluştur
         File tempDirFile = new File(tempDir);
@@ -316,41 +307,21 @@ public class LighthouseWorkerService {
         final String outputFilePath = tempDir + File.separator + "lighthouse-" + jobId + ".json";
         
         // Lighthouse CLI komut parametrelerini hazırla
-        final List<String> command = new ArrayList<>();
+        final List<String> command = buildLighthouseCommand(url, outputFilePath, analysisType);
         
-        command.add(lighthousePath);
-        command.add(url);
-        command.add("--output=json");
-        command.add("--output-path=" + outputFilePath);
+        // Komutu çalıştır - ProcessBuilder yerine daha direkt erişim için Runtime kullanıyoruz
+        log.info("Executing command: {}", String.join(" ", command));
         
-        // Chrome flags düzeltildi
-        command.add("--chrome-flags=--headless --no-sandbox --disable-gpu --disable-dev-shm-usage");
-        
-        // Analiz tipini normalize et
-        final String normalizedAnalysisType = (analysisType == null || analysisType.trim().isEmpty())
-                                           ? "basic" 
-                                           : analysisType.trim().toLowerCase();
-        
-        // Analiz tipine göre ek parametreler ekle
-        switch (normalizedAnalysisType) {
-            case "detailed":
-                // Detaylı analiz için tüm kategorileri kontrol et ve gerçek throttling kullan
-                command.add("--throttling.cpuSlowdownMultiplier=4");
-                command.add("--throttling-method=devtools");
-                break;
-            case "basic":
-            default:
-                // Temel analiz için sadece performans kategorisini kontrol et ve daha hızlı çalıştır
-                command.add("--only-categories=performance");
-                command.add("--throttling-method=simulate");
-                break;
-        }
-        
-        // Komutu çalıştır
-        final ProcessBuilder processBuilder = new ProcessBuilder(command);
+        ProcessBuilder processBuilder = new ProcessBuilder(command);
         processBuilder.redirectErrorStream(true); // Hata çıktılarını birleştir
         
-        log.info("Executing command: {}", String.join(" ", command));
+        // NODE_PATH çevre değişkenini ayarlayarak modul bulma sorunlarını çöz
+        Map<String, String> env = processBuilder.environment();
+        String nodePath = env.getOrDefault("NODE_PATH", "");
+        // Node modüllerinin bulunabileceği standart konumlar ekle
+        env.put("NODE_PATH", nodePath + ":/usr/local/lib/node_modules:/usr/lib/node_modules");
+        
+        // İşlemi başlat
         final Process process = processBuilder.start();
         
         // Çıktıyı oku ve logla
@@ -359,7 +330,7 @@ public class LighthouseWorkerService {
             String line;
             while ((line = reader.readLine()) != null) {
                 output.append(line).append("\n");
-                log.info("Lighthouse CLI output: {}", line); // Daha görünür olması için INFO seviyesine çıkarıldı
+                log.info("Lighthouse CLI output: {}", line);
             }
         }
         
@@ -411,29 +382,144 @@ public class LighthouseWorkerService {
         return result;
     }
     
+    // Lighthouse komutu oluşturma
+    private List<String> buildLighthouseCommand(String url, String outputFilePath, String analysisType) {
+        final List<String> command = new ArrayList<>();
+        
+        // Lighthouse CLI için NPX kullan - NPX modülü bulamama sorunlarını çözebilir
+        command.add("npx");
+        command.add(lighthousePath);
+        command.add(url);
+        command.add("--output=json");
+        command.add("--output-path=" + outputFilePath);
+        
+        // Chrome flags düzeltildi - çift tırnak sorunlarını kaldır
+        command.add("--chrome-flags=--headless --no-sandbox --disable-gpu --disable-dev-shm-usage");
+        
+        // Analiz tipini normalize et
+        final String normalizedAnalysisType = (analysisType == null || analysisType.trim().isEmpty()) 
+                                           ? "basic" 
+                                           : analysisType.trim().toLowerCase();
+        
+        // Analiz tipine göre ek parametreler ekle
+        switch (normalizedAnalysisType) {
+            case "detailed":
+                // Detaylı analiz için tüm kategorileri kontrol et
+                command.add("--throttling.cpuSlowdownMultiplier=4");
+                command.add("--throttling-method=devtools");
+                break;
+            case "basic":
+            default:
+                // Temel analiz için sadece performans kategorisini kontrol et
+                command.add("--only-categories=performance");
+                command.add("--throttling-method=simulate");
+                command.add("--max-wait-for-load=30000");  // Daha kısa bekleme süresi
+                break;
+        }
+        
+        return command;
+    }
+    
+    // Gerekli araçları kontrol et
+    private void checkRequiredTools() throws Exception {
+        // Lighthouse varlığını kontrol et - npx ile çalıştırılacak
+        Process npmCheck = Runtime.getRuntime().exec("which npm");
+        int npmExitCode = npmCheck.waitFor();
+        
+        if (npmExitCode != 0) {
+            log.error("npm not found on system path. Lighthouse CLI cannot run.");
+            throw new RuntimeException("Required tool npm is not installed or not accessible");
+        }
+        
+        // Chrome/Chromium varlığını kontrol et
+        String[] browsers = {"chromium", "google-chrome", "chrome"};
+        boolean foundBrowser = false;
+        
+        for (String browser : browsers) {
+            Process browserCheck = Runtime.getRuntime().exec("which " + browser);
+            if (browserCheck.waitFor() == 0) {
+                log.info("Found browser: {}", browser);
+                foundBrowser = true;
+                break;
+            }
+        }
+        
+        if (!foundBrowser) {
+            log.error("No Chrome/Chromium browser found on system path");
+            throw new RuntimeException("Required browser (Chrome/Chromium) is not installed or not accessible");
+        }
+    }
+
     // CLI çıktısını analiz eder ve hata mesajlarını çıkarır
     private String analyzeCliOutput(String output) {
-        if (output.contains("no such file or directory")) {
-            return "Lighthouse CLI not found or not executable";
+        if (output == null || output.isEmpty()) {
+            return null;
         }
-        if (output.contains("chrome not found")) {
+        
+        // Node.js/NPM modül hatalarını tespit et
+        if (output.contains("Cannot find module")) {
+            return "Node.js module not found: " + extractModuleName(output);
+        }
+        
+        if (output.contains("no such file or directory") || output.contains("not found")) {
+            return "Lighthouse CLI or required dependency not found";
+        }
+        
+        if (output.contains("chrome not found") || output.contains("Chrome could not be found")) {
             return "Chrome browser could not be found";
         }
-        if (output.contains("permission denied")) {
+        
+        if (output.contains("EACCES") || output.contains("permission denied")) {
             return "Permission denied when trying to access resources";
         }
+        
         if (output.contains("ERR_CONNECTION_REFUSED") || output.contains("ERR_NAME_NOT_RESOLVED")) {
             return "Failed to connect to the target URL";
         }
         
-        // Son 5 satır genellikle en önemli hata mesajlarını içerir
-        String[] lines = output.split("\n");
-        StringBuilder lastLines = new StringBuilder("Last lines: ");
-        for (int i = Math.max(0, lines.length - 5); i < lines.length; i++) {
-            lastLines.append(lines[i].trim()).append("; ");
+        if (output.contains("TimeoutError") || output.contains("Navigation Timeout Exceeded")) {
+            return "Page load timeout - the target URL took too long to respond";
         }
         
-        return lastLines.toString();
+        // Son 5 satır genellikle en önemli hata mesajlarını içerir
+        String[] lines = output.split("\n");
+        if (lines.length > 0) {
+            StringBuilder lastLines = new StringBuilder("Last lines: ");
+            for (int i = Math.max(0, lines.length - 5); i < lines.length; i++) {
+                if (!lines[i].trim().isEmpty()) {
+                    lastLines.append(lines[i].trim()).append("; ");
+                }
+            }
+            return lastLines.toString();
+        }
+        
+        return null;
+    }
+    
+    // Modül adı çıkarma yardımcı metodu
+    private String extractModuleName(String output) {
+        // "Cannot find module 'xyz'" formatındaki hatalardan modül adını çıkarır
+        int startIdx = output.indexOf("Cannot find module '");
+        if (startIdx >= 0) {
+            startIdx += "Cannot find module '".length();
+            int endIdx = output.indexOf("'", startIdx);
+            if (endIdx > startIdx) {
+                return output.substring(startIdx, endIdx);
+            }
+        }
+        return "unknown module";
+    }
+    
+    // Hangi hataların yeniden denenmesi gerektiğini belirle
+    private boolean shouldRetry(Throwable error) {
+        String message = error.getMessage() != null ? error.getMessage().toLowerCase() : "";
+        // Chrome başlatma hatalarını yeniden dene,
+        // Ağ hatalarını yeniden dene, 
+        // Ancak çıktı dosyası yazma izni gibi kalıcı hataları deneme
+        return message.contains("chrome") || 
+               message.contains("connection") || 
+               message.contains("timeout") ||
+               message.contains("refused");
     }
     
     // Aktif çalışan worker sayısını döndürür - sağlık kontrolü için kullanılır
