@@ -1,16 +1,28 @@
 # Lighthouse Analysis Service
 
-Bu servis, web sitesi performans analizlerini BullMQ ile uyumlu bir Redis kuyruk sistemi üzerinden yönetir.
+Bu servis, web sitesi performans analizlerini Google Lighthouse CLI kullanarak gerçekleştirir ve Redis kuyruk sistemi aracılığıyla yönetir.
 
 ## Özellikler
 
 - Spring WebFlux tabanlı reaktif API
-- BullMQ ile uyumlu Redis kuyruklama sistemi
+- Redis kuyruklama sistemi
 - Docker üzerinde çalışabilirlik
 - Gelişmiş health check ve metrikler
 - Rate limiting (IP bazlı)
 - CORS yapılandırması
 - Redis bağlantı hatalarına karşı dayanıklılık
+- Gerçek Lighthouse CLI entegrasyonu ile profesyonel analiz
+- Basit ve detaylı analiz seçenekleri
+
+## Ön Gereksinimler
+
+- Java 17 veya üzeri
+- Redis
+- Google Chrome/Chromium
+- Node.js ve NPM
+- Lighthouse CLI (`npm install -g lighthouse`)
+
+Docker kullanıyorsanız, sağlanan Dockerfile tüm gerekli bağımlılıkları içerir.
 
 ## API Endpoints
 
@@ -24,7 +36,8 @@ POST /api/v1/analyze
 
 ```json
 {
-  "url": "https://example.com"
+  "url": "https://example.com",
+  "analysisType": "basic" // veya "detailed"
 }
 ```
 
@@ -32,9 +45,21 @@ POST /api/v1/analyze
 
 ```json
 {
-  "jobId": "a1b2c3d4-e5f6-g7h8-i9j0"
+  "jobId": "a1b2c3d4-e5f6-g7h8-i9j0",
+  "status": "PENDING",
+  "url": "https://example.com",
+  "analysisType": "basic",
+  "queuePosition": 1,
+  "estimatedWaitTime": 30
 }
 ```
+
+#### Analiz Tipleri
+
+- **basic**: Hızlı ve temel performans analizi (sadece performans kategorisini analiz eder, yaklaşık 30-90 saniye)
+- **detailed**: Kapsamlı ve detaylı analiz (tüm kategorileri analiz eder, gerçekçi throttling kullanır, yaklaşık 1-3 dakika)
+
+Analiz süreleri analiz edilen web sitesinin karmaşıklığına ve sunucu yükü seviyesine göre değişkenlik gösterebilir.
 
 ### Analiz Sonuçları Sorgusu
 
@@ -154,7 +179,11 @@ docker-compose up -d
 - `PORT`: Uygulama port numarası (varsayılan: 8085)
 - `REDIS_HOST`: Redis sunucu adresi (varsayılan: redis)
 - `REDIS_PORT`: Redis port numarası (varsayılan: 6379)
-- `REDIS_PASSWORD`: Redis şifresi (varsayılan: 13579ada)
+- `REDIS_PASSWORD`: Redis şifresi
+- `LIGHTHOUSE_CLI_PATH`: Lighthouse CLI yolu (varsayılan: lighthouse)
+- `LIGHTHOUSE_TEMP_DIR`: Geçici dosyalar için dizin (varsayılan: /tmp)
+- `LIGHTHOUSE_JOB_TIMEOUT`: Analiz işlem zaman aşımı (varsayılan: 180 saniye)
+- `LIGHTHOUSE_WORKER_COUNT`: Eşzamanlı worker sayısı (varsayılan: 3)
 - `REDIS_CONNECT_TIMEOUT`: Redis bağlantı zaman aşımı (varsayılan: 2000ms)
 - `LIGHTHOUSE_QUEUE_NAME`: BullMQ kuyruk adı (varsayılan: lighthouse-jobs)
 - `LIGHTHOUSE_RESULTS_PREFIX`: Sonuç anahtarı öneki (varsayılan: lighthouse-results:)

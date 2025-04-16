@@ -27,15 +27,31 @@ public class LighthouseController {
     private final LighthouseWorkerService lighthouseWorkerService;
 
     @PostMapping("/analyze")
-    @Operation(summary = "Analyze website performance", description = "Queue a new Lighthouse analysis job")
+    @Operation(
+        summary = "Analyze website performance", 
+        description = "Queue a new Lighthouse analysis job. You can specify analysisType as 'basic' or 'detailed'."
+    )
     public Mono<ResponseEntity<Map<String, Object>>> analyzeWebsite(
             @Valid @RequestBody AnalysisRequest request) {
-        log.info("Received analysis request for URL: {}", request.getUrl());
+        log.info("Received analysis request for URL: {}, analysisType: {}", 
+                request.getUrl(), request.getAnalysisType());
         
         if (request.getUrl() == null || request.getUrl().isEmpty()) {
             log.warn("Received invalid request: URL is missing");
             return Mono.just(ResponseEntity.badRequest().body(
                 Map.of("error", "URL is required", "status", "ERROR")
+            ));
+        }
+        
+        // Analiz tipini kontrol et
+        String analysisType = request.getAnalysisType();
+        if (analysisType != null && !analysisType.equals("basic") && !analysisType.equals("detailed")) {
+            log.warn("Invalid analysisType: {}", analysisType);
+            return Mono.just(ResponseEntity.badRequest().body(
+                Map.of(
+                    "error", "analysisType must be either 'basic' or 'detailed'",
+                    "status", "ERROR"
+                )
             ));
         }
         
@@ -56,18 +72,17 @@ public class LighthouseController {
                     ));
                 }
                 
-                log.info("Starting analysis for URL: {}", request.getUrl());
+                log.info("Starting analysis for URL: {} with type: {}", request.getUrl(), analysisType);
                 return lighthouseQueueService.queueAnalysisJob(request.getUrl(), request.getOptions())
                     .map(jobId -> {
                         Map<String, Object> response = new HashMap<>();
                         response.put("jobId", jobId);
                         response.put("status", "PENDING");
                         response.put("url", request.getUrl());
+                        response.put("analysisType", analysisType);
                         response.put("queuePosition", queueLength + 1);
-                        response.put("estimatedWaitTime", (queueLength + 1) * 15); // Tahmini 15 saniye/job
                         
-                        // Worker'ları kontrol et ve gerekirse yeni görevleri işlemeye başla
-                        lighthouseWorkerService.checkAndProcessQueue();
+                        // İş kuyruğa alındı, worker'lar zaten otomatik olarak işleri kontrol ediyor
                         
                         return ResponseEntity.accepted().body(response);
                     });
@@ -133,7 +148,8 @@ public class LighthouseController {
                 Map<String, Object> status = new HashMap<>();
                 status.put("queueLength", queueLength);
                 status.put("activeWorkers", lighthouseWorkerService.getActiveWorkerCount());
-                status.put("estimatedWaitTime", queueLength * 15); // Tahmini 15 saniye/job
+                
+                // Tahmini süre kaldırıldı
                 
                 return ResponseEntity.ok(status);
             });

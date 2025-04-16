@@ -37,11 +37,15 @@ lighthouse:
       max-attempts: 5
       retry-delay-ms: 3000
   job:
-    timeout: ${LIGHTHOUSE_JOB_TIMEOUT:120} # 2 dakika (saniye olarak)
+    timeout: ${LIGHTHOUSE_JOB_TIMEOUT:300} # 5 dakikaya çıkarıldı
   worker:
     count: ${LIGHTHOUSE_WORKER_COUNT:3} # Worker sayısı
     poll-interval: 1000 # Poll aralığı (ms)
     check-interval: 10000 # Worker kontrol aralığı (ms)
+  cli:
+    path: ${LIGHTHOUSE_CLI_PATH:lighthouse} # Lighthouse CLI yolu
+  temp:
+    dir: ${LIGHTHOUSE_TEMP_DIR:/tmp/lighthouse} # Geçici dosyalar için dizin
 
 logging:
   level:
