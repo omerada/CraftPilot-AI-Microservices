@@ -48,8 +48,16 @@ COPY --from=node-base /usr/local/bin/npm /usr/local/bin/
 COPY --from=node-base /usr/local/bin/lighthouse /usr/local/bin/
 COPY --from=node-base /usr/local/lib/node_modules /usr/local/lib/node_modules
 COPY --from=node-base /usr/local/bin/google-chrome /usr/local/bin/
-COPY --from=node-base /usr/bin/chromium* /usr/bin/ 2>/dev/null || true
-COPY --from=node-base /usr/bin/google-chrome* /usr/bin/ 2>/dev/null || true
+
+# Shell yönlendirmeler ve mantıksal operatörler ile COPY kullanımı sorun yaratıyor
+# Bu nedenle bunları ayrı bir RUN komutu ile kopyalayalım
+RUN mkdir -p /usr/bin_temp
+COPY --from=node-base /usr/bin/chromium* /usr/bin_temp/ 2>/dev/null || true
+COPY --from=node-base /usr/bin/google-chrome* /usr/bin_temp/ 2>/dev/null || true
+RUN if [ -d "/usr/bin_temp" ]; then \
+      find /usr/bin_temp -type f -exec cp {} /usr/bin/ \; || true; \
+      rm -rf /usr_bin_temp; \
+    fi
 
 WORKDIR /app
 
