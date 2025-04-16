@@ -18,6 +18,7 @@ RUN apt-get update && \
     libxdamage1 libxrandr2 libgbm1 libgtk-3-0 libxshmfence1 libxss1 libxtst6 \
     --no-install-recommends && \
     ln -sf /usr/bin/chromium /usr/bin/google-chrome && \
+    ln -sf /usr/bin/chromium /usr/bin/chromium-browser && \
     rm -rf /var/lib/apt/lists/*
 
 # Lighthouse CLI yükle
