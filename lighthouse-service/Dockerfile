@@ -7,7 +7,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests -B
 
 # Runtime stage
-FROM eclipse-temurin:21-jre
+FROM openjdk:21-jdk-slim
 
 # Gerekli araçlar ve Chromium (ARM64 uyumlu, headless için gerekli bağımlılıklarla)
 RUN apt-get update && \
