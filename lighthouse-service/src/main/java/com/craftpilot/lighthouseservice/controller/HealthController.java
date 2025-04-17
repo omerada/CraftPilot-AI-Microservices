@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 import lombok.extern.slf4j.Slf4j;
 
-import java.lang.reflect.Method;
+import java.lang.management.ManagementFactory;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -82,14 +82,10 @@ public class HealthController {
         
         // JVM çalışma süresi
         try {
-            Class<?> managementFactoryClass = Class.forName("java.lang.management.ManagementFactory");
-            Method runtimeMXBean = managementFactoryClass.getMethod("getRuntimeMXBean");
-            Object bean = runtimeMXBean.invoke(null);
-            Method uptime = bean.getClass().getMethod("getUptime");
-            long uptimeMs = (long) uptime.invoke(bean);
+            long uptimeMs = ManagementFactory.getRuntimeMXBean().getUptime();
             jvmInfo.put("uptime_ms", uptimeMs);
         } catch (Exception e) {
-            log.error("Error getting JVM uptime: {}", e.getMessage());
+            log.warn("Could not get JVM info: {}", e.getMessage());
             jvmInfo.put("uptime_ms", -1);
         }
         

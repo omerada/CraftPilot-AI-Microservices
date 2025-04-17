@@ -12,6 +12,7 @@ FROM eclipse-temurin:17-jre
 # Gerekli araçlar ve Google Chrome (ARM64 uyumlu, headless için gerekli bağımlılıklarla)
 RUN apt-get update && \
     apt-get install -y wget gnupg2 nodejs npm curl \
+    fonts-liberation libasound2 libu2f-udev \
     libatk-bridge2.0-0 libatk1.0-0 libcups2 libdbus-1-3 \
     libgdk-pixbuf2.0-0 libnspr4 libnss3 libx11-xcb1 libxcomposite1 \
     libxdamage1 libxrandr2 libgbm1 libgtk-3-0 libxshmfence1 libxss1 libxtst6 \
@@ -26,7 +27,8 @@ RUN apt-get update && \
     fi && \
     apt-get install -y /tmp/google-chrome.deb || apt-get -fy install && \
     rm /tmp/google-chrome.deb && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    google-chrome --version
 
 # Lighthouse CLI yükle
 RUN npm install -g lighthouse@11.1.0 && npm cache clean --force
