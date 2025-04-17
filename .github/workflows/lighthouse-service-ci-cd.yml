@@ -87,30 +87,54 @@ jobs:
 
       - name: Update Lighthouse Service Dockerfile for ARM64
         run: |
-          echo 'FROM eclipse-temurin:17-jdk-alpine as builder
-          WORKDIR /app
-          COPY mvnw . 
-          COPY .mvn .mvn
+          echo '# Build stage
+          FROM maven:3.9.6-eclipse-temurin-17 AS build
+
+          WORKDIR /build
           COPY pom.xml .
-          COPY src src
-          RUN chmod +x ./mvnw && ./mvnw package -DskipTests
+          COPY .mvn ./.mvn
+          COPY mvnw .
+          COPY src ./src
 
+          RUN chmod +x ./mvnw && ./mvnw clean package -DskipTests
+
+          # Run stage
           FROM eclipse-temurin:17-jre
-          WORKDIR /app
-          COPY --from=builder /app/target/*.jar /app/app.jar
 
-          # Install necessary tools for health check
+          WORKDIR /app
+
+          # Install required packages
           RUN apt-get update && \
               apt-get install -y --no-install-recommends \
               curl \
+              tzdata \
+              libc6 \
+              libstdc++6 \
               && rm -rf /var/lib/apt/lists/*
 
-          HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+          # Create necessary directories
+          RUN mkdir -p /tmp/netty /tmp/lighthouse
+
+          # Copy application
+          COPY --from=build /build/target/*.jar app.jar
+
+          # Set environment variables
+          ENV SPRING_PROFILES_ACTIVE=prod \
+              JAVA_TOOL_OPTIONS="\
+              -XX:+UseContainerSupport \
+              -XX:MaxRAMPercentage=75.0 \
+              -XX:+UseG1GC \
+              -Dio.netty.tryReflectionSetAccessible=true \
+              -Djava.security.egd=file:/dev/./urandom \
+              -Djava.awt.headless=true \
+              -Dfile.encoding=UTF-8"
+
+          # Health check configuration
+          HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
             CMD curl -f http://localhost:8085/health || curl -f http://localhost:8085/actuator/health || exit 1
 
-          ENV SPRING_PROFILES_ACTIVE=prod
           EXPOSE 8085
-          ENTRYPOINT ["java", "-jar", "/app/app.jar"]' > lighthouse-service/Dockerfile
+          ENTRYPOINT ["java", "-jar", "app.jar"]' > lighthouse-service/Dockerfile
 
   build-docker-images:
     name: Build Docker Images
