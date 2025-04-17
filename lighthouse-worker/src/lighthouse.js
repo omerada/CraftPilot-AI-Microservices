@@ -1,4 +1,3 @@
-const lighthouse = require("lighthouse");
 const chromeLauncher = require("chrome-launcher");
 const { logger } = require("./logger");
 const path = require("path");
@@ -31,6 +30,9 @@ async function runLighthouseAnalysis(url, analysisType = "basic") {
       ],
     });
 
+    // Lighthouse modülünü dinamik olarak içe aktar (ESM uyumlu)
+    const lighthouse = await import("lighthouse");
+
     // Lighthouse ayarları ve kategorilerini belirle
     const categories =
       analysisType === "detailed"
@@ -44,8 +46,8 @@ async function runLighthouseAnalysis(url, analysisType = "basic") {
       port: chrome.port,
     };
 
-    // Lighthouse'u çalıştır
-    results = await lighthouse(url, opts);
+    // Lighthouse'u çalıştır (default export kullan)
+    results = await lighthouse.default(url, opts);
 
     // JSON çıktısını yazdır
     fs.writeFileSync(tempOutputPath, results.report);
