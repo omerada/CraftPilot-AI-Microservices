@@ -1,6 +1,6 @@
 FROM node:18-alpine
 
-# Chrome yükleme
+# Chrome yükleme ve health check için gerekli araçları ekle
 RUN apk add --no-cache \
     chromium \
     nss \
@@ -8,6 +8,8 @@ RUN apk add --no-cache \
     harfbuzz \
     ttf-freefont \
     font-noto-emoji \
+    curl \
+    netcat-openbsd \
     && rm -rf /var/cache/apk/*
 
 # Lighthouse Worker uygulama dizini oluştur
@@ -35,8 +37,8 @@ ENV CHROME_PATH=/usr/bin/chromium-browser \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     NODE_ENV=production
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 CMD wget -q -O /dev/null http://localhost:8086/health || exit 1
+# Health check - başlangıç süresini arttır ve curl kullan
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 CMD curl -f http://localhost:8086/health || exit 1
 
 # Kullanıcı değiştir
 USER appuser
