@@ -13,11 +13,11 @@ RUN apk add --no-cache \
 # Lighthouse Worker uygulama dizini oluştur
 WORKDIR /app
 
-# Önce package.json ve package-lock.json kopyala
-COPY package*.json ./
+# Önce package.json kopyala
+COPY package.json ./
 
-# Bağımlılıkları yükle
-RUN npm ci --only=production
+# package-lock.json olmadığında bile çalışacak şekilde npm install kullan
+RUN npm install --only=production
 
 # Uygulama kaynak kodlarını kopyala
 COPY . .
