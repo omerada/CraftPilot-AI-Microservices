@@ -80,9 +80,35 @@ jobs:
           [ ! -f "package-lock.json" ] && npm install --package-lock-only
           npm ci
 
+  update-dockerfile:
+    name: Update Dockerfile for ARM64 Support
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Update Lighthouse Service Dockerfile for ARM64
+        run: |
+          echo 'FROM eclipse-temurin:17-jdk-alpine as builder
+          WORKDIR /app
+          COPY mvnw .
+          COPY .mvn .mvn
+          COPY pom.xml .
+          COPY src src
+          RUN chmod +x ./mvnw && ./mvnw package -DskipTests
+
+          FROM adoptopenjdk/openjdk17:alpine-jre
+          WORKDIR /app
+          COPY --from=builder /app/target/*.jar /app/app.jar
+
+          HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 CMD wget -q -O /dev/null http://localhost:8085/health || exit 1
+
+          ENV SPRING_PROFILES_ACTIVE=prod
+          EXPOSE 8085
+          ENTRYPOINT ["java", "-jar", "/app/app.jar"]' > lighthouse-service/Dockerfile
+
   build-docker-images:
     name: Build Docker Images
-    needs: [build-and-test-service, build-and-test-worker]
+    needs: [build-and-test-service, build-and-test-worker, update-dockerfile]
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v3

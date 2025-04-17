@@ -6,7 +6,7 @@ COPY pom.xml .
 COPY src src
 RUN chmod +x ./mvnw && ./mvnw package -DskipTests
 
-FROM eclipse-temurin:17-jre-alpine
+FROM adoptopenjdk/openjdk17:alpine-jre
 WORKDIR /app
 COPY --from=builder /app/target/*.jar /app/app.jar
 
