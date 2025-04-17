@@ -52,7 +52,7 @@ public class LighthouseQueueService {
         initialStatus.put("complete", false);
         initialStatus.put("status", "PENDING");
         initialStatus.put("timestamp", System.currentTimeMillis());
-            
+        
         logger.info("Job queued with ID: {} for URL: {}", jobId, url);
         
         return redisTemplate.opsForList().rightPush(queueName, job)
@@ -61,7 +61,7 @@ public class LighthouseQueueService {
                 .then(redisTemplate.opsForValue().set(resultsPrefix + "timeout:" + jobId, System.currentTimeMillis(), Duration.ofSeconds(jobTimeoutSeconds)))
                 .thenReturn(jobId);
     }
-
+    
     @SuppressWarnings("unchecked")
     public Mono<JobStatusResponse> getJobStatus(String jobId) {
         if (jobId == null || jobId.isEmpty()) {
@@ -97,7 +97,7 @@ public class LighthouseQueueService {
             })
             .switchIfEmpty(processJobStatus(jobId)); // Timeout kaydı bulunamazsa normal işleme devam et
     }
-
+    
     @SuppressWarnings("unchecked")
     private Mono<JobStatusResponse> processJobStatus(String jobId) {
         return redisTemplate.opsForValue().get(resultsPrefix + jobId)
@@ -151,87 +151,16 @@ public class LighthouseQueueService {
                     }))
             ));
     }
-
-    /**
-     * Map formatındaki nesneyi JobStatusResponse nesnesine dönüştürür
-     */
-    private JobStatusResponse convertMapToJobStatusResponse(Map<String, Object> map) {
-        if (map == null) {
-            logger.warn("Cannot convert null map to JobStatusResponse");
-            JobStatusResponse response = new JobStatusResponse();
-            response.setStatus("ERROR");
-            response.setError("Invalid null response");
-            response.setComplete(false);
-            response.setTimestamp(System.currentTimeMillis());
-            return response;
-        }
-
-        JobStatusResponse response = new JobStatusResponse();
-        
-        // Map'ten değerleri JobStatusResponse nesnesine aktar
-        if (map.containsKey("jobId")) response.setJobId((String) map.get("jobId"));
-        if (map.containsKey("complete")) response.setComplete((Boolean) map.get("complete"));
-        if (map.containsKey("status")) response.setStatus((String) map.get("status"));
-        if (map.containsKey("error")) response.setError((String) map.get("error"));
-        if (map.containsKey("data") && map.get("data") instanceof Map) {
-            response.setData((Map<String, Object>) map.get("data"));
-        } else {
-            // Eğer data alanı yoksa, tüm map'i data olarak kullan (bazı alanları hariç tut)
-            Map<String, Object> dataMap = new HashMap<>(map);
-            dataMap.remove("jobId");
-            dataMap.remove("complete");
-            dataMap.remove("status");
-            dataMap.remove("error");
-            dataMap.remove("timestamp");
-            response.setData(dataMap);
-        }
-        if (map.containsKey("timestamp")) {
-            Object timestamp = map.get("timestamp");
-            if (timestamp instanceof Long) {
-                response.setTimestamp((Long) timestamp);
-            } else if (timestamp instanceof Number) {
-                response.setTimestamp(((Number) timestamp).longValue());
-            } else if (timestamp instanceof String) {
-                try {
-                    response.setTimestamp(Long.parseLong((String) timestamp));
-                } catch (NumberFormatException e) {
-                    response.setTimestamp(System.currentTimeMillis());
-                }
-            }
-        } else {
-            response.setTimestamp(System.currentTimeMillis());
-        }
-        
-        return response;
-    }
     
-    // Job durumunu güncelle (worker tarafından kullanılabilir)
-    public Mono<Boolean> updateJobStatus(String jobId, String status, String errorMessage) {
-        logger.info("Updating job {} status to: {}", jobId, status);
-        
-        Map<String, Object> jobStatus = new HashMap<>();
-        jobStatus.put("jobId", jobId);
-        jobStatus.put("complete", "COMPLETED".equals(status) || "FAILED".equals(status));
-        jobStatus.put("status", status);
-        jobStatus.put("error", errorMessage);
-        jobStatus.put("timestamp", System.currentTimeMillis());
-            
-        return redisTemplate.opsForValue().set(resultsPrefix + "status:" + jobId, jobStatus);
-    }
-
-    // Job durumunu güncelle (worker tarafından kullanılabilir) - data paramı eklenmiş versiyon
-    public Mono<Boolean> updateJobStatus(String jobId, String status, String errorMessage, Map<String, Object> data) {
-        logger.info("Updating job {} status to: {}", jobId, status);
-        
-        Map<String, Object> jobStatus = new HashMap<>();
-        jobStatus.put("jobId", jobId);
-        jobStatus.put("complete", "COMPLETED".equals(status) || "FAILED".equals(status));
-        jobStatus.put("status", status);
-        jobStatus.put("error", errorMessage);
-        jobStatus.put("data", data);
-        jobStatus.put("timestamp", System.currentTimeMillis());
-            
-        return redisTemplate.opsForValue().set(resultsPrefix + "status:" + jobId, jobStatus);
+    private JobStatusResponse convertMapToJobStatusResponse(Map<String, Object> map) {
+        JobStatusResponse response = new JobStatusResponse();
+        response.setJobId((String) map.get("jobId"));
+        response.setComplete((Boolean) map.get("complete"));
+        response.setStatus((String) map.get("status"));
+        response.setError((String) map.get("error"));
+        response.setData(map);
+        response.setTimestamp(map.containsKey("timestamp") ? (Long) map.get("timestamp") : System.currentTimeMillis());
+        return response;
     }
     
     // Redis'teki job sayısını kontrol et

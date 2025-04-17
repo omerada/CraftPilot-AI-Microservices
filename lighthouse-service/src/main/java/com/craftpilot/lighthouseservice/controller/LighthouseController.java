@@ -129,8 +129,11 @@ public class LighthouseController {
                     } else if ("NOT_FOUND".equals(result.getStatus())) {
                         logger.warn("Job {} not found", jobId);
                         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(result);
+                    } else if ("PROCESSING".equals(result.getStatus())) {
+                        logger.info("Job is currently being processed by worker for job ID: {}", jobId);
+                        return ResponseEntity.status(HttpStatus.ACCEPTED).body(result);
                     } else {
-                        logger.info("Job pending, returning status for job ID: {}", jobId);
+                        logger.info("Job pending, waiting for worker pickup for job ID: {}", jobId); 
                         return ResponseEntity.status(HttpStatus.ACCEPTED).body(result);
                     }
                 })

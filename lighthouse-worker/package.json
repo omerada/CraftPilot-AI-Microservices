@@ -1,0 +1,21 @@
+{
+  "name": "lighthouse-worker",
+  "version": "1.0.0",
+  "description": "Lighthouse Worker Service",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "redis": "^4.6.10",
+    "lighthouse": "^11.1.0",
+    "chrome-launcher": "^1.0.0",
+    "pino": "^8.15.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

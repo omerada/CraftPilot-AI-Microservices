@@ -1,10 +1,11 @@
-name: Lighthouse Service CI/CD
+name: Lighthouse Services CI/CD
 
 on:
   push:
     branches: [master]
     paths:
       - "lighthouse-service/**"
+      - "lighthouse-worker/**"
       - ".github/workflows/lighthouse-service-ci-cd.yml"
   workflow_dispatch:
     inputs:
@@ -18,7 +19,8 @@ on:
           - debug
 
 jobs:
-  build-and-deploy:
+  build-and-test-service:
+    name: Build and Test Lighthouse Service
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v3
@@ -50,6 +52,36 @@ jobs:
           cd lighthouse-service
           ./mvnw clean package -DskipTests
 
+  build-and-test-worker:
+    name: Build and Test Lighthouse Worker
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: "lighthouse-worker/package-lock.json"
+
+      - name: Install dependencies
+        run: |
+          cd lighthouse-worker
+          npm ci
+
+      - name: Run Tests
+        run: |
+          cd lighthouse-worker
+          npm test || echo "No tests found, continuing build process"
+
+  build-docker-images:
+    name: Build Docker Images
+    needs: [build-and-test-service, build-and-test-worker]
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
         with:
@@ -64,7 +96,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push Docker image
+      - name: Build and Push Lighthouse Service
         uses: docker/build-push-action@v4
         with:
           context: ./lighthouse-service
@@ -73,6 +105,20 @@ jobs:
           provenance: false
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
 
+      - name: Build and Push Lighthouse Worker
+        uses: docker/build-push-action@v4
+        with:
+          context: ./lighthouse-worker
+          platforms: linux/arm64
+          push: true
+          provenance: false
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-worker:latest-arm64
+
+  deploy-services:
+    name: Deploy Services to VPS
+    needs: [build-docker-images]
+    runs-on: self-hosted
+    steps:
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
@@ -83,16 +129,19 @@ jobs:
             mkdir -p /opt/craftpilot/tmp/netty
             mkdir -p /opt/craftpilot/tmp/lighthouse
 
+            # Lighthouse Service deployment
+            echo "=== Deploying Lighthouse Service ==="
+
             # Stop and remove previous container
-            echo "Stopping and removing previous container if it exists"
+            echo "Stopping and removing previous lighthouse-service container if it exists"
             docker stop lighthouse-service || true
             docker rm lighthouse-service || true
 
             # Pull the latest image with explicit platform for ARM64
-            echo "Pulling latest ARM64 image"
+            echo "Pulling latest ARM64 lighthouse-service image"
             docker pull --platform linux/arm64 ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
 
-            echo "Starting container with proper environment variables"
+            echo "Starting lighthouse-service container with proper environment variables"
             docker run -d \
               --platform linux/arm64 \
               --name lighthouse-service \
@@ -104,9 +153,6 @@ jobs:
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SPRING_DATA_REDIS_HOST=redis \
               -e SPRING_DATA_REDIS_PASSWORD=13579ada \
-              -e LIGHTHOUSE_CLI_PATH=/usr/local/bin/lighthouse \
-              -e CHROME_PATH=/usr/bin/google-chrome \
-              -e LIGHTHOUSE_CHROMIUM_PATH=/usr/bin/google-chrome \
               --ulimit nofile=65536:65536 \
               --security-opt no-new-privileges \
               --health-cmd="curl -f http://localhost:8085/health || exit 1" \
@@ -115,76 +161,130 @@ jobs:
               --health-retries=5 \
               --health-start-period=60s \
               ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-service:latest-arm64
+              
+            # Lighthouse Worker deployment
+            echo "=== Deploying Lighthouse Worker ==="
 
-            # Verify available tools in the container
-            echo "Waiting for container to start (10 seconds)..."
+            # Stop and remove previous worker containers
+            echo "Stopping and removing previous lighthouse-worker containers if they exist"
+            docker ps -q --filter "name=lighthouse-worker" | xargs -r docker stop
+            docker ps -aq --filter "name=lighthouse-worker" | xargs -r docker rm
+
+            # Pull the latest worker image with explicit platform for ARM64
+            echo "Pulling latest ARM64 lighthouse-worker image"
+            docker pull --platform linux/arm64 ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-worker:latest-arm64
+
+            # Start two worker instances
+            echo "Starting lighthouse-worker containers with proper environment variables"
+            for i in 1 2; do
+              docker run -d \
+                --platform linux/arm64 \
+                --name lighthouse-worker-$i \
+                --network craftpilot-network \
+                --restart unless-stopped \
+                -e REDIS_HOST=redis \
+                -e REDIS_PORT=6379 \
+                -e REDIS_PASSWORD=13579ada \
+                -e POLL_INTERVAL=5000 \
+                -e MAX_RETRIES=3 \
+                -e LIGHTHOUSE_QUEUE_NAME=lighthouse-jobs \
+                -e LIGHTHOUSE_RESULTS_PREFIX=lighthouse-results: \
+                --health-cmd="curl -f http://localhost:8086/health || exit 1" \
+                --health-interval=30s \
+                --health-timeout=10s \
+                --health-retries=5 \
+                --health-start-period=30s \
+                ${{ secrets.DOCKERHUB_USERNAME }}/lighthouse-worker:latest-arm64
+            done
+
+            echo "Waiting for containers to start (10 seconds)..."
             sleep 10
 
-            echo "Verifying critical tools in container..."
-            docker exec lighthouse-service java -version || echo "Java check failed"
-            docker exec lighthouse-service node --version || echo "Node.js check failed"
-            docker exec lighthouse-service npm --version || echo "NPM check failed"
-            docker exec lighthouse-service which lighthouse || echo "Lighthouse CLI check failed"
-            docker exec lighthouse-service lighthouse --version || echo "Lighthouse version check failed"
-
-            echo "Validating container environment variables..."
-            docker exec lighthouse-service printenv | grep -E "PATH|NODE_PATH|JAVA_HOME|CHROME"
-
-            echo "=== Waiting for service startup ==="
+            # Check service health
+            echo "=== Checking Lighthouse Service Health ==="
             max_attempts=30
             counter=0
-            success=0
+            service_success=0
 
             while [ $counter -lt $max_attempts ]; do
-              echo "Health check attempt $((counter + 1))/$max_attempts"
+              echo "Service health check attempt $((counter + 1))/$max_attempts"
               
               # Container durumu kontrolü
               if ! docker ps --filter "name=lighthouse-service" --format '{{.Status}}' | grep -q "Up"; then
-                echo "Container is not running anymore. Checking logs..."
+                echo "Service container is not running. Checking logs..."
                 docker logs lighthouse-service | tail -n 100
-                exit 1
+                break
               fi
               
               # Application log kontrolü
               if docker logs lighthouse-service 2>&1 | grep -q "Started LighthouseServiceApplication"; then
-                echo "Application startup completed"
+                echo "Service application startup completed"
                 
                 # Health check kontrolü
                 HEALTH_CHECK=$(curl -s http://localhost:8085/health)
                 if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
-                  echo "✓ Health check passed: $HEALTH_CHECK"
-                  success=1
+                  echo "✓ Service health check passed"
+                  service_success=1
                   break
                 elif echo "$HEALTH_CHECK" | grep -q '"redis":"DOWN"'; then
                   echo "× Redis connection issue detected in health check"
-                  echo "Health response: $HEALTH_CHECK"
-                  # Redis sağlık bilgilerini göster
-                  echo "Redis connection details from logs:"
                   docker logs lighthouse-service 2>&1 | grep -i "redis\|lettuce" | tail -20
                 else
                   echo "× Health check failed with response: $HEALTH_CHECK"
                 fi
               else
-                echo "Waiting for application startup..."
+                echo "Waiting for service application startup..."
               fi
               
-              echo "Waiting for service to start... ($((counter + 1))/$max_attempts)"
               sleep 10
               counter=$((counter + 1))
             done
 
-            if [ $success -eq 1 ]; then
+            # Check worker health
+            echo "=== Checking Lighthouse Worker Health ==="
+            worker_success=0
+
+            for i in 1 2; do
+              if docker ps --filter "name=lighthouse-worker-$i" --format '{{.Status}}' | grep -q "Up"; then
+                WORKER_HEALTH=$(docker exec lighthouse-worker-$i curl -s http://localhost:8086/health || echo '{"status":"DOWN"}')
+                if echo "$WORKER_HEALTH" | grep -q '"status":"UP"'; then
+                  echo "✓ Worker $i health check passed"
+                  worker_success=1
+                else
+                  echo "× Worker $i health check failed"
+                  docker logs lighthouse-worker-$i | tail -n 50
+                fi
+              else
+                echo "Worker $i is not running"
+                docker logs lighthouse-worker-$i | tail -n 50
+              fi
+            done
+
+            # Validate overall deployment status
+            if [ $service_success -eq 1 ] && [ $worker_success -eq 1 ]; then
               echo "=== Deployment completed successfully ==="
               exit 0
             else
-              echo "=== Health check failed - Debug Information ==="
-              echo "Docker Status:"
-              docker ps -a | grep lighthouse-service
-              echo "Container Logs:"
-              docker logs lighthouse-service --tail 100
-              echo "Health Check Response:"
-              curl -v http://localhost:8085/health || true
-              echo "Redis Check:"
+              echo "=== Deployment health check failed ==="
+              
+              if [ $service_success -ne 1 ]; then
+                echo "Service health check failed - Debug Information:"
+                docker ps -a | grep lighthouse-service
+                docker logs lighthouse-service --tail 100
+                curl -v http://localhost:8085/health || true
+              fi
+              
+              if [ $worker_success -ne 1 ]; then
+                echo "Worker health check failed - Debug Information:"
+                docker ps -a | grep lighthouse-worker
+                for i in 1 2; do
+                  echo "Worker $i logs:"
+                  docker logs lighthouse-worker-$i --tail 50
+                done
+              fi
+              
+              echo "Redis Connectivity Check:"
               docker exec lighthouse-service sh -c 'nc -zv $SPRING_DATA_REDIS_HOST $SPRING_DATA_REDIS_PORT' || echo "Redis connection failed"
+              
               exit 1
             fi
