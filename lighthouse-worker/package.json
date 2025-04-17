@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Lighthouse Worker Service",
   "main": "src/index.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js"

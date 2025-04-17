@@ -1,4 +1,3 @@
-const chromeLauncher = require("chrome-launcher");
 const { logger } = require("./logger");
 const path = require("path");
 const fs = require("fs");
@@ -19,6 +18,10 @@ async function runLighthouseAnalysis(url, analysisType = "basic") {
     const tempDir = process.env.LIGHTHOUSE_TEMP_DIR || os.tmpdir();
     tempOutputPath = path.join(tempDir, `lighthouse-${Date.now()}.json`);
 
+    // ESM modüllerini dinamik olarak import et
+    const chromeLauncher = await import("chrome-launcher");
+    const lighthouse = await import("lighthouse");
+
     // Chrome'u başlat
     chrome = await chromeLauncher.launch({
       chromeFlags: [
@@ -29,9 +32,6 @@ async function runLighthouseAnalysis(url, analysisType = "basic") {
         "--disable-software-rasterizer",
       ],
     });
-
-    // Lighthouse modülünü dinamik olarak içe aktar (ESM uyumlu)
-    const lighthouse = await import("lighthouse");
 
     // Lighthouse ayarları ve kategorilerini belirle
     const categories =
@@ -46,7 +46,7 @@ async function runLighthouseAnalysis(url, analysisType = "basic") {
       port: chrome.port,
     };
 
-    // Lighthouse'u çalıştır (default export kullan)
+    // Lighthouse'u çalıştır (default export'u kullanarak)
     results = await lighthouse.default(url, opts);
 
     // JSON çıktısını yazdır
