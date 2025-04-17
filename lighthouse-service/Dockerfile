@@ -16,7 +16,14 @@ RUN apt-get update && \
     libgdk-pixbuf2.0-0 libnspr4 libnss3 libx11-xcb1 libxcomposite1 \
     libxdamage1 libxrandr2 libgbm1 libgtk-3-0 libxshmfence1 libxss1 libxtst6 \
     --no-install-recommends && \
-    wget -O /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+    ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then \
+      wget -O /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb ; \
+    elif [ "$ARCH" = "arm64" ]; then \
+      wget -O /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_arm64.deb ; \
+    else \
+      echo "Unsupported architecture: $ARCH" && exit 1 ; \
+    fi && \
     apt-get install -y /tmp/google-chrome.deb || apt-get -fy install && \
     rm /tmp/google-chrome.deb && \
     rm -rf /var/lib/apt/lists/*
