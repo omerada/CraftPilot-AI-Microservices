@@ -9,17 +9,16 @@ RUN mvn clean package -DskipTests -B
 # Runtime stage
 FROM eclipse-temurin:17-jre
 
-# Gerekli araçlar ve Chromium (ARM64 uyumlu, headless için gerekli bağımlılıklarla)
+# Gerekli araçlar ve Google Chrome (ARM64 uyumlu, headless için gerekli bağımlılıklarla)
 RUN apt-get update && \
-    apt-get install -y nodejs npm curl \
-    chromium-browser \
+    apt-get install -y wget gnupg2 nodejs npm curl \
     libatk-bridge2.0-0 libatk1.0-0 libcups2 libdbus-1-3 \
     libgdk-pixbuf2.0-0 libnspr4 libnss3 libx11-xcb1 libxcomposite1 \
     libxdamage1 libxrandr2 libgbm1 libgtk-3-0 libxshmfence1 libxss1 libxtst6 \
     --no-install-recommends && \
-    chmod +x /usr/bin/chromium-browser && \
-    ln -sf /usr/bin/chromium-browser /usr/bin/google-chrome && \
-    ln -sf /usr/bin/chromium-browser /usr/bin/chromium && \
+    wget -O /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+    apt-get install -y /tmp/google-chrome.deb || apt-get -fy install && \
+    rm /tmp/google-chrome.deb && \
     rm -rf /var/lib/apt/lists/*
 
 # Lighthouse CLI yükle
