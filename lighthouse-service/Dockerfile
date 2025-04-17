@@ -3,11 +3,11 @@ FROM maven:3.9.6-eclipse-temurin-17 AS build
 
 WORKDIR /build
 COPY pom.xml .
-COPY .mvn ./.mvn
-COPY mvnw .
+# Maven wrapper'ı kopyalamak yerine doğrudan Maven kullan
 COPY src ./src
 
-RUN chmod +x ./mvnw && ./mvnw clean package -DskipTests
+# Doğrudan Maven komutunu kullan
+RUN mvn clean package -DskipTests
 
 # Run stage
 FROM eclipse-temurin:17-jre

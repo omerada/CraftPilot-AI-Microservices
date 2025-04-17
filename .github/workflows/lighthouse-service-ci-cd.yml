@@ -92,11 +92,10 @@ jobs:
 
           WORKDIR /build
           COPY pom.xml .
-          COPY .mvn ./.mvn
-          COPY mvnw .
           COPY src ./src
 
-          RUN chmod +x ./mvnw && ./mvnw clean package -DskipTests
+          # Doğrudan Maven kullan
+          RUN mvn clean package -DskipTests
 
           # Run stage
           FROM eclipse-temurin:17-jre
