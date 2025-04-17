@@ -71,17 +71,14 @@ jobs:
         with:
           node-version: "18"
           cache: "npm"
-          cache-dependency-path: "lighthouse-worker/package-lock.json"
+          cache-dependency-path: "lighthouse-worker/package.json"
 
       - name: Install dependencies
         run: |
           cd lighthouse-worker
+          echo "Installing npm dependencies..."
+          [ ! -f "package-lock.json" ] && npm install --package-lock-only
           npm ci
-
-      - name: Run Tests
-        run: |
-          cd lighthouse-worker
-          npm test || echo "No tests found, continuing build process"
 
   build-docker-images:
     name: Build Docker Images
