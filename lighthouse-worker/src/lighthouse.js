@@ -41,21 +41,23 @@ async function runLighthouseAnalysis(url, analysisType = "basic") {
         ? ["performance", "accessibility", "best-practices", "seo"]
         : ["performance"];
 
+    // Her iki analiz tipi için optimize edilmiş ayarlar
     const opts = {
       logLevel: "info",
       output: "json",
       onlyCategories: categories,
       port: chrome.port,
-      locale: "tr", // Türkçe dil desteği ekle
+      locale: "tr", // Türkçe dil desteği
       // Analiz hızını artıracak ayarlar
-      disableStorageReset: true, // Depolama temizliğini devre dışı bırak
-      formFactor: "desktop", // Masaüstü analizi daha hızlı
-      throttlingMethod: "simulate", // Simüle edilmiş throttling daha hızlı
+      disableStorageReset: true,
+      formFactor: "desktop",
+      throttlingMethod: "simulate",
       screenEmulation: {
-        disabled: true, // Ekran emülasyonunu devre dışı bırak
+        disabled: true,
       },
-      // Ekran görüntüsü denetimleri ve görsel öğeleri devre dışı bırak
+      // Ekran görüntüsü ve görsel denetimlerini devre dışı bırak
       skipAudits: [
+        // Görsel denetimleri atla
         "screenshot-thumbnails",
         "final-screenshot",
         "full-page-screenshot",
@@ -63,6 +65,18 @@ async function runLighthouseAnalysis(url, analysisType = "basic") {
         "uses-webp-images",
         "uses-responsive-images",
         "offscreen-images",
+
+        // Analiz tipine göre fazladan denetimleri atla
+        ...(analysisType === "basic"
+          ? [
+              // Basic analiz için ek olarak atlanan denetimler
+              "largest-contentful-paint",
+              "cumulative-layout-shift",
+              "third-party-facades",
+              "third-party-summary",
+              "unsized-images",
+            ]
+          : []),
       ],
     };
 
