@@ -71,7 +71,8 @@ public class PerformanceController {
      */
     @PostMapping("/analyze")
     public Mono<Map<String, Object>> analyzeWebsite(@RequestBody PerformanceAnalysisRequest request) {
-        log.info("Performing performance analysis for URL: {} with type: {}", request.getUrl(), request.getAnalysisType());
+        log.info("Performing performance analysis for URL: {} with type: {} for device: {}", 
+                request.getUrl(), request.getAnalysisType(), request.getDeviceType());
 
         // Önce health check yap
         return healthCheck()
@@ -85,10 +86,11 @@ public class PerformanceController {
                 }
                 
                 // Servis sağlıklı, analiz isteğini gönder
-                // analysisType parametresini de Lighthouse servisine aktar
+                // analysisType ve deviceType parametrelerini de Lighthouse servisine aktar
                 Map<String, Object> requestBody = new HashMap<>();
                 requestBody.put("url", request.getUrl());
                 requestBody.put("analysisType", request.getAnalysisType());
+                requestBody.put("deviceType", request.getDeviceType());
                 
                 return webClientBuilder.build()
                     .post()

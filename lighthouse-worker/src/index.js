@@ -58,14 +58,23 @@ async function processJobs() {
       try {
         // Lighthouse analizi çalıştır
         const analysisType = options.analysisType || "basic";
+        const deviceType = options.deviceType || "desktop"; // Cihaz tipi parametresi ekle
+
         const startTime = Date.now();
-        const results = await runLighthouseAnalysis(url, analysisType);
+        const results = await runLighthouseAnalysis(
+          url,
+          analysisType,
+          deviceType
+        );
         const duration = Date.now() - startTime;
 
-        logger.info(`Analysis completed for job ${jobId} in ${duration}ms`);
+        logger.info(
+          `Analysis completed for job ${jobId} in ${duration}ms for device: ${deviceType}`
+        );
 
         // Sonuçları işle ve kaydet
         results.analysisType = analysisType;
+        results.deviceType = deviceType; // Sonuçlara deviceType ekle
         results.url = url;
         results.timestamp = Date.now();
 

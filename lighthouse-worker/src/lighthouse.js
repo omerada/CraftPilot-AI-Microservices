@@ -4,9 +4,13 @@ const fs = require("fs");
 const os = require("os");
 
 // Lighthouse analizi çalıştırma
-async function runLighthouseAnalysis(url, analysisType = "basic") {
+async function runLighthouseAnalysis(
+  url,
+  analysisType = "basic",
+  deviceType = "desktop"
+) {
   logger.info(
-    `Starting Lighthouse analysis for ${url} with type: ${analysisType}`
+    `Starting Lighthouse analysis for ${url} with type: ${analysisType}, device: ${deviceType}`
   );
 
   let chrome = null;
@@ -41,6 +45,9 @@ async function runLighthouseAnalysis(url, analysisType = "basic") {
         ? ["performance", "accessibility", "best-practices", "seo"]
         : ["performance"];
 
+    // Cihaz tipine göre ayarları belirle
+    const isMobile = deviceType === "mobile";
+
     // Her iki analiz tipi için optimize edilmiş ayarlar
     const opts = {
       logLevel: "info",
@@ -48,12 +55,14 @@ async function runLighthouseAnalysis(url, analysisType = "basic") {
       onlyCategories: categories,
       port: chrome.port,
       locale: "tr", // Türkçe dil desteği
+      // Cihaz tipine göre formFactor'ü ayarla
+      formFactor: isMobile ? "mobile" : "desktop",
       // Analiz hızını artıracak ayarlar
       disableStorageReset: true,
-      formFactor: "desktop",
-      throttlingMethod: "simulate",
+      throttlingMethod: "simulate", // Simüle edilmiş throttling daha hızlı
       screenEmulation: {
-        disabled: true,
+        // Mobil analiz için ekran emülasyonunu etkinleştir
+        disabled: !isMobile,
       },
       // Ekran görüntüsü ve görsel denetimlerini devre dışı bırak
       skipAudits: [

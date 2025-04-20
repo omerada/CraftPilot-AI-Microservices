@@ -11,9 +11,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PerformanceAnalysisRequest {
-    @NotBlank(message = "URL boş olamaz")
+    @NotBlank(message = "URL cannot be empty")
     private String url;
     
     @Builder.Default
     private String analysisType = "basic"; // Varsayılan olarak "basic", diğer değer "detailed"
+    
+    @Builder.Default
+    private String deviceType = "desktop"; // Cihaz tipi alanı ekle
 }

@@ -20,8 +20,11 @@ public class AnalysisRequest {
              message = "Invalid URL format. Must start with http:// or https:// and contain a valid domain")
     private String url;
     
-    @Builder.Default  // Uyarıyı gidermek için @Builder.Default eklendi
+    @Builder.Default
     private String analysisType = "basic";
+    
+    @Builder.Default
+    private String deviceType = "desktop"; // Cihaz tipi alanı ekle (varsayılan: desktop)
     
     private Map<String, Object> options;
 }

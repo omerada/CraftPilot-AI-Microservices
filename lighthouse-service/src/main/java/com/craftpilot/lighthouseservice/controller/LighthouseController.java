@@ -34,11 +34,12 @@ public class LighthouseController {
     @PostMapping("/analyze")
     @Operation(
         summary = "Analyze website performance", 
-        description = "Queue a new Lighthouse analysis job. You can specify analysisType as 'basic' or 'detailed'."
+        description = "Queue a new Lighthouse analysis job. You can specify analysisType as 'basic' or 'detailed' and deviceType as 'mobile' or 'desktop'."
     )
     public Mono<ResponseEntity<Map<String, Object>>> analyzeWebsite(
             @Valid @RequestBody AnalysisRequest request) {
-        logger.info("Received analysis request for URL: {} with type: {}", request.getUrl(), request.getAnalysisType());
+        logger.info("Received analysis request for URL: {} with type: {} for device: {}", 
+                    request.getUrl(), request.getAnalysisType(), request.getDeviceType());
         
         if (request.getUrl() == null || request.getUrl().isEmpty()) {
             logger.warn("Empty URL received");
@@ -51,6 +52,8 @@ public class LighthouseController {
         }
         
         String analysisType = request.getAnalysisType();
+        String deviceType = request.getDeviceType();
+        
         if (analysisType != null && !analysisType.equals("basic") && !analysisType.equals("detailed")) {
             logger.warn("Invalid analysisType: {}", analysisType);
             return Mono.just(ResponseEntity.badRequest().body(
@@ -61,6 +64,16 @@ public class LighthouseController {
             ));
         }
         
+        if (deviceType != null && !deviceType.equals("desktop") && !deviceType.equals("mobile")) {
+            logger.warn("Invalid deviceType: {}", deviceType);
+            return Mono.just(ResponseEntity.badRequest().body(
+                Map.of(
+                    "error", "deviceType must be either 'desktop' or 'mobile'",
+                    "status", "ERROR"
+                )
+            ));
+        }
+
         // Önce kuyruk durumunu kontrol et
         return lighthouseQueueService.getQueueLength()
             .flatMap(queueLength -> {
@@ -78,15 +91,25 @@ public class LighthouseController {
                     ));
                 }
                 
-                logger.info("Starting analysis for URL: {} with type: {}", request.getUrl(), analysisType);
+                logger.info("Starting analysis for URL: {} with type: {} for device: {}", 
+                           request.getUrl(), analysisType, deviceType);
                 
-                return lighthouseQueueService.queueAnalysisJob(request.getUrl(), request.getOptions())
+                // Options nesnesini hazırla
+                Map<String, Object> options = request.getOptions() != null ? 
+                    new HashMap<>(request.getOptions()) : new HashMap<>();
+                
+                // AnalysisType ve deviceType'ı options'a ekle
+                options.put("analysisType", analysisType);
+                options.put("deviceType", deviceType);
+                
+                return lighthouseQueueService.queueAnalysisJob(request.getUrl(), options)
                     .map(jobId -> {
                         Map<String, Object> response = new HashMap<>();
                         response.put("jobId", jobId);
                         response.put("status", "PENDING");
                         response.put("url", request.getUrl());
                         response.put("analysisType", analysisType);
+                        response.put("deviceType", deviceType);
                         response.put("queuePosition", queueLength + 1);
                         
                         // İş kuyruğa alındı, worker'lar zaten otomatik olarak işleri kontrol ediyor
