@@ -22,7 +22,7 @@ async function runLighthouseAnalysis(url, analysisType = "basic") {
     const chromeLauncher = await import("chrome-launcher");
     const lighthouse = await import("lighthouse");
 
-    // Chrome'u başlat
+    // Chrome'u başlat, görsel işlemlerini devre dışı bırak
     chrome = await chromeLauncher.launch({
       chromeFlags: [
         "--headless",
@@ -30,6 +30,8 @@ async function runLighthouseAnalysis(url, analysisType = "basic") {
         "--disable-gpu",
         "--disable-dev-shm-usage",
         "--disable-software-rasterizer",
+        "--disable-images", // Görsel yüklemeyi devre dışı bırak
+        "--blink-settings=imagesEnabled=false", // Blink motorunda görüntüleri devre dışı bırak
       ],
     });
 
@@ -44,6 +46,23 @@ async function runLighthouseAnalysis(url, analysisType = "basic") {
       output: "json",
       onlyCategories: categories,
       port: chrome.port,
+      // Analiz hızını artıracak ayarlar
+      disableStorageReset: true, // Depolama temizliğini devre dışı bırak
+      formFactor: "desktop", // Masaüstü analizi daha hızlı
+      throttlingMethod: "simulate", // Simüle edilmiş throttling daha hızlı
+      screenEmulation: {
+        disabled: true, // Ekran emülasyonunu devre dışı bırak
+      },
+      // Ekran görüntüsü denetimleri ve görsel öğeleri devre dışı bırak
+      skipAudits: [
+        "screenshot-thumbnails",
+        "final-screenshot",
+        "full-page-screenshot",
+        "uses-optimized-images",
+        "uses-webp-images",
+        "uses-responsive-images",
+        "offscreen-images",
+      ],
     };
 
     // Lighthouse'u çalıştır (default export'u kullanarak)
