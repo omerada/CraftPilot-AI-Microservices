@@ -46,6 +46,7 @@ async function runLighthouseAnalysis(url, analysisType = "basic") {
       output: "json",
       onlyCategories: categories,
       port: chrome.port,
+      locale: "tr", // Türkçe dil desteği ekle
       // Analiz hızını artıracak ayarlar
       disableStorageReset: true, // Depolama temizliğini devre dışı bırak
       formFactor: "desktop", // Masaüstü analizi daha hızlı
