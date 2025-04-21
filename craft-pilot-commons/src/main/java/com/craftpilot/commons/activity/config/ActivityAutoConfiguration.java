@@ -3,6 +3,8 @@ package com.craftpilot.commons.activity.config;
 import com.craftpilot.commons.activity.aspect.ActivityLogAspect;
 import com.craftpilot.commons.activity.logger.ActivityLogger;
 import com.craftpilot.commons.activity.producer.ActivityProducer;
+import com.craftpilot.commons.activity.producer.KafkaActivityProducer;
+import com.craftpilot.commons.activity.producer.LoggingActivityProducer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -14,14 +16,21 @@ import org.springframework.kafka.core.KafkaTemplate;
 
 @AutoConfiguration
 @EnableConfigurationProperties(ActivityConfiguration.class)
-@ConditionalOnClass(KafkaTemplate.class)
 @ConditionalOnProperty(prefix = "craftpilot.activity", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class ActivityAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public ActivityProducer activityProducer(KafkaTemplate<String, Object> kafkaTemplate, ActivityConfiguration config) {
-        return new ActivityProducer(kafkaTemplate, config);
+    @ConditionalOnClass(KafkaTemplate.class)
+    public ActivityProducer kafkaActivityProducer(KafkaTemplate<String, Object> kafkaTemplate, ActivityConfiguration config) {
+        return new KafkaActivityProducer(kafkaTemplate, config.getTopic());
+    }
+    
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(name = "spring.kafka.bootstrap-servers", matchIfMissing = true, havingValue = "false")
+    public ActivityProducer loggingActivityProducer() {
+        return new LoggingActivityProducer();
     }
     
     @Bean

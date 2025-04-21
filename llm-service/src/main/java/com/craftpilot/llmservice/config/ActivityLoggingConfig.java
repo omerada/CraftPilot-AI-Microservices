@@ -12,8 +12,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.SendResult;
-import reactor.core.publisher.Mono;
 
 @Configuration
 @EnableAspectJAutoProxy
@@ -29,6 +27,7 @@ public class ActivityLoggingConfig {
     public ActivityConfiguration activityConfiguration() {
         ActivityConfiguration config = new ActivityConfiguration();
         config.setServiceNamePrefix(serviceNamePrefix);
+        config.setTopic(kafkaTopic);
         return config;
     }
 
