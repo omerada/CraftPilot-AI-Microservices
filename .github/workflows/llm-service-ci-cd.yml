@@ -78,20 +78,19 @@ jobs:
         run: |
           # Create a temporary directory for build context
           mkdir -p /tmp/docker-build-context
-          # Copy craft-pilot-commons to build context
+          # Copy craft-pilot-commons to build context directory
           cp -r craft-pilot-commons /tmp/docker-build-context/
-          # Copy llm-service to build context
+          # Copy llm-service to build context directory
           cp -r llm-service /tmp/docker-build-context/
 
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: /tmp/docker-build-context/llm-service
+          context: /tmp/docker-build-context
+          dockerfile: /tmp/docker-build-context/llm-service/Dockerfile
           platforms: linux/arm64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
-          build-args: |
-            COMMONS_DIR=../craft-pilot-commons
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
