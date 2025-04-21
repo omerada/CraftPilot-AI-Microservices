@@ -108,7 +108,7 @@ spring:
               args:
                 redis-rate-limiter.replenishRate: 30
                 redis-rate-limiter.burstCapacity: 60
-                key-resolver: "#{@ipKeyResolver}"
+                key-resolver: "#{@userKeyResolver}"
 
         - id: image-service
           uri: lb://image-service
