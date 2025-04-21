@@ -27,15 +27,10 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
-      - name: Grant execute permission for mvnw
+      - name: Build with Maven (with verbose output)
         run: |
           cd activity-log-service
-          chmod +x mvnw
-
-      - name: Build
-        run: |
-          cd activity-log-service
-          ./mvnw clean package -DskipTests
+          mvn clean package -DskipTests -X
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2

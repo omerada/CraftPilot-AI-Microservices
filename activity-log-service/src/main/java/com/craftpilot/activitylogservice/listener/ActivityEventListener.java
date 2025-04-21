@@ -8,8 +8,10 @@ import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverRecord;
+import reactor.util.retry.Retry;
 
 import java.time.Duration;
 
@@ -37,7 +39,13 @@ public class ActivityEventListener {
                 record.key(), record.topic(), record.partition(), record.offset()))
             .flatMap(this::processRecord, concurrency)
             .doOnError(error -> log.error("Error processing Kafka record: {}", error.getMessage()))
-            .retry(spec -> spec.maxAttempts(3).backoff(Duration.ofSeconds(1), Duration.ofSeconds(10), 2.0))
+            .retryWhen(Retry.backoff(3, Duration.ofSeconds(1))
+                    .maxBackoff(Duration.ofSeconds(10))
+                    .jitter(0.5))
+            .onErrorResume(error -> {
+                log.error("Error processing Kafka event: {}", error.getMessage(), error);
+                return Mono.empty();
+            })
             .subscribe();
     }
 

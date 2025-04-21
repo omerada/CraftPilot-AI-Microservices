@@ -122,9 +122,11 @@ public class ActivityLogRepository {
         }
         
         if (lastDocumentId != null && !lastDocumentId.isEmpty()) {
+            // Create a final copy of query for use in the lambda
+            final Query finalQuery = query;
             return findById(lastDocumentId)
                     .flatMapMany(lastDocument -> {
-                        ApiFuture<QuerySnapshot> future = query
+                        ApiFuture<QuerySnapshot> future = finalQuery
                                 .startAfter(lastDocument)
                                 .limit(limit)
                                 .get();

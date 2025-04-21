@@ -28,6 +28,7 @@ public class ActivityEvent {
     @NotBlank(message = "Action type cannot be empty")
     private String actionType;
     
+    @Builder.Default
     private Map<String, Object> metadata = new HashMap<>();
     
     public boolean isValid() {

@@ -12,6 +12,7 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
+import org.springframework.security.web.server.header.ReferrerPolicyServerHttpHeadersWriter.ReferrerPolicy;
 
 import java.util.Arrays;
 import java.util.List;
@@ -56,7 +57,7 @@ public class LightSecurityConfig {
             .headers(headers -> headers
                 .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'"))
                 .frameOptions(frame -> frame.mode(org.springframework.security.web.server.header.XFrameOptionsServerHttpHeadersWriter.Mode.DENY))
-                .referrerPolicy(referrer -> referrer.policy("strict-origin-when-cross-origin"))
+                .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                 .xssProtection(xss -> xss.disable())
             )
             .build();
