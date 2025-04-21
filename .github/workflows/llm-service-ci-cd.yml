@@ -5,6 +5,7 @@ on:
     branches: [master]
     paths:
       - "llm-service/**"
+      - "craft-pilot-commons/**"
       - ".github/workflows/llm-service-ci-cd.yml"
   workflow_dispatch:
     inputs:
@@ -16,6 +17,11 @@ on:
         options:
           - prod
           - debug
+  pull_request:
+    branches: [master]
+    paths:
+      - "llm-service/**"
+      - "craft-pilot-commons/**"
 
 jobs:
   build-and-deploy:
@@ -61,6 +67,13 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Copy llm-service files for context
+        run: |
+          mkdir -p /tmp/build-context
+          cp -r ../craft-pilot-commons /tmp/build-context/
+          cp -r . /tmp/build-context/llm-service
+        working-directory: ./llm-service
 
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4

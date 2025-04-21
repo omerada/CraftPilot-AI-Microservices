@@ -1,6 +1,13 @@
 # Build stage
 FROM maven:3.9.6-eclipse-temurin-21 AS build
 
+# Clone/copy the craft-pilot-commons source
+WORKDIR /build-lib
+COPY craft-pilot-commons ./craft-pilot-commons
+
+# Build and install the craft-pilot-commons to local Maven repository
+RUN cd craft-pilot-commons && mvn clean install -DskipTests
+
 WORKDIR /build
 COPY pom.xml .
 COPY src ./src
