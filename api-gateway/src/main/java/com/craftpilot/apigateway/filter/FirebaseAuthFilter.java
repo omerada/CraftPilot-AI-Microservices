@@ -127,7 +127,7 @@ public class FirebaseAuthFilter implements WebFilter {
         })
         .onErrorResume(e -> {
             log.error("Token işleme hatası: {}", e.getMessage());
-            return handleError(exchange, HttpStatus.UNAUTHORIZED, "Token işleme hatası: " + e.getMessage());
+            return handleError(exchange, HttpStatus.UNAUTHORIZED, "ERROR: " + e.getMessage());
         });
     }
 

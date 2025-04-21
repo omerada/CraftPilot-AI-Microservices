@@ -51,11 +51,12 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./activity-log-service
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64 # Sadece ARM64 mimarisi hedefleniyor
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:buildcache,mode=max
+          timeout-minutes: 20
 
       - name: Verify Docker build status
         run: |
@@ -72,6 +73,7 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script_stop: true
+          command_timeout: "15m"
           script: |
             echo "Starting deployment of Activity Log Service..."
             # Deploy Activity Log Service
@@ -98,20 +100,45 @@ jobs:
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
 
-            # Geliştirilmiş sağlık kontrolü - başlangıç gecikmesi eklendi
-            echo "Waiting for service to start..."
-            sleep 15
-            for i in {1..12}; do
-              if curl -s http://localhost:8095/actuator/health | grep -q "UP"; then
-                echo "Service is healthy"
-                exit 0
+            echo "Container başlatıldı, servis durumu kontrol ediliyor..."
+
+            # Sağlık kontrolü - geliştirilmiş hata yakalama ile
+            max_attempts=15
+            counter=0
+
+            while [ $counter -lt $max_attempts ]; do
+              echo "Health check attempt $((counter + 1))/$max_attempts"
+              
+              # Container durumu kontrolü
+              if ! docker ps --filter "name=activity-log-service" --format '{{.Status}}' | grep -q "Up"; then
+                echo "Container çalışır durumda değil. Loglar kontrol ediliyor..."
+                docker logs activity-log-service --tail 100
+                exit 1
               fi
-              echo "Attempt $i: Service not ready yet..."
+              
+              # Health check endpoint kontrolü
+              HEALTH_CHECK=$(curl -s http://localhost:8095/actuator/health || echo "FAILED")
+              if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
+                echo "✓ Servis sağlıklı: $HEALTH_CHECK"
+                echo "=== Deployment başarıyla tamamlandı ==="
+                exit 0
+              else
+                echo "Health check yanıtı: $HEALTH_CHECK"
+              fi
+              
+              echo "Servisin başlaması bekleniyor... ($((counter + 1))/$max_attempts)"
               sleep 10
+              counter=$((counter + 1))
             done
 
-            echo "Service failed to become healthy within timeout"
-            docker logs activity-log-service
+            echo "=== Servis başlatılamadı - Debug bilgileri ==="
+            echo "Docker Container Durumu:"
+            docker ps -a | grep activity-log-service
+            echo "Container Logları (son 200 satır):"
+            docker logs activity-log-service --tail 200
+            echo "Hata Mesajları:"
+            docker logs activity-log-service 2>&1 | grep -i "error\|exception\|failed" | tail -30
             exit 1
