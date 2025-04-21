@@ -157,3 +157,11 @@ resilience4j:
 lighthouse:
   service:
     url: ${LIGHTHOUSE_SERVICE_URL:http://lighthouse-service:8085}
+
+# Activity Logging Configuration
+craftpilot:
+  activity:
+    enabled: true
+    topic: user-activity
+    service-name-prefix: LLM
+    error-handling: log-only

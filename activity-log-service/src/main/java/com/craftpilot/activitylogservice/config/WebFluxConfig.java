@@ -3,6 +3,7 @@ package com.craftpilot.activitylogservice.config;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.config.CorsRegistry;
 import org.springframework.web.reactive.config.EnableWebFlux;
+import org.springframework.web.reactive.config.ResourceHandlerRegistry;
 import org.springframework.web.reactive.config.WebFluxConfigurer;
 
 @Configuration
@@ -22,8 +23,14 @@ public class WebFluxConfig implements WebFluxConfigurer {
             .allowedHeaders("*")
             .exposedHeaders("Content-Type", "X-Requested-With", "Accept", "Origin", 
                           "Access-Control-Request-Method", "Access-Control-Request-Headers",
-                          "X-Total-Count")
+                          "X-Total-Count", "X-Error-Message")
             .allowCredentials(true)
             .maxAge(3600);
+    }
+    
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("/static/**")
+               .addResourceLocations("classpath:/static/");
     }
 }

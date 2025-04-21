@@ -25,11 +25,16 @@ import com.craftpilot.llmservice.model.response.ChatItem;
 import com.craftpilot.llmservice.model.response.PaginatedChatHistoryResponse;
 import com.craftpilot.llmservice.model.response.PaginationInfo;
 
+import com.craftpilot.commons.activity.annotation.LogActivity;
+import com.craftpilot.commons.activity.logger.ActivityLogger;
+import com.craftpilot.commons.activity.model.ActivityEventTypes;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ChatHistoryService {
     private final ChatHistoryRepository chatHistoryRepository;
+    private final ActivityLogger activityLogger;  
 
     public Flux<ChatHistory> getChatHistoriesByUserId(String userId, int page, int pageSize) {
         if (userId == null || userId.isEmpty()) {
@@ -66,6 +71,11 @@ public class ChatHistoryService {
                 .onErrorResume(e -> Mono.empty());
     }
 
+    @LogActivity(
+        actionType = ActivityEventTypes.CHAT_HISTORY_CREATE, 
+        userIdParam = "#chatHistory.userId",
+        metadata = "{id: #result.id, title: #result.title}"
+    )
     public Mono<ChatHistory> createChatHistory(ChatHistory chatHistory) {
         if (chatHistory == null) {
             log.warn("Null sohbet geçmişi oluşturma isteği");
@@ -96,6 +106,11 @@ public class ChatHistoryService {
                 .onErrorMap(e -> new RuntimeException("Sohbet geçmişi oluşturulamadı: " + e.getMessage(), e));
     }
 
+    @LogActivity(
+        actionType = ActivityEventTypes.CHAT_HISTORY_UPDATE, 
+        userIdParam = "#chatHistory.userId",
+        metadata = "{id: #result.id, title: #result.title, messageCount: #result.conversations.size()}"
+    )
     public Mono<ChatHistory> updateChatHistory(ChatHistory chatHistory) {
         if (chatHistory == null || chatHistory.getId() == null) {
             log.warn("Geçersiz sohbet geçmişi güncelleme isteği");
@@ -118,11 +133,24 @@ public class ChatHistoryService {
         }
         
         log.debug("Sohbet geçmişi siliniyor, ID: {}", id);
-        return chatHistoryRepository.delete(id)
-                .doOnError(error -> log.error("Sohbet geçmişi silinirken hata, ID {}: {}", id, error.getMessage()))
-                .onErrorMap(e -> new RuntimeException("Sohbet geçmişi silinemedi: " + e.getMessage(), e));
+        return chatHistoryRepository.findById(id)
+                .flatMap(history -> {
+                    // Önce silme işlemini yap
+                    return chatHistoryRepository.delete(id)  
+                            .then(activityLogger.log(
+                                history.getUserId(),
+                                ActivityEventTypes.CHAT_HISTORY_DELETE,
+                                Map.of("id", id, "title", history.getTitle())
+                            ))
+                            .then();
+                });
     }
 
+    @LogActivity(
+        actionType = ActivityEventTypes.CONVERSATION_CREATE,
+        userIdParam = "#result.userId",
+        metadata = "{historyId: #result.id, conversationId: #result.conversations[-1].id}"
+    )
     public Mono<ChatHistory> addConversation(String historyId, Conversation conversation) {
         if (historyId == null || historyId.isEmpty()) {
             log.warn("Geçersiz sohbet ID ile mesaj ekleme isteği");
@@ -153,6 +181,11 @@ public class ChatHistoryService {
                 .onErrorMap(e -> new RuntimeException("Mesaj eklenemedi: " + e.getMessage(), e));
     }
 
+    @LogActivity(
+        actionType = ActivityEventTypes.TITLE_UPDATE,
+        userIdParam = "#result.userId",
+        metadata = "{historyId: #result.id, newTitle: #result.title}"
+    )
     public Mono<ChatHistory> updateChatHistoryTitle(String historyId, String newTitle) {
         if (historyId == null || historyId.isEmpty()) {
             log.warn("Geçersiz ID ile sohbet başlığı güncelleme isteği");
@@ -170,6 +203,11 @@ public class ChatHistoryService {
                 .onErrorMap(e -> new RuntimeException("Sohbet başlığı güncellenemedi: " + e.getMessage(), e));
     }
 
+    @LogActivity(
+        actionType = ActivityEventTypes.CHAT_HISTORY_ARCHIVE, 
+        userIdParam = "#result.userId",
+        metadata = "{id: #result.id, title: #result.title}"
+    )
     public Mono<ChatHistory> archiveChatHistory(String historyId) {
         log.info("Sohbet arşivleniyor, ID: {}", historyId);
         

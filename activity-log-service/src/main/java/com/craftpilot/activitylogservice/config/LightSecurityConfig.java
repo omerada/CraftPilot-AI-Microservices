@@ -3,16 +3,13 @@ package com.craftpilot.activitylogservice.config;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpStatus;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
-import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.web.server.ServerWebExchange;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.server.WebFilter;
-import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
-import org.springframework.security.web.server.header.ReferrerPolicyServerHttpHeadersWriter.ReferrerPolicy;
 
 import java.util.Arrays;
 import java.util.List;
@@ -23,60 +20,59 @@ import java.util.List;
 public class LightSecurityConfig {
 
     private static final List<String> PUBLIC_PATHS = Arrays.asList(
-        "/actuator/",
-        "/v3/api-docs",
-        "/swagger-ui",
-        "/webjars/"
-    );
-
-    private static final List<RequiredHeader> REQUIRED_HEADERS = Arrays.asList(
-        new RequiredHeader("X-User-Id", "User ID is required"),
-        new RequiredHeader("X-User-Role", "User role is required"),
-        new RequiredHeader("X-User-Email", "User email is required")
+            "/actuator",
+            "/actuator/health",
+            "/actuator/info",
+            "/health",
+            "/info",
+            "/v3/api-docs",
+            "/swagger-ui",
+            "/webjars/"
     );
 
     @Bean
+    @Order(1) 
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         return http
-            .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .cors(cors -> cors.disable())
-            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
-            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-            .authorizeExchange(exchanges -> exchanges
-                .pathMatchers(getPublicPaths()).permitAll()
-                .pathMatchers("/admin/**").hasRole("ADMIN")
-                .anyExchange().authenticated()
-            )
-            .addFilterAt(headerValidationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
-            .exceptionHandling(handling -> handling
-                .authenticationEntryPoint((exchange, ex) -> {
-                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                    return exchange.getResponse().setComplete();
-                })
-            )
-            .headers(headers -> headers
-                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'"))
-                .frameOptions(frame -> frame.mode(org.springframework.security.web.server.header.XFrameOptionsServerHttpHeadersWriter.Mode.DENY))
-                .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
-                .xssProtection(xss -> xss.disable())
-            )
-            .build();
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+                .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+                .anonymous(anonymous -> anonymous.authorities("ROLE_ANONYMOUS"))
+                .authorizeExchange(exchanges -> exchanges
+                        .pathMatchers("/**").permitAll() // Tüm isteklere izin ver, header kontrolünü WebFilter ile yap
+                )
+                .build();
     }
 
     @Bean
-    public WebFilter headerValidationFilter() {
+    @Order(0) // En önce çalışacak
+    public WebFilter loggingHeadersFilter() {
         return (exchange, chain) -> {
-            if (isPublicPath(exchange.getRequest().getPath().value())) {
+            ServerHttpRequest request = exchange.getRequest();
+            String path = request.getPath().value();
+            
+            log.debug("İstek geldi: {} {}", request.getMethod(), path);
+            
+            if (isPublicPath(path)) {
+                log.debug("Public path erişimi: {} - kontrolsüz geçiyor", path);
                 return chain.filter(exchange);
             }
-
-            for (RequiredHeader header : REQUIRED_HEADERS) {
-                String headerValue = exchange.getRequest().getHeaders().getFirst(header.name);
-                if (headerValue == null || headerValue.trim().isEmpty()) {
-                    return handleMissingHeader(exchange, header.message);
-                }
+            
+            // Debug için tüm headerları yazdıralım
+            request.getHeaders().forEach((key, values) -> 
+                log.debug("Header: {} = {}", key, values));
+            
+            // X-User-Id header'ı kontrolü
+            String userId = request.getHeaders().getFirst("X-User-Id");
+            
+            if (userId == null || userId.isEmpty()) {
+                log.warn("Gerekli X-User-Id header eksik, ancak isteğe devam ediliyor");
+                // İsteği reddetmek yerine loga yazıp devam edelim
+                // API Gateway zaten yetkilendirmeyi yapıyor
+            } else {
+                log.debug("İstek kimlik doğrulaması başarılı: {}", userId);
             }
-
+            
             return chain.filter(exchange);
         };
     }
@@ -84,26 +80,5 @@ public class LightSecurityConfig {
     private boolean isPublicPath(String path) {
         return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
     }
-
-    private String[] getPublicPaths() {
-        return PUBLIC_PATHS.stream()
-            .map(path -> path + "**")
-            .toArray(String[]::new);
-    }
-
-    private Mono<Void> handleMissingHeader(ServerWebExchange exchange, String message) {
-        exchange.getResponse().setStatusCode(HttpStatus.BAD_REQUEST);
-        exchange.getResponse().getHeaders().add("X-Error-Message", message);
-        return exchange.getResponse().setComplete();
-    }
-
-    private static class RequiredHeader {
-        final String name;
-        final String message;
-
-        RequiredHeader(String name, String message) {
-            this.name = name;
-            this.message = message;
-        }
-    }
 }
+

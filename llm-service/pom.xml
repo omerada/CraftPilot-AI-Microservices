@@ -167,6 +167,13 @@
             <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
             <version>${springdoc.version}</version>
         </dependency>
+
+        <!-- CraftPilot Commons -->
+        <dependency>
+            <groupId>com.craftpilot</groupId>
+            <artifactId>craft-pilot-commons</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
     </dependencies>
 
     <dependencyManagement>
