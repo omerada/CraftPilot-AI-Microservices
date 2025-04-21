@@ -28,6 +28,11 @@ spring:
     serialization:
       write-dates-as-timestamps: false
     date-format: com.fasterxml.jackson.databind.util.ISO8601DateFormat
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${spring.application.name}-group
+      auto-offset-reset: earliest
 
 management:
   endpoints:

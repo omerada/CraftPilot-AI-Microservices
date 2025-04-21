@@ -4,6 +4,7 @@ import com.craftpilot.activitylogservice.model.ActivityEvent;
 import com.craftpilot.activitylogservice.service.ActivityLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -17,19 +18,19 @@ import java.time.Duration;
 
 @Component
 @Slf4j
+@ConditionalOnProperty(name = "spring.kafka.bootstrap-servers")
 public class ActivityEventListener {
-
     private final KafkaReceiver<String, ActivityEvent> receiver;
     private final ActivityLogService activityLogService;
-
+    
     @Value("${kafka.consumer.concurrency:3}")
     private int concurrency;
-
+    
     public ActivityEventListener(KafkaReceiver<String, ActivityEvent> receiver, ActivityLogService activityLogService) {
         this.receiver = receiver;
         this.activityLogService = activityLogService;
     }
-
+    
     @EventListener(ApplicationStartedEvent.class)
     public void startKafkaConsumer() {
         log.info("Starting Kafka consumer with concurrency: {}", concurrency);
@@ -48,26 +49,11 @@ public class ActivityEventListener {
             })
             .subscribe();
     }
-
-    private Flux<ReceiverRecord<String, ActivityEvent>> processRecord(ReceiverRecord<String, ActivityEvent> record) {
-        ActivityEvent event = record.value();
-        
-        if (event == null) {
-            log.warn("Received null event from Kafka, acknowledging and skipping.");
-            record.receiverOffset().acknowledge();
-            return Flux.empty();
-        }
-        
-        return Flux.from(activityLogService.processEvent(event)
-            .doOnSuccess(result -> {
-                log.debug("Successfully processed activity event: {}", event);
-                record.receiverOffset().acknowledge();
-            })
-            .doOnError(error -> {
-                log.error("Failed to process activity event {}: {}", event, error.getMessage());
-                record.receiverOffset().acknowledge(); // Acknowledge even on error to not block the flow
-            })
-            .onErrorResume(e -> Mono.empty())
-            .thenReturn(record));
+    
+    private Mono<Void> processRecord(ReceiverRecord<String, ActivityEvent> record) {
+        return activityLogService.processEvent(record.value())
+            .doOnSuccess(result -> record.receiverOffset().acknowledge())
+            .doOnError(error -> log.error("Failed to process activity event: {}", error.getMessage()))
+            .then();
     }
 }
