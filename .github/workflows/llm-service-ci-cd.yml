@@ -109,7 +109,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: /tmp/docker-build-context
-          dockerfile: llm-service/Dockerfile # Dockerfile'ı göreli yol kullanarak belirt
+          file: llm-service/Dockerfile
           platforms: linux/arm64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
