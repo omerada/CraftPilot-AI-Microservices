@@ -9,7 +9,7 @@ COPY craft-pilot-commons ./craft-pilot-commons
 RUN cd craft-pilot-commons && mvn clean install -DskipTests
 
 WORKDIR /build
-# Dosya yollarını düzelterek llm-service dizininden alıyoruz
+
 COPY llm-service/pom.xml .
 COPY llm-service/src ./src
 
