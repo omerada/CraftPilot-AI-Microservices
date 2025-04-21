@@ -27,10 +27,10 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
-      - name: Build with Maven (with verbose output)
+      - name: Build with Maven
         run: |
           cd activity-log-service
-          mvn clean package -DskipTests -X
+          mvn clean package -DskipTests
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -51,20 +51,11 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./activity-log-service
-          platforms: linux/arm64 # Sadece ARM64 mimarisi hedefleniyor
+          platforms: linux/arm64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:buildcache,mode=max
-          timeout-minutes: 20
-
-      - name: Verify Docker build status
-        run: |
-          echo "Docker build and push completed with digest ${{ steps.docker_build.outputs.digest }}"
-          if [ -z "${{ steps.docker_build.outputs.digest }}" ]; then
-            echo "Docker build failed to produce a digest output"
-            exit 1
-          fi
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
@@ -73,15 +64,14 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script_stop: true
-          command_timeout: "15m"
+          command_timeout: "10m"
           script: |
             echo "Starting deployment of Activity Log Service..."
-            # Deploy Activity Log Service
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
             docker stop activity-log-service || true
             docker rm activity-log-service || true
 
-            # Geliştirilmiş ortam değişkenleri ve network ayarları
+            # Basitleştirilmiş container yapılandırması
             docker run -d \
               --name activity-log-service \
               --network craftpilot-network \
@@ -99,13 +89,18 @@ jobs:
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
-              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+              -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
+              -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*" \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e "JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom" \
+              --health-cmd="curl -f http://localhost:8095/actuator/health || exit 1" \
+              --health-interval=30s \
+              --health-timeout=10s \
+              --health-retries=3 \
+              --health-start-period=60s \
               ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
 
-            echo "Container başlatıldı, servis durumu kontrol ediliyor..."
-
-            # Sağlık kontrolü - geliştirilmiş hata yakalama ile
+            echo "=== Waiting for service startup ==="
             max_attempts=15
             counter=0
 
@@ -114,31 +109,27 @@ jobs:
               
               # Container durumu kontrolü
               if ! docker ps --filter "name=activity-log-service" --format '{{.Status}}' | grep -q "Up"; then
-                echo "Container çalışır durumda değil. Loglar kontrol ediliyor..."
-                docker logs activity-log-service --tail 100
+                echo "Container is not running. Checking logs..."
+                docker logs activity-log-service
                 exit 1
               fi
               
-              # Health check endpoint kontrolü
+              # Health check kontrolü (basitleştirilmiş)
               HEALTH_CHECK=$(curl -s http://localhost:8095/actuator/health || echo "FAILED")
               if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
-                echo "✓ Servis sağlıklı: $HEALTH_CHECK"
-                echo "=== Deployment başarıyla tamamlandı ==="
+                echo "✓ Service is healthy"
+                echo "=== Deployment completed successfully ==="
                 exit 0
-              else
-                echo "Health check yanıtı: $HEALTH_CHECK"
               fi
               
-              echo "Servisin başlaması bekleniyor... ($((counter + 1))/$max_attempts)"
+              echo "Waiting for service to start... ($((counter + 1))/$max_attempts)"
               sleep 10
               counter=$((counter + 1))
             done
 
-            echo "=== Servis başlatılamadı - Debug bilgileri ==="
-            echo "Docker Container Durumu:"
+            echo "=== Service failed to start - Debug Information ==="
+            echo "Docker Status:"
             docker ps -a | grep activity-log-service
-            echo "Container Logları (son 200 satır):"
-            docker logs activity-log-service --tail 200
-            echo "Hata Mesajları:"
-            docker logs activity-log-service 2>&1 | grep -i "error\|exception\|failed" | tail -30
+            echo "Container Logs (last 100 lines):"
+            docker logs activity-log-service --tail 100
             exit 1
