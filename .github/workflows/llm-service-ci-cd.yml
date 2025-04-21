@@ -49,10 +49,14 @@ jobs:
           cd llm-service
           chmod +x mvnw
 
-      - name: Build
+      - name: Build commons library and llm-service
         run: |
-          cd llm-service
+          cd craft-pilot-commons
+          ./mvnw clean install -DskipTests
+          cd ../llm-service
           ./mvnw clean package -DskipTests
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
