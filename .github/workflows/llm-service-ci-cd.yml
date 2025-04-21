@@ -74,20 +74,24 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Copy llm-service files for context
+      - name: Prepare build context
         run: |
-          mkdir -p /tmp/build-context
-          cp -r ../craft-pilot-commons /tmp/build-context/
-          cp -r . /tmp/build-context/llm-service
-        working-directory: ./llm-service
+          # Create a temporary directory for build context
+          mkdir -p /tmp/docker-build-context
+          # Copy craft-pilot-commons to build context
+          cp -r craft-pilot-commons /tmp/docker-build-context/
+          # Copy llm-service to build context
+          cp -r llm-service /tmp/docker-build-context/
 
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: ./llm-service
+          context: /tmp/docker-build-context/llm-service
           platforms: linux/arm64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
+          build-args: |
+            COMMONS_DIR=../craft-pilot-commons
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
