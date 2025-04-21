@@ -1,55 +1,27 @@
-# Build stage
-FROM maven:3.9.6-eclipse-temurin-21 AS build
+# 1. Aşama: Commons kütüphanesini derle
+FROM maven:3.8.6-eclipse-temurin-21 AS commons-builder
+WORKDIR /app/commons
+COPY craft-pilot-commons/pom.xml .
+COPY craft-pilot-commons/src ./src
+RUN mvn clean install -DskipTests
 
-WORKDIR /build
-COPY pom.xml .
-COPY src ./src
+# 2. Aşama: LLM Service'i derle
+FROM maven:3.8.6-eclipse-temurin-21 AS llm-builder
+WORKDIR /app/llm-service
+COPY llm-service/pom.xml .
+# Maven bağımlılıklarını önce indiriyoruz (cache'leme için)
+RUN mvn dependency:go-offline
 
+# Commons kütüphanesini maven local repo'ya kopyala
+COPY --from=commons-builder /root/.m2/repository/com/craftpilot /root/.m2/repository/com/craftpilot
+
+# Kaynak kodları ve derle
+COPY llm-service/src ./src
 RUN mvn clean package -DskipTests
 
-# Run stage
+# 3. Aşama: Runtime image
 FROM eclipse-temurin:21-jre
-
 WORKDIR /app
-
-# Install required packages
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    curl \
-    tzdata \
-    libc6 \
-    libstdc++6 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create necessary directories
-RUN mkdir -p /tmp/netty /app/native-lib
-
-# Copy application
-COPY --from=build /build/target/*.jar app.jar
-
-# Set environment variables
-ENV JAVA_TOOL_OPTIONS="\
-    -XX:+UseContainerSupport \
-    -XX:MaxRAMPercentage=75.0 \
-    -XX:+UseG1GC \
-    -Dio.netty.tryReflectionSetAccessible=true \
-    -Djavax.net.debug=ssl \
-    -Dio.netty.leakDetection.level=disabled \
-    -Djava.security.egd=file:/dev/./urandom \
-    -Djava.awt.headless=true \
-    -Dfile.encoding=UTF-8 \
-    --add-opens=java.base/java.nio=ALL-UNNAMED \
-    --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-    --add-opens=java.base/java.lang=ALL-UNNAMED"
-
-# Google Cloud credential yapılandırması
-# GOOGLE_APPLICATION_CREDENTIALS çalışma zamanında volume ile mount edilecek dosyaya işaret eder
-ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
-
-# Health check düzeltmesi
-HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8062/health || curl -f http://localhost:8062/actuator/health || exit 1
-
-EXPOSE 8062
-
-ENTRYPOINT ["java", "-jar", "app.jar"]
+COPY --from=llm-builder /app/llm-service/target/*.jar llm-service.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "llm-service.jar"]

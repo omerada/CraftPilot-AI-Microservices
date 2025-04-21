@@ -1,5 +1,7 @@
 package com.craftpilot.lighthouseservice.controller;
 
+import com.craftpilot.commons.activity.logger.ActivityLogger;
+import com.craftpilot.commons.activity.model.ActivityEventTypes;
 import com.craftpilot.lighthouseservice.model.AnalysisRequest;
 import com.craftpilot.lighthouseservice.model.JobStatusResponse;
 import com.craftpilot.lighthouseservice.service.LighthouseQueueService;
@@ -30,6 +32,7 @@ public class LighthouseController {
     
     private final LighthouseQueueService lighthouseQueueService;
     private final LighthouseWorkerService lighthouseWorkerService;
+    private final ActivityLogger activityLogger;
 
     @PostMapping("/analyze")
     @Operation(
@@ -37,6 +40,7 @@ public class LighthouseController {
         description = "Queue a new Lighthouse analysis job. You can specify analysisType as 'basic' or 'detailed' and deviceType as 'mobile' or 'desktop'."
     )
     public Mono<ResponseEntity<Map<String, Object>>> analyzeWebsite(
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Valid @RequestBody AnalysisRequest request) {
         logger.info("Received analysis request for URL: {} with type: {} for device: {}", 
                     request.getUrl(), request.getAnalysisType(), request.getDeviceType());
@@ -103,7 +107,7 @@ public class LighthouseController {
                 options.put("deviceType", deviceType);
                 
                 return lighthouseQueueService.queueAnalysisJob(request.getUrl(), options)
-                    .map(jobId -> {
+                    .flatMap(jobId -> {
                         Map<String, Object> response = new HashMap<>();
                         response.put("jobId", jobId);
                         response.put("status", "PENDING");
@@ -112,9 +116,20 @@ public class LighthouseController {
                         response.put("deviceType", deviceType);
                         response.put("queuePosition", queueLength + 1);
                         
-                        // İş kuyruğa alındı, worker'lar zaten otomatik olarak işleri kontrol ediyor
+                        // Aktivite logunu oluştur
+                        Map<String, Object> metadata = new HashMap<>();
+                        metadata.put("jobId", jobId);
+                        metadata.put("url", request.getUrl());
+                        metadata.put("analysisType", analysisType);
+                        metadata.put("deviceType", deviceType);
+                        metadata.put("queuePosition", queueLength + 1);
                         
-                        return ResponseEntity.accepted().body(response);
+                        // Kullanıcı kimliği eksikse anonim olarak işaretle
+                        String effectiveUserId = (userId != null && !userId.isEmpty()) ? userId : "anonymous";
+                        
+                        // Aktiviteyi logla ve sonra yanıtı döndür
+                        return activityLogger.log(effectiveUserId, "PERFORMANCE_ANALYSIS_START", metadata)
+                            .thenReturn(ResponseEntity.accepted().body(response));
                     });
             });
     }
