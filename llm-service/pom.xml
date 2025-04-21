@@ -26,6 +26,14 @@
     </properties>
 
     <dependencies>
+    
+        <!-- CraftPilot Commons -->
+        <dependency>
+            <groupId>com.craftpilot</groupId>
+            <artifactId>craft-pilot-commons</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency> 
+        
         <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -168,12 +176,6 @@
             <version>${springdoc.version}</version>
         </dependency>
 
-        <!-- CraftPilot Commons -->
-        <dependency>
-            <groupId>com.craftpilot</groupId>
-            <artifactId>craft-pilot-commons</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
-        </dependency>
     </dependencies>
 
     <dependencyManagement>

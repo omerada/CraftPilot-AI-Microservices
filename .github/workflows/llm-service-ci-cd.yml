@@ -7,6 +7,11 @@ on:
       - "llm-service/**"
       - "craft-pilot-commons/**"
       - ".github/workflows/llm-service-ci-cd.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "llm-service/**"
+      - "craft-pilot-commons/**"
   workflow_dispatch:
     inputs:
       environment:
@@ -17,11 +22,6 @@ on:
         options:
           - prod
           - debug
-  pull_request:
-    branches: [master]
-    paths:
-      - "llm-service/**"
-      - "craft-pilot-commons/**"
 
 jobs:
   build-and-deploy:
