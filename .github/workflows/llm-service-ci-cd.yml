@@ -44,17 +44,19 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
-      - name: Grant execute permission for mvn
+      - name: Grant execute permission for Maven wrapper
         run: |
           cd llm-service
-          chmod +x mvn
+          if [ -f "mvnw" ]; then chmod +x mvnw; fi
+          cd ../craft-pilot-commons
+          if [ -f "mvnw" ]; then chmod +x mvnw; fi
 
       - name: Build commons library and llm-service
         run: |
           cd craft-pilot-commons
-          ./mvn clean install -DskipTests
+          mvn clean install -DskipTests
           cd ../llm-service
-          ./mvn clean package -DskipTests
+          mvn clean package -DskipTests
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
