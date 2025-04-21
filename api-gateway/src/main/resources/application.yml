@@ -95,6 +95,21 @@ spring:
                 value: "true"
             - StripPrefix=1
 
+        - id: activity-log-service
+          uri: lb://activity-log-service
+          predicates:
+            - Path=/activity-logs/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: activityLogServiceCircuitBreaker
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 30
+                redis-rate-limiter.burstCapacity: 60
+                key-resolver: "#{@ipKeyResolver}"
+
         - id: image-service
           uri: lb://image-service
           predicates:
