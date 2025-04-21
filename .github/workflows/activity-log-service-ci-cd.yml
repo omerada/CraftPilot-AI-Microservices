@@ -50,9 +50,11 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./activity-log-service
-          platforms: linux/arm64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:buildcache,mode=max
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
