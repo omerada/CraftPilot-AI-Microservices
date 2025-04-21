@@ -76,3 +76,23 @@ kafka:
 pagination:
   default-page-size: 20
   max-page-size: 100
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+    instance-info-replication-interval-seconds: 10
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
+    hostname: ${HOSTNAME:activity-log-service}
+    lease-renewal-interval-in-seconds: 10
+    health-check-url-path: /actuator/health
+    status-page-url-path: /actuator/info
+    home-page-url: http://${eureka.instance.hostname}:${server.port}/
+    instance-id: ${spring.application.name}:${server.port}:${random.uuid}
+    metadata-map:
+      management:
+        context-path: /actuator

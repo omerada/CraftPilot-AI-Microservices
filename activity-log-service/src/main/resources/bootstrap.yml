@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: activity-log-service
+  cloud:
+    config:
+      enabled: false
+      discovery:
+        enabled: false
+    discovery:
+      enabled: true
+      client:
+        composite-indicator:
+          enabled: false
