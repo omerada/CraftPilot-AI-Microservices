@@ -1,0 +1,22 @@
+# Build stage
+FROM maven:3.9.6-eclipse-temurin-17 AS build
+
+WORKDIR /build
+COPY pom.xml .
+COPY src ./src
+
+# Maven build
+RUN mvn clean package -DskipTests
+
+# Run stage
+FROM eclipse-temurin:17-jdk
+
+WORKDIR /app
+COPY --from=build /build/target/*.jar app.jar
+
+# JVM settings
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
+
+EXPOSE 8095
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]
