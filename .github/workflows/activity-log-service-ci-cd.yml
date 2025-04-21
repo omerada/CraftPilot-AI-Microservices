@@ -47,6 +47,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and Push Docker image
+        id: docker_build
         uses: docker/build-push-action@v4
         with:
           context: ./activity-log-service
@@ -56,14 +57,23 @@ jobs:
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:buildcache,mode=max
 
+      - name: Verify Docker build status
+        run: |
+          echo "Docker build and push completed with digest ${{ steps.docker_build.outputs.digest }}"
+          if [ -z "${{ steps.docker_build.outputs.digest }}" ]; then
+            echo "Docker build failed to produce a digest output"
+            exit 1
+          fi
+
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
           script: |
-
+            echo "Starting deployment of Activity Log Service..."
             # Deploy Activity Log Service
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
             docker stop activity-log-service || true
