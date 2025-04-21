@@ -78,16 +78,38 @@ jobs:
         run: |
           # Create a temporary directory for build context
           mkdir -p /tmp/docker-build-context
-          # Copy craft-pilot-commons to build context directory
-          cp -r craft-pilot-commons /tmp/docker-build-context/
-          # Copy llm-service to build context directory
+
+          # Check source directories and files
+          echo "Current directory: $(pwd)"
+          echo "Checking llm-service directory:"
+          ls -la llm-service/
+
+          # Ensure llm-service and craft-pilot-commons directories exist
+          if [ ! -d "llm-service" ]; then
+            echo "ERROR: llm-service directory not found"
+            exit 1
+          fi
+
+          if [ ! -d "craft-pilot-commons" ]; then
+            echo "ERROR: craft-pilot-commons directory not found"
+            exit 1
+          fi
+
+          # Copy both directories to build context
           cp -r llm-service /tmp/docker-build-context/
+          cp -r craft-pilot-commons /tmp/docker-build-context/
+
+          # Verify build context contents
+          echo "Checking build context:"
+          ls -la /tmp/docker-build-context/
+          echo "Checking llm-service directory in build context:"
+          ls -la /tmp/docker-build-context/llm-service/
 
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
           context: /tmp/docker-build-context
-          dockerfile: /tmp/docker-build-context/llm-service/Dockerfile
+          dockerfile: llm-service/Dockerfile # Dockerfile'ı göreli yol kullanarak belirt
           platforms: linux/arm64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
