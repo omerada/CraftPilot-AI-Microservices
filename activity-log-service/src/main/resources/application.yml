@@ -1,0 +1,73 @@
+server:
+  port: 8095
+  compression:
+    enabled: true
+    mime-types: application/json,text/plain
+    min-response-size: 1024
+  shutdown: graceful
+
+spring:
+  application:
+    name: activity-log-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+    include: kafka-base
+  cloud:
+    gcp:
+      project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
+      credentials:
+        location: file:${GOOGLE_APPLICATION_CREDENTIALS:/app/credentials/gcp-credentials.json}
+      firestore:
+        enabled: true
+        project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
+        emulator:
+          enabled: ${FIRESTORE_EMULATOR_ENABLED:false}
+          host: ${FIRESTORE_EMULATOR_HOST:localhost:8081}
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+    date-format: com.fasterxml.jackson.databind.util.ISO8601DateFormat
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
+  level:
+    root: INFO
+    com.craftpilot: DEBUG
+    org.springframework.web: INFO
+    org.springframework.kafka: INFO
+    com.google.cloud.firestore: INFO
+
+kafka:
+  topics:
+    user-activity: user-activity
+  consumer:
+    group-id: ${spring.application.name}-group
+    concurrency: 3
+    auto-offset-reset: earliest
+    max-poll-records: 100
+
+pagination:
+  default-page-size: 20
+  max-page-size: 100
