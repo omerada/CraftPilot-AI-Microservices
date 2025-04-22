@@ -52,11 +52,12 @@ public class LightSecurityConfig {
             ServerHttpRequest request = exchange.getRequest();
             String path = request.getPath().value();
             
-            log.debug("İstek geldi: {} {}", request.getMethod(), path);
-            
+      
             if (isPublicPath(path)) {
                 return chain.filter(exchange);
             }
+
+                  log.debug("İstek geldi: {} {}", request.getMethod(), path); 
             
             // Debug için tüm headerları yazdıralım
             request.getHeaders().forEach((key, values) -> 
