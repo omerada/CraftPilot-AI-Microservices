@@ -2,54 +2,51 @@ spring:
   application:
     name: user-service
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:prod}
+    active: ${SPRING_PROFILES_ACTIVE:dev}
     include: kafka-base
-  autoconfigure:
-    exclude:
-      - org.redisson.spring.starter.RedissonAutoConfiguration
-      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
-      - org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration
-  main:
-    allow-bean-definition-overriding: true
-    log-startup-info: true
   data:
     redis:
-      repositories:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:13579ada}
+      connect-timeout: 30000 # Increased timeout
+      timeout: 30000 # Increased timeout
+      client-type: lettuce
+      ssl:
         enabled: false
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2
+          max-wait: 30000ms # Added explicit max wait
+        shutdown-timeout: 5000ms
+        cluster:
+          refresh:
+            adaptive: true
+            period: 30s
+      retry:
+        max-attempts: 3
+        initial-interval: 1000
+        max-interval: 3000
+        multiplier: 2.0
+
   firebase:
     config:
       path: ${FIREBASE_CONFIG_PATH:/etc/gcp/credentials/gcp-credentials.json}
-  kafka:
-    admin:
-      fail-fast: false
-      properties:
-        request.timeout.ms: ${KAFKA_ADMIN_REQUEST_TIMEOUT_MS:45000}
-        default.api.timeout.ms: ${KAFKA_ADMIN_DEFAULT_API_TIMEOUT_MS:60000}
-        admin.metadata.max.age.ms: 180000
-        retry.backoff.ms: 1000
-        retries: 3
-  cache:
-    type: caffeine
-    caffeine:
-      spec: maximumSize=1000,expireAfterWrite=60s
 
 eureka:
   instance:
     prefer-ip-address: true
-    lease-renewal-interval-in-seconds: 5
-    lease-expiration-duration-in-seconds: 10
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
     instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
     metadata-map:
       user.name: ${eureka.client.security.user.name:craftpilot}
       user.password: ${eureka.client.security.user.password:13579ada}
-      startup: ${random.uuid}
-      management.context-path: /actuator
-    health-check-url-path: /actuator/health
-    status-page-url-path: /actuator/info
-    home-page-url: http://${eureka.instance.hostname}:${server.port}/
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_SERVER_URL:http://craftpilot:13579ada@eureka-server:8761/eureka/}
+      defaultZone: http://${eureka.client.security.user.name:craftpilot}:${eureka.client.security.user.password:13579ada}@${EUREKA_HOST:eureka-server}:${EUREKA_PORT:8761}/eureka/
     register-with-eureka: ${EUREKA_REGISTER:true}
     fetch-registry: ${EUREKA_FETCH:true}
     enabled: ${EUREKA_ENABLED:true}
@@ -58,9 +55,7 @@ eureka:
     refresh:
       enable: true
     shouldDisableDelta: true
-    registry-fetch-interval-seconds: 5
-    initial-instance-info-replication-interval-seconds: 5
-    instance-info-replication-interval-seconds: 5
+    registry-fetch-interval-seconds: 30
     security:
       user:
         name: ${EUREKA_USERNAME:craftpilot}
@@ -73,7 +68,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: "*"
+        include: health,metrics,prometheus,info,loggers
       base-path: /actuator
   endpoint:
     health:
@@ -82,11 +77,11 @@ management:
         enabled: true
       group:
         readiness:
-          include: "redis,diskSpace,ping,refreshScope"
+          include: redis,diskSpace
           show-details: always
         liveness:
-          include: "ping"
-          show-details: never
+          include: ping
+          show-details: always
   health:
     redis:
       enabled: true
@@ -99,8 +94,7 @@ management:
     circuitbreakers:
       enabled: true
     kafka:
-      enabled: false
-    validate-group-membership: false
+      enabled: false # Disable Kafka health check temporarily
 
 springdoc:
   api-docs:
@@ -110,56 +104,31 @@ springdoc:
 
 resilience4j:
   circuitbreaker:
-    configs:
-      default:
-        slidingWindowSize: 10
-        failureRateThreshold: 50
-        waitDurationInOpenState: 10s # 30s yerine 10s
-        permittedNumberOfCallsInHalfOpenState: 3
-        automaticTransitionFromOpenToHalfOpenEnabled: true
     instances:
       userPreferences:
-        baseConfig: default
-        slidingWindowSize: 8
-        waitDurationInOpenState: 5s # Daha hızlı toparlanması için
-      userRedis: # UserService için özel Redis devre kesici
-        baseConfig: default
-      redisCircuitBreaker: # Kütüphane için ortak Redis devre kesici
-        slidingWindowType: COUNT_BASED
         slidingWindowSize: 10
         failureRateThreshold: 50
-        waitDurationInOpenState: 5s
-        permittedNumberOfCallsInHalfOpenState: 3
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 5
+        registerHealthIndicator: true
+        allowHealthIndicatorToFail: true
+        automaticTransitionFromOpenToHalfOpenEnabled: true
         recordExceptions:
-          - java.util.concurrent.TimeoutException
-          - java.io.IOException
+          - java.lang.Exception
   retry:
     instances:
       userPreferences:
-        maxAttempts: 2
-        waitDuration: 500ms
-      redis:
-        maxAttempts: 2
-        waitDuration: 250ms
+        maxAttempts: 3
+        waitDuration: 1000ms
         retryExceptions:
-          - java.util.concurrent.TimeoutException
-          - java.io.IOException
+          - java.lang.Exception
   timelimiter:
     instances:
       userPreferences:
-        timeoutDuration: 3s
+        timeoutDuration: 5s
         cancelRunningFuture: true
 
 kafka:
-  producer:
-    timeout: 5
-    enabled: true
-  retry:
-    backoff:
-      initial-interval: 1000
-      max-interval: 10000
-      multiplier: 2.0
-    max-attempts: 3
   topics:
     user-preferences: user-preferences
     user-events: user-events
@@ -168,55 +137,6 @@ kafka:
 logging:
   level:
     root: INFO
-    com.craftpilot: DEBUG
     com.craftpilot.userservice: DEBUG
-    com.craftpilot.redis: INFO # DEBUG yerine INFO seviyesi
     org.springframework.data.redis: DEBUG
     org.springframework.boot.actuate: DEBUG
-    org.springframework.web: INFO
-    io.lettuce: INFO # DEBUG yerine INFO seviyesi
-
-craftpilot:
-  redis:
-    host: ${REDIS_HOST:redis}
-    port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:13579ada}
-    database: 0
-    connect-timeout: 1000ms # 2000ms'den 1000ms'e düşürüldü
-    timeout: 800ms # 1000ms'den 800ms'e düşürüldü
-    cache-ttl-hours: 24
-    pool-max-active: 16 # 32'den 16'ya düşürüldü - daha verimli
-    pool-max-idle: 8 # 16'dan 8'e düşürüldü
-    pool-min-idle: 4 # 8'den 4'e düşürüldü
-    pool-max-wait: 500ms # 1000ms'den 500ms'e düşürüldü
-    circuit-breaker-enabled: true
-    circuit-breaker-failure-rate-threshold: 50.0
-    circuit-breaker-wait-duration-in-open-state: 10s # 30s yerine 10s
-    circuit-breaker-permitted-calls-in-half-open-state: 3
-    circuit-breaker-minimum-number-of-calls: 3
-    retry-enabled: true
-    max-retry-attempts: 2
-    retry-wait-duration: 250ms # 500ms'den 250ms'e düşürüldü
-    health-indicator-enabled: true
-
-spring.data.redis:
-  connect-timeout: 2000ms
-  timeout: 1000ms
-  lettuce:
-    pool:
-      max-active: 8
-      max-idle: 8
-      min-idle: 2
-      max-wait: 1000ms
-    shutdown-timeout: 200ms
-
-spring.cloud.loadbalancer.cache:
-  caffeine:
-    spec: maximumSize=500,expireAfterWrite=5s
-  ttl: 5s
-  enabled: true
-
-# Kullanıcı tercihleri operasyon timeout değeri
-user-preference:
-  operation:
-    timeout: 1000 # 1 saniye timeout
