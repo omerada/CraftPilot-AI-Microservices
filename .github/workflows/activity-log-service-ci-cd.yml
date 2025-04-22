@@ -7,6 +7,15 @@ on:
       - "activity-log-service/**"
       - ".github/workflows/activity-log-service-ci-cd.yml"
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy to"
+        required: true
+        default: "prod"
+        type: choice
+        options:
+          - prod
+          - debug
 
 jobs:
   build-and-deploy:
@@ -71,34 +80,67 @@ jobs:
             docker stop activity-log-service || true
             docker rm activity-log-service || true
 
-            # Basitleştirilmiş container yapılandırması
-            docker run -d \
-              --name activity-log-service \
-              --network craftpilot-network \
-              --restart unless-stopped \
-              -p 8095:8095 \
-              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
-              -e SPRING_PROFILES_ACTIVE=prod \
-              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e HOSTNAME=activity-log-service \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
-              -e SPRING_SECURITY_USER_NAME=craftpilot \
-              -e SPRING_SECURITY_USER_PASSWORD=13579ada \
-              -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
-              -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
-              -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*" \
-              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-              -e "JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom" \
-              --health-cmd="curl -f http://localhost:8095/actuator/health || exit 1" \
-              --health-interval=30s \
-              --health-timeout=10s \
-              --health-retries=3 \
-              --health-start-period=60s \
-              ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
+            # Debug ve prod modları için farklı container yapılandırması
+            if [[ "${{ github.event.inputs.environment }}" == "debug" ]]; then
+              # Debug modu container yapılandırması
+              docker run -d \
+                --name activity-log-service \
+                --network craftpilot-network \
+                --restart unless-stopped \
+                -p 8095:8095 \
+                -p 5010:5010 \
+                -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e HOSTNAME=activity-log-service \
+                -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+                -e SPRING_SECURITY_USER_NAME=craftpilot \
+                -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+                -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
+                -e REDIS_HOST=redis \
+                -e REDIS_PORT=6379 \
+                -e REDIS_PASSWORD=13579ada \
+                -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
+                -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*" \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e "JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5010" \
+                --health-cmd="curl -f http://localhost:8095/actuator/health || exit 1" \
+                --health-interval=30s \
+                --health-timeout=10s \
+                --health-retries=3 \
+                --health-start-period=60s \
+                ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
+            else
+              # Prod modu container yapılandırması
+              docker run -d \
+                --name activity-log-service \
+                --network craftpilot-network \
+                --restart unless-stopped \
+                -p 8095:8095 \
+                -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e HOSTNAME=activity-log-service \
+                -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
+                -e SPRING_SECURITY_USER_NAME=craftpilot \
+                -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+                -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
+                -e REDIS_HOST=redis \
+                -e REDIS_PORT=6379 \
+                -e REDIS_PASSWORD=13579ada \
+                -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
+                -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*" \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e "JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom" \
+                --health-cmd="curl -f http://localhost:8095/actuator/health || exit 1" \
+                --health-interval=30s \
+                --health-timeout=10s \
+                --health-retries=3 \
+                --health-start-period=60s \
+                ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
+            fi
 
             echo "=== Waiting for service startup ==="
             max_attempts=15
