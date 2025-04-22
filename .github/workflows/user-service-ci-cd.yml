@@ -109,7 +109,13 @@ jobs:
           script: |
             echo "Starting deployment of User Service..."
 
-            # Kafka ve Redis durumunu kontrol et
+            # Credentials dosyası için izinleri ayarla
+            sudo mkdir -p /opt/craftpilot/gcp
+            sudo cp /opt/craftpilot/gcp-credentials.json /opt/craftpilot/gcp/
+            sudo chown -R 1001:1001 /opt/craftpilot/gcp
+            sudo chmod 640 /opt/craftpilot/gcp/gcp-credentials.json
+
+            # Kafka ve Redis kontrolü
             if ! docker exec -t kafka kafka-topics --bootstrap-server localhost:9092 --list > /dev/null; then
               echo "Kafka is not available! Waiting for it to start..."
               sleep 30
@@ -143,21 +149,21 @@ jobs:
 
             # Debug ve prod modları için farklı container yapılandırması
             if [[ "${{ github.event.inputs.environment }}" == "debug" ]]; then
-              # Debug modu container yapılandırması
               docker run -d \
                 --name user-service \
                 --network craftpilot-network \
                 --restart unless-stopped \
                 -p 8060:8060 \
                 -p 5005:5005 \
-                -v /opt/craftpilot/gcp-credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
+                -v /opt/craftpilot/gcp:/gcp:ro \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
                 -e KAFKA_CLIENT_ID=user-service \
                 -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
                 -e HOSTNAME=user-service \
-                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
-                -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
+                -e GOOGLE_APPLICATION_CREDENTIALS=/gcp/gcp-credentials.json \
+                -e FIREBASE_CONFIG_PATH=/gcp/gcp-credentials.json \
+                -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/gcp/gcp-credentials.json \
                 -e SPRING_SECURITY_USER_NAME=craftpilot \
                 -e SPRING_SECURITY_USER_PASSWORD=13579ada \
                 -e REDIS_HOST=redis \
@@ -168,6 +174,7 @@ jobs:
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
                 -e SPRING_KAFKA_ADMIN_AUTO_CREATE=false \
                 -e "JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005" \
+                --user 1001:1001 \
                 --health-cmd="curl -f http://localhost:8060/actuator/health || exit 1" \
                 --health-interval=30s \
                 --health-timeout=10s \
@@ -175,20 +182,20 @@ jobs:
                 --health-start-period=90s \
                 ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
             else
-              # Prod modu container yapılandırması
               docker run -d \
                 --name user-service \
                 --network craftpilot-network \
                 --restart unless-stopped \
                 -p 8060:8060 \
-                -v /opt/craftpilot/gcp-credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
+                -v /opt/craftpilot/gcp:/gcp:ro \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
                 -e KAFKA_CLIENT_ID=user-service \
                 -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
                 -e HOSTNAME=user-service \
-                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
-                -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
+                -e GOOGLE_APPLICATION_CREDENTIALS=/gcp/gcp-credentials.json \
+                -e FIREBASE_CONFIG_PATH=/gcp/gcp-credentials.json \
+                -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/gcp/gcp-credentials.json \
                 -e SPRING_SECURITY_USER_NAME=craftpilot \
                 -e SPRING_SECURITY_USER_PASSWORD=13579ada \
                 -e REDIS_HOST=redis \
@@ -199,6 +206,7 @@ jobs:
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
                 -e SPRING_KAFKA_ADMIN_AUTO_CREATE=false \
                 -e "JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom" \
+                --user 1001:1001 \
                 --health-cmd="curl -f http://localhost:8060/actuator/health || exit 1" \
                 --health-interval=30s \
                 --health-timeout=10s \
