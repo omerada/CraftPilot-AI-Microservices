@@ -39,13 +39,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: List repository contents
+        run: |
+          echo "Working Directory: $(pwd)"
+          echo "Repository Contents:"
+          ls -la .
+          echo "Infrastructure Directory:"
+          ls -la ./infrastructure || echo "Infrastructure directory not found"
+
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true
           command_timeout: "10m"
           script: |
             echo "==== Altyapı Servisleri Yönetimi Başlatılıyor ===="
@@ -61,15 +68,17 @@ jobs:
               cp docker-compose.infra.yml docker-compose.infra.yml.bak.$(date +%Y%m%d%H%M%S)
             fi
 
-            # Repository'den en güncel docker-compose.infra.yml dosyasını kopyala
-            if [ ! -f "${{ github.workspace }}/infrastructure/docker-compose.infra.yml" ]; then
-              echo "HATA: docker-compose.infra.yml dosyası bulunamadı!"
-              echo "Dosya yolu: ${{ github.workspace }}/infrastructure/docker-compose.infra.yml"
-              ls -la ${{ github.workspace }}
+            # GitHub repository'den doğrudan docker-compose dosyasını indir
+            echo "Docker compose dosyası indiriliyor..."
+            curl -s -H "Accept: application/vnd.github.v3.raw" \
+              -o docker-compose.infra.yml \
+              -L "https://raw.githubusercontent.com/OmerSah/Craft-Pilot-Ai/main/infrastructure/docker-compose.infra.yml"
+
+            # Dosyanın indirilip indirilmediğini kontrol et
+            if [ ! -f docker-compose.infra.yml ]; then
+              echo "HATA: docker-compose.infra.yml dosyası indirilemedi!"
               exit 1
             fi
-
-            cp ${{ github.workspace }}/infrastructure/docker-compose.infra.yml docker-compose.infra.yml
 
             ACTION="${{ github.event.inputs.action }}"
             SERVICE="${{ github.event.inputs.service }}"
