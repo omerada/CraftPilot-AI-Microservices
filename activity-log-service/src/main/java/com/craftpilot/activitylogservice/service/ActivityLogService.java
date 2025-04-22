@@ -15,6 +15,7 @@ import reactor.core.publisher.Mono;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -46,10 +47,11 @@ public class ActivityLogService {
 
     public Mono<ActivityLog> processEvent(ActivityEvent event) {
         return Mono.just(event)
-            .doOnNext(e -> log.debug("Processing activity event: userId={}, actionType={}", e.getUserId(), e.getActionType()))
-            .filter(ActivityEvent::isValid)
+            .doOnNext(e -> log.info("Processing activity event: userId={}, actionType={}, metadata={}", 
+                    e.getUserId(), e.getActionType(), e.getMetadata()))
+            .filter(this::validateEvent)
             .switchIfEmpty(Mono.error(new ValidationException("Invalid activity event")))
-            .map(ActivityLog::fromEvent)
+            .map(this::convertToActivityLog)
             .flatMap(activityLogRepository::save)
             .doOnSuccess(savedLog -> {
                 log.info("Activity logged: userId={}, actionType={}, id={}", 
@@ -58,10 +60,24 @@ public class ActivityLogService {
                     "actionType", savedLog.getActionType(), 
                     "userId", savedLog.getUserId()).increment();
             })
-            .doOnError(error -> log.error("Failed to process activity event: {}", error.getMessage()))
+            .doOnError(error -> log.error("Failed to process activity event: {}", error.getMessage(), error))
             .name("processEvent")
             .tag("source", "kafka")
             .metrics();
+    }
+    
+    private boolean validateEvent(ActivityEvent event) {
+        boolean isValid = event.isValid();
+        if (!isValid) {
+            log.error("Invalid activity event received: {}", event);
+        }
+        return isValid;
+    }
+    
+    private ActivityLog convertToActivityLog(ActivityEvent event) {
+        ActivityLog log = ActivityLog.fromEvent(event);
+        log.setId(UUID.randomUUID().toString()); // Ensure ID is set
+        return log;
     }
 
     public Mono<PageResponse<ActivityLog>> getLogs(

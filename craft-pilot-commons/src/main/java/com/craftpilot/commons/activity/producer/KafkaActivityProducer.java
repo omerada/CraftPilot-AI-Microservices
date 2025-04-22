@@ -23,16 +23,22 @@ public class KafkaActivityProducer implements ActivityProducer {
             return Mono.error(new IllegalArgumentException("Invalid activity event"));
         }
         
-        return Mono.fromRunnable(() -> {
+        return Mono.create(sink -> {
             String key = event.getUserId() + "-" + System.currentTimeMillis();
-            log.debug("Sending activity event to topic {}: {}", topic, event);
+            log.info("Sending activity event to topic {}: userId={}, actionType={}, metadata={}",
+                   topic, event.getUserId(), event.getActionType(), event.getMetadata());
             
             kafkaTemplate.send(topic, key, event)
                 .whenComplete((result, ex) -> {
                     if (ex != null) {
-                        log.error("Failed to send activity event: {}", ex.getMessage());
+                        log.error("Failed to send activity event: {}", ex.getMessage(), ex);
+                        sink.error(ex);
                     } else {
-                        log.debug("Activity event sent successfully");
+                        log.info("Activity event sent successfully to topic: {}, partition: {}, offset: {}",
+                               result.getRecordMetadata().topic(),
+                               result.getRecordMetadata().partition(),
+                               result.getRecordMetadata().offset());
+                        sink.success();
                     }
                 });
         });

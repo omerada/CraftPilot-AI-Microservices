@@ -39,9 +39,10 @@ public class KafkaConfig {
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, autoOffsetReset);
-        props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.craftpilot.activitylogservice.model");
-        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "com.craftpilot.activitylogservice.model.ActivityEvent");
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.craftpilot.*");  // Paket kapsamını genişlet
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "com.craftpilot.commons.activity.model.ActivityEvent");  // Doğru sınıf yolunu belirt
 
+        log.info("Configuring Kafka receiver for topic: {} with bootstrap servers: {}", activityTopic, bootstrapServers);
         return ReceiverOptions.<String, ActivityEvent>create(props)
                 .subscription(Collections.singleton(activityTopic));
     }

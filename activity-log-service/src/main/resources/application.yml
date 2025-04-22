@@ -66,7 +66,7 @@ logging:
 
 kafka:
   topics:
-    user-activity: user-activity
+    user-activity: activity-events # Bu değer "user-activity" idi, "activity-events" olarak değiştirilmeli
   consumer:
     group-id: ${spring.application.name}-group
     concurrency: 3

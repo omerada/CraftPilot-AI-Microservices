@@ -14,6 +14,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 @Repository
@@ -32,16 +33,23 @@ public class ActivityLogRepository {
     }
 
     public Mono<ActivityLog> save(ActivityLog activityLog) {
-        log.debug("Saving activity log: {}", activityLog);
+        log.info("Saving activity log: userId={}, actionType={}, id={}",
+                activityLog.getUserId(), activityLog.getActionType(), activityLog.getId());
+        
+        // ID yoksa oluştur
+        if (activityLog.getId() == null || activityLog.getId().trim().isEmpty()) {
+            activityLog.setId(UUID.randomUUID().toString());
+        }
         
         ApiFuture<WriteResult> future = getCollection()
                 .document(activityLog.getId())
                 .set(activityLog);
         
         return Mono.fromFuture(toCompletableFuture(future))
-                .thenReturn(activityLog)
-                .doOnSuccess(saved -> log.debug("Successfully saved activity log with ID: {}", saved.getId()))
-                .doOnError(error -> log.error("Failed to save activity log: {}", error.getMessage()));
+                .doOnSuccess(writeResult -> log.info("Successfully saved activity log with ID: {}, write time: {}", 
+                        activityLog.getId(), writeResult.getUpdateTime()))
+                .doOnError(error -> log.error("Failed to save activity log: {}", error.getMessage(), error))
+                .thenReturn(activityLog);
     }
 
     public Mono<ActivityLog> findById(String id) {

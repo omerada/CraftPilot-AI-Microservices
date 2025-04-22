@@ -36,10 +36,12 @@ public class ActivityEventListener {
         log.info("Starting Kafka consumer with concurrency: {}", concurrency);
         
         receiver.receive()
-            .doOnNext(record -> log.debug("Received activity event: key={}, topic={}, partition={}, offset={}",
-                record.key(), record.topic(), record.partition(), record.offset()))
+            .doOnNext(record -> {
+                log.info("Received activity event: key={}, topic={}, partition={}, offset={}, value={}",
+                    record.key(), record.topic(), record.partition(), record.offset(), record.value());
+            })
             .flatMap(this::processRecord, concurrency)
-            .doOnError(error -> log.error("Error processing Kafka record: {}", error.getMessage()))
+            .doOnError(error -> log.error("Error processing Kafka record: {}", error.getMessage(), error))
             .retryWhen(Retry.backoff(3, Duration.ofSeconds(1))
                     .maxBackoff(Duration.ofSeconds(10))
                     .jitter(0.5))
@@ -47,13 +49,23 @@ public class ActivityEventListener {
                 log.error("Error processing Kafka event: {}", error.getMessage(), error);
                 return Mono.empty();
             })
-            .subscribe();
+            .subscribe(
+                success -> {}, 
+                error -> log.error("Fatal error in Kafka consumer: {}", error.getMessage(), error),
+                () -> log.error("Kafka consumer completed unexpectedly")
+            );
+        
+        log.info("Kafka consumer started successfully");
     }
-    
+
     private Mono<Void> processRecord(ReceiverRecord<String, ActivityEvent> record) {
+        log.info("Processing activity event: {}", record.value());
         return activityLogService.processEvent(record.value())
-            .doOnSuccess(result -> record.receiverOffset().acknowledge())
-            .doOnError(error -> log.error("Failed to process activity event: {}", error.getMessage()))
+            .doOnSuccess(result -> {
+                record.receiverOffset().acknowledge();
+                log.info("Successfully processed and acknowledged activity event");
+            })
+            .doOnError(error -> log.error("Failed to process activity event: {}", error.getMessage(), error))
             .then();
     }
 }
