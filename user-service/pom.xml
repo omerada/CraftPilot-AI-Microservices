@@ -175,6 +175,12 @@
             <artifactId>resilience4j-spring-boot3</artifactId>
         </dependency>
 
+		<!-- Spring Data Commons for ReactiveCrudRepository -->
+        <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-commons</artifactId>
+        </dependency>
+
 		<!-- Test -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
