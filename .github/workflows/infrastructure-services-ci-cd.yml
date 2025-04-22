@@ -65,10 +65,11 @@ jobs:
 
             cd /opt/craftpilot/infrastructure || exit 1
 
+            # Docker ağını oluştur
+            docker network create craftpilot-network || true
+
             # Docker compose dosyasını oluştur
             cat > docker-compose.infra.yml << 'EOL'
-            version: "3.8"
-
             services:
               zookeeper:
                 image: confluentinc/cp-zookeeper:7.3.0 
@@ -77,15 +78,21 @@ jobs:
                 environment:
                   ZOOKEEPER_CLIENT_PORT: 2181
                   ZOOKEEPER_TICK_TIME: 2000
+                  ZOOKEEPER_INIT_LIMIT: 5
+                  ZOOKEEPER_SYNC_LIMIT: 2
                 ports:
                   - "2181:2181"
                 volumes:
-                  - zookeeper-data:/var/lib/zookeeper/data
-                  - zookeeper-log:/var/lib/zookeeper/log
+                  - type: volume
+                    source: zookeeper-data
+                    target: /var/lib/zookeeper/data
+                  - type: volume
+                    source: zookeeper-log 
+                    target: /var/lib/zookeeper/log
                 networks:
                   - craftpilot-network
                 healthcheck:
-                  test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
+                  test: echo ruok | nc localhost 2181 | grep imok
                   interval: 10s
                   timeout: 5s
                   retries: 5
@@ -96,8 +103,7 @@ jobs:
                 container_name: kafka
                 restart: unless-stopped
                 depends_on:
-                  zookeeper:
-                    condition: service_healthy
+                  - zookeeper
                 ports:
                   - "9092:9092"
                 environment:
@@ -108,12 +114,15 @@ jobs:
                   KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
                   KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
                   KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+                  KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
                 volumes:
-                  - kafka-data:/var/lib/kafka/data
+                  - type: volume
+                    source: kafka-data
+                    target: /var/lib/kafka/data
                 networks:
                   - craftpilot-network
                 healthcheck:
-                  test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
+                  test: kafka-topics --bootstrap-server localhost:9092 --list || exit 1
                   interval: 30s
                   timeout: 10s
                   retries: 3
@@ -124,15 +133,11 @@ jobs:
                 container_name: kafka-tools
                 restart: unless-stopped
                 depends_on:
-                  kafka:
-                    condition: service_healthy
-                entrypoint: /bin/bash
+                  - kafka
+                entrypoint: ["/bin/bash"]
                 tty: true
                 stdin_open: true
-                command: -c "echo 'Kafka CLI tools hazır.' && sleep infinity"
-                environment:
-                  KAFKA_BROKER_ID: ignored
-                  KAFKA_ZOOKEEPER_CONNECT: ignored
+                command: -c "echo 'Kafka CLI tools ready.' && sleep infinity"
                 networks:
                   - craftpilot-network
 
@@ -142,19 +147,15 @@ jobs:
                 restart: unless-stopped
                 ports:
                   - "6379:6379"
-                command: >
-                  --requirepass 13579ada
-                  --maxmemory 800mb
-                  --maxmemory-policy volatile-lru
-                  --appendonly yes
-                  --appendfsync everysec
-                  --no-appendfsync-on-rewrite yes
+                command: redis-server --requirepass 13579ada --maxmemory 800mb --maxmemory-policy volatile-lru --appendonly yes --appendfsync everysec --no-appendfsync-on-rewrite yes
                 volumes:
-                  - redis-data:/data
+                  - type: volume
+                    source: redis-data
+                    target: /data
                 networks:
                   - craftpilot-network
                 healthcheck:
-                  test: ["CMD", "redis-cli", "-a", "13579ada", "ping"]
+                  test: redis-cli -a 13579ada ping || exit 1
                   interval: 5s
                   timeout: 3s
                   retries: 3
@@ -169,7 +170,6 @@ jobs:
             networks:
               craftpilot-network:
                 external: true
-                name: craftpilot-network
             EOL
 
             # Dosya oluşturulduğunu kontrol et
