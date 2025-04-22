@@ -2,17 +2,19 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     producer:
-      retries: 3
-      acks: all
+      retries: 1
+      acks: 1
       batch-size: 16384
       buffer-memory: 33554432
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
-        enable.idempotence: true
-        max.in.flight.requests.per.connection: 1
-        request.timeout.ms: 30000
-        delivery.timeout.ms: 60000
+        # Güvenlik için idempotence devre dışı bırakıldı - daha az sistem yükü
+        enable.idempotence: false
+        max.block.ms: 3000
+        request.timeout.ms: 3000
+        delivery.timeout.ms: 5000
+        linger.ms: 10
     consumer:
       group-id: ${spring.application.name}-group
       auto-offset-reset: earliest
@@ -20,23 +22,13 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "com.craftpilot.*"
-        isolation.level: read_committed
         max.poll.records: 100
         heartbeat.interval.ms: 3000
         session.timeout.ms: 30000
         fetch.max.wait.ms: 500
-        request.timeout.ms: 45000
-        default.api.timeout.ms: 60000
     admin:
       auto-create: true
       fail-fast: false
-      properties:
-        bootstrap.servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
-        request.timeout.ms: 45000
-        default.api.timeout.ms: 60000
-        admin.metadata.max.age.ms: 180000
-        retries: 3
-        retry.backoff.ms: 1000
 
 kafka:
   topic:

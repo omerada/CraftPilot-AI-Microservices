@@ -5,11 +5,13 @@ on:
     branches: [master]
     paths:
       - "user-service/**"
+      - "redis-client-lib/**"
       - ".github/workflows/user-service-ci-cd.yml"
   pull_request:
     branches: [master]
     paths:
       - "user-service/**"
+      - "redis-client-lib/**"
   workflow_dispatch:
     inputs:
       environment:
@@ -47,10 +49,18 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           logout: true
 
+      - name: Copy user-service files for context
+        run: |
+          mkdir -p /tmp/build-context
+          cp -r ../redis-client-lib /tmp/build-context/
+          cp -r . /tmp/build-context/user-service
+        working-directory: ./user-service
+
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: ./user-service
+          context: /tmp/build-context
+          file: /tmp/build-context/user-service/Dockerfile
           platforms: linux/arm64
           push: true
           tags: |
