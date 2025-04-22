@@ -2,10 +2,9 @@ spring:
   application:
     name: user-service
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:dev}
+    active: ${SPRING_PROFILES_ACTIVE:prod}
     include: kafka-base
   autoconfigure:
-    # Spring Boot'un kendi Redis ve Redisson yapılandırmalarını devre dışı bırakıyoruz
     exclude:
       - org.redisson.spring.starter.RedissonAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
@@ -13,7 +12,6 @@ spring:
   main:
     allow-bean-definition-overriding: true
     log-startup-info: true
-  # Spring Redis yapılandırmasını devre dışı bırakıyoruz - redis-client-lib kullanacağız
   data:
     redis:
       repositories:

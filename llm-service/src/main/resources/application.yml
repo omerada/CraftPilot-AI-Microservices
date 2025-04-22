@@ -28,7 +28,7 @@ spring:
   application:
     name: llm-service
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:dev}
+    active: ${SPRING_PROFILES_ACTIVE:prod}
     # Kafka profilini isteğe bağlı hale getir
     include: ${KAFKA_ENABLED:false} ? kafka-base
   main:

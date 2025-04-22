@@ -12,7 +12,7 @@ spring:
   application:
     name: notification-service
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:dev}
+    active: ${SPRING_PROFILES_ACTIVE:prod}
     include: kafka-base
   sendgrid:
     api-key: ${SPRING_SENDGRID_API_KEY}

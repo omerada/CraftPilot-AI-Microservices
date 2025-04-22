@@ -10,7 +10,7 @@ spring:
   application:
     name: image-service
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:dev}
+    active: ${SPRING_PROFILES_ACTIVE:prod}
     include: kafka-base-base
   cache:
     type: redis
