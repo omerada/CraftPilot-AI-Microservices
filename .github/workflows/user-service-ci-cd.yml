@@ -41,6 +41,23 @@ jobs:
           cd user-service
           mvn clean package -DskipTests
 
+      - name: Prepare build context
+        run: |
+          # Create a temporary directory for build context
+          mkdir -p /tmp/user-service-build-context
+
+          # Check source directory
+          echo "Current directory: $(pwd)"
+          echo "Checking user-service directory:"
+          ls -la user-service/
+
+          # Copy required files to the build context
+          cp -r user-service/* /tmp/user-service-build-context/
+
+          # Verify build context contents
+          echo "Checking build context:"
+          ls -la /tmp/user-service-build-context/
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
         with:
@@ -59,7 +76,7 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v4
         with:
-          context: ./user-service
+          context: /tmp/user-service-build-context
           platforms: linux/arm64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
