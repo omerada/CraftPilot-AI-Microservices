@@ -68,8 +68,18 @@ jobs:
             # Docker ağını oluştur
             docker network create craftpilot-network || true
 
+            # Önceki container'ları temizle
+            echo "==== Eski container'ları temizleme ===="
+            docker-compose -f docker-compose.infra.yml down --volumes --remove-orphans || true
+            docker system prune -f
+
+            # İlgili volume'ları temizle
+            echo "==== Volume'ları temizleme ===="
+            docker volume rm zookeeper-data zookeeper-log kafka-data redis-data || true
+
             # Docker compose dosyasını oluştur
             cat > docker-compose.infra.yml << 'EOL'
+            version: '3.8'
             services:
               zookeeper:
                 image: confluentinc/cp-zookeeper:7.3.0 
@@ -92,11 +102,16 @@ jobs:
                 networks:
                   - craftpilot-network
                 healthcheck:
-                  test: echo ruok | nc localhost 2181 | grep imok
+                  test: echo stat | nc localhost 2181 || exit 1
                   interval: 10s
                   timeout: 5s
                   retries: 5
                   start_period: 30s
+                logging:
+                  driver: "json-file"
+                  options:
+                    max-size: "50m"
+                    max-file: "3"
 
               kafka:
                 image: confluentinc/cp-kafka:7.3.0
@@ -206,6 +221,52 @@ jobs:
 
             if ! command -v docker-compose >/dev/null 2>&1; then
               echo "HATA: docker-compose bulunamadı!"
+              exit 1
+            fi
+
+            # Docker daemon'ın çalıştığından emin ol ve yeniden başlatmayı dene
+            if ! systemctl is-active --quiet docker; then
+              echo "Docker servisi yeniden başlatılıyor..."
+              sudo systemctl restart docker
+              sleep 10
+            fi
+
+            # Retry mekanizması ekle
+            retry_count=0
+            max_retries=3
+
+            while [ $retry_count -lt $max_retries ]; do
+              case "$ACTION" in
+                deploy|restart|start)
+                  echo "==== Servisler başlatılıyor (Deneme $((retry_count + 1))/$max_retries) ===="
+                  if docker-compose -f docker-compose.infra.yml up -d $SERVICE_PARAM; then
+                    echo "==== Servislerin başlaması bekleniyor ===="
+                    sleep 30
+                    
+                    # Servis durumlarını kontrol et
+                    if docker-compose -f docker-compose.infra.yml ps | grep -q "Up"; then
+                      echo "==== Servisler başarıyla başlatıldı ===="
+                      break
+                    fi
+                  fi
+                  
+                  echo "==== Başlatma başarısız, yeniden deneniyor ===="
+                  docker-compose -f docker-compose.infra.yml down --volumes
+                  sleep 10
+                  retry_count=$((retry_count + 1))
+                  ;;
+                  
+                *)
+                  # Diğer eylemler için mevcut mantığı kullan
+                  docker-compose -f docker-compose.infra.yml $ACTION $SERVICE_PARAM
+                  break
+                  ;;
+              esac
+            done
+
+            if [ $retry_count -eq $max_retries ]; then
+              echo "==== HATA: Maksimum yeniden deneme sayısına ulaşıldı ===="
+              docker-compose -f docker-compose.infra.yml logs
               exit 1
             fi
 
