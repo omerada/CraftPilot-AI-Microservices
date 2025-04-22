@@ -3,6 +3,7 @@ package com.craftpilot.userservice.service;
 import com.craftpilot.userservice.dto.UserPreferenceRequest;
 import com.craftpilot.userservice.mapper.UserPreferenceMapper;
 import com.craftpilot.userservice.model.UserPreference;
+import com.craftpilot.userservice.model.PreferenceChangeEvent;
 import com.craftpilot.userservice.repository.UserPreferenceRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
@@ -11,12 +12,17 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import org.springframework.kafka.support.SendResult;
+import io.micrometer.core.instrument.MeterRegistry;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
 @Service
@@ -27,6 +33,9 @@ public class UserPreferenceService {
     private final RedisCacheService redisCacheService;
     private final UserPreferenceMapper mapper;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final KafkaTemplate<String, String> kafkaTemplateString;
+    private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
     
     @Value("${kafka.topics.user-preferences:user-preferences}")
     private String userPreferencesTopic;
@@ -404,6 +413,43 @@ public class UserPreferenceService {
                 });
         } catch (Exception e) {
             log.error("Error publishing preference update: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Tercih değişikliği olayını Kafka'ya yayınlar, hata durumunda güvenli şekilde devam eder
+     */
+    private void publishPreferenceChangeEvent(String userId, UserPreference preference) {
+        try {
+            PreferenceChangeEvent event = new PreferenceChangeEvent();
+            event.setUserId(userId);
+            event.setTimestamp(System.currentTimeMillis());
+            event.setPreferenceType("user_preference");
+            event.setPreferenceData(objectMapper.convertValue(preference, new TypeReference<Map<String, Object>>() {}));
+            
+            String eventJson = objectMapper.writeValueAsString(event);
+            
+            CompletableFuture<SendResult<String, String>> future = kafkaTemplateString.send("user-preferences", userId, eventJson);
+            
+            future.whenComplete((result, ex) -> {
+                if (ex == null) {
+                    log.debug("Tercih değişikliği olayı başarıyla yayınlandı: userId={}, topic={}, partition={}, offset={}", userId, result.getRecordMetadata().topic(), result.getRecordMetadata().partition(), result.getRecordMetadata().offset());
+                    
+                    // Başarılı metrik
+                    meterRegistry.counter("preference.kafka.publish.success", "userId", userId).increment();
+                } else {
+                    log.error("Tercih değişikliği olayı yayınlanırken hata: userId={}, error={}", userId, ex.getMessage());
+                    // Hata metriği
+                    meterRegistry.counter("preference.kafka.publish.error", "userId", userId).increment();
+                }
+            });
+            
+            // Deneme metriği
+            meterRegistry.counter("preference.kafka.publish.attempt", "userId", userId).increment();
+        } catch (Exception e) {
+            log.error("Tercih değişikliği olayı yayınlanırken istisna: userId={}, error={}", userId, e.getMessage());
+            // Hata durumunda işlemin devam etmesini sağla - kritik operasyon değil
+            meterRegistry.counter("preference.kafka.error", "type", e.getClass().getSimpleName()).increment();
         }
     }
 }

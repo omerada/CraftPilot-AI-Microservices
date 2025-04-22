@@ -21,6 +21,22 @@ spring:
   firebase:
     config:
       path: ${FIREBASE_CONFIG_PATH:/etc/gcp/credentials/gcp-credentials.json}
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 10
+      retry-backoff-ms: 1000
+      # Kafka bağlantı hatalarını yönetme
+      properties:
+        reconnect.backoff.ms: 1000
+        reconnect.backoff.max.ms: 5000
+        retry.backoff.ms: 1000
+        request.timeout.ms: 30000
+        max.block.ms: 10000
+        delivery.timeout.ms: 60000
 
 eureka:
   instance:
