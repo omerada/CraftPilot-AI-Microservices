@@ -57,6 +57,8 @@ jobs:
           script: |
             echo "==== Altyapı Servisleri Yönetimi Başlatılıyor ===="
 
+            set -e # Herhangi bir komut hata verirse scripti durdur
+
             # Infrastructure dizinini oluştur (yoksa)
             sudo mkdir -p /opt/craftpilot/infrastructure
             sudo chown -R $USER:$USER /opt/craftpilot/infrastructure
@@ -68,15 +70,25 @@ jobs:
               cp docker-compose.infra.yml docker-compose.infra.yml.bak.$(date +%Y%m%d%H%M%S)
             fi
 
-            # GitHub repository'den doğrudan docker-compose dosyasını indir
+            # GitHub repository'den docker-compose dosyasını indir ve hata kontrolü yap
             echo "Docker compose dosyası indiriliyor..."
-            curl -s -H "Accept: application/vnd.github.v3.raw" \
+            HTTP_CODE=$(curl -s -w '%{http_code}' -H "Accept: application/vnd.github.v3.raw" \
               -o docker-compose.infra.yml \
-              -L "https://raw.githubusercontent.com/OmerSah/Craft-Pilot-Ai/main/infrastructure/docker-compose.infra.yml"
+              -L "https://raw.githubusercontent.com/OmerSah/Craft-Pilot-Ai/main/infrastructure/docker-compose.infra.yml")
+              
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "HATA: docker-compose.infra.yml dosyası indirilemedi! HTTP Code: $HTTP_CODE"
+              exit 1
+            fi
 
-            # Dosyanın indirilip indirilmediğini kontrol et
-            if [ ! -f docker-compose.infra.yml ]; then
-              echo "HATA: docker-compose.infra.yml dosyası indirilemedi!"
+            if [ ! -f docker-compose.infra.yml ] || [ ! -s docker-compose.infra.yml ]; then
+              echo "HATA: docker-compose.infra.yml dosyası boş veya eksik!"
+              exit 1
+            fi
+
+            # Docker compose dosyasının geçerliliğini kontrol et
+            if ! docker-compose -f docker-compose.infra.yml config > /dev/null; then
+              echo "HATA: docker-compose.infra.yml dosyası geçersiz!"
               exit 1
             fi
 
@@ -94,14 +106,26 @@ jobs:
             # Environment değişkenlerini ayarla
             export ENV=$ENV
 
+            # Docker ve docker-compose'un çalıştığından emin ol
+            if ! docker info >/dev/null 2>&1; then
+              echo "HATA: Docker servisine erişilemiyor!"
+              exit 1
+            fi
+
+            if ! command -v docker-compose >/dev/null 2>&1; then
+              echo "HATA: docker-compose bulunamadı!"
+              exit 1
+            fi
+
             # İstenen eylemi gerçekleştir
             case "$ACTION" in
               deploy)
                 echo "==== Servisler durduruluyor: $SERVICE ===="
-                docker-compose -f docker-compose.infra.yml down $SERVICE_PARAM
+                docker-compose -f docker-compose.infra.yml down $SERVICE_PARAM || true
                 
                 echo "==== Servisler yeniden oluşturuluyor: $SERVICE ===="
                 docker-compose -f docker-compose.infra.yml up -d $SERVICE_PARAM
+                sleep 10 # Servislerin başlaması için bekle
                 
                 echo "==== Servis durumu kontrol ediliyor ===="
                 docker-compose -f docker-compose.infra.yml ps
@@ -184,7 +208,13 @@ jobs:
                 ;;
             esac
 
-            echo "==== Altyapı Servisleri Yönetimi Tamamlandı ===="
+            # Başarı durumunu kontrol et
+            if [ $? -eq 0 ]; then
+              echo "==== Altyapı Servisleri Yönetimi Başarıyla Tamamlandı ===="
+            else
+              echo "==== HATA: Altyapı Servisleri Yönetiminde Sorun Oluştu ===="
+              exit 1
+            fi
 
       - name: Kafka CLI Kullanım Kılavuzu
         if: ${{ github.event.inputs.action == 'status' && (github.event.inputs.service == 'kafka' || github.event.inputs.service == 'all' || github.event.inputs.service == 'kafka-cli') }}
