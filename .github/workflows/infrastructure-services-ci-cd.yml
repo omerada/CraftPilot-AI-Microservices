@@ -57,36 +57,128 @@ jobs:
           script: |
             echo "==== Altyapı Servisleri Yönetimi Başlatılıyor ===="
 
-            set -e # Herhangi bir komut hata verirse scripti durdur
+            set -e
 
-            # Infrastructure dizinini oluştur (yoksa)
+            # Infrastructure dizinini oluştur
             sudo mkdir -p /opt/craftpilot/infrastructure
             sudo chown -R $USER:$USER /opt/craftpilot/infrastructure
 
             cd /opt/craftpilot/infrastructure || exit 1
 
-            # Mevcut docker-compose.infra.yml dosyasını yedekle
-            if [ -f docker-compose.infra.yml ]; then
-              cp docker-compose.infra.yml docker-compose.infra.yml.bak.$(date +%Y%m%d%H%M%S)
-            fi
+            # Docker compose dosyasını oluştur
+            cat > docker-compose.infra.yml << 'EOL'
+            version: "3.8"
 
-            # GitHub repository'den docker-compose dosyasını indir ve hata kontrolü yap
-            echo "Docker compose dosyası indiriliyor..."
-            HTTP_CODE=$(curl -s -w '%{http_code}' -H "Accept: application/vnd.github.v3.raw" \
-              -o docker-compose.infra.yml \
-              -L "https://raw.githubusercontent.com/OmerSah/Craft-Pilot-Ai/main/infrastructure/docker-compose.infra.yml")
-              
-            if [ "$HTTP_CODE" != "200" ]; then
-              echo "HATA: docker-compose.infra.yml dosyası indirilemedi! HTTP Code: $HTTP_CODE"
+            services:
+              zookeeper:
+                image: confluentinc/cp-zookeeper:7.3.0 
+                container_name: zookeeper
+                restart: unless-stopped
+                environment:
+                  ZOOKEEPER_CLIENT_PORT: 2181
+                  ZOOKEEPER_TICK_TIME: 2000
+                ports:
+                  - "2181:2181"
+                volumes:
+                  - zookeeper-data:/var/lib/zookeeper/data
+                  - zookeeper-log:/var/lib/zookeeper/log
+                networks:
+                  - craftpilot-network
+                healthcheck:
+                  test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+                  start_period: 30s
+
+              kafka:
+                image: confluentinc/cp-kafka:7.3.0
+                container_name: kafka
+                restart: unless-stopped
+                depends_on:
+                  zookeeper:
+                    condition: service_healthy
+                ports:
+                  - "9092:9092"
+                environment:
+                  KAFKA_BROKER_ID: 1
+                  KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+                  KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+                  KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+                  KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+                  KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+                  KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+                volumes:
+                  - kafka-data:/var/lib/kafka/data
+                networks:
+                  - craftpilot-network
+                healthcheck:
+                  test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
+                  interval: 30s
+                  timeout: 10s
+                  retries: 3
+                  start_period: 60s
+
+              kafka-tools:
+                image: confluentinc/cp-kafka:7.3.0
+                container_name: kafka-tools
+                restart: unless-stopped
+                depends_on:
+                  kafka:
+                    condition: service_healthy
+                entrypoint: /bin/bash
+                tty: true
+                stdin_open: true
+                command: -c "echo 'Kafka CLI tools hazır.' && sleep infinity"
+                environment:
+                  KAFKA_BROKER_ID: ignored
+                  KAFKA_ZOOKEEPER_CONNECT: ignored
+                networks:
+                  - craftpilot-network
+
+              redis:
+                image: redis:7.0-alpine
+                container_name: redis
+                restart: unless-stopped
+                ports:
+                  - "6379:6379"
+                command: >
+                  --requirepass 13579ada
+                  --maxmemory 800mb
+                  --maxmemory-policy volatile-lru
+                  --appendonly yes
+                  --appendfsync everysec
+                  --no-appendfsync-on-rewrite yes
+                volumes:
+                  - redis-data:/data
+                networks:
+                  - craftpilot-network
+                healthcheck:
+                  test: ["CMD", "redis-cli", "-a", "13579ada", "ping"]
+                  interval: 5s
+                  timeout: 3s
+                  retries: 3
+                  start_period: 10s
+
+            volumes:
+              zookeeper-data:
+              zookeeper-log:
+              kafka-data:
+              redis-data:
+
+            networks:
+              craftpilot-network:
+                external: true
+                name: craftpilot-network
+            EOL
+
+            # Dosya oluşturulduğunu kontrol et
+            if [ ! -f docker-compose.infra.yml ]; then
+              echo "HATA: docker-compose.infra.yml dosyası oluşturulamadı!"
               exit 1
             fi
 
-            if [ ! -f docker-compose.infra.yml ] || [ ! -s docker-compose.infra.yml ]; then
-              echo "HATA: docker-compose.infra.yml dosyası boş veya eksik!"
-              exit 1
-            fi
-
-            # Docker compose dosyasının geçerliliğini kontrol et
+            # Docker compose geçerliliğini kontrol et
             if ! docker-compose -f docker-compose.infra.yml config > /dev/null; then
               echo "HATA: docker-compose.infra.yml dosyası geçersiz!"
               exit 1
