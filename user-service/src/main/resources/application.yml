@@ -28,19 +28,28 @@ spring:
         admin.metadata.max.age.ms: 180000
         retry.backoff.ms: 1000
         retries: 3
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=60s
 
 eureka:
   instance:
     prefer-ip-address: true
-    lease-renewal-interval-in-seconds: 30
-    lease-expiration-duration-in-seconds: 90
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
     instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
     metadata-map:
       user.name: ${eureka.client.security.user.name:craftpilot}
       user.password: ${eureka.client.security.user.password:13579ada}
+      startup: ${random.uuid}
+      management.context-path: /actuator
+    health-check-url-path: /actuator/health
+    status-page-url-path: /actuator/info
+    home-page-url: http://${eureka.instance.hostname}:${server.port}/
   client:
     serviceUrl:
-      defaultZone: http://${eureka.client.security.user.name:craftpilot}:${eureka.client.security.user.password:13579ada}@${EUREKA_HOST:eureka-server}:${EUREKA_PORT:8761}/eureka/
+      defaultZone: ${EUREKA_SERVER_URL:http://craftpilot:13579ada@eureka-server:8761/eureka/}
     register-with-eureka: ${EUREKA_REGISTER:true}
     fetch-registry: ${EUREKA_FETCH:true}
     enabled: ${EUREKA_ENABLED:true}
@@ -49,7 +58,9 @@ eureka:
     refresh:
       enable: true
     shouldDisableDelta: true
-    registry-fetch-interval-seconds: 30
+    registry-fetch-interval-seconds: 5
+    initial-instance-info-replication-interval-seconds: 5
+    instance-info-replication-interval-seconds: 5
     security:
       user:
         name: ${EUREKA_USERNAME:craftpilot}
@@ -62,7 +73,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,metrics,prometheus,info,loggers
+        include: "*"
       base-path: /actuator
   endpoint:
     health:
@@ -71,11 +82,11 @@ management:
         enabled: true
       group:
         readiness:
-          include: diskSpace,redis
+          include: "redis,diskSpace,ping,refreshScope"
           show-details: always
         liveness:
-          include: ping
-          show-details: always
+          include: "ping"
+          show-details: never
   health:
     redis:
       enabled: true
@@ -187,6 +198,23 @@ craftpilot:
     max-retry-attempts: 2
     retry-wait-duration: 250ms # 500ms'den 250ms'e düşürüldü
     health-indicator-enabled: true
+
+spring.data.redis:
+  connect-timeout: 2000ms
+  timeout: 1000ms
+  lettuce:
+    pool:
+      max-active: 8
+      max-idle: 8
+      min-idle: 2
+      max-wait: 1000ms
+    shutdown-timeout: 200ms
+
+spring.cloud.loadbalancer.cache:
+  caffeine:
+    spec: maximumSize=500,expireAfterWrite=5s
+  ttl: 5s
+  enabled: true
 
 # Kullanıcı tercihleri operasyon timeout değeri
 user-preference:
