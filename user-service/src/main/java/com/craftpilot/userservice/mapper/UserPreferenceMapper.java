@@ -5,6 +5,8 @@ import com.craftpilot.userservice.model.UserPreference;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 @Component
 public class UserPreferenceMapper {
@@ -16,7 +18,9 @@ public class UserPreferenceMapper {
 
         return UserPreference.builder()
                 .theme(dto.getTheme())
+                .themeSchema(dto.getThemeSchema())
                 .language(dto.getLanguage())
+                .layout(dto.getLayout())
                 .notifications(dto.getNotifications())
                 .pushEnabled(dto.getPushEnabled())
                 .aiModelFavorites(dto.getAiModelFavorites())
@@ -30,7 +34,9 @@ public class UserPreferenceMapper {
 
         return UserPreferenceRequest.builder()
                 .theme(entity.getTheme())
+                .themeSchema(entity.getThemeSchema())
                 .language(entity.getLanguage())
+                .layout(entity.getLayout())
                 .notifications(entity.getNotifications())
                 .pushEnabled(entity.getPushEnabled())
                 .aiModelFavorites(entity.getAiModelFavorites())

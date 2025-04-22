@@ -3,6 +3,7 @@ package com.craftpilot.userservice.service;
 import com.craftpilot.userservice.dto.UserPreferenceRequest;
 import com.craftpilot.userservice.mapper.UserPreferenceMapper;
 import com.craftpilot.userservice.model.UserPreference;
+import com.craftpilot.userservice.repository.UserPreferenceRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeoutException;
 @Slf4j
 @RequiredArgsConstructor
 public class UserPreferenceService {
+    private final UserPreferenceRepository repository;
     private final RedisCacheService redisCacheService;
     private final UserPreferenceMapper mapper;
     private final KafkaTemplate<String, Object> kafkaTemplate;
@@ -32,21 +34,40 @@ public class UserPreferenceService {
     @Value("${user-preference.operation.timeout:1000}")
     private long operationTimeoutMillis;
 
+    @Value("${kafka.topics.preference-events:preference-events}")
+    private String preferencesEventsTopic;
+
     @CircuitBreaker(name = "userPreferences", fallbackMethod = "getDefaultPreferences")
     public Mono<UserPreference> getUserPreferences(String userId) {
         log.info("Kullanıcı tercihleri getiriliyor: userId={}", userId);
         return redisCacheService.getUserPreferences(userId)
-            .doOnSuccess(pref -> log.debug("Kullanıcı tercihleri başarıyla getirildi: userId={}", userId))
-            .doOnError(e -> log.error("Kullanıcı tercihleri getirilirken hata: userId={}, error={}", userId, e.getMessage()));
+                .switchIfEmpty(
+                    repository.findById(userId)
+                        .flatMap(preferences -> {
+                            // Redis önbelleğine kaydet
+                            return redisCacheService.saveUserPreferences(preferences)
+                                .thenReturn(preferences);
+                        })
+                        .switchIfEmpty(Mono.defer(() -> {
+                            // Kullanıcı bulunamazsa varsayılan tercih oluştur
+                            UserPreference defaultPrefs = createDefaultPreferences(userId);
+                            return redisCacheService.saveUserPreferences(defaultPrefs)
+                                .thenReturn(defaultPrefs);
+                        }))
+                )
+                .doOnError(e -> log.error("Kullanıcı tercihleri getirilirken hata: userId={}, error={}", 
+                        userId, e.getMessage()));
     }
 
     public Mono<UserPreference> getDefaultPreferences(String userId, Throwable t) {
         log.warn("Varsayılan tercihler döndürülüyor (fallback): userId={}, error={}", userId, t.getMessage());
+        Map<String, Boolean> notificationsMap = new HashMap<>();
+        notificationsMap.put("general", true); // veya false
         return Mono.just(UserPreference.builder()
                 .userId(userId)
                 .theme("light")
                 .language("tr")
-                .notifications(true)
+                .notifications(notificationsMap)
                 .pushEnabled(true)
                 .createdAt(System.currentTimeMillis())
                 .updatedAt(System.currentTimeMillis())
@@ -114,11 +135,13 @@ public class UserPreferenceService {
     }
 
     private Mono<UserPreference> createFallbackThemePreference(String userId, String theme) {
+        Map<String, Boolean> notificationsMap = new HashMap<>();
+        notificationsMap.put("general", true); // veya false
         UserPreference fallbackPreference = UserPreference.builder()
                 .userId(userId)
                 .theme(theme)
                 .language("tr")
-                .notifications(true)
+                .notifications(notificationsMap)
                 .pushEnabled(true)
                 .aiModelFavorites(new ArrayList<>())
                 .createdAt(System.currentTimeMillis())
@@ -158,12 +181,14 @@ public class UserPreferenceService {
     public Mono<UserPreference> updateLanguageFallback(String userId, String language, Throwable t) {
         log.warn("Dil güncelleme işlemi için fallback çalıştırıldı: userId={}, error={}", userId, t.getMessage());
         
+        Map<String, Boolean> notificationsMap = new HashMap<>();
+        notificationsMap.put("general", true); // veya false
         // Basit bir UserPreference oluştur ve sadece dil değerini ayarla
         UserPreference fallbackPreference = UserPreference.builder()
                 .userId(userId)
                 .language(language)
                 .theme("light") // varsayılan değer
-                .notifications(true) // varsayılan değer
+                .notifications(notificationsMap) // varsayılan değer
                 .pushEnabled(true) // varsayılan değer
                 .aiModelFavorites(new ArrayList<>())
                 .updatedAt(System.currentTimeMillis())
@@ -203,11 +228,13 @@ public class UserPreferenceService {
     }
 
     private Mono<UserPreference> createFallbackFavoritesPreference(String userId, List<String> favorites) {
+        Map<String, Boolean> notificationsMap = new HashMap<>();
+        notificationsMap.put("general", true); // veya false
         UserPreference fallbackPreference = UserPreference.builder()
                 .userId(userId)
                 .theme("light")
                 .language("tr")
-                .notifications(true)
+                .notifications(notificationsMap)
                 .pushEnabled(true)
                 .aiModelFavorites(favorites)
                 .createdAt(System.currentTimeMillis())
@@ -233,6 +260,122 @@ public class UserPreferenceService {
             .doOnError(e -> log.error("Kullanıcı tercihleri silinirken hata: userId={}, error={}", 
                     userId, e.getMessage()))
             .onErrorReturn(false);
+    }
+
+    public Mono<UserPreference> updateUserPreferences(String userId, Map<String, Object> updates) {
+        log.info("Kullanıcı tercihleri güncelleniyor: userId={}", userId);
+        return getUserPreferences(userId)
+                .flatMap(existingPreferences -> {
+                    // İlk kez oluşturuluyorsa createdAt ayarla
+                    if (existingPreferences.getCreatedAt() == null) {
+                        existingPreferences.setCreatedAt(System.currentTimeMillis());
+                    }
+
+                    // Gelen değerleri mevcut tercihlerle birleştir
+                    mergePreferences(existingPreferences, updates);
+
+                    // updatedAt'i güncelle
+                    existingPreferences.setUpdatedAt(System.currentTimeMillis());
+
+                    // Redis'e ve veritabanına kaydet
+                    return redisCacheService.saveUserPreferences(existingPreferences)
+                        .timeout(Duration.ofMillis(operationTimeoutMillis))
+                        .doOnError(e -> {
+                            if (e instanceof TimeoutException) {
+                                log.warn("Redis kaydetme işlemi zaman aşımına uğradı, ancak işlem arka planda devam edecek: userId={}", userId);
+                            } else {
+                                log.error("Redis kaydetme işlemi sırasında hata: userId={}, error={}", userId, e.getMessage());
+                            }
+                        })
+                        .onErrorResume(e -> Mono.empty())
+                        .then(repository.save(existingPreferences))
+                        .doOnSuccess(saved -> {
+                            // Kafka ile tercih değişikliği olayını yayınla
+                            publishPreferenceUpdated(userId, updates);
+                        });
+                })
+                .doOnError(e -> log.error("Kullanıcı tercihleri güncellenirken hata: userId={}, error={}", 
+                        userId, e.getMessage()));
+    }
+
+    private void mergePreferences(UserPreference target, Map<String, Object> updates) {
+        // theme güncelleme
+        if (updates.containsKey("theme")) {
+            target.setTheme((String) updates.get("theme"));
+        }
+
+        // themeSchema güncelleme
+        if (updates.containsKey("themeSchema")) {
+            target.setThemeSchema((String) updates.get("themeSchema"));
+        }
+
+        // language güncelleme
+        if (updates.containsKey("language")) {
+            target.setLanguage((String) updates.get("language"));
+        }
+
+        // layout güncelleme
+        if (updates.containsKey("layout")) {
+            target.setLayout((String) updates.get("layout"));
+        }
+
+        // aiModelFavorites güncelleme
+        if (updates.containsKey("aiModelFavorites")) {
+            target.setAiModelFavorites((List<String>) updates.get("aiModelFavorites"));
+        }
+
+        // notifications güncelleme
+        if (updates.containsKey("notifications")) {
+            Map<String, Boolean> newNotifications = (Map<String, Boolean>) updates.get("notifications");
+            if (target.getNotifications() == null) {
+                target.setNotifications(new HashMap<>());
+            }
+            target.getNotifications().putAll(newNotifications);
+        }
+
+        // pushEnabled güncelleme
+        if (updates.containsKey("pushEnabled")) {
+            target.setPushEnabled((Boolean) updates.get("pushEnabled"));
+        }
+    }
+
+    private UserPreference createDefaultPreferences(String userId) {
+        log.info("Varsayılan kullanıcı tercihleri oluşturuluyor: userId={}", userId);
+        
+        Map<String, Boolean> notificationsMap = new HashMap<>();
+        notificationsMap.put("general", true); // veya false
+        UserPreference preferences = UserPreference.builder()
+            .userId(userId)
+            .theme("system")
+            .themeSchema("default")
+            .language("en")
+            .layout("collapsibleSide")
+            .aiModelFavorites(new ArrayList<>())
+            .notifications(notificationsMap)
+            .pushEnabled(false)
+            .build();
+
+        // Zaman damgaları
+        Long now = System.currentTimeMillis();
+        preferences.setCreatedAt(now);
+        preferences.setUpdatedAt(now);
+
+        return preferences;
+    }
+
+    private void publishPreferenceUpdated(String userId, Map<String, Object> updates) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("userId", userId);
+            event.put("eventType", "PREFERENCE_UPDATED");
+            event.put("timestamp", System.currentTimeMillis());
+            event.put("updates", updates);
+
+            kafkaTemplate.send(preferencesEventsTopic, userId, event);
+            log.debug("Tercih değişikliği olayı yayınlandı: userId={}", userId);
+        } catch (Exception e) {
+            log.error("Tercih değişikliği olayı yayınlanırken hata: userId={}, error={}", userId, e.getMessage());
+        }
     }
 
     private void publishPreferenceUpdated(String userId, String preferenceType, String value) {

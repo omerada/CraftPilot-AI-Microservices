@@ -11,12 +11,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.time.Duration;
 import java.util.concurrent.TimeoutException;
 
 @RestController
@@ -50,6 +50,10 @@ public class UserPreferenceController {
             UserPreference preference = userPreferenceMapper.toEntity(request);
             preference.setUserId(userId);
             
+            Map<String, Boolean> notificationsMap = new HashMap<>();
+            notificationsMap.put("general", true); // veya gerekli değer
+            preference.setNotifications(notificationsMap);
+            
             return userPreferenceService.saveUserPreferences(preference)
                     .map(saved -> ResponseEntity.status(HttpStatus.CREATED).body(saved))
                     .doOnSuccess(response -> log.info("Kullanıcı tercihleri başarıyla oluşturuldu: userId={}", userId))
@@ -65,32 +69,25 @@ public class UserPreferenceController {
     @Operation(summary = "Kullanıcı tercihlerini güncelle", description = "Kullanıcı tercihlerini günceller")
     public Mono<ResponseEntity<UserPreference>> updateUserPreferences(
             @PathVariable String userId,
-            @RequestBody UserPreferenceRequest request) {
+            @RequestBody Map<String, Object> updates) {
         log.info("Kullanıcı tercihleri güncelleniyor: userId={}", userId);
         
-        try {
-            UserPreference preference = userPreferenceMapper.toEntity(request);
-            preference.setUserId(userId);
-            
-            return userPreferenceService.saveUserPreferences(preference)
-                    .map(ResponseEntity::ok)
-                    // 8 saniyeden 3 saniyeye indiriyoruz - bu değeri application.yml'den alacak şekilde düzenlenebilir
-                    .timeout(Duration.ofMillis(1500))
-                    .doOnSuccess(response -> log.info("Kullanıcı tercihleri başarıyla güncellendi: userId={}", userId))
-                    .doOnError(e -> {
-                        if (e instanceof TimeoutException) {
-                            log.error("Kullanıcı tercihleri güncelleme zaman aşımına uğradı: userId={}", userId);
-                        } else {
-                            log.error("Kullanıcı tercihleri güncellenirken hata: userId={}, error={}", userId, e.getMessage());
-                        }
-                    })
-                    .onErrorResume(TimeoutException.class, e -> Mono.just(ResponseEntity.status(HttpStatus.ACCEPTED)
-                            .body(preference))) // Timeout durumunda 202 Accepted dönüyoruz
-                    .onErrorResume(e -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()));
-        } catch (Exception e) {
-            log.error("Kullanıcı tercihleri güncellenirken istisna: userId={}, error={}", userId, e.getMessage());
-            return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
-        }
+        return userPreferenceService.updateUserPreferences(userId, updates)
+                .timeout(Duration.ofMillis(1500))
+                .map(ResponseEntity::ok)
+                .doOnSuccess(response -> log.info("Kullanıcı tercihleri başarıyla güncellendi: userId={}", userId))
+                .doOnError(e -> {
+                    if (e instanceof TimeoutException) {
+                        log.warn("Kullanıcı tercihleri güncelleme zaman aşımına uğradı: userId={}", userId);
+                    } else {
+                        log.error("Kullanıcı tercihleri güncellenirken hata: userId={}, error={}", userId, e.getMessage());
+                    }
+                })
+                .onErrorResume(TimeoutException.class, e -> {
+                    UserPreference preference = createFallbackPreference(userId, updates);
+                    return Mono.just(ResponseEntity.accepted().body(preference));
+                })
+                .onErrorResume(e -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()));
     }
 
     @DeleteMapping
@@ -141,7 +138,6 @@ public class UserPreferenceController {
                 .doOnError(e -> log.error("Dil güncellenirken hata: userId={}, error={}", userId, e.getMessage()))
                 .onErrorResume(e -> {
                     log.error("Dil güncelleme hatası (fallback çalıştırılıyor): {}", e.getMessage());
-                    // userPreferenceService içindeki fallback çalışmadığında controller seviyesinde fallback
                     return createFallbackLanguagePreference(userId, language)
                             .map(fallback -> ResponseEntity.ok(fallback))
                             .onErrorReturn(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
@@ -181,11 +177,14 @@ public class UserPreferenceController {
 
     // Fallback metotları
     private Mono<UserPreference> createFallbackPreference(String userId, UserPreferenceRequest request) {
+        Map<String, Boolean> notificationsMap = new HashMap<>();
+        notificationsMap.put("general", true);
+        
         UserPreference fallbackPreference = UserPreference.builder()
                 .userId(userId)
                 .theme(request.getTheme() != null ? request.getTheme() : "light")
                 .language(request.getLanguage() != null ? request.getLanguage() : "tr")
-                .notifications(request.getNotifications() != null ? request.getNotifications() : true)
+                .notifications(request.getNotifications() != null ? request.getNotifications() : notificationsMap)
                 .pushEnabled(request.getPushEnabled() != null ? request.getPushEnabled() : true)
                 .aiModelFavorites(request.getAiModelFavorites() != null ? request.getAiModelFavorites() : List.of())
                 .createdAt(System.currentTimeMillis())
@@ -197,11 +196,14 @@ public class UserPreferenceController {
     }
 
     private Mono<UserPreference> createFallbackThemePreference(String userId, String theme) {
+        Map<String, Boolean> notificationsMap = new HashMap<>();
+        notificationsMap.put("general", true);
+        
         UserPreference fallbackPreference = UserPreference.builder()
                 .userId(userId)
                 .theme(theme)
                 .language("tr")
-                .notifications(true)
+                .notifications(notificationsMap)
                 .pushEnabled(true)
                 .aiModelFavorites(List.of())
                 .createdAt(System.currentTimeMillis())
@@ -213,11 +215,14 @@ public class UserPreferenceController {
     }
 
     private Mono<UserPreference> createFallbackLanguagePreference(String userId, String language) {
+        Map<String, Boolean> notificationsMap = new HashMap<>();
+        notificationsMap.put("general", true);
+        
         UserPreference fallbackPreference = UserPreference.builder()
                 .userId(userId)
                 .theme("light")
                 .language(language)
-                .notifications(true)
+                .notifications(notificationsMap)
                 .pushEnabled(true)
                 .aiModelFavorites(List.of())
                 .createdAt(System.currentTimeMillis())
@@ -229,11 +234,14 @@ public class UserPreferenceController {
     }
 
     private Mono<UserPreference> createFallbackFavoritesPreference(String userId, List<String> favorites) {
+        Map<String, Boolean> notificationsMap = new HashMap<>();
+        notificationsMap.put("general", true);
+        
         UserPreference fallbackPreference = UserPreference.builder()
                 .userId(userId)
                 .theme("light")
                 .language("tr")
-                .notifications(true)
+                .notifications(notificationsMap)
                 .pushEnabled(true)
                 .aiModelFavorites(favorites)
                 .createdAt(System.currentTimeMillis())
@@ -242,5 +250,30 @@ public class UserPreferenceController {
         
         log.info("Fallback favori modeller tercihi oluşturuldu: userId={}", userId);
         return Mono.just(fallbackPreference);
+    }
+
+    // Fallback metodu - zaman aşımı durumunda
+    private UserPreference createFallbackPreference(String userId, Map<String, Object> updates) {
+        UserPreference fallbackPreference = UserPreference.builder()
+                .userId(userId)
+                .theme(updates.containsKey("theme") ? (String)updates.get("theme") : "system")
+                .themeSchema(updates.containsKey("themeSchema") ? (String)updates.get("themeSchema") : "default")
+                .language(updates.containsKey("language") ? (String)updates.get("language") : "tr")
+                .layout(updates.containsKey("layout") ? (String)updates.get("layout") : "collapsibleSide")
+                .pushEnabled(updates.containsKey("pushEnabled") ? (Boolean)updates.get("pushEnabled") : false)
+                .createdAt(System.currentTimeMillis())
+                .updatedAt(System.currentTimeMillis())
+                .build();
+        
+        if (updates.containsKey("aiModelFavorites")) {
+            fallbackPreference.setAiModelFavorites((List<String>)updates.get("aiModelFavorites"));
+        }
+        
+        if (updates.containsKey("notifications")) {
+            fallbackPreference.setNotifications((Map<String, Boolean>)updates.get("notifications"));
+        }
+        
+        log.info("Fallback tercihi oluşturuldu: userId={}", userId);
+        return fallbackPreference;
     }
 }

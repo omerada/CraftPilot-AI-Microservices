@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.HashMap;
 
 /**
  * Redis önbellekleme işlemlerini yöneten servis.
@@ -53,7 +54,11 @@ public class RedisCacheService {
                                 .userId(userId)
                                 .theme("light")
                                 .language("tr")
-                                .notifications(true)
+                                .layout("collapsibleSide")
+                                // Map<String, Boolean> oluştur
+                                .notifications(new HashMap<String, Boolean>() {{
+                                    put("general", true);
+                                }})
                                 .pushEnabled(true)
                                 .createdAt(System.currentTimeMillis())
                                 .updatedAt(System.currentTimeMillis())

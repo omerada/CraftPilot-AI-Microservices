@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -13,7 +14,9 @@ import java.util.List;
 public class UserPreferenceRequest {
     private String theme;
     private String language;
-    private Boolean notifications;
+    private String themeSchema;
+    private String layout;
+    private Map<String, Boolean> notifications;
     private Boolean pushEnabled;
     private List<String> aiModelFavorites;
 }
