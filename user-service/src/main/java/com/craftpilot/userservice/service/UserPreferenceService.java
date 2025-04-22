@@ -324,6 +324,11 @@ public class UserPreferenceService {
             target.setAiModelFavorites((List<String>) updates.get("aiModelFavorites"));
         }
 
+        // lastSelectedModelId güncelleme
+        if (updates.containsKey("lastSelectedModelId")) {
+            target.setLastSelectedModelId((String) updates.get("lastSelectedModelId"));
+        }
+
         // notifications güncelleme
         if (updates.containsKey("notifications")) {
             Map<String, Boolean> newNotifications = (Map<String, Boolean>) updates.get("notifications");
@@ -353,6 +358,7 @@ public class UserPreferenceService {
             .aiModelFavorites(new ArrayList<>())
             .notifications(notificationsMap)
             .pushEnabled(false)
+            .lastSelectedModelId("google/gemini-2.0-flash-lite-001") // Varsayılan model ID'si
             .build();
 
         // Zaman damgaları

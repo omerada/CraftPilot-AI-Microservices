@@ -49,6 +49,10 @@ public class UserPreference {
     
     @Builder.Default
     private Boolean pushEnabled = false;
+    
+    // Son seçilen AI modeli ID'si
+    @Builder.Default
+    private String lastSelectedModelId = "google/gemini-2.0-flash-lite-001";
 
     // Zaman damgaları
     private Long createdAt;

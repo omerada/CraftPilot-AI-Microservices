@@ -24,6 +24,7 @@ public class UserPreferenceMapper {
                 .notifications(dto.getNotifications())
                 .pushEnabled(dto.getPushEnabled())
                 .aiModelFavorites(dto.getAiModelFavorites())
+                .lastSelectedModelId(dto.getLastSelectedModelId())
                 .build();
     }
 
@@ -40,6 +41,7 @@ public class UserPreferenceMapper {
                 .notifications(entity.getNotifications())
                 .pushEnabled(entity.getPushEnabled())
                 .aiModelFavorites(entity.getAiModelFavorites())
+                .lastSelectedModelId(entity.getLastSelectedModelId())
                 .build();
     }
 }

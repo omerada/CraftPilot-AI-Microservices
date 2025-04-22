@@ -30,6 +30,7 @@ import com.craftpilot.userservice.model.user.event.UserEvent;
 import com.google.firebase.auth.UserRecord;
 import com.google.firebase.auth.UserRecord.UpdateRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.craftpilot.userservice.model.UserPreference;
 
 /**
  * Kullanıcı işlemleri için servis arayüzü.
@@ -46,6 +47,7 @@ public class UserService {
     private final RedisCacheService cacheService;
     private final KafkaService kafkaService;
     private final KafkaTemplate<String, UserEvent> kafkaTemplate;
+    private final UserPreferenceService userPreferenceService;
 
     @Value("${kafka.topics.user-events}")
     private String userEventsTopic;
@@ -274,5 +276,17 @@ public class UserService {
                 .switchIfEmpty(userRepository.findById(id)
                         .flatMap(user -> cacheService.set(id, user)
                                 .thenReturn(user)));
+    }
+
+    // Bu metot kullanıcının plan bilgisini getirir
+    // Gerçek uygulamada kullanıcı veritabanı veya üyelik servisi üzerinden sorgu yapılmalıdır
+    public Mono<String> getUserPlan(String userId) {
+        // Örnek olarak varsayılan değer döndürüyoruz
+        // Gerçek uygulamada bu kullanıcı veritabanından veya başka bir servisten alınır
+        return Mono.just("free");
+    }
+    
+    public Mono<UserPreference> getUserPreferences(String userId) {
+        return userPreferenceService.getUserPreferences(userId);
     }
 }

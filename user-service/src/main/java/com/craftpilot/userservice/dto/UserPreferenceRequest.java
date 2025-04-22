@@ -19,4 +19,5 @@ public class UserPreferenceRequest {
     private Map<String, Boolean> notifications;
     private Boolean pushEnabled;
     private List<String> aiModelFavorites;
+    private String lastSelectedModelId;
 }
