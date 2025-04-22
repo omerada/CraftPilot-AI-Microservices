@@ -51,8 +51,7 @@ public class LightSecurityConfig {
             String method = request.getMethod().name();
             String clientIp = getClientIp(exchange);
             
-            if (isPublicPath(path)) {
-                log.debug("Public path erişimi: {} {} - kontrolsüz geçiyor [IP: {}]", method, path, clientIp);
+            if (isPublicPath(path)) { 
                 return chain.filter(exchange);
             }
             

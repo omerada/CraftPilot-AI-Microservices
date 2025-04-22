@@ -54,7 +54,6 @@ public class LightSecurityConfig {
             log.debug("İstek geldi: {} {}", request.getMethod(), path);
             
             if (isPublicPath(path)) {
-                log.debug("Public path erişimi: {} - kontrolsüz geçiyor", path);
                 return chain.filter(exchange);
             }
             
