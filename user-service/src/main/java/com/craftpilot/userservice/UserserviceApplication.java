@@ -9,9 +9,9 @@ import org.springframework.context.annotation.Import;
 @Import(LightSecurityConfig.class)
 @SpringBootApplication
 @EnableDiscoveryClient
-public class UserServiceApplication {
+public class UserserviceApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(UserServiceApplication.class, args); 
+        SpringApplication.run(UserserviceApplication.class, args); 
     }
 }
