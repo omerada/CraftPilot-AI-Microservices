@@ -64,6 +64,32 @@ jobs:
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:buildcache-arm64
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/eureka-server:buildcache-arm64,mode=max
 
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Check Infrastructure Services
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "Checking infrastructure services availability..."
+
+            # Redis kontrolü
+            if ! docker exec -t redis redis-cli -a 13579ada ping | grep -q PONG; then
+              echo "Redis is not available! Aborting deployment."
+              exit 1
+            fi
+
+            # Kafka kontrolü 
+            if ! docker exec -t kafka kafka-topics --bootstrap-server localhost:9092 --list > /dev/null; then
+              echo "Kafka is not available! Aborting deployment."
+              exit 1
+            fi
+
+            echo "All infrastructure services are available. Proceeding with deployment."
+
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:

@@ -1,0 +1,192 @@
+name: Infrastructure Services CI/CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        description: "Deployment environment"
+        options:
+          - prod
+          - staging
+          - debug
+        default: "prod"
+      action:
+        type: choice
+        description: "Action to perform"
+        options:
+          - deploy
+          - restart
+          - start
+          - stop
+          - status
+        default: "restart"
+      service:
+        type: choice
+        description: "Target service"
+        options:
+          - all
+          - kafka
+          - zookeeper
+          - redis
+          - kafka-cli
+        default: "all"
+
+jobs:
+  deploy-infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          command_timeout: "10m"
+          script: |
+            echo "==== Altyapı Servisleri Yönetimi Başlatılıyor ===="
+            cd /opt/craftpilot/infrastructure
+
+            # Mevcut docker-compose.infra.yml dosyasını yedekle
+            if [ -f docker-compose.infra.yml ]; then
+              cp docker-compose.infra.yml docker-compose.infra.yml.bak.$(date +%Y%m%d%H%M%S)
+            fi
+
+            # Repository'den en güncel docker-compose.infra.yml dosyasını kopyala
+            cp ${{ github.workspace }}/infrastructure/docker-compose.infra.yml docker-compose.infra.yml
+
+            ACTION="${{ github.event.inputs.action }}"
+            SERVICE="${{ github.event.inputs.service }}"
+            ENV="${{ github.event.inputs.environment }}"
+
+            # Servis parametresine göre işlem yapılacak servis(ler)i belirle
+            if [ "$SERVICE" == "all" ]; then
+              SERVICE_PARAM=""
+            else
+              SERVICE_PARAM="$SERVICE"
+            fi
+
+            # Environment değişkenlerini ayarla
+            export ENV=$ENV
+
+            # İstenen eylemi gerçekleştir
+            case "$ACTION" in
+              deploy)
+                echo "==== Servisler durduruluyor: $SERVICE ===="
+                docker-compose -f docker-compose.infra.yml down $SERVICE_PARAM
+                
+                echo "==== Servisler yeniden oluşturuluyor: $SERVICE ===="
+                docker-compose -f docker-compose.infra.yml up -d $SERVICE_PARAM
+                
+                echo "==== Servis durumu kontrol ediliyor ===="
+                docker-compose -f docker-compose.infra.yml ps
+                ;;
+              
+              restart)
+                echo "==== Servisler yeniden başlatılıyor: $SERVICE ===="
+                docker-compose -f docker-compose.infra.yml restart $SERVICE_PARAM
+                
+                echo "==== Servis durumu kontrol ediliyor ===="
+                docker-compose -f docker-compose.infra.yml ps
+                ;;
+              
+              start)
+                echo "==== Servisler başlatılıyor: $SERVICE ===="
+                docker-compose -f docker-compose.infra.yml up -d $SERVICE_PARAM
+                
+                echo "==== Servis durumu kontrol ediliyor ===="
+                docker-compose -f docker-compose.infra.yml ps
+                ;;
+              
+              stop)
+                echo "==== Servisler durduruluyor: $SERVICE ===="
+                docker-compose -f docker-compose.infra.yml stop $SERVICE_PARAM
+                
+                echo "==== Servis durumu kontrol ediliyor ===="
+                docker-compose -f docker-compose.infra.yml ps
+                ;;
+              
+              status)
+                echo "==== Servis durumu kontrol ediliyor ===="
+                docker-compose -f docker-compose.infra.yml ps
+                
+                # Redis durumu kontrolü
+                if [ "$SERVICE" == "all" ] || [ "$SERVICE" == "redis" ]; then
+                  echo ""
+                  echo "==== Redis Durumu ===="
+                  if docker exec -t redis redis-cli -a 13579ada ping | grep -q 'PONG'; then
+                    echo "Redis çalışıyor"
+                    echo "Bilgiler:"
+                    docker exec -t redis redis-cli -a 13579ada info | grep connected
+                    docker exec -t redis redis-cli -a 13579ada info memory | grep used_memory_human
+                    docker exec -t redis redis-cli -a 13579ada info keyspace
+                  else
+                    echo "Redis yanıt vermiyor veya çalışmıyor!"
+                  fi
+                fi
+                
+                # Kafka durumu kontrolü
+                if [ "$SERVICE" == "all" ] || [ "$SERVICE" == "kafka" ] || [ "$SERVICE" == "kafka-cli" ]; then
+                  echo ""
+                  echo "==== Kafka Durumu ===="
+                  if docker exec -t kafka bash -c "kafka-topics --bootstrap-server localhost:9092 --list" > /dev/null 2>&1; then
+                    echo "Kafka çalışıyor"
+                    echo "Topics:"
+                    docker exec -t kafka kafka-topics --bootstrap-server localhost:9092 --list
+                    echo ""
+                    echo "Consumer Grupları:"
+                    docker exec -t kafka kafka-consumer-groups --bootstrap-server localhost:9092 --list
+                  else
+                    echo "Kafka yanıt vermiyor veya çalışmıyor!"
+                  fi
+                fi
+                
+                # Zookeeper durumu kontrolü
+                if [ "$SERVICE" == "all" ] || [ "$SERVICE" == "zookeeper" ]; then
+                  echo ""
+                  echo "==== Zookeeper Durumu ===="
+                  if docker exec -t zookeeper bash -c "echo ruok | nc localhost 2181" | grep -q 'imok'; then
+                    echo "Zookeeper çalışıyor"
+                  else
+                    echo "Zookeeper yanıt vermiyor veya çalışmıyor!"
+                  fi
+                fi
+                ;;
+              
+              *)
+                echo "Geçersiz işlem: $ACTION"
+                exit 1
+                ;;
+            esac
+
+            echo "==== Altyapı Servisleri Yönetimi Tamamlandı ===="
+
+      - name: Kafka CLI Kullanım Kılavuzu
+        if: ${{ github.event.inputs.action == 'status' && (github.event.inputs.service == 'kafka' || github.event.inputs.service == 'all' || github.event.inputs.service == 'kafka-cli') }}
+        run: |
+          echo "==== Kafka CLI Kullanım Kılavuzu ===="
+          echo ""
+          echo "Topic Listeleme:"
+          echo "  docker exec -t kafka-tools kafka-topics --bootstrap-server kafka:9092 --list"
+          echo ""
+          echo "Topic Detayları:"
+          echo "  docker exec -t kafka-tools kafka-topics --bootstrap-server kafka:9092 --describe --topic [TOPIC_ADI]"
+          echo ""
+          echo "Bir Topic'teki Mesajları İzleme:"
+          echo "  docker exec -it kafka-tools kafka-console-consumer --bootstrap-server kafka:9092 --topic [TOPIC_ADI] --from-beginning"
+          echo ""  
+          echo "Bir Topic'e Mesaj Gönderme:"
+          echo "  docker exec -it kafka-tools kafka-console-producer --broker-list kafka:9092 --topic [TOPIC_ADI]"
+          echo ""
+          echo "Consumer Gruplarını Listeleme:"
+          echo "  docker exec -t kafka-tools kafka-consumer-groups --bootstrap-server kafka:9092 --list"
+          echo ""
+          echo "Consumer Grup Detayları:"
+          echo "  docker exec -t kafka-tools kafka-consumer-groups --bootstrap-server kafka:9092 --describe --group [GRUP_ADI]"
+          echo ""
+          echo "Örnek Topic İzleme (user-events):"
+          echo "  docker exec -it kafka-tools kafka-console-consumer --bootstrap-server kafka:9092 --topic user-events --from-beginning"
