@@ -20,7 +20,7 @@ public class ActivityLoggingConfig {
     @Value("${activity.service-name-prefix:LLM}")
     private String serviceNamePrefix;
 
-    @Value("${activity.kafka-topic:activity-events}")
+    @Value("${activity.kafka-topic:user-activity}")
     private String kafkaTopic;
 
     @Bean
