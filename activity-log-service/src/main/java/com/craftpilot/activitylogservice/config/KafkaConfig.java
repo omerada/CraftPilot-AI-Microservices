@@ -1,6 +1,7 @@
 package com.craftpilot.activitylogservice.config;
 
 import com.craftpilot.activitylogservice.model.ActivityEvent;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +17,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
+@Slf4j
 @ConditionalOnProperty(name = "spring.kafka.bootstrap-servers")
 public class KafkaConfig {
 
@@ -39,8 +41,8 @@ public class KafkaConfig {
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, autoOffsetReset);
-        props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.craftpilot.*");  // Paket kapsamını genişlet
-        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "com.craftpilot.commons.activity.model.ActivityEvent");  // Doğru sınıf yolunu belirt
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.craftpilot.*");
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "com.craftpilot.activitylogservice.model.ActivityEvent");
 
         log.info("Configuring Kafka receiver for topic: {} with bootstrap servers: {}", activityTopic, bootstrapServers);
         return ReceiverOptions.<String, ActivityEvent>create(props)
