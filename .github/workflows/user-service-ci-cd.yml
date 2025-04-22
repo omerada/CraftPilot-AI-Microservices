@@ -44,19 +44,33 @@ jobs:
       - name: Prepare build context
         run: |
           # Create a temporary directory for build context
-          mkdir -p /tmp/user-service-build-context
+          mkdir -p /tmp/docker-build-context
 
-          # Check source directory
+          # Check source directories and files
           echo "Current directory: $(pwd)"
           echo "Checking user-service directory:"
           ls -la user-service/
 
-          # Copy required files to the build context
-          cp -r user-service/* /tmp/user-service-build-context/
+          # Ensure user-service and redis-client-lib directories exist
+          if [ ! -d "user-service" ]; then
+            echo "ERROR: user-service directory not found"
+            exit 1
+          fi
+
+          if [ ! -d "redis-client-lib" ]; then
+            echo "ERROR: redis-client-lib directory not found"
+            exit 1
+          fi
+
+          # Copy both directories to build context
+          cp -r user-service /tmp/docker-build-context/
+          cp -r redis-client-lib /tmp/docker-build-context/
 
           # Verify build context contents
           echo "Checking build context:"
-          ls -la /tmp/user-service-build-context/
+          ls -la /tmp/docker-build-context/
+          echo "Checking user-service directory in build context:"
+          ls -la /tmp/docker-build-context/user-service/
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -76,7 +90,8 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v4
         with:
-          context: /tmp/user-service-build-context
+          context: /tmp/docker-build-context
+          file: user-service/Dockerfile
           platforms: linux/arm64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
