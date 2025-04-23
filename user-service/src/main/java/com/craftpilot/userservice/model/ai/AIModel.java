@@ -20,6 +20,7 @@ public class AIModel {
     @Id
     @DocumentId
     private String id;
+    private String modelId;
     private String value;
     private String label;
     private String description;

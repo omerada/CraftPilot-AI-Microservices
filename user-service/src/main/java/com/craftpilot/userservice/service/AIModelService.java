@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
@@ -134,5 +135,16 @@ public class AIModelService {
         
         // Eşleşen bir eski ID varsa yeni ID'yi döndür, yoksa orijinal ID'yi kullan
         return modelMappings.getOrDefault(modelId, modelId);
+    }
+    
+    public Mono<AIModel> saveModel(AIModel model) {
+        log.info("AI Model kaydediliyor: modelId={}", model.getModelId() != null ? model.getModelId() : model.getId());
+        return modelRepository.save(model);
+    }
+
+    public Flux<AIModel> saveAllModels(List<AIModel> models) {
+        log.info("{} AI model kaydediliyor", models.size());
+        return Flux.fromIterable(models)
+            .flatMap(this::saveModel);
     }
 }

@@ -450,7 +450,8 @@ public class ModelDataLoader {
         String creditType = determineCreditType(category);
         
         return AIModel.builder()
-                .id(id)
+                .id(id)                 // Orijinal ID'yi id alanına ata
+                .modelId(id)            // Orijinal ID'yi modelId alanına da ata
                 .value(id)
                 .label(name)
                 .description(description)
