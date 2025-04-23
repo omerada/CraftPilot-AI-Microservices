@@ -59,12 +59,20 @@ spring:
       cache-null-values: false
       use-key-prefix: true
 
-# Kafka yapılandırması için koşullu başlatma
-kafka:
-  enabled: ${KAFKA_ENABLED:false}
-  topics:
-    ai-events: ai-events
-    llm-completions: llm-completions
+# Kafka yapılandırmasını ekleyelim/düzenleyelim
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      retries: 3
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+# Activity logging yapılandırması
+activity:
+  service-name-prefix: LLM
+  kafka-topic: user-activity
 
 # Eureka ayarları
 eureka:
@@ -157,11 +165,3 @@ resilience4j:
 lighthouse:
   service:
     url: ${LIGHTHOUSE_SERVICE_URL:http://lighthouse-service:8085}
-
-# Activity Logging Configuration
-craftpilot:
-  activity:
-    enabled: true
-    topic: user-activity
-    service-name-prefix: LLM
-    error-handling: log-only

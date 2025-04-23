@@ -74,7 +74,7 @@ public class ChatHistoryService {
     @LogActivity(
         actionType = ActivityEventTypes.CHAT_HISTORY_CREATE, 
         userIdParam = "#chatHistory.userId",
-        metadata = "{id: #result.id, title: #result.title}"
+        metadata = "{\"id\": #result.id, \"title\": #result.title}"
     )
     public Mono<ChatHistory> createChatHistory(ChatHistory chatHistory) {
         if (chatHistory == null) {
@@ -109,7 +109,7 @@ public class ChatHistoryService {
     @LogActivity(
         actionType = ActivityEventTypes.CHAT_HISTORY_UPDATE, 
         userIdParam = "#chatHistory.userId",
-        metadata = "{id: #result.id, title: #result.title, messageCount: #result.conversations.size()}"
+        metadata = "{\"id\": #result.id, \"title\": #result.title, \"messageCount\": #result.conversations.size()}"
     )
     public Mono<ChatHistory> updateChatHistory(ChatHistory chatHistory) {
         if (chatHistory == null || chatHistory.getId() == null) {
@@ -126,21 +126,26 @@ public class ChatHistoryService {
                 .onErrorMap(e -> new RuntimeException("Sohbet geçmişi güncellenemedi: " + e.getMessage(), e));
     }
 
-    public Mono<Void> deleteChatHistory(String id) {
-        if (id == null || id.isEmpty()) {
+    @LogActivity(
+        actionType = ActivityEventTypes.CHAT_HISTORY_DELETE, 
+        userIdParam = "#userId",
+        metadata = "{\"id\": #historyId}"
+    )
+    public Mono<Void> deleteChatHistory(String userId, String historyId) {
+        if (historyId == null || historyId.isEmpty()) {
             log.warn("Geçersiz ID ile sohbet geçmişi silme isteği");
             return Mono.error(new IllegalArgumentException("Geçerli bir ID gerekli"));
         }
         
-        log.debug("Sohbet geçmişi siliniyor, ID: {}", id);
-        return chatHistoryRepository.findById(id)
+        log.debug("Sohbet geçmişi siliniyor, ID: {}", historyId);
+        return chatHistoryRepository.findById(historyId)
                 .flatMap(history -> {
                     // Önce silme işlemini yap
-                    return chatHistoryRepository.delete(id)  
+                    return chatHistoryRepository.delete(historyId)  
                             .then(activityLogger.log(
-                                history.getUserId(),
+                                userId,
                                 ActivityEventTypes.CHAT_HISTORY_DELETE,
-                                Map.of("id", id, "title", history.getTitle())
+                                Map.of("id", historyId, "title", history.getTitle())
                             ))
                             .then();
                 });
@@ -205,10 +210,10 @@ public class ChatHistoryService {
 
     @LogActivity(
         actionType = ActivityEventTypes.CHAT_HISTORY_ARCHIVE, 
-        userIdParam = "#result.userId",
-        metadata = "{id: #result.id, title: #result.title}"
+        userIdParam = "#userId",
+        metadata = "{\"id\": #historyId}"
     )
-    public Mono<ChatHistory> archiveChatHistory(String historyId) {
+    public Mono<ChatHistory> archiveChatHistory(String userId, String historyId) {
         log.info("Sohbet arşivleniyor, ID: {}", historyId);
         
         return chatHistoryRepository.findById(historyId)
