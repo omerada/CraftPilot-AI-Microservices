@@ -23,6 +23,12 @@ public class AIModelRepository {
     public Mono<AIModel> save(AIModel model) {
         return Mono.fromCallable(() -> {
             try {
+                // Generate an ID if none exists
+                if (model.getId() == null || model.getId().isEmpty()) {
+                    String generatedId = firestore.collection(COLLECTION_NAME).document().getId();
+                    model.setId(generatedId);
+                }
+                
                 firestore.collection(COLLECTION_NAME)
                         .document(model.getId())
                         .set(model)
