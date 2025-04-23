@@ -119,10 +119,12 @@ public class ChatHistoryController {
     }
 
     @DeleteMapping("/histories/{id}")
-    public Mono<ResponseEntity<Void>> deleteChatHistory(@PathVariable String id) {
+    public Mono<ResponseEntity<Void>> deleteChatHistory(
+            @RequestHeader("X-User-Id") String userId,
+            @PathVariable String id) {
         log.info("Sohbet geçmişi silme isteği, ID: {}", id);
         
-        return chatHistoryService.deleteChatHistory(id)
+        return chatHistoryService.deleteChatHistory(userId, id)
                 .thenReturn(ResponseEntity.noContent().<Void>build())
                 .onErrorResume(error -> {
                     log.error("Sohbet geçmişi silinirken hata, ID {}: {}", id, error.getMessage());
@@ -181,10 +183,12 @@ public class ChatHistoryController {
     }
 
     @PostMapping("/histories/{id}/do-archive")
-    public Mono<ResponseEntity<ChatHistory>> archiveChatHistoryPost(@PathVariable String id) {
+    public Mono<ResponseEntity<ChatHistory>> archiveChatHistoryPost(
+            @RequestHeader("X-User-Id") String userId,
+            @PathVariable String id) {
         log.info("Sohbet arşivleme isteği (POST method), ID: {}", id);
         
-        return chatHistoryService.archiveChatHistory(id)
+        return chatHistoryService.archiveChatHistory(userId, id)
                 .map(ResponseEntity::ok)
                 .onErrorResume(error -> {
                     log.error("Sohbet arşivlenirken hata, ID {}: {}", id, error.getMessage());
