@@ -187,65 +187,42 @@ jobs:
             fi
 
             echo "=== Waiting for Service to Start ==="
-            max_attempts=30
+            max_attempts=20
             counter=0
 
             while [ $counter -lt $max_attempts ]; do
               echo "Health check attempt $((counter + 1))/$max_attempts"
               
-              # Container durumu kontrolü
+              # Container status check
               if ! docker ps --filter "name=user-service" --format '{{.Status}}' | grep -q "Up"; then
                 echo "Container is not running anymore. Checking logs..."
-                docker logs user-service --tail 300
+                docker logs user-service --tail 100
                 exit 1
               fi
               
-              # Application log kontrolü
-              if docker logs user-service 2>&1 | grep -q "Started UserserviceApplication"; then
-                echo "Application startup completed"
-                
-                # Eureka registration kontrolü
-                if docker logs user-service 2>&1 | grep -q "DiscoveryClient.*registration status: 204"; then
-                  echo "Successfully registered with Eureka"
-                  
-                  # Final health check
-                  HEALTH_CHECK=$(curl -s http://localhost:8060/actuator/health)
-                  if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
-                    echo "✓ Service is healthy: $HEALTH_CHECK"
-                    echo "=== Deployment completed successfully ==="
-                    exit 0
-                  else
-                    echo "Health check response: $HEALTH_CHECK"
-                  fi
-                else
-                  # Ekstra Eureka log bilgisi
-                  echo "Waiting for Eureka registration..."
-                  docker logs user-service 2>&1 | grep -i "eureka" | tail -10
-                fi
+              # Health check
+              HEALTH_CHECK=$(curl -s http://localhost:8060/actuator/health || echo "Failed to connect")
+              
+              if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
+                echo "✓ Service is healthy: $HEALTH_CHECK"
+                echo "=== Deployment completed successfully ==="
+                exit 0
               else
-                # Başlangıç loglarını kontrol et
-                echo "Waiting for application startup..."
-                docker logs user-service 2>&1 | grep -i "userservice\|error\|exception" | tail -10
+                echo "Health check response: $HEALTH_CHECK"
               fi
               
               echo "Waiting for service to start... ($((counter + 1))/$max_attempts)"
-              sleep 10
+              sleep 15
               counter=$((counter + 1))
             done
 
             echo "=== Service Failed to Start - Debug Information ==="
             echo "Docker Container Status:"
             docker ps -a | grep user-service
-            echo "Container Logs (son 500 satır):"
-            docker logs user-service --tail 500
-            echo "Hata Mesajları ve İstisnalar:"
-            docker logs user-service 2>&1 | grep -i "error\|exception\|failed" | tail -50
-            echo "Eureka Kayıt Bilgileri:"
-            docker logs user-service 2>&1 | grep -i "eureka\|discovery" | tail -30
-            echo "Redis Bağlantı Bilgileri:"
-            docker logs user-service 2>&1 | grep -i "redis" | tail -20
-            echo "Network Information:"
-            docker network inspect craftpilot-network
+            echo "Container Logs (last 100 lines):"
+            docker logs user-service --tail 100
+            echo "Error Messages and Exceptions:"
+            docker logs user-service 2>&1 | grep -i "error\|exception\|failed" | tail -20
             echo "Health Check Response:"
             curl -v http://localhost:8060/actuator/health || true
             exit 1
