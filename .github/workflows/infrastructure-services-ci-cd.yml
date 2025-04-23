@@ -74,8 +74,17 @@ jobs:
 
             # Önceki container'ları temizle
             echo "==== Eski container'ları temizleme ===="
-            # Verileri koruyarak container'ları durdur (--volumes parametresi kaldırıldı)
-            docker-compose -f docker-compose.infra.yml down --remove-orphans || true
+            # İlk olarak konteynerlerin varlığını doğrudan kontrol et ve varsa kaldır
+            echo "==== Mevcut konteynerler kontrol ediliyor ve zorla kaldırılıyor ===="
+            for CONTAINER_NAME in redis zookeeper kafka kafka-tools; do
+              if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+                echo "Konteyner ${CONTAINER_NAME} bulundu, kaldırılıyor..."
+                docker rm -f ${CONTAINER_NAME} || true
+              fi
+            done
+
+            # Varsa docker-compose projesi olarak da kaldırma işlemi yap
+            docker-compose -f docker-compose.infra.yml -p craftpilot-infra down --remove-orphans || true
             docker system prune -f
 
             # İlgili volume'ları koşullu olarak temizle
@@ -249,12 +258,21 @@ jobs:
               case "$ACTION" in
                 deploy|restart|start)
                   echo "==== Servisler başlatılıyor (Deneme $((retry_count + 1))/$max_retries) ===="
-                  if docker-compose -f docker-compose.infra.yml up -d $SERVICE_PARAM; then
+                  
+                  # Her denemeden önce mevcut konteynerleri kontrol et ve kaldır
+                  for CONTAINER_NAME in redis zookeeper kafka kafka-tools; do
+                    if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+                      echo "Konteyner ${CONTAINER_NAME} hala mevcut, zorla kaldırılıyor..."
+                      docker rm -f ${CONTAINER_NAME} || true
+                    fi
+                  done
+                  
+                  if docker-compose -f docker-compose.infra.yml -p craftpilot-infra up -d $SERVICE_PARAM; then
                     echo "==== Servislerin başlaması bekleniyor ===="
                     sleep 30
                     
                     # Servis durumlarını kontrol et
-                    if docker-compose -f docker-compose.infra.yml ps | grep -q "Up"; then
+                    if docker-compose -f docker-compose.infra.yml -p craftpilot-infra ps | grep -q "Up"; then
                       echo "==== Servisler başarıyla başlatıldı ===="
                       break
                     fi
@@ -262,14 +280,14 @@ jobs:
                   
                   echo "==== Başlatma başarısız, yeniden deneniyor ===="
                   # Volume'ları koruyarak yeniden başlat (--volumes parametresi kaldırıldı)
-                  docker-compose -f docker-compose.infra.yml down
+                  docker-compose -f docker-compose.infra.yml -p craftpilot-infra down
                   sleep 10
                   retry_count=$((retry_count + 1))
                   ;;
                   
                 *)
                   # Diğer eylemler için mevcut mantığı kullan
-                  docker-compose -f docker-compose.infra.yml $ACTION $SERVICE_PARAM
+                  docker-compose -f docker-compose.infra.yml -p craftpilot-infra $ACTION $SERVICE_PARAM
                   break
                   ;;
               esac
@@ -277,7 +295,14 @@ jobs:
 
             if [ $retry_count -eq $max_retries ]; then
               echo "==== HATA: Maksimum yeniden deneme sayısına ulaşıldı ===="
-              docker-compose -f docker-compose.infra.yml logs
+              echo "==== Mevcut Docker Konteyner Durumu ===="
+              docker ps -a
+              echo "==== Docker Konteyner Detayları ===="
+              for CONTAINER_NAME in redis zookeeper kafka kafka-tools; do
+                echo "Konteyner ${CONTAINER_NAME} detayları:"
+                docker inspect ${CONTAINER_NAME} 2>/dev/null || echo "Konteyner bulunamadı"
+              done
+              docker-compose -f docker-compose.infra.yml -p craftpilot-infra logs
               exit 1
             fi
 
@@ -286,43 +311,43 @@ jobs:
               deploy)
                 echo "==== Servisler durduruluyor: $SERVICE ===="
                 # Volume'ları koruyarak durdur
-                docker-compose -f docker-compose.infra.yml down $SERVICE_PARAM || true
+                docker-compose -f docker-compose.infra.yml -p craftpilot-infra down $SERVICE_PARAM || true
                 
                 echo "==== Servisler yeniden oluşturuluyor: $SERVICE ===="
-                docker-compose -f docker-compose.infra.yml up -d $SERVICE_PARAM
+                docker-compose -f docker-compose.infra.yml -p craftpilot-infra up -d $SERVICE_PARAM
                 sleep 10 # Servislerin başlaması için bekle
                 
                 echo "==== Servis durumu kontrol ediliyor ===="
-                docker-compose -f docker-compose.infra.yml ps
+                docker-compose -f docker-compose.infra.yml -p craftpilot-infra ps
                 ;;
               
               restart)
                 echo "==== Servisler yeniden başlatılıyor: $SERVICE ===="
-                docker-compose -f docker-compose.infra.yml restart $SERVICE_PARAM
+                docker-compose -f docker-compose.infra.yml -p craftpilot-infra restart $SERVICE_PARAM
                 
                 echo "==== Servis durumu kontrol ediliyor ===="
-                docker-compose -f docker-compose.infra.yml ps
+                docker-compose -f docker-compose.infra.yml -p craftpilot-infra ps
                 ;;
               
               start)
                 echo "==== Servisler başlatılıyor: $SERVICE ===="
-                docker-compose -f docker-compose.infra.yml up -d $SERVICE_PARAM
+                docker-compose -f docker-compose.infra.yml -p craftpilot-infra up -d $SERVICE_PARAM
                 
                 echo "==== Servis durumu kontrol ediliyor ===="
-                docker-compose -f docker-compose.infra.yml ps
+                docker-compose -f docker-compose.infra.yml -p craftpilot-infra ps
                 ;;
               
               stop)
                 echo "==== Servisler durduruluyor: $SERVICE ===="
-                docker-compose -f docker-compose.infra.yml stop $SERVICE_PARAM
+                docker-compose -f docker-compose.infra.yml -p craftpilot-infra stop $SERVICE_PARAM
                 
                 echo "==== Servis durumu kontrol ediliyor ===="
-                docker-compose -f docker-compose.infra.yml ps
+                docker-compose -f docker-compose.infra.yml -p craftpilot-infra ps
                 ;;
               
               status)
                 echo "==== Servis durumu kontrol ediliyor ===="
-                docker-compose -f docker-compose.infra.yml ps
+                docker-compose -f docker-compose.infra.yml -p craftpilot-infra ps
                 
                 # Redis durumu kontrolü
                 if [ "$SERVICE" == "all" ] || [ "$SERVICE" == "redis" ]; then
