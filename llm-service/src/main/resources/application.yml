@@ -58,9 +58,7 @@ spring:
       time-to-live: 3600000
       cache-null-values: false
       use-key-prefix: true
-
-# Kafka yapılandırmasını ekleyelim/düzenleyelim
-spring:
+  # Kafka yapılandırmasını ekleyelim/düzenleyelim
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     producer:
