@@ -31,6 +31,10 @@ on:
           - redis
           - kafka-cli
         default: "all"
+      clean_data:
+        type: boolean
+        description: "⚠️ TEHLİKE: Volume'ları temizle (tüm veriler silinir!)"
+        default: false
 
 jobs:
   deploy-infrastructure:
@@ -70,12 +74,18 @@ jobs:
 
             # Önceki container'ları temizle
             echo "==== Eski container'ları temizleme ===="
-            docker-compose -f docker-compose.infra.yml down --volumes --remove-orphans || true
+            # Verileri koruyarak container'ları durdur (--volumes parametresi kaldırıldı)
+            docker-compose -f docker-compose.infra.yml down --remove-orphans || true
             docker system prune -f
 
-            # İlgili volume'ları temizle
-            echo "==== Volume'ları temizleme ===="
-            docker volume rm zookeeper-data zookeeper-log kafka-data redis-data || true
+            # İlgili volume'ları koşullu olarak temizle
+            if [ "${{ github.event.inputs.clean_data }}" == "true" ]; then
+              echo "==== ⚠️ TEHLİKE: Volume'lar siliniyor! Tüm veriler kaybolacak! ===="
+              docker volume rm zookeeper-data zookeeper-log kafka-data redis-data || true
+              echo "==== Volume'lar temizlendi ===="
+            else
+              echo "==== Volume'lar korunuyor, mevcut veriler saklanacak ===="
+            fi
 
             # Docker compose dosyasını oluştur
             cat > docker-compose.infra.yml << 'EOL'
@@ -251,7 +261,8 @@ jobs:
                   fi
                   
                   echo "==== Başlatma başarısız, yeniden deneniyor ===="
-                  docker-compose -f docker-compose.infra.yml down --volumes
+                  # Volume'ları koruyarak yeniden başlat (--volumes parametresi kaldırıldı)
+                  docker-compose -f docker-compose.infra.yml down
                   sleep 10
                   retry_count=$((retry_count + 1))
                   ;;
@@ -274,6 +285,7 @@ jobs:
             case "$ACTION" in
               deploy)
                 echo "==== Servisler durduruluyor: $SERVICE ===="
+                # Volume'ları koruyarak durdur
                 docker-compose -f docker-compose.infra.yml down $SERVICE_PARAM || true
                 
                 echo "==== Servisler yeniden oluşturuluyor: $SERVICE ===="
