@@ -18,7 +18,7 @@ import java.util.concurrent.CompletableFuture;
 @RequiredArgsConstructor
 @Slf4j
 public class PerformanceAnalysisRepository {
-    private static final String COLLECTION_NAME = "performance_analysis";
+    private static final String COLLECTION_NAME = "performanceAnalysis";
     
     private final Firestore firestore;
     

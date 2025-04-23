@@ -17,7 +17,7 @@ import java.util.UUID;
 public class SubscriptionPlanRepository {
 
     private final Firestore firestore;
-    private static final String COLLECTION_NAME = "subscription_plans";
+    private static final String COLLECTION_NAME = "subscriptionPlans";
 
     public Mono<SubscriptionPlan> save(SubscriptionPlan plan) {
         if (plan.getId() == null) {

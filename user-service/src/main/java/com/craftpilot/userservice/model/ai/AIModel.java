@@ -27,4 +27,8 @@ public class AIModel {
     private Integer maxTokens;
     private Integer maxInputTokens;
     private String requiredPlan;
+    private Integer creditCost; // Her kullanımda tüketilecek kredi miktarı
+    private String category; // Model kategorisi (basic, standard, premium gibi)
+    private String architecture; // Modelin mimarisi
+    private Integer contextLength; // Modelin bağlam penceresi uzunluğu
 }

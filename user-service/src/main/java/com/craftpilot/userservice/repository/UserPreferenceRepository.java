@@ -17,7 +17,7 @@ import java.util.concurrent.CompletableFuture;
 public class UserPreferenceRepository {
 
     private final Firestore firestore;
-    private static final String COLLECTION_NAME = "user_preferences";
+    private static final String COLLECTION_NAME = "userPreferences";
 
     public Mono<UserPreference> findById(String userId) {
         return Mono.fromCallable(() -> 
