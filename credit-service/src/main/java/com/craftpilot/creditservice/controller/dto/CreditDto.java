@@ -12,9 +12,17 @@ import java.time.LocalDateTime;
 public class CreditDto {
     private String id;
     private String userId;
+    
+    // Standart kredi bilgileri
     private BigDecimal balance;
     private BigDecimal totalCreditsEarned;
     private BigDecimal totalCreditsUsed;
+    
+    // Gelişmiş kredi bilgileri
+    private BigDecimal advancedBalance;
+    private BigDecimal totalAdvancedCreditsEarned;
+    private BigDecimal totalAdvancedCreditsUsed;
+    
     private LocalDateTime lastUpdated;
     private LocalDateTime createdAt;
 
@@ -25,8 +33,11 @@ public class CreditDto {
                 .balance(credit.getBalance())
                 .totalCreditsEarned(credit.getTotalCreditsEarned())
                 .totalCreditsUsed(credit.getTotalCreditsUsed())
+                .advancedBalance(credit.getAdvancedBalance())
+                .totalAdvancedCreditsEarned(credit.getTotalAdvancedCreditsEarned())
+                .totalAdvancedCreditsUsed(credit.getTotalAdvancedCreditsUsed())
                 .lastUpdated(credit.getLastUpdated())
                 .createdAt(credit.getCreatedAt())
                 .build();
     }
-} 
+}

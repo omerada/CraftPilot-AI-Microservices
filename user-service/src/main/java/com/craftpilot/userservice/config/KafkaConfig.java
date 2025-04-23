@@ -95,7 +95,7 @@ public class KafkaConfig {
 
     // String değerleri için KafkaTemplate
     @Bean
-    public KafkaTemplate<String, String> kafkaTemplate() {
+    public KafkaTemplate<String, String> stringKafkaTemplate() {
         return new KafkaTemplate<>(stringProducerFactory());
     }
     

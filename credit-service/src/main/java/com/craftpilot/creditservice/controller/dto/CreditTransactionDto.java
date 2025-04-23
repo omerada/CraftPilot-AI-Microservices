@@ -13,22 +13,22 @@ public class CreditTransactionDto {
     private String id;
     private String userId;
     private String serviceId;
-    private CreditTransaction.TransactionType type;
     private BigDecimal amount;
+    private String type;
     private String description;
-    private CreditTransaction.TransactionStatus status;
-    private LocalDateTime createdAt;
+    private String creditType;
+    private LocalDateTime timestamp;
 
     public static CreditTransactionDto fromEntity(CreditTransaction transaction) {
         return CreditTransactionDto.builder()
                 .id(transaction.getId())
                 .userId(transaction.getUserId())
                 .serviceId(transaction.getServiceId())
-                .type(transaction.getType())
                 .amount(transaction.getAmount())
+                .type(transaction.getType())
                 .description(transaction.getDescription())
-                .status(transaction.getStatus())
-                .createdAt(transaction.getCreatedAt())
+                .creditType(transaction.getCreditType())
+                .timestamp(transaction.getTimestamp())
                 .build();
     }
-} 
+}

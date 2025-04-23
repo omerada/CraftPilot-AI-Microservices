@@ -39,7 +39,8 @@ public class CreditController {
                 request.getServiceId(),
                 request.getAmount(),
                 request.getType(),
-                request.getDescription()
+                request.getDescription(),
+                request.getCreditType() // Kredi tipini ekleyin
         ).map(CreditTransactionDto::fromEntity);
     }
 

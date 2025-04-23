@@ -31,6 +31,7 @@ public class AIModel {
     private Integer maxInputTokens;
     private String requiredPlan;
     private Integer creditCost; // Her kullanımda tüketilecek kredi miktarı
+    private String creditType;  // Kredi tipi (STANDARD veya ADVANCED)
     private String category; // Model kategorisi (basic, standard, premium gibi)
 
     // Yeni alanlar

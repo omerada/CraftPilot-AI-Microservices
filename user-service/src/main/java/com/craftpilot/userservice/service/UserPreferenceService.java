@@ -88,8 +88,13 @@ public class UserPreferenceService {
     public Mono<UserPreference> saveUserPreferences(UserPreference userPreference) {
         log.info("Kullanıcı tercihleri kaydediliyor: userId={}", userPreference.getUserId());
         return userPreferenceRepository.save(userPreference)
-            .flatMap(savedPreference -> redisCacheService.saveUserPreference(savedPreference)
-                .thenReturn(savedPreference))
+            .flatMap(savedPreference -> {
+                // savedPreference tipini UserPreference olarak belirtiyoruz
+                UserPreference preference = (UserPreference) savedPreference;
+                // metot adını düzeltiyoruz: saveUserPreference -> saveUserPreferences
+                return redisCacheService.saveUserPreferences(preference)
+                    .thenReturn(preference);
+            })
             .doOnSuccess(savedPreference -> {
                 // Event publishing'i non-blocking ve hata toleranslı hale getir
                 eventService.publishPreferenceChangedEvent(savedPreference)
@@ -99,7 +104,7 @@ public class UserPreferenceService {
                         error -> log.error("Tercih değişikliği olayı yayınlanırken hata (event publish işlemi ana işlem akışını etkilemedi): userId={}, error={}", 
                                 savedPreference.getUserId(), error.getMessage())
                     );
-                log.info("Kullanıcı tercihleri başarıyla kaydedildi: userId={}", userPreference.getUserId());
+                log.info("Kullanıcı tercihleri başarıyla kaydedildi: userId={}", savedPreference.getUserId());
             })
             .doOnError(e -> log.error("Kullanıcı tercihleri kaydedilirken hata: userId={}, error={}", 
                     userPreference.getUserId(), e.getMessage()));

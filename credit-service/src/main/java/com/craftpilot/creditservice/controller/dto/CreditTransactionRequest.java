@@ -1,25 +1,33 @@
 package com.craftpilot.creditservice.controller.dto;
 
-import com.craftpilot.creditservice.model.CreditTransaction;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class CreditTransactionRequest {
-    @NotBlank(message = "Service ID is required")
+    @NotEmpty(message = "Service ID boş olamaz")
     private String serviceId;
-
-    @NotNull(message = "Transaction type is required")
-    private CreditTransaction.TransactionType type;
-
-    @NotNull(message = "Amount is required")
-    @Positive(message = "Amount must be positive")
+    
+    @NotNull(message = "Miktar boş olamaz")
+    @Positive(message = "Miktar pozitif olmalı")
     private BigDecimal amount;
-
-    @NotBlank(message = "Description is required")
+    
+    @NotEmpty(message = "İşlem tipi boş olamaz")
+    private String type;
+    
     private String description;
-} 
+    
+    @NotEmpty(message = "Kredi tipi boş olamaz")
+    @Builder.Default
+    private String creditType = "STANDARD"; // Varsayılan değer
+}

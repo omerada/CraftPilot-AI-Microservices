@@ -30,6 +30,12 @@ public class CreditService {
     @Value("${kafka.topics.credit-events}")
     private String creditEventsTopic;
 
+    @Value("${initial.credit.amount}")
+    private String initialCreditAmount;
+
+    @Value("${initial.advanced.credit.amount}")
+    private String initialAdvancedCreditAmount;
+
     public Mono<Credit> getUserCredits(String userId) {
         return creditRepository.findByUserId(userId)
                 .switchIfEmpty(createInitialCredit(userId));
@@ -39,14 +45,18 @@ public class CreditService {
             CreditTransaction.TransactionType type, String description) {
         return getUserCredits(userId)
                 .flatMap(credit -> {
-                    if (type == CreditTransaction.TransactionType.DEBIT && credit.getBalance().compareTo(amount) < 0) {
+                    // String tipini TransactionType enum'a dönüştür
+                    boolean isDebit = type == CreditTransaction.TransactionType.DEBIT;
+                    
+                    if (isDebit && credit.getBalance().compareTo(amount) < 0) {
                         return Mono.error(new InsufficientCreditsException("Insufficient credits"));
                     }
 
                     CreditTransaction transaction = CreditTransaction.builder()
                             .userId(userId)
                             .serviceId(serviceId)
-                            .type(type)
+                            .type(isDebit ? "DEBIT" : "CREDIT") // String olarak ayarla
+                            .type2(type) // Enum değerini yeni alana kaydet
                             .amount(amount)
                             .description(description)
                             .status(CreditTransaction.TransactionStatus.PENDING)
@@ -61,8 +71,15 @@ public class CreditService {
                                     }));
                 })
                 .doOnSuccess(transaction -> {
-                    meterRegistry.counter("credit.transactions", "type", transaction.getType().toString()).increment();
-                    kafkaTemplate.send(creditEventsTopic, userId, new CreditEvent(transaction))
+                    meterRegistry.counter("credit.transactions", "type", transaction.getType()).increment();
+                    CreditEvent event = CreditEvent.builder()
+                            .userId(userId)
+                            .amount(transaction.getAmount())
+                            .type(transaction.getType())
+                            .creditType(transaction.getCreditType())
+                            .timestamp(System.currentTimeMillis())
+                            .build();
+                    kafkaTemplate.send(creditEventsTopic, userId, event)
                         .whenComplete((result, ex) -> {
                             if (ex != null) {
                                 log.error("Failed to send credit event for user: {}", userId, ex);
@@ -74,36 +91,156 @@ public class CreditService {
                 .doOnError(error -> log.error("Error processing credit transaction", error));
     }
 
+    /**
+     * Yeni bir kredi işlemi yapar
+     */
+    public Mono<CreditTransaction> processTransaction(
+            String userId, 
+            String serviceId,
+            BigDecimal amount,
+            String type,
+            String description,
+            String creditType) {
+        
+        return getUserCredits(userId)
+                .flatMap(credit -> {
+                    // Kredi tipine göre bakiyeyi kontrol et
+                    if ("ADVANCED".equals(creditType)) {
+                        if (type.equals("DEBIT") && credit.getAdvancedBalance().compareTo(amount) < 0) {
+                            return Mono.error(new InsufficientCreditsException("Yetersiz gelişmiş kredi bakiyesi"));
+                        }
+                    } else {
+                        if (type.equals("DEBIT") && credit.getBalance().compareTo(amount) < 0) {
+                            return Mono.error(new InsufficientCreditsException("Yetersiz kredi bakiyesi"));
+                        }
+                    }
+
+                    // İşlem kaydı oluştur
+                    CreditTransaction transaction = CreditTransaction.builder()
+                            .userId(userId)
+                            .serviceId(serviceId)
+                            .amount(amount)
+                            .type(type)
+                            .description(description)
+                            .creditType(creditType)
+                            .timestamp(LocalDateTime.now())
+                            .build();
+
+                    // Krediyi güncelle
+                    if ("ADVANCED".equals(creditType)) {
+                        if (type.equals("DEBIT")) {
+                            credit.setAdvancedBalance(credit.getAdvancedBalance().subtract(amount));
+                            credit.setTotalAdvancedCreditsUsed(credit.getTotalAdvancedCreditsUsed().add(amount));
+                        } else {
+                            credit.setAdvancedBalance(credit.getAdvancedBalance().add(amount));
+                            credit.setTotalAdvancedCreditsEarned(credit.getTotalAdvancedCreditsEarned().add(amount));
+                        }
+                    } else {
+                        if (type.equals("DEBIT")) {
+                            credit.setBalance(credit.getBalance().subtract(amount));
+                            credit.setTotalCreditsUsed(credit.getTotalCreditsUsed().add(amount));
+                        } else {
+                            credit.setBalance(credit.getBalance().add(amount));
+                            credit.setTotalCreditsEarned(credit.getTotalCreditsEarned().add(amount));
+                        }
+                    }
+
+                    credit.setLastUpdated(LocalDateTime.now());
+
+                    // Kredi ve işlemi kaydet
+                    return creditRepository.save(credit)
+                            .then(transactionRepository.save(transaction))
+                            .doOnSuccess(t -> {
+                                // Metrik ve olay gönderimi
+                                publishCreditEvent(userId, amount, type, creditType);
+                                recordCreditMetrics(userId, amount, type, creditType);
+                            });
+                });
+    }
+
     public Flux<CreditTransaction> getUserTransactions(String userId) {
         return transactionRepository.findByUserId(userId);
     }
 
+    /**
+     * Yeni kullanıcı için başlangıç kredisi oluşturur
+     */
     private Mono<Credit> createInitialCredit(String userId) {
+        log.info("Yeni kullanıcı için başlangıç kredisi oluşturuluyor: userId={}", userId);
+        LocalDateTime now = LocalDateTime.now();
+        
         Credit credit = Credit.builder()
                 .userId(userId)
-                .balance(BigDecimal.ZERO)
-                .totalCreditsEarned(BigDecimal.ZERO)
+                .balance(new BigDecimal(initialCreditAmount))
+                .totalCreditsEarned(new BigDecimal(initialCreditAmount))
                 .totalCreditsUsed(BigDecimal.ZERO)
-                .createdAt(LocalDateTime.now())
-                .lastUpdated(LocalDateTime.now())
+                .advancedBalance(new BigDecimal(initialAdvancedCreditAmount))
+                .totalAdvancedCreditsEarned(new BigDecimal(initialAdvancedCreditAmount))
+                .totalAdvancedCreditsUsed(BigDecimal.ZERO)
+                .createdAt(now)
+                .lastUpdated(now)
+                .deleted(false)
                 .build();
+        
         return creditRepository.save(credit);
     }
 
     private Mono<Credit> updateCreditBalance(Credit credit, CreditTransaction transaction) {
-        BigDecimal newBalance = transaction.getType() == CreditTransaction.TransactionType.CREDIT
-                ? credit.getBalance().add(transaction.getAmount())
-                : credit.getBalance().subtract(transaction.getAmount());
+        // Check if type is a String or enum and handle accordingly
+        BigDecimal newBalance;
+        if (transaction.getType2() != null) {
+            // Use enum type2 field
+            newBalance = transaction.getType2() == CreditTransaction.TransactionType.CREDIT
+                    ? credit.getBalance().add(transaction.getAmount())
+                    : credit.getBalance().subtract(transaction.getAmount());
 
-        credit.setBalance(newBalance);
-        credit.setLastUpdated(LocalDateTime.now());
+            credit.setBalance(newBalance);
+            credit.setLastUpdated(LocalDateTime.now());
 
-        if (transaction.getType() == CreditTransaction.TransactionType.CREDIT) {
-            credit.setTotalCreditsEarned(credit.getTotalCreditsEarned().add(transaction.getAmount()));
+            if (transaction.getType2() == CreditTransaction.TransactionType.CREDIT) {
+                credit.setTotalCreditsEarned(credit.getTotalCreditsEarned().add(transaction.getAmount()));
+            } else {
+                credit.setTotalCreditsUsed(credit.getTotalCreditsUsed().add(transaction.getAmount()));
+            }
         } else {
-            credit.setTotalCreditsUsed(credit.getTotalCreditsUsed().add(transaction.getAmount()));
+            // Use string type field
+            newBalance = "CREDIT".equals(transaction.getType())
+                    ? credit.getBalance().add(transaction.getAmount())
+                    : credit.getBalance().subtract(transaction.getAmount());
+                    
+            credit.setBalance(newBalance);
+            credit.setLastUpdated(LocalDateTime.now());
+
+            if ("CREDIT".equals(transaction.getType())) {
+                credit.setTotalCreditsEarned(credit.getTotalCreditsEarned().add(transaction.getAmount()));
+            } else {
+                credit.setTotalCreditsUsed(credit.getTotalCreditsUsed().add(transaction.getAmount()));
+            }
         }
 
         return creditRepository.save(credit);
+    }
+
+    // Kredi olayını yayınlama ve metrik kayıt fonksiyonlarını güncelle
+    private void publishCreditEvent(String userId, BigDecimal amount, String type, String creditType) {
+        CreditEvent event = CreditEvent.builder()
+                .userId(userId)
+                .amount(amount)
+                .type(type)
+                .creditType(creditType)
+                .timestamp(System.currentTimeMillis())
+                .build();
+        
+        kafkaTemplate.send("credit-events", event);
+    }
+
+    private void recordCreditMetrics(String userId, BigDecimal amount, String type, String creditType) {
+        String metricName = type.equals("DEBIT") ? "credits.used" : "credits.added";
+        if ("ADVANCED".equals(creditType)) {
+            metricName = "advanced." + metricName;
+        }
+        
+        meterRegistry.counter(metricName, "userId", userId)
+                .increment(amount.doubleValue());
     }
 }
