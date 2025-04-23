@@ -9,9 +9,9 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:prod}
     include: kafka-base
   redis:
-    host: ${REDIS_HOST:localhost}
+    host: ${REDIS_HOST:redis}
     port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:}
+    password: ${REDIS_PASSWORD:13579ada}
     timeout: 2000
     database: ${REDIS_DATABASE:0}
     lettuce:

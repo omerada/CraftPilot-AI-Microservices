@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.springframework.kafka.support.SendResult;
 import io.micrometer.core.instrument.MeterRegistry;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -29,8 +30,9 @@ import java.util.concurrent.TimeoutException;
 @Slf4j
 @RequiredArgsConstructor
 public class UserPreferenceService {
-    private final UserPreferenceRepository repository;
+    private final UserPreferenceRepository userPreferenceRepository;
     private final RedisCacheService redisCacheService;
+    private final EventService eventService;
     private final UserPreferenceMapper mapper;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final KafkaTemplate<String, String> kafkaTemplateString;
@@ -51,7 +53,7 @@ public class UserPreferenceService {
         log.info("Kullanıcı tercihleri getiriliyor: userId={}", userId);
         return redisCacheService.getUserPreferences(userId)
                 .switchIfEmpty(
-                    repository.findById(userId)
+                    userPreferenceRepository.findById(userId)
                         .flatMap(preferences -> {
                             // Redis önbelleğine kaydet
                             return redisCacheService.saveUserPreferences(preferences)
@@ -83,64 +85,36 @@ public class UserPreferenceService {
                 .build());
     }
 
-    public Mono<UserPreference> saveUserPreferences(UserPreference preferences) {
-        log.info("Kullanıcı tercihleri kaydediliyor: userId={}", preferences.getUserId());
-        
-        // Redis'e kayıt işlemini timeout ile sarmalıyoruz
-        return redisCacheService.saveUserPreferences(preferences)
-                .timeout(Duration.ofMillis(operationTimeoutMillis))
-                .doOnError(e -> {
-                    if (e instanceof TimeoutException) {
-                        log.warn("Redis kaydetme işlemi zaman aşımına uğradı, ancak işlem arka planda devam edecek: userId={}", 
-                                preferences.getUserId());
-                    } else {
-                        log.error("Redis kaydetme işlemi sırasında hata: userId={}, error={}", 
-                                preferences.getUserId(), e.getMessage());
-                    }
-                })
-                .onErrorResume(e -> Mono.empty())
-                // Kafka'ya bildirimi non-blocking yapıyoruz
-                .then(Mono.fromCallable(() -> {
-                    // Kafka'ya bildirim gönderme işlemini asenkron yapıyoruz
-                    try {
-                        kafkaTemplate.sendDefault(preferences.getUserId(), preferences);
-                    } catch (Exception e) {
-                        log.warn("Kafka mesajı gönderilirken hata oluştu: {}", e.getMessage());
-                    }
-                    return preferences;
-                }))
-                .doOnSuccess(pref -> log.debug("Kullanıcı tercihleri işlemi tamamlandı: userId={}", preferences.getUserId()));
+    public Mono<UserPreference> saveUserPreferences(UserPreference userPreference) {
+        log.info("Kullanıcı tercihleri kaydediliyor: userId={}", userPreference.getUserId());
+        return userPreferenceRepository.save(userPreference)
+            .flatMap(savedPreference -> redisCacheService.saveUserPreference(savedPreference)
+                .thenReturn(savedPreference))
+            .doOnSuccess(savedPreference -> {
+                // Event publishing'i non-blocking ve hata toleranslı hale getir
+                eventService.publishPreferenceChangedEvent(savedPreference)
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .subscribe(
+                        null,
+                        error -> log.error("Tercih değişikliği olayı yayınlanırken hata (event publish işlemi ana işlem akışını etkilemedi): userId={}, error={}", 
+                                savedPreference.getUserId(), error.getMessage())
+                    );
+                log.info("Kullanıcı tercihleri başarıyla kaydedildi: userId={}", userPreference.getUserId());
+            })
+            .doOnError(e -> log.error("Kullanıcı tercihleri kaydedilirken hata: userId={}, error={}", 
+                    userPreference.getUserId(), e.getMessage()));
     }
     
     public Mono<UserPreference> updateTheme(String userId, String theme) {
         log.info("Tema güncelleniyor: userId={}, theme={}", userId, theme);
         return getUserPreferences(userId)
-            .flatMap(pref -> {
-                if (theme.equals(pref.getTheme())) {
-                    log.info("Tema değeri zaten '{}' olarak ayarlı, güncelleme yapılmadı", theme);
-                    return Mono.just(pref);
-                }
-                
-                pref.setTheme(theme);
-                pref.setUpdatedAt(System.currentTimeMillis());
-                return redisCacheService.saveUserPreferences(pref)
-                    .timeout(Duration.ofMillis(operationTimeoutMillis))
-                    .onErrorResume(e -> {
-                        log.warn("Redis teması güncelleme hatası (arka planda devam edecek): {}", e.getMessage());
-                        return Mono.just(Boolean.TRUE); // İşlemi devam ettir
-                    })
-                    .thenReturn(pref);
+            .flatMap(existingPreference -> {
+                existingPreference.setTheme(theme);
+                existingPreference.setUpdatedAt(System.currentTimeMillis());
+                return saveUserPreferences(existingPreference);
             })
-            .doOnNext(saved -> {
-                // Tema değişikliğini asenkron olarak event olarak yayınla
-                try {
-                    publishPreferenceUpdated(userId, "theme", theme);
-                } catch (Exception e) {
-                    log.warn("Tema değişikliği yayınlanırken hata: {}", e.getMessage());
-                }
-            })
-            .doOnError(e -> log.error("Tema güncellenirken hata: userId={}, theme={}, error={}", 
-                    userId, theme, e.getMessage()));
+            .doOnSuccess(updatedPreference -> 
+                log.info("Tema başarıyla güncellendi: userId={}, theme={}", userId, theme));
     }
 
     private Mono<UserPreference> createFallbackThemePreference(String userId, String theme) {
@@ -297,7 +271,7 @@ public class UserPreferenceService {
                             }
                         })
                         .onErrorResume(e -> Mono.empty())
-                        .then(repository.save(existingPreferences))
+                        .then(userPreferenceRepository.save(existingPreferences))
                         .doOnSuccess(saved -> {
                             // Kafka ile tercih değişikliği olayını yayınla
                             publishPreferenceUpdated(userId, updates);

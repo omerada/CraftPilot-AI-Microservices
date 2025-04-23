@@ -139,6 +139,7 @@ springdoc:
   default-consumes-media-type: application/json
 
 kafka:
+  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
   topics:
     notification-events: notification-events
     notification-delivery: notification-delivery

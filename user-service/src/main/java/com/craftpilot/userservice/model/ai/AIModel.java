@@ -8,6 +8,9 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.TypeAlias;
 import com.google.cloud.firestore.annotation.DocumentId;
 
+import java.util.List;
+import java.util.Map;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -29,6 +32,57 @@ public class AIModel {
     private String requiredPlan;
     private Integer creditCost; // Her kullanımda tüketilecek kredi miktarı
     private String category; // Model kategorisi (basic, standard, premium gibi)
-    private String architecture; // Modelin mimarisi
+
+    // Yeni alanlar
+    private Long created; // Model oluşturma zaman damgası
     private Integer contextLength; // Modelin bağlam penceresi uzunluğu
+    
+    // Mimari bilgileri (String yerine nesne olarak)
+    private Architecture architecture;
+    
+    // Fiyatlandırma bilgileri
+    private Pricing pricing;
+    
+    // Sağlayıcı bilgileri
+    private TopProvider topProvider;
+    
+    // İstek limitleri
+    private Object perRequestLimits;
+    
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Architecture {
+        private String modality;
+        private List<String> inputModalities;
+        private List<String> outputModalities;
+        private String tokenizer;
+        private String instructType;
+    }
+    
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Pricing {
+        private String prompt;
+        private String completion;
+        private String request;
+        private String image;
+        private String webSearch;
+        private String internalReasoning;
+        private String inputCacheRead;
+        private String inputCacheWrite;
+    }
+    
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TopProvider {
+        private Integer contextLength;
+        private Integer maxCompletionTokens;
+        private Boolean isModerated;
+    }
 }

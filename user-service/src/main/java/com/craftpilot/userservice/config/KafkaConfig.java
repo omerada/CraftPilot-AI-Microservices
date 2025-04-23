@@ -16,21 +16,57 @@ import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 import org.springframework.util.backoff.ExponentialBackOff;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.kafka.KafkaException;
+
 import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
+@Slf4j
 public class KafkaConfig {
 
-    @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
+    @Value("${spring.kafka.bootstrap-servers:kafka:9092}")
     private String bootstrapServers;
+    
+    @Value("${spring.kafka.enabled:true}")
+    private boolean kafkaEnabled;
 
     @Bean
+    @ConditionalOnProperty(name = "spring.kafka.enabled", havingValue = "true", matchIfMissing = true)
+    public ProducerFactory<String, Object> producerFactory() {
+        Map<String, Object> configProps = new HashMap<>();
+        configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+        // Kafka bağlantı sorunlarını daha iyi yönetmek için yapılandırma
+        configProps.put(ProducerConfig.RETRIES_CONFIG, 3);
+        configProps.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 1000);
+        configProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 5000);
+        configProps.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 5000);
+        configProps.put(ProducerConfig.ACKS_CONFIG, "1");
+        return new DefaultKafkaProducerFactory<>(configProps);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "spring.kafka.enabled", havingValue = "true", matchIfMissing = true)
+    public KafkaTemplate<String, Object> kafkaTemplate() {
+        try {
+            return new KafkaTemplate<>(producerFactory());
+        } catch (Exception e) {
+            log.error("Kafka yapılandırması oluşturulamadı. Kafka bağlantısına erişilemiyor olabilir: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "spring.kafka.enabled", havingValue = "true", matchIfMissing = true)
     public KafkaAdmin kafkaAdmin() {
         Map<String, Object> configs = new HashMap<>();
         configs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        configs.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 30000);
-        configs.put(AdminClientConfig.RETRIES_CONFIG, 5);
+        // Admin istemcisi için timeout süresini azalt
+        configs.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 5000);
         return new KafkaAdmin(configs);
     }
 

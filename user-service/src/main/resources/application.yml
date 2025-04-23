@@ -22,21 +22,21 @@ spring:
     config:
       path: ${FIREBASE_CONFIG_PATH:/etc/gcp/credentials/gcp-credentials.json}
   kafka:
-    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    enabled: true
+    bootstrap-servers: ${KAFKA_BROKERS:kafka:9092}
     producer:
+      retries: 3
+      acks: 1
+      batch-size: 16384
+      buffer-memory: 33554432
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
-      acks: all
-      retries: 10
-      retry-backoff-ms: 1000
-      # Kafka bağlantı hatalarını yönetme
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
-        reconnect.backoff.ms: 1000
-        reconnect.backoff.max.ms: 5000
+        request.timeout.ms: 5000
         retry.backoff.ms: 1000
-        request.timeout.ms: 30000
-        max.block.ms: 10000
-        delivery.timeout.ms: 60000
+        max.block.ms: 5000
+        # Bağlantı sorunlarında daha hızlı hata vermesi için
+        delivery.timeout.ms: 10000
 
 eureka:
   instance:
@@ -131,6 +131,15 @@ resilience4j:
         recordExceptions:
           - java.util.concurrent.TimeoutException
           - java.io.IOException
+      kafkaPublisher:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 30s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
   retry:
     instances:
       userPreferences:
@@ -162,6 +171,8 @@ kafka:
     user-preferences: user-preferences
     user-events: user-events
     user-activity: user-activity
+  topic:
+    user-preferences: user-preferences
 
 logging:
   level:
@@ -201,3 +212,10 @@ craftpilot:
 user-preference:
   operation:
     timeout: 1000 # 1 saniye timeout
+
+# AI Model yapılandırmaları
+app:
+  load-models: ${LOAD_MODELS:false}
+  models:
+    file: ${MODELS_FILE:newmodels.json}
+    version: ${MODELS_VERSION:1}

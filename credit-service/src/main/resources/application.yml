@@ -115,7 +115,7 @@ springdoc:
     enabled: true
 
 redis:
-  host: ${REDIS_HOST:localhost}
+  host: ${REDIS_HOST:redis}
   port: ${REDIS_PORT:6379}
   password: ${REDIS_PASSWORD:13579ada}
   lettuce:

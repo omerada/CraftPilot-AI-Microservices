@@ -3,9 +3,11 @@ package com.craftpilot.userservice.command;
 import com.craftpilot.userservice.service.ModelDataLoader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+
 import java.time.Duration;
 
 @Component
@@ -15,15 +17,17 @@ import java.time.Duration;
 public class ModelDataLoaderCommand implements CommandLineRunner {
 
     private final ModelDataLoader modelDataLoader;
+    
+    @Value("${app.models.file:newmodels.json}")
+    private String modelsFile;
 
     @Override
     public void run(String... args) {
         log.info("AI modelleri yükleme işlemi başlıyor...");
         
-        String jsonFilePath = "c:\\Projects\\Craft-Pilot-Ai\\models.json";
-        if (args.length > 0 && args[0] != null && !args[0].isEmpty()) {
-            jsonFilePath = args[0];
-        }
+        // Dosya yolunu belirle
+        String jsonFilePath = args.length > 0 && args[0] != null && !args[0].isEmpty() ? 
+                              args[0] : modelsFile;
         
         modelDataLoader.loadModelsFromJson(jsonFilePath)
             .timeout(Duration.ofMinutes(5))
@@ -33,6 +37,6 @@ public class ModelDataLoaderCommand implements CommandLineRunner {
             .doOnError(error -> {
                 log.error("AI model yükleme sırasında hata: {}", error.getMessage(), error);
             })
-            .block();
+            .subscribe();
     }
 }

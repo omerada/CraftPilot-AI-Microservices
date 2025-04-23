@@ -1,12 +1,16 @@
 package com.craftpilot.userservice.repository;
 
 import com.craftpilot.userservice.model.ai.Provider;
+import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.Firestore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 @Repository
 @RequiredArgsConstructor
@@ -17,29 +21,42 @@ public class ProviderRepository {
     
     public Mono<Provider> save(Provider provider) {
         return Mono.fromCallable(() -> {
-            firestore.collection(COLLECTION_NAME)
-                    .document(provider.getName())
-                    .set(provider)
-                    .get();
-            return provider;
+            try {
+                firestore.collection(COLLECTION_NAME)
+                        .document(provider.getName())
+                        .set(provider)
+                        .get();
+                return provider;
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException("Error saving provider", e);
+            }
         }).subscribeOn(Schedulers.boundedElastic());
     }
     
     public Flux<Provider> findAll() {
-        return Flux.defer(() -> Flux.fromIterable(
-                firestore.collection(COLLECTION_NAME).get().get().getDocuments())
-                .map(doc -> doc.toObject(Provider.class)))
-                .subscribeOn(Schedulers.boundedElastic());
+        return Flux.defer(() -> {
+            try {
+                return Flux.fromIterable(
+                        firestore.collection(COLLECTION_NAME).get().get().getDocuments())
+                        .map(doc -> doc.toObject(Provider.class));
+            } catch (InterruptedException | ExecutionException e) {
+                return Flux.error(new RuntimeException("Error retrieving all providers", e));
+            }
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
     public Mono<Provider> findById(String name) {
-        return Mono.fromCallable(() -> 
-            firestore.collection(COLLECTION_NAME)
-                    .document(name)
-                    .get()
-                    .get()
-                    .toObject(Provider.class)
-        ).subscribeOn(Schedulers.boundedElastic());
+        return Mono.fromCallable(() -> {
+            try {
+                return firestore.collection(COLLECTION_NAME)
+                        .document(name)
+                        .get()
+                        .get()
+                        .toObject(Provider.class);
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException("Error retrieving provider by ID", e);
+            }
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
     public Mono<Void> deleteById(String name) {

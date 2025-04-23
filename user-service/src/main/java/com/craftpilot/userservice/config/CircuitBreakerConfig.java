@@ -1,5 +1,6 @@
 package com.craftpilot.userservice.config;
 
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.SlidingWindowType;
 import io.github.resilience4j.common.circuitbreaker.configuration.CircuitBreakerConfigCustomizer;
 import io.github.resilience4j.common.ratelimiter.configuration.RateLimiterConfigCustomizer;
@@ -11,6 +12,23 @@ import java.time.Duration;
 
 @Configuration
 public class CircuitBreakerConfig {
+
+    @Bean
+    public CircuitBreakerRegistry circuitBreakerRegistry() {
+        io.github.resilience4j.circuitbreaker.CircuitBreakerConfig circuitBreakerConfig = 
+                io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
+                .failureRateThreshold(50)
+                .slowCallRateThreshold(50)
+                .waitDurationInOpenState(Duration.ofSeconds(30))
+                .slowCallDurationThreshold(Duration.ofSeconds(2))
+                .permittedNumberOfCallsInHalfOpenState(5)
+                .minimumNumberOfCalls(10)
+                .slidingWindowType(SlidingWindowType.COUNT_BASED)
+                .slidingWindowSize(10)
+                .build();
+        
+        return CircuitBreakerRegistry.of(circuitBreakerConfig);
+    }
 
     @Bean
     @Primary

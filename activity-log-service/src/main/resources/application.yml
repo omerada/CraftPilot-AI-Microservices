@@ -29,10 +29,19 @@ spring:
       write-dates-as-timestamps: false
     date-format: com.fasterxml.jackson.databind.util.ISO8601DateFormat
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     consumer:
       group-id: ${spring.application.name}-group
+      concurrency: 3
       auto-offset-reset: earliest
+      max-poll-records: 100
+
+# Redis yapılandırması ekleniyor
+spring.data.redis:
+  host: ${REDIS_HOST:redis}
+  port: ${REDIS_PORT:6379}
+  password: ${REDIS_PASSWORD:13579ada}
+  timeout: 5000
 
 management:
   endpoints:
