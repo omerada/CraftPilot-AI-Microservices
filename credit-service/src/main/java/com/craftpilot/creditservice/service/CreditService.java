@@ -27,13 +27,13 @@ public class CreditService {
     private final KafkaTemplate<String, CreditEvent> kafkaTemplate;
     private final MeterRegistry meterRegistry;
 
-    @Value("${kafka.topics.credit-events}")
+    @Value("${kafka.topics.credit-events:credit-events}")
     private String creditEventsTopic;
 
-    @Value("${initial.credit.amount}")
+    @Value("${initial.credit.amount:100}")  // Varsayılan değer: 100
     private String initialCreditAmount;
 
-    @Value("${initial.advanced.credit.amount}")
+    @Value("${initial.advanced.credit.amount:0}")  // Varsayılan değer: 0
     private String initialAdvancedCreditAmount;
 
     public Mono<Credit> getUserCredits(String userId) {
@@ -192,7 +192,7 @@ public class CreditService {
             // Use enum type2 field
             newBalance = transaction.getType2() == CreditTransaction.TransactionType.CREDIT
                     ? credit.getBalance().add(transaction.getAmount())
-                    : credit.getBalance().subtract(transaction.getAmount());
+                    : credit.getBalance().subtract(transaction.getAmount()); // Fazla nokta kaldırıldı
 
             credit.setBalance(newBalance);
             credit.setLastUpdated(LocalDateTime.now());
