@@ -1,5 +1,6 @@
 package com.craftpilot.userservice.config;
 
+import com.craftpilot.userservice.model.user.event.UserEvent;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -33,12 +34,9 @@ public class KafkaConfig {
         return new KafkaAdmin(configs);
     }
 
-    @Bean
-    public ProducerFactory<String, String> producerFactory() {
+    private Map<String, Object> getBaseProducerConfigs() {
         Map<String, Object> configProps = new HashMap<>();
         configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         configProps.put(ProducerConfig.ACKS_CONFIG, "all");
         configProps.put(ProducerConfig.RETRIES_CONFIG, 10);
         configProps.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 1000);
@@ -47,29 +45,45 @@ public class KafkaConfig {
         configProps.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 10000);
         configProps.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 60000);
         configProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 30000);
+        return configProps;
+    }
+
+    // String değerleri için ProducerFactory
+    @Bean
+    public ProducerFactory<String, String> stringProducerFactory() {
+        Map<String, Object> configProps = getBaseProducerConfigs();
+        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         return new DefaultKafkaProducerFactory<>(configProps);
     }
 
+    // String değerleri için KafkaTemplate
     @Bean
     public KafkaTemplate<String, String> kafkaTemplate() {
-        return new KafkaTemplate<>(producerFactory());
+        return new KafkaTemplate<>(stringProducerFactory());
     }
     
-    // Object değerleri için yeni ProducerFactory
+    // UserEvent değerleri için ProducerFactory
     @Bean
-    public ProducerFactory<String, Object> objectProducerFactory() {
-        Map<String, Object> configProps = new HashMap<>();
-        configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+    public ProducerFactory<String, UserEvent> userEventProducerFactory() {
+        Map<String, Object> configProps = getBaseProducerConfigs();
         configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
-        configProps.put(ProducerConfig.ACKS_CONFIG, "all");
-        configProps.put(ProducerConfig.RETRIES_CONFIG, 10);
-        configProps.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 1000);
-        configProps.put(ProducerConfig.RECONNECT_BACKOFF_MS_CONFIG, 1000);
-        configProps.put(ProducerConfig.RECONNECT_BACKOFF_MAX_MS_CONFIG, 5000);
-        configProps.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 10000);
-        configProps.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 60000);
-        configProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 30000);
+        return new DefaultKafkaProducerFactory<>(configProps);
+    }
+    
+    // UserEvent değerleri için KafkaTemplate
+    @Bean
+    public KafkaTemplate<String, UserEvent> userEventKafkaTemplate() {
+        return new KafkaTemplate<>(userEventProducerFactory());
+    }
+    
+    // Generic Object değerleri için ProducerFactory
+    @Bean
+    public ProducerFactory<String, Object> objectProducerFactory() {
+        Map<String, Object> configProps = getBaseProducerConfigs();
+        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
         return new DefaultKafkaProducerFactory<>(configProps);
     }
     
