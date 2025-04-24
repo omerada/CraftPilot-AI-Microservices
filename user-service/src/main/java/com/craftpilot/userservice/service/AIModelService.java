@@ -32,11 +32,23 @@ public class AIModelService {
 
     @CircuitBreaker(name = "aiModels", fallbackMethod = "getDefaultModels")
     public Mono<ModelsData> getAvailableModels(String userPlan) {
-        log.info("AI modelleri getiriliyor: userPlan={}", userPlan);
+        log.info("Tüm AI modeller getiriliyor (filtreleme yapılmadan)");
         
-        // Kullanıcı planına göre uygun modelleri filtrele
-        return filterModelsByPlan(userPlan)
+        return modelRepository.findAll()
+            .collectList()
             .flatMap(models -> {
+                // Modelleri önce kredi tipine (STANDARD -> ADVANCED) sonra maliyete (ucuzdan pahalıya) göre sırala
+                models.sort((model1, model2) -> {
+                    // Önce kredi tipine göre sırala (STANDARD önce)
+                    int creditTypeComparison = compareCreditTypes(model1.getCreditType(), model2.getCreditType());
+                    if (creditTypeComparison != 0) {
+                        return creditTypeComparison;
+                    }
+                    
+                    // Kredi tipi aynıysa, kredi maliyetine göre sırala (küçükten büyüğe)
+                    return model1.getCreditCost().compareTo(model2.getCreditCost());
+                });
+                
                 // Provider'ları getir
                 return providerRepository.findAll()
                     .collectList()
@@ -62,7 +74,7 @@ public class AIModelService {
                     });
             })
             .doOnSuccess(data -> log.info("AI modelleri başarıyla getirildi: modelCount={}, providerCount={}", 
-                data.getModels().size(), data.getProviders().size()))
+                data.getModels().size(), data.getProviders() != null ? data.getProviders().size() : 0))
             .doOnError(e -> log.error("AI modelleri getirilirken hata: error={}", e.getMessage()));
     }
     
@@ -109,19 +121,9 @@ public class AIModelService {
         }
     }
     
-    private Mono<List<AIModel>> filterModelsByPlan(String userPlan) {
-        // Plan hiyerarşisi - üst plan, alt planları içerir
-        Map<String, List<String>> planHierarchy = new HashMap<>();
-        planHierarchy.put("free", List.of("free"));
-        planHierarchy.put("pro", List.of("free", "pro"));
-        planHierarchy.put("premium", List.of("free", "pro", "premium"));
-        planHierarchy.put("enterprise", List.of("free", "pro", "premium", "enterprise"));
-        
-        List<String> allowedPlans = planHierarchy.getOrDefault(userPlan.toLowerCase(), List.of("free"));
-        
-        return modelRepository.findAll()
-            .filter(model -> allowedPlans.contains(model.getRequiredPlan().toLowerCase()))
-            .collectList();
+    private Mono<List<AIModel>> filterModelsByPlan(String userPlan) { 
+        log.info("Tüm AI modeller getiriliyor (filtreleme yapılmadan)");
+        return modelRepository.findAll().collectList();
     }
     
     private String mapLegacyModelId(String modelId) {
@@ -143,5 +145,19 @@ public class AIModelService {
         log.info("{} AI model kaydediliyor", models.size());
         return Flux.fromIterable(models)
             .flatMap(this::saveModel);
+    }
+    
+    // Kredi tipi karşılaştırma yardımcı metodu
+    private int compareCreditTypes(String creditType1, String creditType2) {
+        // "STANDARD" < "ADVANCED" olacak şekilde sırala
+        if (creditType1 == null && creditType2 == null) return 0;
+        if (creditType1 == null) return -1;  // null değerler başta olsun
+        if (creditType2 == null) return 1;
+        
+        // STANDARD önce, ADVANCED sonra
+        if ("STANDARD".equals(creditType1) && "ADVANCED".equals(creditType2)) return -1;
+        if ("ADVANCED".equals(creditType1) && "STANDARD".equals(creditType2)) return 1;
+        
+        return 0;  // Aynı kredi tipi
     }
 }
