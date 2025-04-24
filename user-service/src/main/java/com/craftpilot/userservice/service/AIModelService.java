@@ -73,16 +73,13 @@ public class AIModelService {
         List<AIModel> defaultModels = new ArrayList<>();
         defaultModels.add(AIModel.builder()
             .id("google/gemini-2.0-flash-lite-001")
-            .value("google/gemini-2.0-flash-lite-001")
-            .label("Gemini Flash Lite")
-            .description("Hızlı yanıt süresi için optimize edilmiş")
-            .provider("Google")
-            .providerIcon("TbBrandGoogle")
-            .maxTokens(8000)
+            .modelId("google/gemini-2.0-flash-lite-001")
+            .modelName("Gemini Flash Lite")
+            .provider("Google") 
             .maxInputTokens(6000)
             .requiredPlan("free")
             .build());
-            
+        
         // Birkaç varsayılan provider oluştur
         List<Provider> defaultProviders = new ArrayList<>();
         defaultProviders.add(Provider.builder()

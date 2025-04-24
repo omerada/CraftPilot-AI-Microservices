@@ -1,1618 +1,482 @@
-{
-  "data": [
-    {
-      "id": "openai/gpt-4.1-nano",
-      "value": "openai/gpt-4.1-nano",
-      "label": "OpenAI: GPT-4.1 Nano",
-      "description": "For tasks that demand low latency, GPT‑4.1 nano is the fastest and cheapest model in the GPT-4.1 series. It delivers exceptional performance at a small size with its 1 million token context window, and scores 80.1% on MMLU, 50.3% on GPQA, and 9.8% on Aider polyglot coding – even higher than GPT‑4o mini. It's ideal for tasks like classification or autocompletion.",
-      "badge": "FAST",
-      "popular": true,
-      "provider": "OpenAI",
-      "providerIcon": "openai",
-      "maxTokens": 1047576,
-      "maxInputTokens": 523788,
-      "requiredPlan": "free",
-      "creditCost": 1,
-      "category": "free",
-      "created": 1744651369,
-      "contextLength": 1047576,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": ["image", "text"],
-        "output_modalities": ["text"],
-        "tokenizer": "GPT",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.000025",
-        "completion": "0.00025",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.000000025"
-      },
-      "top_provider": {
-        "context_length": 1047576,
-        "max_completion_tokens": 32768,
-        "is_moderated": true
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "anthropic/claude-3.5-haiku",
-      "value": "anthropic/claude-3.5-haiku",
-      "label": "Anthropic: Claude 3.5 Haiku",
-      "description": "Claude 3.5 Haiku features offers enhanced capabilities in speed, coding accuracy, and tool use. Engineered to excel in real-time applications, it delivers quick response times that are essential for dynamic tasks such as chat interactions and immediate coding suggestions.",
-      "badge": "NEW",
-      "popular": true,
-      "provider": "Anthropic",
-      "providerIcon": "anthropic",
-      "maxTokens": 200000,
-      "maxInputTokens": 100000,
-      "requiredPlan": "free",
-      "creditCost": 2,
-      "category": "free",
-      "created": 1730678400,
-      "contextLength": 200000,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": ["text", "image"],
-        "output_modalities": ["text"],
-        "tokenizer": "Claude",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.001",
-        "completion": "0.005",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_write": "0.000001"
-      },
-      "top_provider": {
-        "context_length": 200000,
-        "max_completion_tokens": 100000,
-        "is_moderated": true
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "google/gemini-2.0-flash-001",
-      "value": "google/gemini-2.0-flash-001",
-      "label": "Google: Gemini 2.0 Flash",
-      "description": "Gemini Flash 2.0 offers a significantly faster time to first token (TTFT) compared to Gemini Flash 1.5, while maintaining quality on par with larger models like Gemini Pro 1.5. It introduces notable enhancements in multimodal understanding, coding capabilities, complex instruction following, and function calling.",
-      "badge": "VERSATILE",
-      "popular": false,
-      "provider": "Google",
-      "providerIcon": "google",
-      "maxTokens": 1000000,
-      "maxInputTokens": 500000,
-      "requiredPlan": "free",
-      "creditCost": 2,
-      "category": "free",
-      "created": 1738769413,
-      "contextLength": 1000000,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Gemini",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.000183",
-        "completion": "0.00055",
-        "request": "0",
-        "image": "0.00004",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_write": "0.0000001833"
-      },
-      "top_provider": {
-        "context_length": 1000000,
-        "max_completion_tokens": 8192,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "cohere/command-r7b-12-2024",
-      "value": "cohere/command-r7b-12-2024",
-      "label": "Cohere: Command R7B (12-2024)",
-      "description": "Command R7B (12-2024) is a small, fast update of the Command R+ model, delivered in December 2024. It excels at RAG, tool use, agents, and similar tasks requiring complex reasoning and multiple steps.",
-      "badge": null,
-      "popular": false,
-      "provider": "Cohere",
-      "providerIcon": "cohere",
-      "maxTokens": 128000,
-      "maxInputTokens": 64000,
-      "requiredPlan": "free",
-      "creditCost": 1,
-      "category": "free",
-      "created": 1734158152,
-      "contextLength": 128000,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.00015",
-        "completion": "0.0003",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 128000,
-        "max_completion_tokens": null,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "qwen/qwen-turbo",
-      "value": "qwen/qwen-turbo",
-      "label": "Qwen: Qwen-Turbo",
-      "description": "Qwen-Turbo, based on Qwen2.5, is a 1M context model that provides fast speed and low cost, suitable for simple tasks.",
-      "badge": "FAST",
-      "popular": false,
-      "provider": "Qwen",
-      "providerIcon": "qwen",
-      "maxTokens": 1000000,
-      "maxInputTokens": 500000,
-      "requiredPlan": "free",
-      "creditCost": 1,
-      "category": "free",
-      "created": 1738410974,
-      "contextLength": 1000000,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Qwen",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0002",
-        "completion": "0.0002",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 1000000,
-        "max_completion_tokens": null,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "mistral/ministral-3b",
-      "value": "mistral/ministral-3b",
-      "label": "Mistral: Ministral 3B",
-      "description": "Ministral 3B is a 3B parameter model optimized for on-device and edge computing. It excels in knowledge, commonsense reasoning, and function-calling, outperforming larger models like Mistral 7B on most benchmarks. Supporting up to 128k context length, it's ideal for orchestrating agentic workflows and specialist tasks with efficient inference.",
-      "badge": "EFFICIENT",
-      "popular": false,
-      "provider": "Mistral",
-      "providerIcon": "mistral",
-      "maxTokens": 131072,
-      "maxInputTokens": 65536,
-      "requiredPlan": "free",
-      "creditCost": 1,
-      "category": "free",
-      "created": 1729123200,
-      "contextLength": 131072,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Mistral",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0001",
-        "completion": "0.0002",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 131072,
-        "max_completion_tokens": null,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "perplexity/sonar",
-      "value": "perplexity/sonar",
-      "label": "Perplexity: Sonar",
-      "description": "Sonar is lightweight, affordable, fast, and simple to use — now featuring citations and the ability to customize sources. It is designed for companies seeking to integrate lightweight question-and-answer features optimized for speed.",
-      "badge": null,
-      "popular": false,
-      "provider": "Perplexity",
-      "providerIcon": "perplexity",
-      "maxTokens": 127072,
-      "maxInputTokens": 63536,
-      "requiredPlan": "free",
-      "creditCost": 1,
-      "category": "free",
-      "created": 1738013808,
-      "contextLength": 127072,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0001",
-        "completion": "0.0002",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 127072,
-        "max_completion_tokens": null,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "meta-llama/llama-3.2-1b-instruct",
-      "value": "meta-llama/llama-3.2-1b-instruct",
-      "label": "Meta: Llama 3.2 1B Instruct",
-      "description": "Llama 3.2 1B is a 1-billion-parameter language model focused on efficiently performing natural language tasks, such as summarization, dialogue, and multilingual text analysis. Its smaller size allows it to operate efficiently in low-resource environments while maintaining strong task performance.",
-      "badge": "COMPACT",
-      "popular": false,
-      "provider": "Meta",
-      "providerIcon": "meta",
-      "maxTokens": 131072,
-      "maxInputTokens": 65536,
-      "requiredPlan": "free",
-      "creditCost": 1,
-      "category": "free",
-      "created": 1727222400,
-      "contextLength": 131072,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Llama3",
-        "instruct_type": "llama3"
-      },
-      "pricing": {
-        "prompt": "0.00025",
-        "completion": "0.00025",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 131072,
-        "max_completion_tokens": null,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "microsoft/phi-4",
-      "value": "microsoft/phi-4",
-      "label": "Microsoft: Phi 4",
-      "description": "Microsoft Phi-4 is designed to perform well in complex reasoning tasks and can operate efficiently in situations with limited memory or where quick responses are needed. At 14 billion parameters, it was trained on a mix of high-quality synthetic datasets, data from curated websites, and academic materials.",
-      "badge": "BALANCED",
-      "popular": false,
-      "provider": "Microsoft",
-      "providerIcon": "microsoft",
-      "maxTokens": 16384,
-      "maxInputTokens": 8192,
-      "requiredPlan": "free",
-      "creditCost": 1,
-      "category": "free",
-      "created": 1736489872,
-      "contextLength": 16384,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.00025",
-        "completion": "0.00025",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 16384,
-        "max_completion_tokens": null,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "deepseek/deepseek-r1-distill-qwen-1.5b",
-      "value": "deepseek/deepseek-r1-distill-qwen-1.5b",
-      "label": "DeepSeek: R1 Distill Qwen 1.5B",
-      "description": "DeepSeek R1 Distill Qwen 1.5B is a distilled large language model based on Qwen 2.5 Math 1.5B, using outputs from DeepSeek R1. It's a very small and efficient model which outperforms GPT 4o 0513 on Math Benchmarks.",
-      "badge": "MATH",
-      "popular": false,
-      "provider": "DeepSeek",
-      "providerIcon": "deepseek",
-      "maxTokens": 131072,
-      "maxInputTokens": 65536,
-      "requiredPlan": "free",
-      "creditCost": 1,
-      "category": "free",
-      "created": 1738328067,
-      "contextLength": 131072,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Qwen",
-        "instruct_type": "deepseek-r1"
-      },
-      "pricing": {
-        "prompt": "0.0001",
-        "completion": "0.0002",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 131072,
-        "max_completion_tokens": null,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "nvidia/llama-3.1-nemotron-nano-8b-v1",
-      "value": "nvidia/llama-3.1-nemotron-nano-8b-v1",
-      "label": "NVIDIA: Llama 3.1 Nemotron Nano 8B v1",
-      "description": "Llama-3.1-Nemotron-Nano-8B-v1 is a compact large language model (LLM) derived from Meta's Llama-3.1-8B-Instruct, specifically optimized for reasoning tasks, conversational interactions, retrieval-augmented generation (RAG), and tool-calling applications.",
-      "badge": null,
-      "popular": false,
-      "provider": "NVIDIA",
-      "providerIcon": "nvidia",
-      "maxTokens": 131072,
-      "maxInputTokens": 65536,
-      "requiredPlan": "free",
-      "creditCost": 1,
-      "category": "free",
-      "created": 1744123873,
-      "contextLength": 131072,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0001",
-        "completion": "0.0002",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 131072,
-        "max_completion_tokens": null,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "liquid/lfm-3b",
-      "value": "liquid/lfm-3b",
-      "label": "Liquid: LFM 3B",
-      "description": "Liquid's LFM 3B delivers incredible performance for its size. It positions itself as first place among 3B parameter transformers, hybrids, and RNN models It is also on par with Phi-3.5-mini on multiple benchmarks, while being 18.4% smaller.",
-      "badge": "COMPACT",
-      "popular": false,
-      "provider": "Liquid",
-      "providerIcon": "liquid",
-      "maxTokens": 32768,
-      "maxInputTokens": 16384,
-      "requiredPlan": "free",
-      "creditCost": 1,
-      "category": "free",
-      "created": 1737806501,
-      "contextLength": 32768,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Other",
-        "instruct_type": "chatml"
-      },
-      "pricing": {
-        "prompt": "0.0001",
-        "completion": "0.0002",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 32768,
-        "max_completion_tokens": null,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "openai/o1-mini",
-      "value": "openai/o1-mini",
-      "label": "OpenAI: o1-mini",
-      "description": "The latest and strongest model family from OpenAI, o1 is designed to spend more time thinking before responding. The o1 models are optimized for math, science, programming, and other STEM-related tasks. They consistently exhibit PhD-level accuracy on benchmarks in physics, chemistry, and biology.",
-      "badge": "REASONING",
-      "popular": true,
-      "provider": "OpenAI",
-      "providerIcon": "openai",
-      "maxTokens": 128000,
-      "maxInputTokens": 64000,
-      "requiredPlan": "free",
-      "creditCost": 2,
-      "category": "free",
-      "created": 1726099200,
-      "contextLength": 128000,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "GPT",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.00055",
-        "completion": "0.00165",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.00000055"
-      },
-      "top_provider": {
-        "context_length": 128000,
-        "max_completion_tokens": 32768,
-        "is_moderated": true
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "anthropic/claude-3-haiku",
-      "value": "anthropic/claude-3-haiku",
-      "label": "Anthropic: Claude 3 Haiku",
-      "description": "Claude 3 Haiku is Anthropic's fastest and most compact model for near-instant responsiveness. Quick and accurate targeted performance.",
-      "badge": "FAST",
-      "popular": true,
-      "provider": "Anthropic",
-      "providerIcon": "anthropic",
-      "maxTokens": 200000,
-      "maxInputTokens": 100000,
-      "requiredPlan": "free",
-      "creditCost": 1,
-      "category": "free",
-      "created": 1709049600,
-      "contextLength": 200000,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": ["text", "image"],
-        "output_modalities": ["text"],
-        "tokenizer": "Claude",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.00025",
-        "completion": "0.00125",
-        "request": "0",
-        "image": "0.0004",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.00000003",
-        "input_cache_write": "0.0000003"
-      },
-      "top_provider": {
-        "context_length": 200000,
-        "max_completion_tokens": 100000,
-        "is_moderated": true
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "openai/gpt-4o-2024-11-20",
-      "value": "openai/gpt-4o-2024-11-20",
-      "label": "OpenAI: GPT-4o (2024-11-20)",
-      "description": "The 2024-11-20 version of GPT-4o offers a leveled-up creative writing ability with more natural, engaging, and tailored writing to improve relevance & readability. It's also better at working with uploaded files, providing deeper insights & more thorough responses.",
-      "badge": "PREMIUM",
-      "popular": true,
-      "provider": "OpenAI",
-      "providerIcon": "openai",
-      "maxTokens": 128000,
-      "maxInputTokens": 64000,
-      "requiredPlan": "pro",
-      "creditCost": 5,
-      "category": "pro",
-      "created": 1732127594,
-      "contextLength": 128000,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": ["image", "text"],
-        "output_modalities": ["text"],
-        "tokenizer": "GPT",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.01",
-        "completion": "0.03",
-        "request": "0",
-        "image": "0.00425",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.00000125"
-      },
-      "top_provider": {
-        "context_length": 128000,
-        "max_completion_tokens": 32768,
-        "is_moderated": true
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "anthropic/claude-3.5-sonnet",
-      "value": "anthropic/claude-3.5-sonnet",
-      "label": "Anthropic: Claude 3.5 Sonnet",
-      "description": "Claude 3.5 Sonnet delivers better-than-Opus capabilities, faster-than-Sonnet speeds, at the same Sonnet prices. Particularly excels at coding, data science, visual processing, and agentic tasks requiring complex problem-solving steps.",
-      "badge": "PREMIUM",
-      "popular": true,
-      "provider": "Anthropic",
-      "providerIcon": "anthropic",
-      "maxTokens": 200000,
-      "maxInputTokens": 100000,
-      "requiredPlan": "pro",
-      "creditCost": 6,
-      "category": "pro",
-      "created": 1729555200,
-      "contextLength": 200000,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": ["image", "text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Claude",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.015",
-        "completion": "0.075",
-        "request": "0",
-        "image": "0.0045",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_write": "0.00000375"
-      },
-      "top_provider": {
-        "context_length": 200000,
-        "max_completion_tokens": 100000,
-        "is_moderated": true
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "google/gemini-2.5-pro-preview",
-      "value": "google/gemini-2.5-pro-preview",
-      "label": "Google: Gemini 2.5 Pro",
-      "description": "Gemini 2.5 Pro is Google's state-of-the-art AI model designed for advanced reasoning, coding, mathematics, and scientific tasks. It employs 'thinking' capabilities, enabling it to reason through responses with enhanced accuracy and nuanced context handling. Gemini 2.5 Pro achieves top-tier performance on multiple benchmarks, including first-place positioning on the LMArena leaderboard.",
-      "badge": "EXTENSIVE",
-      "popular": true,
-      "provider": "Google",
-      "providerIcon": "google",
-      "maxTokens": 1048576,
-      "maxInputTokens": 524288,
-      "requiredPlan": "pro",
-      "creditCost": 5,
-      "category": "pro",
-      "created": 1742922099,
-      "contextLength": 1048576,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": ["image", "text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Gemini",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0075",
-        "completion": "0.0075",
-        "request": "0",
-        "image": "0.0025",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_write": "0"
-      },
-      "top_provider": {
-        "context_length": 1048576,
-        "max_completion_tokens": 8192,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "mistralai/mistral-large-2411",
-      "value": "mistralai/mistral-large-2411",
-      "label": "Mistral: Mistral Large 2411",
-      "description": "Mistral Large 2411 provides significant upgrades with notable improvements in long context understanding, a new system prompt, and more accurate function calling. It excels at reasoning, code, JSON, chat, and supports dozens of languages including French, German, Spanish, Italian, Portuguese, Arabic, Hindi, Russian, Chinese, Japanese, and Korean.",
-      "badge": "VERSATILE",
-      "popular": true,
-      "provider": "Mistral",
-      "providerIcon": "mistral",
-      "maxTokens": 131072,
-      "maxInputTokens": 65536,
-      "requiredPlan": "pro",
-      "creditCost": 5,
-      "category": "pro",
-      "created": 1731978685,
-      "contextLength": 131072,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Mistral",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.007",
-        "completion": "0.021",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 131072,
-        "max_completion_tokens": 65536,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "openai/gpt-4o-mini",
-      "value": "openai/gpt-4o-mini",
-      "label": "OpenAI: GPT-4o Mini",
-      "description": "GPT-4o Mini delivers performance competitive with GPT-4o at substantially lower latency and cost. It retains high quality response capabilities while providing fast, efficient processing for a wide range of tasks from content generation to complex problem-solving.",
-      "badge": "EFFICIENT",
-      "popular": true,
-      "provider": "OpenAI",
-      "providerIcon": "openai",
-      "maxTokens": 128000,
-      "maxInputTokens": 64000,
-      "requiredPlan": "pro",
-      "creditCost": 3,
-      "category": "pro",
-      "created": 1719244800,
-      "contextLength": 128000,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": ["image", "text"],
-        "output_modalities": ["text"],
-        "tokenizer": "GPT",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0015",
-        "completion": "0.006",
-        "request": "0",
-        "image": "0.002",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 128000,
-        "max_completion_tokens": 32768,
-        "is_moderated": true
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "anthropic/claude-3.5-haiku",
-      "value": "anthropic/claude-3.5-haiku",
-      "label": "Anthropic: Claude 3.5 Haiku",
-      "description": "Claude 3.5 Haiku features enhanced capabilities in speed, coding accuracy, and tool use. Engineered to excel in real-time applications, it delivers quick response times essential for dynamic tasks such as chat interactions and immediate coding suggestions, making it highly suitable for environments demanding both speed and precision.",
-      "badge": "FAST",
-      "popular": true,
-      "provider": "Anthropic",
-      "providerIcon": "anthropic",
-      "maxTokens": 200000,
-      "maxInputTokens": 100000,
-      "requiredPlan": "pro",
-      "creditCost": 3,
-      "category": "pro",
-      "created": 1730678400,
-      "contextLength": 200000,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Claude",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0025",
-        "completion": "0.0125",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_write": "0.000001"
-      },
-      "top_provider": {
-        "context_length": 200000,
-        "max_completion_tokens": 100000,
-        "is_moderated": true
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "google/gemini-2.0-flash",
-      "value": "google/gemini-2.0-flash",
-      "label": "Google: Gemini 2.0 Flash",
-      "description": "Gemini 2.0 Flash offers a significantly faster time to first token compared to previous models, while maintaining quality on par with larger models. It introduces notable enhancements in multimodal understanding, coding capabilities, complex instruction following, and function calling for seamless and robust agentic experiences.",
-      "badge": "BALANCED",
-      "popular": true,
-      "provider": "Google",
-      "providerIcon": "google",
-      "maxTokens": 1000000,
-      "maxInputTokens": 500000,
-      "requiredPlan": "pro",
-      "creditCost": 3,
-      "category": "pro",
-      "created": 1738769413,
-      "contextLength": 1000000,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Gemini",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.000183",
-        "completion": "0.00055",
-        "request": "0",
-        "image": "0.00004",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_write": "0.0000001833"
-      },
-      "top_provider": {
-        "context_length": 1000000,
-        "max_completion_tokens": 8192,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "qwen/qwen-plus",
-      "value": "qwen/qwen-plus",
-      "label": "Qwen: Qwen-Plus",
-      "description": "Qwen-Plus, based on the Qwen2.5 foundation model, is a 131K context model with a balanced performance, speed, and cost combination, making it ideal for developers seeking high reliability at a moderate price point for business applications.",
-      "badge": "BALANCED",
-      "popular": false,
-      "provider": "Qwen",
-      "providerIcon": "qwen",
-      "maxTokens": 131072,
-      "maxInputTokens": 65536,
-      "requiredPlan": "pro",
-      "creditCost": 3,
-      "category": "pro",
-      "created": 1738409840,
-      "contextLength": 131072,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Qwen",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0006",
-        "completion": "0.0006",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 131072,
-        "max_completion_tokens": 65536,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "openai/o3-mini",
-      "value": "openai/o3-mini",
-      "label": "OpenAI: o3 Mini",
-      "description": "OpenAI o3-mini is a cost-efficient language model optimized for STEM reasoning tasks, particularly excelling in science, mathematics, and coding. It features three adjustable reasoning effort levels and supports key developer capabilities including function calling, structured outputs, and streaming.",
-      "badge": "STEM",
-      "popular": false,
-      "provider": "OpenAI",
-      "providerIcon": "openai",
-      "maxTokens": 200000,
-      "maxInputTokens": 100000,
-      "requiredPlan": "pro",
-      "creditCost": 4,
-      "category": "pro",
-      "created": 1738351721,
-      "contextLength": 200000,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "GPT",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0015",
-        "completion": "0.0015",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.00000055"
-      },
-      "top_provider": {
-        "context_length": 200000,
-        "max_completion_tokens": 32768,
-        "is_moderated": true
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "mistralai/codestral-2501",
-      "value": "mistralai/codestral-2501",
-      "label": "Mistral: Codestral 2501",
-      "description": "Mistral's cutting-edge language model for coding. Codestral specializes in low-latency, high-frequency tasks such as fill-in-the-middle (FIM), code correction and test generation, making it ideal for developer productivity improvements.",
-      "badge": "CODE",
-      "popular": false,
-      "provider": "Mistral",
-      "providerIcon": "mistral",
-      "maxTokens": 262144,
-      "maxInputTokens": 131072,
-      "requiredPlan": "pro",
-      "creditCost": 4,
-      "category": "pro",
-      "created": 1736895522,
-      "contextLength": 262144,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Mistral",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0025",
-        "completion": "0.0075",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 262144,
-        "max_completion_tokens": 131072,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "qwen/qwen-2.5-coder-32b-instruct",
-      "value": "qwen/qwen-2.5-coder-32b-instruct",
-      "label": "Qwen: Qwen2.5 Coder 32B",
-      "description": "Qwen2.5-Coder brings significantly improved code generation, code reasoning and code fixing capabilities. It provides a comprehensive foundation for real-world applications such as Code Agents, enhancing coding capabilities while maintaining strengths in mathematics and general competencies.",
-      "badge": "CODE",
-      "popular": false,
-      "provider": "Qwen",
-      "providerIcon": "qwen",
-      "maxTokens": 32768,
-      "maxInputTokens": 16384,
-      "requiredPlan": "pro",
-      "creditCost": 4,
-      "category": "pro",
-      "created": 1731368400,
-      "contextLength": 32768,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Qwen",
-        "instruct_type": "chatml"
-      },
-      "pricing": {
-        "prompt": "0.0015",
-        "completion": "0.0015",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 32768,
-        "max_completion_tokens": 16384,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "qwen/qwen-2.5-vl-72b-instruct",
-      "value": "qwen/qwen-2.5-vl-72b-instruct",
-      "label": "Qwen: Qwen2.5 VL 72B",
-      "description": "Qwen2.5-VL is proficient in recognizing common objects such as flowers, birds, fish, and insects. It is also highly capable of analyzing texts, charts, icons, graphics, and layouts within images, making it excellent for document analysis and visual content interpretation.",
-      "badge": "VISUAL",
-      "popular": false,
-      "provider": "Qwen",
-      "providerIcon": "qwen",
-      "maxTokens": 128000,
-      "maxInputTokens": 64000,
-      "requiredPlan": "pro",
-      "creditCost": 4,
-      "category": "pro",
-      "created": 1738410311,
-      "contextLength": 128000,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": ["image", "text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Qwen",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.001",
-        "completion": "0.001",
-        "request": "0",
-        "image": "0.002",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 128000,
-        "max_completion_tokens": 64000,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "openai/gpt-4.1",
-      "value": "openai/gpt-4.1",
-      "label": "OpenAI: GPT-4.1",
-      "description": "GPT-4.1 is a flagship large language model optimized for advanced instruction following, real-world software engineering, and long-context reasoning. It supports a 1 million token context window and excels at precise code diffs, agent reliability, and high recall in large document contexts.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "OpenAI",
-      "providerIcon": "openai",
-      "maxTokens": 1047576,
-      "maxInputTokens": 523788,
-      "requiredPlan": "enterprise",
-      "creditCost": 10,
-      "category": "enterprise",
-      "created": 1744651385,
-      "contextLength": 1047576,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": ["image", "text"],
-        "output_modalities": ["text"],
-        "tokenizer": "GPT",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.01",
-        "completion": "0.03",
-        "request": "0",
-        "image": "0.0045",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.0000005"
-      },
-      "top_provider": {
-        "context_length": 1047576,
-        "max_completion_tokens": 32768,
-        "is_moderated": true
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "anthropic/claude-3.7-sonnet",
-      "value": "anthropic/claude-3.7-sonnet",
-      "label": "Anthropic: Claude 3.7 Sonnet",
-      "description": "Claude 3.7 Sonnet is an advanced large language model with improved reasoning, coding, and problem-solving capabilities. It introduces a hybrid reasoning approach, allowing users to choose between rapid responses and extended, step-by-step processing for complex tasks.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "Anthropic",
-      "providerIcon": "anthropic",
-      "maxTokens": 200000,
-      "maxInputTokens": 100000,
-      "requiredPlan": "enterprise",
-      "creditCost": 10,
-      "category": "enterprise",
-      "created": 1740422110,
-      "contextLength": 200000,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": ["image", "text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Claude",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.03",
-        "completion": "0.15",
-        "request": "0",
-        "image": "0.0045",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_write": "0.00000375"
-      },
-      "top_provider": {
-        "context_length": 200000,
-        "max_completion_tokens": 100000,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "x-ai/grok-beta",
-      "value": "x-ai/grok-beta",
-      "label": "xAI: Grok Beta",
-      "description": "Grok Beta is xAI's experimental language model with state-of-the-art reasoning capabilities, best for complex and multi-step use cases, offering enhanced context length and sophisticated problem-solving for enterprise applications.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "xAI",
-      "providerIcon": "xai",
-      "maxTokens": 131072,
-      "maxInputTokens": 65536,
-      "requiredPlan": "enterprise",
-      "creditCost": 10,
-      "category": "enterprise",
-      "created": 1729382400,
-      "contextLength": 131072,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.01",
-        "completion": "0.03",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 131072,
-        "max_completion_tokens": 65536,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "deepseek/deepseek-v3",
-      "value": "deepseek/deepseek-chat",
-      "label": "DeepSeek: DeepSeek V3",
-      "description": "DeepSeek-V3 is the latest model from the DeepSeek team, building upon the instruction following and coding abilities of previous versions. Pre-trained on nearly 15 trillion tokens, it outperforms other open-source models and rivals leading closed-source models for enterprise use cases.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "DeepSeek",
-      "providerIcon": "deepseek",
-      "maxTokens": 163840,
-      "maxInputTokens": 81920,
-      "requiredPlan": "enterprise",
-      "creditCost": 8,
-      "category": "enterprise",
-      "created": 1735241320,
-      "contextLength": 163840,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.005",
-        "completion": "0.02",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 163840,
-        "max_completion_tokens": 81920,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "openai/gpt-4.5-preview",
-      "value": "openai/gpt-4.5-preview",
-      "label": "OpenAI: GPT-4.5 (Preview)",
-      "description": "GPT-4.5 (Preview) is a research preview of OpenAI's latest language model, designed to advance capabilities in reasoning, creativity, and multi-turn conversation. It builds on previous iterations with improvements in world knowledge, contextual coherence, and the ability to follow user intent more effectively.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "OpenAI",
-      "providerIcon": "openai",
-      "maxTokens": 128000,
-      "maxInputTokens": 64000,
-      "requiredPlan": "enterprise",
-      "creditCost": 10,
-      "category": "enterprise",
-      "created": 1740687810,
-      "contextLength": 128000,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": ["image", "text"],
-        "output_modalities": ["text"],
-        "tokenizer": "GPT",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.01",
-        "completion": "0.03",
-        "request": "0",
-        "image": "0.00425",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.0000375"
-      },
-      "top_provider": {
-        "context_length": 128000,
-        "max_completion_tokens": 32768,
-        "is_moderated": true
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "openai/o1",
-      "value": "openai/o1",
-      "label": "OpenAI: o1",
-      "description": "The latest and strongest model family from OpenAI, o1 is designed to spend more time thinking before responding. The o1 model series is trained with large-scale reinforcement learning to reason using chain of thought.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "OpenAI",
-      "providerIcon": "openai",
-      "maxTokens": 200000,
-      "maxInputTokens": 100000,
-      "requiredPlan": "enterprise",
-      "creditCost": 10,
-      "category": "enterprise",
-      "created": 1734459999,
-      "contextLength": 200000,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "GPT",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.015",
-        "completion": "0.075",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.0000075"
-      },
-      "top_provider": {
-        "context_length": 200000,
-        "max_completion_tokens": 100000,
-        "is_moderated": true
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "openai/o1-pro",
-      "value": "openai/o1-pro",
-      "label": "OpenAI: o1-pro",
-      "description": "The o1 series of models are trained with reinforcement learning to think before they answer and perform complex reasoning. The o1-pro model uses more compute to think harder and provide consistently better answers.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "OpenAI",
-      "providerIcon": "openai",
-      "maxTokens": 200000,
-      "maxInputTokens": 100000,
-      "requiredPlan": "enterprise",
-      "creditCost": 12,
-      "category": "enterprise",
-      "created": 1742423211,
-      "contextLength": 200000,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "GPT",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.03",
-        "completion": "0.15",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0.02"
-      },
-      "top_provider": {
-        "context_length": 200000,
-        "max_completion_tokens": 100000,
-        "is_moderated": true
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "anthropic/claude-3.7-sonnet:thinking",
-      "value": "anthropic/claude-3.7-sonnet:thinking",
-      "label": "Anthropic: Claude 3.7 Sonnet (thinking)",
-      "description": "Claude 3.7 Sonnet with thinking capabilities is an advanced large language model with improved reasoning through explicit thought processes. It introduces a hybrid reasoning approach, allowing users to see extended, step-by-step processing for complex tasks.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "Anthropic",
-      "providerIcon": "anthropic",
-      "maxTokens": 200000,
-      "maxInputTokens": 100000,
-      "requiredPlan": "enterprise",
-      "creditCost": 12,
-      "category": "enterprise",
-      "created": 1740422110,
-      "contextLength": 200000,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": ["image", "text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Claude",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.03",
-        "completion": "0.15",
-        "request": "0",
-        "image": "0.0045",
-        "web_search": "0",
-        "internal_reasoning": "0.03",
-        "input_cache_write": "0.00000375"
-      },
-      "top_provider": {
-        "context_length": 200000,
-        "max_completion_tokens": 100000,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "google/gemini-2.5-pro-exp-03-25:free",
-      "value": "google/gemini-2.5-pro-exp-03-25:free",
-      "label": "Google: Gemini 2.5 Pro Experimental",
-      "description": "Gemini 2.5 Pro Experimental is Google's state-of-the-art AI model with enhanced capabilities for advanced reasoning, coding, mathematics, and scientific tasks. It employs \"thinking\" capabilities for improved accuracy and nuanced context handling.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "Google",
-      "providerIcon": "google",
-      "maxTokens": 1000000,
-      "maxInputTokens": 500000,
-      "requiredPlan": "enterprise",
-      "creditCost": 8,
-      "category": "enterprise",
-      "created": 1742922099,
-      "contextLength": 1000000,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": ["image", "text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Gemini",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.01",
-        "completion": "0.03",
-        "request": "0",
-        "image": "0.005",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_write": "0"
-      },
-      "top_provider": {
-        "context_length": 1000000,
-        "max_completion_tokens": 65535,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "deepseek/deepseek-r1",
-      "value": "deepseek/deepseek-r1",
-      "label": "DeepSeek: R1",
-      "description": "DeepSeek R1 is a 671B parameter model with impressive reasoning capabilities. With 37B active parameters in an inference pass, it delivers performance comparable to OpenAI's o1 while being open-sourced.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "DeepSeek",
-      "providerIcon": "deepseek",
-      "maxTokens": 163840,
-      "maxInputTokens": 81920,
-      "requiredPlan": "enterprise",
-      "creditCost": 8,
-      "category": "enterprise",
-      "created": 1737381095,
-      "contextLength": 163840,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "DeepSeek",
-        "instruct_type": "deepseek-r1"
-      },
-      "pricing": {
-        "prompt": "0.006",
-        "completion": "0.024",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 163840,
-        "max_completion_tokens": 81920,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "meta-llama/llama-4-maverick",
-      "value": "meta-llama/llama-4-maverick",
-      "label": "Meta: Llama 4 Maverick",
-      "description": "Llama 4 Maverick 17B Instruct (128E) is a high-capacity multimodal language model from Meta, built on a mixture-of-experts (MoE) architecture with 128 experts and 17 billion active parameters per forward pass (400B total). Optimized for vision-language tasks and multimodality.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "Meta",
-      "providerIcon": "meta",
-      "maxTokens": 1048576,
-      "maxInputTokens": 524288,
-      "requiredPlan": "enterprise",
-      "creditCost": 8,
-      "category": "enterprise",
-      "created": 1743881822,
-      "contextLength": 1048576,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": ["image", "text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Llama",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.007",
-        "completion": "0.028",
-        "request": "0",
-        "image": "0.003",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 1048576,
-        "max_completion_tokens": 524288,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "meta-llama/llama-4-scout",
-      "value": "meta-llama/llama-4-scout",
-      "label": "Meta: Llama 4 Scout",
-      "description": "Llama 4 Scout 17B Instruct (16E) is a mixture-of-experts (MoE) language model activating 17 billion parameters out of a total of 109B. It supports native multimodal input and multilingual output across 12 supported languages with a 10 million token context window.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "Meta",
-      "providerIcon": "meta",
-      "maxTokens": 1048576,
-      "maxInputTokens": 524288,
-      "requiredPlan": "enterprise",
-      "creditCost": 8,
-      "category": "enterprise",
-      "created": 1743881519,
-      "contextLength": 1048576,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": ["image", "text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Llama",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.006",
-        "completion": "0.024",
-        "request": "0",
-        "image": "0.0025",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 1048576,
-        "max_completion_tokens": 524288,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
-      "value": "nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
-      "label": "NVIDIA: Llama 3.1 Nemotron Ultra 253B v1",
-      "description": "Llama-3.1-Nemotron-Ultra-253B-v1 is derived from Meta's Llama-3.1-405B-Instruct and customized using Neural Architecture Search (NAS), resulting in enhanced efficiency, reduced memory usage, and improved inference latency with a 128K token context window.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "NVIDIA",
-      "providerIcon": "nvidia",
-      "maxTokens": 131072,
-      "maxInputTokens": 65536,
-      "requiredPlan": "enterprise",
-      "creditCost": 9,
-      "category": "enterprise",
-      "created": 1744115059,
-      "contextLength": 131072,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Llama3",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.007",
-        "completion": "0.028",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 131072,
-        "max_completion_tokens": 65536,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "x-ai/grok-beta",
-      "value": "x-ai/grok-beta",
-      "label": "xAI: Grok Beta",
-      "description": "Grok Beta is xAI's experimental language model with state-of-the-art reasoning capabilities, best for complex and multi-step use cases, offering enhanced context length and sophisticated problem-solving for enterprise applications.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "xAI",
-      "providerIcon": "xai",
-      "maxTokens": 131072,
-      "maxInputTokens": 65536,
-      "requiredPlan": "enterprise",
-      "creditCost": 10,
-      "category": "enterprise",
-      "created": 1729382400,
-      "contextLength": 131072,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.01",
-        "completion": "0.03",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 131072,
-        "max_completion_tokens": 65536,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "ai21/jamba-1.6-large",
-      "value": "ai21/jamba-1.6-large",
-      "label": "AI21: Jamba 1.6 Large",
-      "description": "AI21 Jamba Large 1.6 is a high-performance hybrid foundation model with 94 billion active parameters (398 billion total) combining State Space Models (Mamba) with Transformer attention mechanisms, optimized for extremely long-context handling up to 256K tokens.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "AI21",
-      "providerIcon": "ai21",
-      "maxTokens": 256000,
-      "maxInputTokens": 128000,
-      "requiredPlan": "enterprise",
-      "creditCost": 8,
-      "category": "enterprise",
-      "created": 1741905173,
-      "contextLength": 256000,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.008",
-        "completion": "0.024",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 256000,
-        "max_completion_tokens": 128000,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    },
-    {
-      "id": "qwen/qwq-32b",
-      "value": "qwen/qwq-32b",
-      "label": "Qwen: QwQ 32B",
-      "description": "QwQ is the reasoning model of the Qwen series with specialized thinking and reasoning capabilities. QwQ-32B achieves competitive performance against state-of-the-art reasoning models including DeepSeek-R1 and o1-mini.",
-      "badge": "ENTERPRISE",
-      "popular": false,
-      "provider": "Qwen",
-      "providerIcon": "qwen",
-      "maxTokens": 131072,
-      "maxInputTokens": 65536,
-      "requiredPlan": "enterprise",
-      "creditCost": 8,
-      "category": "enterprise",
-      "created": 1741208814,
-      "contextLength": 131072,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
-        "tokenizer": "Qwen",
-        "instruct_type": "qwq"
-      },
-      "pricing": {
-        "prompt": "0.006",
-        "completion": "0.024",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0.01"
-      },
-      "top_provider": {
-        "context_length": 131072,
-        "max_completion_tokens": 65536,
-        "is_moderated": false
-      },
-      "per_request_limits": null
-    }
-  ]
-}
+[
+  {
+    "id": "meta-llama/llama-3.2-1b-instruct",
+    "modelId": "meta-llama/llama-3.2-1b-instruct",
+    "modelName": "Meta: Llama 3.2 1B Instruct",
+    "provider": "Meta",
+    "maxInputTokens": 8000,
+    "requiredPlan": "FREE",
+    "creditCost": 1,
+    "creditType": "STANDARD",
+    "category": "FREE",
+    "contextLength": 131072
+  },
+  {
+    "id": "deepseek/deepseek-r1-distill-qwen-1.5b",
+    "modelId": "deepseek/deepseek-r1-distill-qwen-1.5b",
+    "modelName": "DeepSeek: R1 Distill Qwen 1.5B",
+    "provider": "DeepSeek",
+    "maxInputTokens": 8000,
+    "requiredPlan": "FREE",
+    "creditCost": 1,
+    "creditType": "STANDARD",
+    "category": "FREE",
+    "contextLength": 131072
+  },
+  {
+    "id": "liquid/lfm-3b",
+    "modelId": "liquid/lfm-3b",
+    "modelName": "Liquid: LFM 3B",
+    "provider": "Liquid",
+    "maxInputTokens": 6000,
+    "requiredPlan": "FREE",
+    "creditCost": 1,
+    "creditType": "STANDARD",
+    "category": "FREE",
+    "contextLength": 32768
+  },
+  {
+    "id": "mistral/ministral-3b",
+    "modelId": "mistralai/ministral-3b",
+    "modelName": "Mistral: Ministral 3B",
+    "provider": "Mistral",
+    "maxInputTokens": 8000,
+    "requiredPlan": "FREE",
+    "creditCost": 1,
+    "creditType": "STANDARD",
+    "category": "FREE",
+    "contextLength": 131072
+  },
+  {
+    "id": "nvidia/llama-3.1-nemotron-nano-8b-v1",
+    "modelId": "nvidia/llama-3.1-nemotron-nano-8b-v1:free",
+    "modelName": "NVIDIA: Llama 3.1 Nemotron Nano 8B v1 (free)",
+    "provider": "NVIDIA",
+    "maxInputTokens": 8000,
+    "requiredPlan": "FREE",
+    "creditCost": 1,
+    "creditType": "STANDARD",
+    "category": "FREE",
+    "contextLength": 131072
+  },
+  {
+    "id": "cohere/command-r7b-12-2024",
+    "modelId": "cohere/command-r7b-12-2024",
+    "modelName": "Cohere: Command R7B (12-2024)",
+    "provider": "Cohere",
+    "maxInputTokens": 8000,
+    "requiredPlan": "FREE",
+    "creditCost": 1,
+    "creditType": "STANDARD",
+    "category": "FREE",
+    "contextLength": 128000
+  },
+  {
+    "id": "microsoft/phi-4",
+    "modelId": "microsoft/phi-4",
+    "modelName": "Microsoft: Phi 4",
+    "provider": "Microsoft",
+    "maxInputTokens": 6000,
+    "requiredPlan": "FREE",
+    "creditCost": 1,
+    "creditType": "STANDARD",
+    "category": "FREE",
+    "contextLength": 16384
+  },
+  {
+    "id": "perplexity/sonar",
+    "modelId": "perplexity/sonar",
+    "modelName": "Perplexity: Sonar",
+    "provider": "Perplexity",
+    "maxInputTokens": 8000,
+    "requiredPlan": "FREE",
+    "creditCost": 1,
+    "creditType": "STANDARD",
+    "category": "FREE",
+    "contextLength": 127072
+  },
+  {
+    "id": "qwen/qwen-turbo",
+    "modelId": "qwen/qwen-turbo",
+    "modelName": "Qwen: Qwen-Turbo",
+    "provider": "Qwen",
+    "maxInputTokens": 10000,
+    "requiredPlan": "FREE",
+    "creditCost": 1,
+    "creditType": "STANDARD",
+    "category": "FREE",
+    "contextLength": 1000000
+  },
+  {
+    "id": "anthropic/claude-3-haiku",
+    "modelId": "anthropic/claude-3-haiku",
+    "modelName": "Anthropic: Claude 3 Haiku",
+    "provider": "Anthropic",
+    "maxInputTokens": 12000,
+    "requiredPlan": "FREE",
+    "creditCost": 1,
+    "creditType": "STANDARD",
+    "category": "FREE",
+    "contextLength": 200000
+  },
+  {
+    "id": "anthropic/claude-3.5-haiku",
+    "modelId": "anthropic/claude-3.5-haiku",
+    "modelName": "Anthropic: Claude 3.5 Haiku",
+    "provider": "Anthropic",
+    "maxInputTokens": 15000,
+    "requiredPlan": "FREE",
+    "creditCost": 2,
+    "creditType": "STANDARD",
+    "category": "FREE",
+    "contextLength": 200000
+  },
+  {
+    "id": "openai/gpt-4.1-nano",
+    "modelId": "openai/gpt-4.1-nano",
+    "modelName": "OpenAI: GPT-4.1 Nano",
+    "provider": "OpenAI",
+    "maxInputTokens": 15000,
+    "requiredPlan": "FREE",
+    "creditCost": 2,
+    "creditType": "STANDARD",
+    "category": "FREE",
+    "contextLength": 1047576
+  },
+  {
+    "id": "google/gemini-2.0-flash-001",
+    "modelId": "google/gemini-2.0-flash-001",
+    "modelName": "Google: Gemini 2.0 Flash",
+    "provider": "Google",
+    "maxInputTokens": 15000,
+    "requiredPlan": "FREE",
+    "creditCost": 2,
+    "creditType": "STANDARD",
+    "category": "FREE",
+    "contextLength": 1000000
+  },
+  {
+    "id": "google/gemini-2.0-flash",
+    "modelId": "google/gemini-2.0-flash-001",
+    "modelName": "Google: Gemini 2.0 Flash",
+    "provider": "Google",
+    "maxInputTokens": 25000,
+    "requiredPlan": "PRO",
+    "creditCost": 3,
+    "creditType": "ADVANCED",
+    "category": "PRO",
+    "contextLength": 1000000
+  },
+  {
+    "id": "qwen/qwen-plus",
+    "modelId": "qwen/qwen-plus",
+    "modelName": "Qwen: Qwen-Plus",
+    "provider": "Qwen",
+    "maxInputTokens": 25000,
+    "requiredPlan": "PRO",
+    "creditCost": 3,
+    "creditType": "ADVANCED",
+    "category": "PRO",
+    "contextLength": 131072
+  },
+  {
+    "id": "openai/o1-mini",
+    "modelId": "openai/o1-mini",
+    "modelName": "OpenAI: o1-mini",
+    "provider": "OpenAI",
+    "maxInputTokens": 25000,
+    "requiredPlan": "PRO",
+    "creditCost": 4,
+    "creditType": "ADVANCED",
+    "category": "PRO",
+    "contextLength": 128000
+  },
+  {
+    "id": "openai/gpt-4o-mini",
+    "modelId": "openai/gpt-4o-mini",
+    "modelName": "OpenAI: GPT-4o Mini",
+    "provider": "OpenAI",
+    "maxInputTokens": 25000,
+    "requiredPlan": "PRO",
+    "creditCost": 4,
+    "creditType": "ADVANCED",
+    "category": "PRO",
+    "contextLength": 128000
+  },
+  {
+    "id": "openai/o3-mini",
+    "modelId": "openai/o3-mini",
+    "modelName": "OpenAI: o3-mini",
+    "provider": "OpenAI",
+    "maxInputTokens": 30000,
+    "requiredPlan": "PRO",
+    "creditCost": 5,
+    "creditType": "ADVANCED",
+    "category": "PRO",
+    "contextLength": 200000
+  },
+  {
+    "id": "mistralai/codestral-2501",
+    "modelId": "mistralai/codestral-2501",
+    "modelName": "Mistral: Codestral 2501",
+    "provider": "Mistral",
+    "maxInputTokens": 40000,
+    "requiredPlan": "PRO",
+    "creditCost": 5,
+    "creditType": "ADVANCED",
+    "category": "PRO",
+    "contextLength": 262144
+  },
+  {
+    "id": "qwen/qwen-2.5-coder-32b-instruct",
+    "modelId": "qwen/qwen-2.5-coder-32b-instruct",
+    "modelName": "Qwen2.5 Coder 32B Instruct",
+    "provider": "Qwen",
+    "maxInputTokens": 16000,
+    "requiredPlan": "PRO",
+    "creditCost": 6,
+    "creditType": "ADVANCED",
+    "category": "PRO",
+    "contextLength": 32768
+  },
+  {
+    "id": "qwen/qwen-2.5-vl-72b-instruct",
+    "modelId": "qwen/qwen-2.5-vl-72b-instruct",
+    "modelName": "Qwen: Qwen2.5 VL 72B Instruct",
+    "provider": "Qwen",
+    "maxInputTokens": 40000,
+    "requiredPlan": "PRO",
+    "creditCost": 7,
+    "creditType": "ADVANCED",
+    "category": "PRO",
+    "contextLength": 128000
+  },
+  {
+    "id": "openai/gpt-4o-2024-11-20",
+    "modelId": "openai/gpt-4o-2024-11-20",
+    "modelName": "OpenAI: GPT-4o (2024-11-20)",
+    "provider": "OpenAI",
+    "maxInputTokens": 60000,
+    "requiredPlan": "PRO",
+    "creditCost": 8,
+    "creditType": "ADVANCED",
+    "category": "PRO",
+    "contextLength": 128000
+  },
+  {
+    "id": "anthropic/claude-3.5-sonnet",
+    "modelId": "anthropic/claude-3.5-sonnet",
+    "modelName": "Anthropic: Claude 3.5 Sonnet",
+    "provider": "Anthropic",
+    "maxInputTokens": 60000,
+    "requiredPlan": "PRO",
+    "creditCost": 9,
+    "creditType": "ADVANCED",
+    "category": "PRO",
+    "contextLength": 200000
+  },
+  {
+    "id": "google/gemini-2.5-pro-preview",
+    "modelId": "google/gemini-2.5-pro-preview-03-25",
+    "modelName": "Google: Gemini 2.5 Pro Preview",
+    "provider": "Google",
+    "maxInputTokens": 80000,
+    "requiredPlan": "PRO",
+    "creditCost": 10,
+    "creditType": "ADVANCED",
+    "category": "PRO",
+    "contextLength": 1048576
+  },
+  {
+    "id": "mistralai/mistral-large-2411",
+    "modelId": "mistralai/mistral-large-2411",
+    "modelName": "Mistral Large 2411",
+    "provider": "Mistral",
+    "maxInputTokens": 65000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 12,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 131072
+  },
+  {
+    "id": "qwen/qwq-32b",
+    "modelId": "qwen/qwq-32b",
+    "modelName": "Qwen: QwQ 32B",
+    "provider": "Qwen",
+    "maxInputTokens": 65000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 15,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 131072
+  },
+  {
+    "id": "ai21/jamba-1.6-large",
+    "modelId": "ai21/jamba-1.6-large",
+    "modelName": "AI21: Jamba 1.6 Large",
+    "provider": "AI21",
+    "maxInputTokens": 80000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 15,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 256000
+  },
+  {
+    "id": "deepseek/deepseek-v3",
+    "modelId": "deepseek/deepseek-chat-v3",
+    "modelName": "DeepSeek: DeepSeek V3",
+    "provider": "DeepSeek",
+    "maxInputTokens": 65000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 18,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 163840
+  },
+  {
+    "id": "deepseek/deepseek-r1",
+    "modelId": "deepseek/deepseek-r1",
+    "modelName": "DeepSeek: R1",
+    "provider": "DeepSeek",
+    "maxInputTokens": 80000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 20,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 163840
+  },
+  {
+    "id": "x-ai/grok-beta",
+    "modelId": "x-ai/grok-beta",
+    "modelName": "xAI: Grok Beta",
+    "provider": "xAI",
+    "maxInputTokens": 65000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 20,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 131072
+  },
+  {
+    "id": "meta-llama/llama-4-scout",
+    "modelId": "meta-llama/llama-4-scout",
+    "modelName": "Meta: Llama 4 Scout",
+    "provider": "Meta",
+    "maxInputTokens": 100000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 22,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 1048576
+  },
+  {
+    "id": "meta-llama/llama-4-maverick",
+    "modelId": "meta-llama/llama-4-maverick",
+    "modelName": "Meta: Llama 4 Maverick",
+    "provider": "Meta",
+    "maxInputTokens": 120000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 25,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 1048576
+  },
+  {
+    "id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+    "modelId": "nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
+    "modelName": "NVIDIA: Llama 3.1 Nemotron Ultra 253B v1 (free)",
+    "provider": "NVIDIA",
+    "maxInputTokens": 65000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 25,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 131072
+  },
+  {
+    "id": "openai/gpt-4.1",
+    "modelId": "openai/gpt-4.1",
+    "modelName": "OpenAI: GPT-4.1",
+    "provider": "OpenAI",
+    "maxInputTokens": 100000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 30,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 1047576
+  },
+  {
+    "id": "openai/gpt-4.5-preview",
+    "modelId": "openai/gpt-4.5-preview",
+    "modelName": "OpenAI: GPT-4.5 (Preview)",
+    "provider": "OpenAI",
+    "maxInputTokens": 65000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 30,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 128000
+  },
+  {
+    "id": "openai/o1",
+    "modelId": "openai/o1",
+    "modelName": "OpenAI: o1",
+    "provider": "OpenAI",
+    "maxInputTokens": 80000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 35,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 200000
+  },
+  {
+    "id": "google/gemini-2.5-pro-exp-03-25",
+    "modelId": "google/gemini-2.5-pro-exp-03-25:free",
+    "modelName": "Google: Gemini 2.5 Pro Experimental (free)",
+    "provider": "Google",
+    "maxInputTokens": 100000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 35,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 1000000
+  },
+  {
+    "id": "anthropic/claude-3.7-sonnet",
+    "modelId": "anthropic/claude-3.7-sonnet",
+    "modelName": "Anthropic: Claude 3.7 Sonnet",
+    "provider": "Anthropic",
+    "maxInputTokens": 80000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 40,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 200000
+  },
+  {
+    "id": "openai/o1-pro",
+    "modelId": "openai/o1-pro",
+    "modelName": "OpenAI: o1-pro",
+    "provider": "OpenAI",
+    "maxInputTokens": 100000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 50,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 200000
+  },
+  {
+    "id": "anthropic/claude-3.7-sonnet-thinking",
+    "modelId": "anthropic/claude-3.7-sonnet:thinking",
+    "modelName": "Anthropic: Claude 3.7 Sonnet (thinking)",
+    "provider": "Anthropic",
+    "maxInputTokens": 80000,
+    "requiredPlan": "ENTERPRISE",
+    "creditCost": 60,
+    "creditType": "ADVANCED",
+    "category": "ENTERPRISE",
+    "contextLength": 200000
+  }
+]
