@@ -15,8 +15,4 @@ import java.util.List;
 public class ModelResponse {
     private List<AIModel> models;
     private List<Provider> providers;
-    private String defaultModelId;
-    private String userPlan;
-    private String lastSelectedModelId;
-    private Integer version;
 }

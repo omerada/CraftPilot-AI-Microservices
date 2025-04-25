@@ -38,20 +38,14 @@ public class AIModelController {
                     .flatMap(userPlan ->
                         userService.getUserPreferences(userId)
                             .flatMap(preferences -> {
-                                // Son seçilen model yoksa varsayılan değer kullan
-                                final String lastSelectedModel = preferences.getLastSelectedModelId() != null ?
-                                        preferences.getLastSelectedModelId() : 
-                                        modelService.getDefaultModelForPlan(userPlan);
-
+                                // Son seçilen model bilgisini kullanmıyoruz artık
+                                
                                 return modelService.getAvailableModels(userPlan)
                                     .map(modelsData -> {
                                         ModelResponse response = ModelResponse.builder()
                                             .models(modelsData.getModels())
                                             .providers(modelsData.getProviders())
-                                            .defaultModelId(modelService.getDefaultModelForPlan(userPlan))
-                                            .userPlan(userPlan)
-                                            .lastSelectedModelId(lastSelectedModel)
-                                            .version(modelsData.getVersion())
+                                            // defaultModelId, userPlan, lastSelectedModelId ve version alanları kaldırıldı
                                             .build();
                                         return ResponseEntity.ok(response);
                                     });

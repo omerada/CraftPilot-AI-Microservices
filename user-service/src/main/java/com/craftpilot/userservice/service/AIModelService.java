@@ -8,7 +8,6 @@ import com.craftpilot.userservice.repository.ProviderRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -27,9 +26,6 @@ public class AIModelService {
     private final AIModelRepository modelRepository;
     private final ProviderRepository providerRepository;
     
-    @Value("${ai.models.version:1}")
-    private Integer modelsVersion;
-
     @CircuitBreaker(name = "aiModels", fallbackMethod = "getDefaultModels")
     public Mono<ModelsData> getAvailableModels(String userPlan) {
         log.info("Tüm AI modeller getiriliyor (filtreleme yapılmadan)");
@@ -68,7 +64,6 @@ public class AIModelService {
                         return Mono.just(ModelsData.builder()
                             .models(models)
                             .providers(enrichedProviders)
-                            .version(modelsVersion)
                             .build()
                         );
                     });
@@ -104,7 +99,6 @@ public class AIModelService {
         return ModelsData.builder()
             .models(defaultModels)
             .providers(defaultProviders)
-            .version(1)
             .build();
     }
     

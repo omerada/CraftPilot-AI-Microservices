@@ -15,5 +15,4 @@ import java.util.List;
 public class ModelsData {
     private List<AIModel> models;
     private List<Provider> providers;
-    private Integer version;
 }
