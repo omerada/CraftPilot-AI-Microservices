@@ -238,11 +238,152 @@ public class ChatHistoryService {
                             "Sohbet arşivlenemedi: " + e.getMessage(), e));
                 });
     }
-    
+
+    @LogActivity(
+        actionType = ActivityEventTypes.CHAT_HISTORY_UNARCHIVE, 
+        userIdParam = "#userId",
+        metadata = "{\"id\": #historyId}"
+    )
+    public Mono<ChatHistory> unarchiveChatHistory(String userId, String historyId) {
+        log.info("Sohbet arşivden çıkarılıyor, ID: {}", historyId);
+        
+        return chatHistoryRepository.findById(historyId)
+                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, 
+                        "Chat history with ID " + historyId + " not found")))
+                .flatMap(chatHistory -> {
+                    log.debug("Sohbet geçmişi bulundu, şu anki enable değeri: {}", chatHistory.isEnable());
+                    chatHistory.setEnable(true);
+                    chatHistory.setUpdatedAt(Timestamp.now());
+                    
+                    return chatHistoryRepository.save(chatHistory)
+                            .doOnSuccess(updatedChat -> 
+                                log.info("Sohbet başarıyla arşivden çıkarıldı, ID: {}", updatedChat.getId()));
+                })
+                .onErrorResume(e -> {
+                    if (e instanceof ResponseStatusException) {
+                        log.error("Sohbet arşivden çıkarılamadı: {}", e.getMessage());
+                        return Mono.error(e);
+                    }
+                    log.error("Sohbet arşivden çıkarılırken hata: {}", e.getMessage(), e);
+                    return Mono.error(new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, 
+                            "Sohbet arşivden çıkarılamadı: " + e.getMessage(), e));
+                });
+    }
+
+    /**
+     * Belirli kullanıcının arşivlediği sohbet geçmişlerini sayfalanmış olarak getirir
+     */
+    public Mono<PaginatedChatHistoryResponse> getArchivedChatHistories(
+            String userId, int page, int pageSize, String searchQuery, String sortBy, String sortOrder) {
+        log.info("Arşivlenmiş sohbet geçmişleri alınıyor: {}", userId);
+        
+        // Sayfalama mantığını doğru hesaplamak için önce tüm kayıtları getirelim
+        return chatHistoryRepository.findAllByUserId(userId, 1, Integer.MAX_VALUE)
+                .collectList()
+                .flatMap(allHistories -> {
+                    // Sadece arşivlenmiş (enable=false) kayıtları filtreleme
+                    List<ChatHistory> archivedHistories = allHistories.stream()
+                            .filter(history -> !history.isEnable()) // Arşivlenmiş olanlar (enable=false)
+                            .collect(Collectors.toList());
+                    
+                    // Arama filtresi uygula
+                    List<ChatHistory> filteredHistories = archivedHistories;
+                    if (searchQuery != null && !searchQuery.trim().isEmpty()) {
+                        String query = searchQuery.toLowerCase();
+                        filteredHistories = archivedHistories.stream()
+                                .filter(history -> history.getTitle() != null && 
+                                        history.getTitle().toLowerCase().contains(query))
+                                .collect(Collectors.toList());
+                    }
+                    
+                    // Sıralama uygula
+                    Comparator<ChatHistory> comparator;
+                    if ("createdAt".equals(sortBy)) {
+                        comparator = Comparator.comparing(history -> getTimestampValue(history.getCreatedAt()));
+                    } else {
+                        // Default to updatedAt
+                        comparator = Comparator.comparing(history -> getTimestampValue(history.getUpdatedAt()));
+                    }
+                    
+                    // Sıralama yönü
+                    if ("asc".equals(sortOrder)) {
+                        // Ascending sıralama
+                    } else {
+                        // Default to descending
+                        comparator = comparator.reversed();
+                    }
+                    
+                    filteredHistories = filteredHistories.stream()
+                            .sorted(comparator)
+                            .collect(Collectors.toList());
+                    
+                    // Toplam kayıt sayısı
+                    int totalFilteredRecords = filteredHistories.size();
+                    
+                    // Sayfalama için hesaplamalar
+                    int skipCount = (page - 1) * pageSize;
+                    int remainingItems = Math.min(pageSize, totalFilteredRecords - skipCount);
+                    
+                    // Sayfa için öğeleri al
+                    List<ChatHistory> pagedHistories = filteredHistories.stream()
+                            .skip(skipCount)
+                            .limit(pageSize)
+                            .collect(Collectors.toList());
+                    
+                    // ChatItem'lara dönüştür
+                    List<ChatItem> items = pagedHistories.stream()
+                            .map(this::convertToChatItem)
+                            .collect(Collectors.toList());
+                    
+                    // Kategoriler için tek bir kategori oluştur: "archived"
+                    LinkedHashMap<String, CategoryData> categories = new LinkedHashMap<>();
+                    categories.put("archived", new CategoryData(items, totalFilteredRecords));
+                    
+                    // Sayfalama bilgileri oluştur
+                    int totalPages = totalFilteredRecords > 0 
+                            ? (int) Math.ceil((double) totalFilteredRecords / pageSize) 
+                            : 0;
+                    
+                    boolean hasMore = totalFilteredRecords > page * pageSize;
+                    
+                    PaginationInfo paginationInfo = PaginationInfo.builder()
+                            .currentPage(page)
+                            .totalPages(totalPages)
+                            .pageSize(pageSize)
+                            .totalItems(totalFilteredRecords)
+                            .hasMore(hasMore)
+                            .build();
+                    
+                    // Yanıtı oluştur
+                    PaginatedChatHistoryResponse response = PaginatedChatHistoryResponse.builder()
+                            .categories(categories)
+                            .pagination(paginationInfo)
+                            .build();
+                    
+                    return Mono.just(response);
+                });
+    }
+
+    /**
+     * ChatHistory listeleme metodlarına arşiv durumu filtresi ekler
+     * @param histories Filtre uygulanacak sohbet geçmişi listesi
+     * @param showArchived Arşivlenmiş sohbetleri göster (null ise tümünü gösterir)
+     * @return Filtre uygulanmış liste
+     */
+    private List<ChatHistory> filterByArchiveStatus(List<ChatHistory> histories, Boolean showArchived) {
+        if (showArchived == null) {
+            return histories; // Filtre yok, tümünü göster
+        }
+        
+        return histories.stream()
+                .filter(history -> showArchived == !history.isEnable())
+                .collect(Collectors.toList());
+    }
+
     public Mono<PaginatedChatHistoryResponse> getChatHistoriesByUserIdCategorized(
             String userId, int page, int pageSize, List<String> categoryFilters, 
-            String searchQuery, String sortBy, String sortOrder) {
-        log.info("Kategorize edilmiş sohbet geçmişi alınıyor: {}", userId);
+            String searchQuery, String sortBy, String sortOrder, Boolean showArchived) {
+        log.info("Kategorize edilmiş sohbet geçmişi alınıyor: {}, showArchived: {}", userId, showArchived);
         
         // If no categories are specified, use all categories in correct order
         final List<String> finalCategoryFilters = categoryFilters == null || categoryFilters.isEmpty() 
@@ -253,16 +394,19 @@ public class ChatHistoryService {
         return chatHistoryRepository.findAllByUserId(userId, 1, Integer.MAX_VALUE) // Get all histories first
                 .collectList()
                 .flatMap(allHistories -> {
-                    // Veritabanındaki toplam kayıt sayısı (filtrelemeden önce)
-                    int totalDatabaseRecords = allHistories.size();
+                    // Arşiv durumuna göre filtrele
+                    List<ChatHistory> archiveFilteredHistories = filterByArchiveStatus(allHistories, showArchived);
+                    
+                    // Veritabanındaki toplam kayıt sayısı (filtrelemeden sonce)
+                    int totalDatabaseRecords = archiveFilteredHistories.size();
                     
                     log.debug("Toplam kayıt sayısı: {}", totalDatabaseRecords);
                     
                     // Apply search filter if specified
-                    List<ChatHistory> filteredHistories = allHistories;
+                    List<ChatHistory> filteredHistories = archiveFilteredHistories;
                     if (searchQuery != null && !searchQuery.trim().isEmpty()) {
                         String query = searchQuery.toLowerCase();
-                        filteredHistories = allHistories.stream()
+                        filteredHistories = archiveFilteredHistories.stream()
                                 .filter(history -> history.getTitle() != null && 
                                         history.getTitle().toLowerCase().contains(query))
                                 .collect(Collectors.toList());
@@ -311,9 +455,6 @@ public class ChatHistoryService {
                     // Sayfalama için skip ve limit değerlerini hesapla
                     int skipCount = (page - 1) * pageSize;
                     int remainingItems = Math.min(pageSize, totalFilteredRecords - skipCount);
-                    
-                    log.info("📄 Sayfalama: sayfa {}, boyut {}, atlanacak {}, gösterilecek {}", 
-                            page, pageSize, skipCount, remainingItems);
                     
                     // Kategorileri işle ve gösterilecek öğeleri belirle
                     if (remainingItems > 0) {
@@ -520,16 +661,19 @@ public class ChatHistoryService {
     /**
      * ChatGPT benzeri düz liste halinde sohbet geçmişlerini döndüren metot
      */
-    public Mono<Map<String, Object>> getFlatChatHistoriesByUserId(String userId, int offset, int limit, String order) {
-        log.info("Düz liste halinde sohbet geçmişi alınıyor: {}, offset: {}, limit: {}", 
-                userId, offset, limit);
+    public Mono<Map<String, Object>> getFlatChatHistoriesByUserId(String userId, int offset, int limit, String order, Boolean showArchived) {
+        log.info("Düz liste halinde sohbet geçmişi alınıyor: {}, offset: {}, limit: {}, showArchived: {}", 
+                userId, offset, limit, showArchived);
         
         // Tüm kayıtları getir ve sonra filtreleme, sıralama yap
         return chatHistoryRepository.findAllByUserId(userId, 1, Integer.MAX_VALUE)
                 .collectList()
                 .flatMap(allHistories -> {
+                    // Arşiv durumuna göre filtreleme
+                    List<ChatHistory> filteredHistories = filterByArchiveStatus(allHistories, showArchived);
+                    
                     // Toplam kayıt sayısı
-                    int totalCount = allHistories.size();
+                    int totalCount = filteredHistories.size();
                     
                     // Sıralama kriterleri
                     Comparator<ChatHistory> comparator;
@@ -544,7 +688,7 @@ public class ChatHistoryService {
                     comparator = comparator.reversed();
                     
                     // Sıralama ve sayfalama uygula
-                    List<Map<String, Object>> items = allHistories.stream()
+                    List<Map<String, Object>> items = filteredHistories.stream()
                             .sorted(comparator)
                             .skip(offset)
                             .limit(limit)
