@@ -82,23 +82,117 @@ public class UserService {
                 .doFinally(signalType -> sample.stop(userRetrievalTimer));
     }
 
+    /**
+     * Kullanıcı adının başka bir kullanıcı tarafından kullanılıp kullanılmadığını kontrol eder.
+     * 
+     * @param username Kontrol edilecek kullanıcı adı
+     * @return Kullanıcı adı alınmışsa true, değilse false döner
+     */
+    public Mono<Boolean> isUsernameTaken(String username) {
+        if (username == null || username.trim().isEmpty()) {
+            return Mono.just(false);
+        }
+        return userRepository.findByUsername(username)
+                .map(user -> true)
+                .defaultIfEmpty(false);
+    }
+
+    /**
+     * Verilen temel kullanıcı adından benzersiz bir kullanıcı adı üretir.
+     * 
+     * @param baseUsername Temel kullanıcı adı
+     * @return Benzersiz kullanıcı adı
+     */
+    public Mono<String> generateUniqueUsername(String baseUsername) {
+        if (baseUsername == null || baseUsername.trim().isEmpty()) {
+            baseUsername = "user_" + System.currentTimeMillis() % 10000;
+        } else {
+            // Kullanıcı adını düzelt (sadece alfanumerik karakterler ve alt çizgiler)
+            baseUsername = baseUsername.replaceAll("[^a-zA-Z0-9_]", "").toLowerCase();
+            if (baseUsername.isEmpty()) {
+                baseUsername = "user_" + System.currentTimeMillis() % 10000;
+            }
+        }
+        
+        final String username = baseUsername;
+        
+        return isUsernameTaken(username)
+                .flatMap(taken -> {
+                    if (!taken) {
+                        return Mono.just(username);
+                    } else {
+                        // Kullanıcı adı alınmışsa, sonuna rastgele bir sayı ekle
+                        String newUsername = username + "_" + (System.currentTimeMillis() % 10000);
+                        return generateUniqueUsername(newUsername);
+                    }
+                });
+    }
+
+    /**
+     * Firebase token'ından kullanıcı bilgilerini alır ve benzersiz bir kullanıcı adı ile
+     * UserEntity nesnesi oluşturur.
+     * 
+     * @param token Firebase kimlik token'ı
+     * @return Benzersiz kullanıcı adına sahip UserEntity
+     */
+    private Mono<UserEntity> buildUserWithUniqueUsername(FirebaseToken token) {
+        String baseUsername;
+        String email = token.getEmail();
+        String displayName = token.getName();
+        
+        // Kullanıcı adını displayName veya email'den oluştur
+        if (displayName != null && !displayName.trim().isEmpty()) {
+            baseUsername = displayName.toLowerCase().replace(" ", "_");
+        } else {
+            baseUsername = email != null ? email.split("@")[0].toLowerCase() : null;
+        }
+        
+        return generateUniqueUsername(baseUsername)
+                .map(uniqueUsername -> UserEntity.builder()
+                        .id(token.getUid())
+                        .email(token.getEmail())
+                        .username(uniqueUsername)
+                        .displayName(token.getName())
+                        .photoUrl(token.getPicture())
+                        .role(UserRole.USER)
+                        .status(UserStatus.ACTIVE)
+                        .createdAt(System.currentTimeMillis())
+                        .updatedAt(System.currentTimeMillis())
+                        .build());
+    }
+
+    // Kullanıcı oluşturma metodunu güncelleme
+    public Mono<UserEntity> verifyAndCreateUser(String firebaseToken) {
+        return verifyFirebaseToken(firebaseToken)
+                .flatMap(this::buildUserWithUniqueUsername)
+                .flatMap(this::createUser);
+    }
+
+    // Kullanıcı güncelleme metodunu güncelleme (benzersiz userName kontrolü)
     @Transactional
     public Mono<UserEntity> updateUser(String userId, UserEntity updates) {
+        if (updates.getUsername() != null) {
+            // Kullanıcı adı değiştirilmek isteniyorsa, benzersizliği kontrol et
+            return userRepository.findByUsername(updates.getUsername())
+                    .flatMap(existingUser -> {
+                        // Eğer bulunan kullanıcı kendisi değilse, bu kullanıcı adı alınmış demektir
+                        if (!existingUser.getId().equals(userId)) {
+                            return Mono.error(new RuntimeException("Bu kullanıcı adı başkası tarafından kullanılıyor"));
+                        }
+                        // Kendisiyse güncellemeye devam et
+                        return updateUserInternal(userId, updates);
+                    })
+                    .switchIfEmpty(updateUserInternal(userId, updates)); // Kullanıcı adı alınmamışsa güncellemeye devam et
+        }
+        // Kullanıcı adı değiştirilmiyorsa normal güncelleme
+        return updateUserInternal(userId, updates);
+    }
+    
+    // Kullanıcı güncelleme iç metodu
+    private Mono<UserEntity> updateUserInternal(String userId, UserEntity updates) {
         return userRepository.findById(userId)
                 .flatMap(existingUser -> {
-                    if (updates.getUsername() != null) {
-                        existingUser.setUsername(updates.getUsername());
-                    }
-                    if (updates.getDisplayName() != null) {
-                        existingUser.setDisplayName(updates.getDisplayName());
-                    }
-                    if (updates.getPhotoUrl() != null) {
-                        existingUser.setPhotoUrl(updates.getPhotoUrl());
-                    }
-                    if (updates.getStatus() != null) {
-                        existingUser.setStatus(updates.getStatus());
-                    }
-                    existingUser.setUpdatedAt(System.currentTimeMillis());
+                    updateUserFields(existingUser, updates);
                     return userRepository.save(existingUser);
                 })
                 .doOnSuccess(updatedUser -> {
@@ -108,157 +202,72 @@ public class UserService {
                 .doOnError(error -> log.error("Error updating user: {}", error.getMessage()));
     }
 
+    // Kullanıcı silme metodunu güncelleme (kullanıcı tercihlerini de sil)
     public Mono<Void> deleteUser(String userId) {
         return userRepository.findById(userId)
-                .flatMap(user -> userRepository.deleteById(userId)
-                        .then(Mono.fromRunnable(() -> {
-                            kafkaService.sendUserDeletedEvent(user);
-                            sendUserEvent(user, "USER_DELETED");
-                        })))
+                .flatMap(user -> {
+                    // Kullanıcı tercihlerini sil
+                    return userPreferenceService.deleteUserPreferences(userId)
+                            .then(Mono.defer(() -> {
+                                // Firestore'dan kullanıcıyı sil
+                                return userRepository.deleteById(userId);
+                            }))
+                            .then(Mono.fromRunnable(() -> {
+                                try {
+                                    // Firebase'den kullanıcıyı sil
+                                    firebaseAuth.deleteUser(userId);
+                                } catch (FirebaseAuthException e) {
+                                    log.error("Firebase'den kullanıcı silinirken hata: {}", e.getMessage());
+                                    // Hata olsa bile işleme devam et
+                                }
+                                // Kafka olaylarını gönder
+                                kafkaService.sendUserDeletedEvent(user);
+                                sendUserEvent(user, "USER_DELETED");
+                                log.info("Kullanıcı başarıyla silindi: {}", userId);
+                            }));
+                })
                 .then();
     }
 
-    public Mono<UserEntity> updateUserStatus(String userId, UserStatus status) {
-        return userRepository.findById(userId)
-                .flatMap(user -> {
-                    user.setStatus(status);
-                    user.setUpdatedAt(System.currentTimeMillis());
-                    return userRepository.save(user);
-                })
-                .doOnSuccess(updatedUser -> kafkaService.sendUserUpdatedEvent(updatedUser))
-                .doOnError(error -> log.error("Error updating user status: {}", error.getMessage()));
-    }
-
-    public Mono<UserEntity> searchUsers(String email, String username) {
-        if (email != null && !email.isEmpty()) {
-            return userRepository.findByEmail(email);
-        } else if (username != null && !username.isEmpty()) {
-            return userRepository.findByUsername(username);
-        }
-        return Mono.error(new IllegalArgumentException("Either email or username must be provided"));
-    }
-
-    public Mono<FirebaseToken> verifyFirebaseToken(String token) {
-        return Mono.fromCallable(() -> firebaseAuth.verifyIdToken(token))
-                .doOnError(e -> log.error("Error verifying Firebase token: {}", e.getMessage()));
-    }
-
-    private UserEntity buildUserFromToken(FirebaseToken token) {
-        return UserEntity.builder()
-                .id(token.getUid())
-                .email(token.getEmail())
-                .username(generateUsername(token.getEmail()))
-                .displayName(token.getName())
-                .photoUrl(token.getPicture())
-                .role(UserRole.USER)
-                .status(UserStatus.ACTIVE)
-                .createdAt(System.currentTimeMillis())
-                .updatedAt(System.currentTimeMillis())
-                .build();
-    }
-
-    private void updateUserFields(UserEntity existingUser, UserEntity updates) {
-        if (updates.getUsername() != null) {
-            existingUser.setUsername(updates.getUsername());
-        }
-        if (updates.getDisplayName() != null) {
-            existingUser.setDisplayName(updates.getDisplayName());
-        }
-        if (updates.getPhotoUrl() != null) {
-            existingUser.setPhotoUrl(updates.getPhotoUrl());
-        }
-        if (updates.getStatus() != null) {
-            existingUser.setStatus(updates.getStatus());
-        }
-        existingUser.setUpdatedAt(System.currentTimeMillis());
-    }
-
-    private String generateUsername(String email) {
-        return email.split("@")[0] + "_" + System.currentTimeMillis() % 1000;
-    }
-
-    private void validateUserUpdate(UserEntity updates) {
-        Set<ConstraintViolation<UserEntity>> violations = validator.validate(updates);
-        if (!violations.isEmpty()) {
-            throw new ValidationException(
-                violations.stream()
-                    .map(ConstraintViolation::getMessage)
-                    .collect(Collectors.joining(", "))
-            );
-        }
-    }
-
-    public Mono<UserEntity> verifyAndCreateUser(String firebaseToken) {
-        return verifyFirebaseToken(firebaseToken)
-                .map(decodedToken -> UserEntity.builder()
-                        .id(decodedToken.getUid())
-                        .email(decodedToken.getEmail())
-                        .displayName(decodedToken.getName())
-                        .photoUrl(decodedToken.getPicture())
-                        .status(UserStatus.ACTIVE)
-                        .createdAt(System.currentTimeMillis())
-                        .updatedAt(System.currentTimeMillis())
-                        .build())
-                .flatMap(this::createUser);
-    }
-
+    // Firebase kimlik doğrulama ve senkronizasyon metodunu güncelleme
     public Mono<UserEntity> verifyAndCreateOrUpdateUser(String firebaseToken) {
         return verifyFirebaseToken(firebaseToken)
-            .flatMap(decodedToken -> userRepository.findById(decodedToken.getUid())
-                .flatMap(existingUser -> {
-                    // Update existing user if needed
-                    boolean needsUpdate = false;
-                    if (!existingUser.getEmail().equals(decodedToken.getEmail())) {
-                        existingUser.setEmail(decodedToken.getEmail());
-                        needsUpdate = true;
-                    }
-                    if (!existingUser.getDisplayName().equals(decodedToken.getName())) {
-                        existingUser.setDisplayName(decodedToken.getName());
-                        needsUpdate = true;
-                    }
-                    if (needsUpdate) {
-                        existingUser.setUpdatedAt(System.currentTimeMillis());
-                        return userRepository.save(existingUser);
-                    }
-                    return Mono.just(existingUser);
-                })
-                .switchIfEmpty(Mono.defer(() -> {
-                    // Create new user if not exists
-                    UserEntity newUser = buildUserFromToken(decodedToken);
-                    return createUser(newUser);
-                })));
-    }
-
-    public Mono<UserEntity> handleFirebaseUpdate(String userId, UserEntity updates) {
-        return userRepository.findById(userId)
-            .flatMap(existingUser -> {
-                updateUserFields(existingUser, updates);
-                return userRepository.save(existingUser)
-                    .doOnSuccess(savedUser -> {
-                        // Firebase ile senkronize et
-                        try {
-                            UpdateRequest request = new UpdateRequest(userId)
-                                .setDisplayName(updates.getDisplayName())
-                                .setPhotoUrl(updates.getPhotoUrl());
-                            firebaseAuth.updateUser(request);
-                        } catch (FirebaseAuthException e) {
-                            log.error("Firebase update failed", e);
-                        }
-                    });
-            });
-    }
-
-    private void sendUserEvent(UserEntity user, String eventType) {
-        UserEvent event = UserEvent.fromEntity(user, eventType);
-        
-        kafkaTemplate.send(userEventsTopic, user.getId(), event)
-            .whenComplete((result, ex) -> {
-                if (ex != null) {
-                    log.error("Failed to send user event: {}", ex.getMessage());
-                } else {
-                    log.debug("User event sent successfully: {}", eventType);
-                }
-            });
+                .flatMap(decodedToken -> userRepository.findById(decodedToken.getUid())
+                        .flatMap(existingUser -> {
+                            // Mevcut kullanıcıyı güncelle
+                            boolean needsUpdate = false;
+                            
+                            if (!existingUser.getEmail().equals(decodedToken.getEmail())) {
+                                existingUser.setEmail(decodedToken.getEmail());
+                                needsUpdate = true;
+                            }
+                            
+                            if (decodedToken.getName() != null && 
+                                (existingUser.getDisplayName() == null || 
+                                !existingUser.getDisplayName().equals(decodedToken.getName()))) {
+                                existingUser.setDisplayName(decodedToken.getName());
+                                needsUpdate = true;
+                            }
+                            
+                            if (decodedToken.getPicture() != null && 
+                                (existingUser.getPhotoUrl() == null || 
+                                !existingUser.getPhotoUrl().equals(decodedToken.getPicture()))) {
+                                existingUser.setPhotoUrl(decodedToken.getPicture());
+                                needsUpdate = true;
+                            }
+                            
+                            if (needsUpdate) {
+                                existingUser.setUpdatedAt(System.currentTimeMillis());
+                                return userRepository.save(existingUser);
+                            }
+                            
+                            return Mono.just(existingUser);
+                        })
+                        .switchIfEmpty(Mono.defer(() -> {
+                            // Kullanıcı yoksa yeni oluştur
+                            return buildUserWithUniqueUsername(decodedToken)
+                                    .flatMap(this::createUser);
+                        })));
     }
 
     public Mono<UserEntity> findById(String id) {
@@ -288,5 +297,140 @@ public class UserService {
     
     public Mono<UserPreference> getUserPreferences(String userId) {
         return userPreferenceService.getUserPreferences(userId);
+    }
+
+    /**
+     * Firebase token'ını doğrular
+     * 
+     * @param firebaseToken Firebase kimlik token'ı
+     * @return Çözümlenmiş FirebaseToken
+     */
+    private Mono<FirebaseToken> verifyFirebaseToken(String firebaseToken) {
+        return Mono.fromCallable(() -> {
+            try {
+                return firebaseAuth.verifyIdToken(firebaseToken);
+            } catch (FirebaseAuthException e) {
+                log.error("Token doğrulama hatası: {}", e.getMessage());
+                throw new RuntimeException("Token doğrulama hatası: " + e.getMessage());
+            }
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
+     * Kullanıcı olay mesajını gönderir
+     * 
+     * @param user Kullanıcı varlığı
+     * @param eventType Olay tipi (örn. USER_CREATED, USER_UPDATED)
+     */
+    private void sendUserEvent(UserEntity user, String eventType) {
+        try {
+            UserEvent event = UserEvent.fromEntity(user, eventType);
+            kafkaTemplate.send(userEventsTopic, user.getId(), event)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("Kullanıcı olayı gönderilirken hata: {}", ex.getMessage());
+                    } else {
+                        log.debug("Kullanıcı olayı gönderildi: userId={}, event={}", user.getId(), eventType);
+                    }
+                });
+        } catch (Exception e) {
+            log.error("Kullanıcı olayı gönderilirken beklenmeyen hata: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Kullanıcı alanlarını güncellemek için kullanılan yardımcı metot
+     * 
+     * @param existingUser Mevcut kullanıcı
+     * @param updates Güncellenecek değerler
+     */
+    private void updateUserFields(UserEntity existingUser, UserEntity updates) {
+        if (updates.getEmail() != null) {
+            existingUser.setEmail(updates.getEmail());
+        }
+        if (updates.getUsername() != null) {
+            existingUser.setUsername(updates.getUsername());
+        }
+        if (updates.getDisplayName() != null) {
+            existingUser.setDisplayName(updates.getDisplayName());
+        }
+        if (updates.getPhotoUrl() != null) {
+            existingUser.setPhotoUrl(updates.getPhotoUrl());
+        }
+        if (updates.getRole() != null) {
+            existingUser.setRole(updates.getRole());
+        }
+        if (updates.getStatus() != null) {
+            existingUser.setStatus(updates.getStatus());
+        }
+        
+        existingUser.setUpdatedAt(System.currentTimeMillis());
+    }
+
+    /**
+     * Kullanıcı durumunu günceller
+     * 
+     * @param userId Kullanıcı ID
+     * @param status Yeni durum
+     * @return Güncellenmiş kullanıcı
+     */
+    public Mono<UserEntity> updateUserStatus(String userId, UserStatus status) {
+        log.info("Kullanıcı durumu güncelleniyor: id={}, status={}", userId, status);
+        return userRepository.findById(userId)
+                .flatMap(existingUser -> {
+                    existingUser.setStatus(status);
+                    existingUser.setUpdatedAt(System.currentTimeMillis());
+                    return userRepository.save(existingUser);
+                })
+                .doOnSuccess(updatedUser -> {
+                    kafkaService.sendUserUpdatedEvent(updatedUser);
+                    sendUserEvent(updatedUser, "USER_STATUS_UPDATED");
+                    log.info("Kullanıcı durumu başarıyla güncellendi: id={}, status={}", userId, status);
+                })
+                .doOnError(e -> log.error("Kullanıcı durumu güncellenirken hata: id={}, error={}", userId, e.getMessage()));
+    }
+
+    /**
+     * Email veya kullanıcı adına göre kullanıcı arar
+     * 
+     * @param email Email adresi
+     * @param username Kullanıcı adı
+     * @return Bulunan kullanıcı veya hata
+     */
+    public Mono<UserEntity> searchUsers(String email, String username) {
+        log.info("Kullanıcı aranıyor: email={}, username={}", email, username);
+        
+        if (email != null && !email.trim().isEmpty()) {
+            return userRepository.findByEmail(email)
+                    .switchIfEmpty(Mono.error(new UserNotFoundException("Email ile kullanıcı bulunamadı: " + email)));
+        } else if (username != null && !username.trim().isEmpty()) {
+            return userRepository.findByUsername(username)
+                    .switchIfEmpty(Mono.error(new UserNotFoundException("Kullanıcı adı ile kullanıcı bulunamadı: " + username)));
+        } else {
+            return Mono.error(new ValidationException("Arama için email veya username parametresi gereklidir."));
+        }
+    }
+
+    /**
+     * Firebase'den gelen güncellemeleri sistemle senkronize eder
+     * 
+     * @param userId Kullanıcı ID
+     * @param updates Güncellemeler
+     * @return Güncellenmiş kullanıcı
+     */
+    public Mono<UserEntity> handleFirebaseUpdate(String userId, UserEntity updates) {
+        log.info("Firebase güncellemesi işleniyor: id={}", userId);
+        return userRepository.findById(userId)
+                .switchIfEmpty(Mono.error(new UserNotFoundException(userId)))
+                .flatMap(existingUser -> {
+                    updateUserFields(existingUser, updates);
+                    return userRepository.save(existingUser);
+                })
+                .doOnSuccess(updatedUser -> {
+                    kafkaService.sendUserUpdatedEvent(updatedUser);
+                    sendUserEvent(updatedUser, "USER_FIREBASE_SYNC");
+                    log.info("Firebase güncellemesi başarıyla işlendi: id={}", userId);
+                })
+                .doOnError(e -> log.error("Firebase güncellemesi işlenirken hata: id={}, error={}", userId, e.getMessage()));
     }
 }

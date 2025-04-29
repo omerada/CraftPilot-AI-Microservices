@@ -25,9 +25,12 @@ public class UserController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Yeni kullanıcı oluştur", description = "Firebase token kullanarak yeni bir kullanıcı oluşturur")
+    @Operation(summary = "Yeni kullanıcı oluştur", description = "Firebase token kullanarak yeni bir kullanıcı oluşturur ve benzersiz bir kullanıcı adı atar")
     public Mono<UserEntity> createUser(@RequestHeader("Firebase-Token") String firebaseToken) {
-        return userService.verifyAndCreateUser(firebaseToken);
+        log.info("Yeni kullanıcı oluşturma isteği alındı");
+        return userService.verifyAndCreateUser(firebaseToken)
+                .doOnSuccess(user -> log.info("Kullanıcı başarıyla oluşturuldu: id={}, username={}", user.getId(), user.getUsername()))
+                .doOnError(e -> log.error("Kullanıcı oluşturulurken hata: {}", e.getMessage()));
     }
 
     @GetMapping("/{id}")
@@ -37,16 +40,22 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Kullanıcı güncelle", description = "Kullanıcı bilgilerini günceller")
+    @Operation(summary = "Kullanıcı güncelle", description = "Kullanıcı bilgilerini günceller ve kullanıcı adı değiştiriliyorsa benzersizliği kontrol eder")
     public Mono<UserEntity> updateUser(@PathVariable String id, @RequestBody UserEntity updates) {
-        return userService.updateUser(id, updates);
+        log.info("Kullanıcı güncelleme isteği alındı: id={}", id);
+        return userService.updateUser(id, updates)
+                .doOnSuccess(user -> log.info("Kullanıcı başarıyla güncellendi: id={}", id))
+                .doOnError(e -> log.error("Kullanıcı güncellenirken hata: id={}, error={}", id, e.getMessage()));
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Kullanıcı sil", description = "Belirtilen kullanıcıyı siler")
+    @Operation(summary = "Kullanıcı sil", description = "Belirtilen kullanıcıyı, tercihlerini ve Firebase'deki kaydını siler")
     public Mono<Void> deleteUser(@PathVariable String id) {
-        return userService.deleteUser(id);
+        log.info("Kullanıcı silme isteği alındı: id={}", id);
+        return userService.deleteUser(id)
+                .doOnSuccess(v -> log.info("Kullanıcı ve ilgili verileri başarıyla silindi: id={}", id))
+                .doOnError(e -> log.error("Kullanıcı silinirken hata: id={}, error={}", id, e.getMessage()));
     }
 
     @PatchMapping("/{id}/status")
@@ -74,7 +83,10 @@ public class UserController {
     @Operation(summary = "Firebase kullanıcısını senkronize et", 
               description = "Firebase Authentication'dan gelen kullanıcıyı sistemle senkronize eder")
     public Mono<UserEntity> syncFirebaseUser(@RequestHeader("Firebase-Token") String firebaseToken) {
-        return userService.verifyAndCreateOrUpdateUser(firebaseToken);
+        log.info("Firebase kullanıcı senkronizasyon isteği alındı");
+        return userService.verifyAndCreateOrUpdateUser(firebaseToken)
+                .doOnSuccess(user -> log.info("Kullanıcı başarıyla senkronize edildi: id={}", user.getId()))
+                .doOnError(e -> log.error("Kullanıcı senkronizasyonunda hata: {}", e.getMessage()));
     }
 
     @PutMapping("/{id}/firebase-sync")

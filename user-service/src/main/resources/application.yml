@@ -115,11 +115,20 @@ resilience4j:
         waitDurationInOpenState: 10s # 30s yerine 10s
         permittedNumberOfCallsInHalfOpenState: 3
         automaticTransitionFromOpenToHalfOpenEnabled: true
+      userOperations:
+        baseConfig: default
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        failureRateThreshold: 60
+        waitDurationInOpenState: 5s
+        permittedNumberOfCallsInHalfOpenState: 5
+        recordFailurePredicate: com.craftpilot.userservice.exception.UserOperationFailurePredicate
     instances:
       userPreferences:
         baseConfig: default
         slidingWindowSize: 8
         waitDurationInOpenState: 5s # Daha hızlı toparlanması için
+
       userRedis: # UserService için özel Redis devre kesici
         baseConfig: default
       redisCircuitBreaker: # Kütüphane için ortak Redis devre kesici
