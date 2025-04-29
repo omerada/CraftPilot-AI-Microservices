@@ -8,8 +8,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+
+import java.util.Map;
 
 /**
  * REST controller for managing user-related operations using Firebase Authentication and Firestore.
@@ -35,27 +38,94 @@ public class UserController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Kullanıcı getir", description = "ID'ye göre kullanıcı bilgilerini getirir")
-    public Mono<UserEntity> getUser(@PathVariable String id) {
-        return userService.getUserById(id);
+    public Mono<ResponseEntity<Object>> getUser(@PathVariable String id) {
+        log.info("Kullanıcı bilgisi isteniyor: id={}", id);
+        
+        return userService.findById(id)
+                .map(user -> ResponseEntity.ok().body((Object)user))
+                .doOnSuccess(response -> {
+                    if (response.getStatusCode().is2xxSuccessful()) {
+                        log.info("Kullanıcı başarıyla getirildi: id={}", id);
+                    }
+                })
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.warn("Kullanıcı bulunamadı: id={}", id);
+                    Map<String, String> errorResponse = Map.of(
+                            "error", "User not found",
+                            "message", "Belirtilen ID ile kullanıcı bulunamadı: " + id,
+                            "status", "404"
+                    );
+                    return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body((Object)errorResponse));
+                }))
+                .onErrorResume(e -> {
+                    log.error("Kullanıcı getirilirken hata: id={}, error={}", id, e.getMessage());
+                    Map<String, String> errorResponse = Map.of(
+                            "error", "Internal Server Error",
+                            "message", "Kullanıcı bilgisi alınırken bir hata oluştu",
+                            "status", "500"
+                    );
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object)errorResponse));
+                });
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Kullanıcı güncelle", description = "Kullanıcı bilgilerini günceller ve kullanıcı adı değiştiriliyorsa benzersizliği kontrol eder")
-    public Mono<UserEntity> updateUser(@PathVariable String id, @RequestBody UserEntity updates) {
+    public Mono<ResponseEntity<Object>> updateUser(@PathVariable String id, @RequestBody UserEntity updates) {
         log.info("Kullanıcı güncelleme isteği alındı: id={}", id);
-        return userService.updateUser(id, updates)
-                .doOnSuccess(user -> log.info("Kullanıcı başarıyla güncellendi: id={}", id))
-                .doOnError(e -> log.error("Kullanıcı güncellenirken hata: id={}, error={}", id, e.getMessage()));
+        return userService.findById(id)
+                .flatMap(existingUser -> userService.updateUser(id, updates)
+                        .map(updatedUser -> ResponseEntity.ok().body((Object)updatedUser)))
+                .doOnSuccess(response -> {
+                    if (response.getStatusCode().is2xxSuccessful()) {
+                        log.info("Kullanıcı başarıyla güncellendi: id={}", id);
+                    }
+                })
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.warn("Güncellenecek kullanıcı bulunamadı: id={}", id);
+                    Map<String, String> errorResponse = Map.of(
+                            "error", "User not found",
+                            "message", "Belirtilen ID ile güncellenecek kullanıcı bulunamadı: " + id,
+                            "status", "404"
+                    );
+                    return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body((Object)errorResponse));
+                }))
+                .onErrorResume(e -> {
+                    log.error("Kullanıcı güncellenirken hata: id={}, error={}", id, e.getMessage());
+                    Map<String, String> errorResponse = Map.of(
+                            "error", "Internal Server Error",
+                            "message", "Kullanıcı güncellenirken bir hata oluştu: " + e.getMessage(),
+                            "status", "500"
+                    );
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object)errorResponse));
+                });
     }
 
     @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Kullanıcı sil", description = "Belirtilen kullanıcıyı, tercihlerini ve Firebase'deki kaydını siler")
-    public Mono<Void> deleteUser(@PathVariable String id) {
+    public Mono<ResponseEntity<Object>> deleteUser(@PathVariable String id) {
         log.info("Kullanıcı silme isteği alındı: id={}", id);
-        return userService.deleteUser(id)
-                .doOnSuccess(v -> log.info("Kullanıcı ve ilgili verileri başarıyla silindi: id={}", id))
-                .doOnError(e -> log.error("Kullanıcı silinirken hata: id={}, error={}", id, e.getMessage()));
+        return userService.findById(id)
+                .flatMap(user -> userService.deleteUser(id)
+                        .then(Mono.just(ResponseEntity.noContent().<Object>build())))
+                .doOnSuccess(response -> log.info("Kullanıcı ve ilgili verileri başarıyla silindi: id={}", id))
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.warn("Silinecek kullanıcı bulunamadı: id={}", id);
+                    Map<String, String> errorResponse = Map.of(
+                            "error", "User not found", 
+                            "message", "Belirtilen ID ile silinecek kullanıcı bulunamadı: " + id,
+                            "status", "404"
+                    );
+                    return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body((Object)errorResponse));
+                }))
+                .onErrorResume(e -> {
+                    log.error("Kullanıcı silinirken hata: id={}, error={}", id, e.getMessage());
+                    Map<String, String> errorResponse = Map.of(
+                            "error", "Internal Server Error",
+                            "message", "Kullanıcı silinirken bir hata oluştu: " + e.getMessage(),
+                            "status", "500"
+                    );
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object)errorResponse));
+                });
     }
 
     @PatchMapping("/{id}/status")
