@@ -15,7 +15,7 @@ spring:
     gcp:
       project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
       credentials:
-        location: file:/gcp-credentials.json
+        location: ${GCP_CREDENTIALS_LOCATION:file:/etc/gcp/credentials/gcp-credentials.json}
       firestore:
         enabled: true
     kubernetes:
