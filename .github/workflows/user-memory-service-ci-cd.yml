@@ -26,6 +26,8 @@ env:
   SERVICE_NAME: user-memory-service
   CONTAINER_PORT: 8067
   DOCKER_REGISTRY: craftpilot
+  IMAGE_TAG: latest-arm64
+  MANAGEMENT_PORT: 8067
 
 jobs:
   build-and-deploy:
@@ -35,8 +37,6 @@ jobs:
         working-directory: ./user-memory-service
     steps:
       - uses: actions/checkout@v3
-
-      # Maven build adımlarını kaldırdık, build işlemi Dockerfile içinde yapılacak
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -62,10 +62,12 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/user-memory-service:latest-arm64
-            ${{ secrets.DOCKERHUB_USERNAME }}/user-memory-service:${{ github.sha }}-arm64
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-memory-service:buildcache-arm64
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-memory-service:buildcache-arm64,mode=max
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }}-arm64
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.SERVICE_NAME }}:buildcache-arm64
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.SERVICE_NAME }}:buildcache-arm64,mode=max
+          build-args: |
+            SKIP_TESTS=true
 
       - id: "auth"
         name: "Authenticate to Google Cloud"
@@ -98,11 +100,11 @@ jobs:
             mkdir -p /opt/craftpilot
 
             echo "=== Continuing with Deployment ==="
-            # GCP credentials dosyasının dizin yolunu oluştur
+            # GCP credentials dizini oluştur
             mkdir -p /opt/craftpilot/gcp/credentials
             # GCP credentials dosyasını oluştur
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp/credentials/gcp-credentials.json
-            # İzinleri ayarla - herkes tarafından okunabilsin (güvenliğe dikkat!)
+            # İzinleri ayarla - herkes tarafından okunabilsin
             chmod 644 /opt/craftpilot/gcp/credentials/gcp-credentials.json
 
             echo "=== Verifying Docker Status ==="
@@ -113,59 +115,26 @@ jobs:
 
             echo "=== Deploying User Memory Service ==="
             # Force pull latest image
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/user-memory-service:latest-arm64
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
 
             echo "=== Stopping Old Container ==="
-            docker rm -f user-memory-service || true
+            docker rm -f ${{ env.SERVICE_NAME }} || true
 
             echo "=== Starting User Memory Service ==="
             if [[ "${{ github.event.inputs.environment }}" == "debug" ]]; then
               docker run -d \
-                --name user-memory-service \
+                --name ${{ env.SERVICE_NAME }} \
                 --network craftpilot-network \
                 --restart unless-stopped \
-                -p 8067:8067 \
+                -p ${{ env.CONTAINER_PORT }}:${{ env.CONTAINER_PORT }} \
                 -p 5008:5008 \
                 -v /opt/craftpilot/gcp/credentials/gcp-credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
                 -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
-                -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
+                -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/etc/gcp/credentials/gcp-credentials.json \
                 -e SPRING_PROFILES_ACTIVE=prod \
-                -e SERVER_PORT=8067 \
+                -e SERVER_PORT=${{ env.CONTAINER_PORT }} \
                 -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-                -e EUREKA_INSTANCE_HOSTNAME=user-memory-service \
-                -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
-                -e REDIS_HOST=redis \
-                -e REDIS_PORT=6379 \
-                -e REDIS_PASSWORD=13579ada \
-                -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
-                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
-                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
-                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
-                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics,loggers,env" \
-                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-                -e SPRING_APPLICATION_NAME=user-memory-service \
-                -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
-                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_NETFLIX_EUREKA=DEBUG \
-                -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5008" \
-                --health-cmd="curl -f http://localhost:8067/actuator/health || exit 1" \
-                --health-interval=10s \
-                --health-retries=10 \
-                --health-timeout=5s \
-                --health-start-period=60s \
-                ${{ secrets.DOCKERHUB_USERNAME }}/user-memory-service:latest-arm64
-            else
-              docker run -d \
-                --name user-memory-service \
-                --network craftpilot-network \
-                --restart unless-stopped \
-                -p 8067:8067 \
-                -v /opt/craftpilot/gcp/credentials/gcp-credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
-                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
-                -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
-                -e SPRING_PROFILES_ACTIVE=prod \
-                -e SERVER_PORT=8067 \
-                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-                -e EUREKA_INSTANCE_HOSTNAME=user-memory-service \
+                -e EUREKA_INSTANCE_HOSTNAME=${{ env.SERVICE_NAME }} \
                 -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
@@ -176,14 +145,48 @@ jobs:
                 -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
                 -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics,prometheus" \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-                -e SPRING_APPLICATION_NAME=user-memory-service \
+                -e SPRING_APPLICATION_NAME=${{ env.SERVICE_NAME }} \
                 -e SPRING_CLOUD_GCP_PROJECT_ID=${SPRING_CLOUD_GCP_PROJECT_ID:-craft-pilot-ai} \
-                --health-cmd="curl -f http://localhost:8067/actuator/health || exit 1" \
+                -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_NETFLIX_EUREKA=DEBUG \
+                -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5008" \
+                --health-cmd="curl -f http://localhost:${{ env.CONTAINER_PORT }}/actuator/health || exit 1" \
+                --health-interval=10s \
+                --health-retries=10 \
+                --health-timeout=5s \
+                --health-start-period=60s \
+                ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
+            else
+              docker run -d \
+                --name ${{ env.SERVICE_NAME }} \
+                --network craftpilot-network \
+                --restart unless-stopped \
+                -p ${{ env.CONTAINER_PORT }}:${{ env.CONTAINER_PORT }} \
+                -v /opt/craftpilot/gcp/credentials/gcp-credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
+                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
+                -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/etc/gcp/credentials/gcp-credentials.json \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e SERVER_PORT=${{ env.CONTAINER_PORT }} \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_INSTANCE_HOSTNAME=${{ env.SERVICE_NAME }} \
+                -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+                -e REDIS_HOST=redis \
+                -e REDIS_PORT=6379 \
+                -e REDIS_PASSWORD=13579ada \
+                -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics,prometheus" \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e SPRING_APPLICATION_NAME=${{ env.SERVICE_NAME }} \
+                -e SPRING_CLOUD_GCP_PROJECT_ID=${SPRING_CLOUD_GCP_PROJECT_ID:-craft-pilot-ai} \
+                --health-cmd="curl -f http://localhost:${{ env.CONTAINER_PORT }}/actuator/health || exit 1" \
                 --health-interval=10s \
                 --health-retries=10 \
                 --health-timeout=5s \
                 --health-start-period=40s \
-                ${{ secrets.DOCKERHUB_USERNAME }}/user-memory-service:latest-arm64
+                ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
             fi
 
             echo "=== Waiting for Service to Start ==="
@@ -194,14 +197,14 @@ jobs:
               echo "Health check attempt $((counter + 1))/$max_attempts"
               
               # Container status check
-              if ! docker ps --filter "name=user-memory-service" --format '{{.Status}}' | grep -q "Up"; then
+              if ! docker ps --filter "name=${{ env.SERVICE_NAME }}" --format '{{.Status}}' | grep -q "Up"; then
                 echo "Container is not running anymore. Checking logs..."
-                docker logs user-memory-service --tail 100
+                docker logs ${{ env.SERVICE_NAME }} --tail 100
                 exit 1
               fi
               
               # Health check
-              HEALTH_CHECK=$(curl -s http://localhost:8067/actuator/health || echo "Failed to connect")
+              HEALTH_CHECK=$(curl -s http://localhost:${{ env.CONTAINER_PORT }}/actuator/health || echo "Failed to connect")
               
               if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
                 echo "✓ Service is healthy: $HEALTH_CHECK"
@@ -218,11 +221,11 @@ jobs:
 
             echo "=== Service Failed to Start - Debug Information ==="
             echo "Docker Container Status:"
-            docker ps -a | grep user-memory-service
+            docker ps -a | grep ${{ env.SERVICE_NAME }}
             echo "Container Logs (last 100 lines):"
-            docker logs user-memory-service --tail 100
+            docker logs ${{ env.SERVICE_NAME }} --tail 100
             echo "Error Messages and Exceptions:"
-            docker logs user-memory-service 2>&1 | grep -i "error\|exception\|failed" | tail -20
-            echo "Health Check Response:"
-            curl -v http://localhost:8067/actuator/health || true
+            docker logs ${{ env.SERVICE_NAME }} 2>&1 | grep -i "error\|exception\|failed" | tail -20
+
+            echo "=== Deployment Failed ==="
             exit 1
