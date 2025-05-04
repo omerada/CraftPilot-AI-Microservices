@@ -2,33 +2,39 @@ name: User Memory Service CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "user-memory-service/**"
       - ".github/workflows/user-memory-service-ci-cd.yml"
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - "user-memory-service/**"
       - ".github/workflows/user-memory-service-ci-cd.yml"
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy to"
+        required: true
+        default: "prod"
+        type: choice
+        options:
+          - prod
+          - debug
 
 env:
   SERVICE_NAME: user-memory-service
-  GCR_REGION: eu.gcr.io
-  GKE_CLUSTER: craftpilot-cluster
-  GKE_ZONE: europe-west3-a
-  IMAGE_TAG: ${{ github.sha }}
   CONTAINER_PORT: 8067
+  DOCKER_REGISTRY: craftpilot
 
 jobs:
-  build:
-    name: Build and Test
-    runs-on: ubuntu-latest
-
+  build-and-deploy:
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: ./user-memory-service
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Set up JDK 21
         uses: actions/setup-java@v3
@@ -39,306 +45,197 @@ jobs:
 
       - name: Build with Maven
         run: |
-          cd user-memory-service
           ./mvnw clean package -DskipTests
 
       - name: Run tests
         run: |
-          cd user-memory-service
           ./mvnw test
 
       - name: Run security check
         run: |
-          cd user-memory-service
           ./mvnw dependency-check:check || echo "Security check completed with warnings"
 
-      - name: Cache Maven packages
-        uses: actions/cache@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
         with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: service-jar
-          path: user-memory-service/target/*.jar
-
-  docker:
-    name: Build and Push Docker image
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: service-jar
-          path: user-memory-service/target/
+          platforms: arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
+          platforms: linux/arm64
 
-      - name: Configure Docker to use Google Cloud
-        run: gcloud auth configure-docker ${{ env.GCR_REGION }}
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: true
 
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
           context: ./user-memory-service
+          platforms: linux/arm64
           push: true
           tags: |
-            ${{ env.GCR_REGION }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
-            ${{ env.GCR_REGION }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64
+            ${{ secrets.DOCKERHUB_USERNAME }}/user-memory-service:latest-arm64
+            ${{ secrets.DOCKERHUB_USERNAME }}/user-memory-service:${{ github.sha }}-arm64
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-memory-service:buildcache-arm64
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-memory-service:buildcache-arm64,mode=max
 
-  deploy:
-    name: Deploy to GKE
-    runs-on: ubuntu-latest
-    needs: docker
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
+      - id: "auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v1"
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
+          credentials_json: "${{ secrets.GCP_SA_KEY }}"
 
-      - name: Get GKE credentials
-        uses: google-github-actions/get-gke-credentials@v1
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v1"
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@master
         with:
-          cluster_name: ${{ env.GKE_CLUSTER }}
-          location: ${{ env.GKE_ZONE }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: "20m"
+          debug: true
+          script: |
+            set -e  # Exit on any error
 
-      - name: Check for existing deployment
-        id: check-deployment
-        run: |
-          if kubectl get deployment ${{ env.SERVICE_NAME }} -n craftpilot &> /dev/null; then
-            echo "deployment_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "deployment_exists=false" >> $GITHUB_OUTPUT
-          fi
+            echo "=== Testing SSH Connection ==="
+            whoami
+            pwd
 
-      - name: Update existing deployment
-        if: steps.check-deployment.outputs.deployment_exists == 'true'
-        run: |
-          kubectl -n craftpilot set image deployment/${{ env.SERVICE_NAME }} ${{ env.SERVICE_NAME }}=${{ env.GCR_REGION }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
-          kubectl -n craftpilot rollout status deployment/${{ env.SERVICE_NAME }}
+            echo "=== System Architecture ==="
+            uname -m
 
-      - name: Create new deployment
-        if: steps.check-deployment.outputs.deployment_exists == 'false'
-        run: |
-          cat <<EOF | kubectl apply -f -
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: ${{ env.SERVICE_NAME }}
-            namespace: craftpilot
-            labels:
-              app: ${{ env.SERVICE_NAME }}
-          spec:
-            replicas: 2
-            strategy:
-              type: RollingUpdate
-              rollingUpdate:
-                maxSurge: 1
-                maxUnavailable: 0
-            selector:
-              matchLabels:
-                app: ${{ env.SERVICE_NAME }}
-            template:
-              metadata:
-                labels:
-                  app: ${{ env.SERVICE_NAME }}
-                annotations:
-                  prometheus.io/scrape: "true"
-                  prometheus.io/path: "/actuator/prometheus"
-                  prometheus.io/port: "${{ env.CONTAINER_PORT }}"
-              spec:
-                affinity:
-                  podAntiAffinity:
-                    preferredDuringSchedulingIgnoredDuringExecution:
-                      - weight: 100
-                        podAffinityTerm:
-                          labelSelector:
-                            matchExpressions:
-                              - key: app
-                                operator: In
-                                values:
-                                  - ${{ env.SERVICE_NAME }}
-                          topologyKey: kubernetes.io/hostname
-                containers:
-                - name: ${{ env.SERVICE_NAME }}
-                  image: ${{ env.GCR_REGION }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
-                  imagePullPolicy: Always
-                  ports:
-                  - containerPort: ${{ env.CONTAINER_PORT }}
-                    name: http
-                  env:
-                  - name: SPRING_PROFILES_ACTIVE
-                    value: "prod"
-                  - name: SERVER_PORT
-                    value: "${{ env.CONTAINER_PORT }}"
-                  - name: GOOGLE_APPLICATION_CREDENTIALS
-                    value: "/secrets/firestore-credentials.json"
-                  - name: GCP_PROJECT_ID
-                    valueFrom:
-                      secretKeyRef:
-                        name: gcp-credentials
-                        key: project-id
-                  - name: SPRING_CLOUD_GCP_PROJECT_ID
-                    valueFrom:
-                      secretKeyRef:
-                        name: gcp-credentials
-                        key: project-id
-                  - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
-                    value: "http://craftpilot:13579ada@eureka-server:8761/eureka/"
-                  - name: EUREKA_INSTANCE_PREFER_IP_ADDRESS
-                    value: "true"
-                  - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
-                    value: "health,info,metrics,prometheus"
-                  - name: REDIS_HOST
-                    valueFrom:
-                      configMapKeyRef:
-                        name: redis-config
-                        key: host
-                  - name: REDIS_PORT
-                    valueFrom:
-                      configMapKeyRef:
-                        name: redis-config
-                        key: port
-                  - name: REDIS_PASSWORD
-                    valueFrom:
-                      secretKeyRef:
-                        name: redis-secret
-                        key: password
-                  - name: HOSTNAME
-                    valueFrom:
-                      fieldRef:
-                        fieldPath: metadata.name
-                  volumeMounts:
-                  - name: firestore-credentials
-                    mountPath: "/secrets"
-                    readOnly: true
-                  resources:
-                    requests:
-                      memory: "512Mi"
-                      cpu: "250m"
-                    limits:
-                      memory: "1Gi"
-                      cpu: "500m"
-                  startupProbe:
-                    httpGet:
-                      path: /actuator/health
-                      port: ${{ env.CONTAINER_PORT }}
-                    initialDelaySeconds: 30
-                    periodSeconds: 10
-                    failureThreshold: 30
-                  livenessProbe:
-                    httpGet:
-                      path: /actuator/health/liveness
-                      port: ${{ env.CONTAINER_PORT }}
-                    initialDelaySeconds: 60
-                    periodSeconds: 15
-                    timeoutSeconds: 5
-                    failureThreshold: 3
-                  readinessProbe:
-                    httpGet:
-                      path: /actuator/health/readiness
-                      port: ${{ env.CONTAINER_PORT }}
-                    initialDelaySeconds: 30
-                    periodSeconds: 10
-                    timeoutSeconds: 5
-                    failureThreshold: 3
-                volumes:
-                - name: firestore-credentials
-                  secret:
-                    secretName: firestore-credentials
-                terminationGracePeriodSeconds: 60
-          EOF
-          kubectl -n craftpilot rollout status deployment/${{ env.SERVICE_NAME }}
+            echo "=== Testing Directory Access ==="
+            mkdir -p /opt/craftpilot
 
-      - name: Check or create service
-        run: |
-          if ! kubectl get service ${{ env.SERVICE_NAME }} -n craftpilot &> /dev/null; then
-            cat <<EOF | kubectl apply -f -
-            apiVersion: v1
-            kind: Service
-            metadata:
-              name: ${{ env.SERVICE_NAME }}
-              namespace: craftpilot
-              labels:
-                app: ${{ env.SERVICE_NAME }}
-            spec:
-              selector:
-                app: ${{ env.SERVICE_NAME }}
-              ports:
-              - port: 80
-                targetPort: ${{ env.CONTAINER_PORT }}
-                protocol: TCP
-                name: http
-              type: ClusterIP
-            EOF
-          fi
+            echo "=== Continuing with Deployment ==="
+            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
+            chmod 600 /opt/craftpilot/gcp-credentials.json
 
-      - name: Create ServiceMonitor if Prometheus is enabled
-        run: |
-          if kubectl get crd servicemonitors.monitoring.coreos.com &> /dev/null; then
-            cat <<EOF | kubectl apply -f -
-            apiVersion: monitoring.coreos.com/v1
-            kind: ServiceMonitor
-            metadata:
-              name: ${{ env.SERVICE_NAME }}-monitor
-              namespace: craftpilot
-              labels:
-                release: prometheus
-            spec:
-              selector:
-                matchLabels:
-                  app: ${{ env.SERVICE_NAME }}
-              endpoints:
-              - port: http
-                path: /actuator/prometheus
-                interval: 15s
-              namespaceSelector:
-                matchNames:
-                - craftpilot
-            EOF
-          fi
+            echo "=== Verifying Docker Status ==="
+            if ! systemctl is-active --quiet docker; then
+              echo "Docker is not running. Starting Docker..."
+              sudo systemctl start docker
+            fi
 
-      - name: Verify Deployment Health
-        run: |
-          echo "Waiting for deployment to stabilize..."
-          sleep 30
-          kubectl -n craftpilot get pods -l app=${{ env.SERVICE_NAME }}
-          kubectl -n craftpilot exec -it $(kubectl -n craftpilot get pods -l app=${{ env.SERVICE_NAME }} -o jsonpath='{.items[0].metadata.name}') -- curl -sSf http://localhost:${{ env.CONTAINER_PORT }}/actuator/health || echo "Health check unavailable but continuing"
+            echo "=== Deploying User Memory Service ==="
+            # Force pull latest image
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/user-memory-service:latest-arm64
 
-      - name: Send deployment notification
-        if: success()
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_CHANNEL: deployments
-          SLACK_COLOR: good
-          SLACK_TITLE: User Memory Service Deployed
-          SLACK_MESSAGE: "User Memory Service has been deployed to production :rocket:"
-          MSG_MINIMAL: true
+            echo "=== Stopping Old Container ==="
+            docker rm -f user-memory-service || true
+
+            echo "=== Starting User Memory Service ==="
+            if [[ "${{ github.event.inputs.environment }}" == "debug" ]]; then
+              docker run -d \
+                --name user-memory-service \
+                --network craftpilot-network \
+                --restart unless-stopped \
+                -p 8067:8067 \
+                -p 5008:5008 \
+                -v /opt/craftpilot/gcp/credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
+                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
+                -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e SERVER_PORT=8067 \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_INSTANCE_HOSTNAME=user-memory-service \
+                -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+                -e REDIS_HOST=redis \
+                -e REDIS_PORT=6379 \
+                -e REDIS_PASSWORD=13579ada \
+                -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics,loggers,env" \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e SPRING_APPLICATION_NAME=user-memory-service \
+                -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_NETFLIX_EUREKA=DEBUG \
+                -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5008" \
+                --health-cmd="curl -f http://localhost:8067/actuator/health || exit 1" \
+                --health-interval=10s \
+                --health-retries=10 \
+                --health-timeout=5s \
+                --health-start-period=60s \
+                ${{ secrets.DOCKERHUB_USERNAME }}/user-memory-service:latest-arm64
+            else
+              docker run -d \
+                --name user-memory-service \
+                --network craftpilot-network \
+                --restart unless-stopped \
+                -p 8067:8067 \
+                -v /opt/craftpilot/gcp/credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
+                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
+                -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e SERVER_PORT=8067 \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_INSTANCE_HOSTNAME=user-memory-service \
+                -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
+                -e REDIS_HOST=redis \
+                -e REDIS_PORT=6379 \
+                -e REDIS_PASSWORD=13579ada \
+                -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics,prometheus" \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e SPRING_APPLICATION_NAME=user-memory-service \
+                -e SPRING_CLOUD_GCP_PROJECT_ID=${SPRING_CLOUD_GCP_PROJECT_ID:-craft-pilot-ai} \
+                --health-cmd="curl -f http://localhost:8067/actuator/health || exit 1" \
+                --health-interval=10s \
+                --health-retries=10 \
+                --health-timeout=5s \
+                --health-start-period=40s \
+                ${{ secrets.DOCKERHUB_USERNAME }}/user-memory-service:latest-arm64
+            fi
+
+            echo "=== Waiting for Service to Start ==="
+            max_attempts=20
+            counter=0
+
+            while [ $counter -lt $max_attempts ]; do
+              echo "Health check attempt $((counter + 1))/$max_attempts"
+              
+              # Container status check
+              if ! docker ps --filter "name=user-memory-service" --format '{{.Status}}' | grep -q "Up"; then
+                echo "Container is not running anymore. Checking logs..."
+                docker logs user-memory-service --tail 100
+                exit 1
+              fi
+              
+              # Health check
+              HEALTH_CHECK=$(curl -s http://localhost:8067/actuator/health || echo "Failed to connect")
+              
+              if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
+                echo "✓ Service is healthy: $HEALTH_CHECK"
+                echo "=== Deployment completed successfully ==="
+                exit 0
+              else
+                echo "Health check response: $HEALTH_CHECK"
+              fi
+              
+              echo "Waiting for service to start... ($((counter + 1))/$max_attempts)"
+              sleep 15
+              counter=$((counter + 1))
+            done
+
+            echo "=== Service Failed to Start - Debug Information ==="
+            echo "Docker Container Status:"
+            docker ps -a | grep user-memory-service
+            echo "Container Logs (last 100 lines):"
+            docker logs user-memory-service --tail 100
+            echo "Error Messages and Exceptions:"
+            docker logs user-memory-service 2>&1 | grep -i "error\|exception\|failed" | tail -20
+            echo "Health Check Response:"
+            curl -v http://localhost:8067/actuator/health || true
+            exit 1

@@ -15,7 +15,7 @@ RUN addgroup -S craftpilot && adduser -S appuser -G craftpilot
 USER appuser
 
 # Healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD wget -q --spider http://localhost:8067/actuator/health/liveness || exit 1
 
 # JVM ayarları optimize edildi
