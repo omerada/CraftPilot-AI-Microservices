@@ -16,21 +16,40 @@ import reactor.core.publisher.Mono;
 @Slf4j
 @Tag(name = "User Memory", description = "User memory management endpoints")
 public class UserMemoryController {
-    
     private final UserMemoryService userMemoryService;
-    
-    @PostMapping("/{userId}/process")
-    @Operation(summary = "Process user message", description = "Process a user message for memory extraction")
-    public Mono<Void> processUserMessage(@PathVariable String userId, @RequestBody String message) {
-        log.info("Processing message for user: {}", userId);
-        return userMemoryService.processUserMessage(userId, message);
-    }
-    
+
     @GetMapping("/{userId}")
-    @Operation(summary = "Get user memory", description = "Retrieve the memory for a specific user")
+    @Operation(summary = "Get user memory", description = "Retrieves memory for a specific user")
     public Mono<ResponseEntity<UserMemory>> getUserMemory(@PathVariable String userId) {
-        log.info("Retrieving memory for user: {}", userId);
         return userMemoryService.getUserMemory(userId)
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{userId}/entry")
+    @Operation(summary = "Add memory entry", description = "Adds a new memory entry for a specific user")
+    public Mono<ResponseEntity<UserMemory>> addMemoryEntry(
+            @PathVariable String userId,
+            @RequestBody UserMemory.MemoryEntry entry) {
+        return userMemoryService.addMemoryEntry(userId, entry)
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping
+    @Operation(summary = "Update user memory", description = "Updates the entire memory for a specific user")
+    public Mono<ResponseEntity<UserMemory>> updateUserMemory(@RequestBody UserMemory userMemory) {
+        return userMemoryService.updateUserMemory(userMemory)
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{userId}/clean")
+    @Operation(summary = "Clean old entries", description = "Removes entries older than the specified threshold")
+    public Mono<ResponseEntity<UserMemory>> cleanOldEntries(
+            @PathVariable String userId,
+            @RequestParam(defaultValue = "30") int daysThreshold) {
+        return userMemoryService.cleanOldEntries(userId, daysThreshold)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }

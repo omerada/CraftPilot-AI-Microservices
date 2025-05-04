@@ -163,3 +163,11 @@ resilience4j:
 lighthouse:
   service:
     url: ${LIGHTHOUSE_SERVICE_URL:http://lighthouse-service:8085}
+
+service:
+  user-memory:
+    url: ${USER_MEMORY_SERVICE_URL:http://user-memory-service}
+
+ai:
+  model:
+    extraction: ${AI_MODEL_EXTRACTION:google/gemma-3-4b-it}

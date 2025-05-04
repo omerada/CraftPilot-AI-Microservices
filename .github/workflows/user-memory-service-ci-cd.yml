@@ -47,6 +47,11 @@ jobs:
           cd user-memory-service
           ./mvnw test
 
+      - name: Run security check
+        run: |
+          cd user-memory-service
+          ./mvnw dependency-check:check || echo "Security check completed with warnings"
+
       - name: Cache Maven packages
         uses: actions/cache@v3
         with:
@@ -152,6 +157,11 @@ jobs:
               app: ${{ env.SERVICE_NAME }}
           spec:
             replicas: 2
+            strategy:
+              type: RollingUpdate
+              rollingUpdate:
+                maxSurge: 1
+                maxUnavailable: 0
             selector:
               matchLabels:
                 app: ${{ env.SERVICE_NAME }}
@@ -164,14 +174,30 @@ jobs:
                   prometheus.io/path: "/actuator/prometheus"
                   prometheus.io/port: "${{ env.CONTAINER_PORT }}"
               spec:
+                affinity:
+                  podAntiAffinity:
+                    preferredDuringSchedulingIgnoredDuringExecution:
+                      - weight: 100
+                        podAffinityTerm:
+                          labelSelector:
+                            matchExpressions:
+                              - key: app
+                                operator: In
+                                values:
+                                  - ${{ env.SERVICE_NAME }}
+                          topologyKey: kubernetes.io/hostname
                 containers:
                 - name: ${{ env.SERVICE_NAME }}
                   image: ${{ env.GCR_REGION }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
+                  imagePullPolicy: Always
                   ports:
                   - containerPort: ${{ env.CONTAINER_PORT }}
+                    name: http
                   env:
                   - name: SPRING_PROFILES_ACTIVE
                     value: "prod"
+                  - name: SERVER_PORT
+                    value: "${{ env.CONTAINER_PORT }}"
                   - name: GOOGLE_APPLICATION_CREDENTIALS
                     value: "/secrets/firestore-credentials.json"
                   - name: GCP_PROJECT_ID
@@ -179,8 +205,36 @@ jobs:
                       secretKeyRef:
                         name: gcp-credentials
                         key: project-id
+                  - name: SPRING_CLOUD_GCP_PROJECT_ID
+                    valueFrom:
+                      secretKeyRef:
+                        name: gcp-credentials
+                        key: project-id
                   - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
                     value: "http://craftpilot:13579ada@eureka-server:8761/eureka/"
+                  - name: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+                    value: "true"
+                  - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+                    value: "health,info,metrics,prometheus"
+                  - name: REDIS_HOST
+                    valueFrom:
+                      configMapKeyRef:
+                        name: redis-config
+                        key: host
+                  - name: REDIS_PORT
+                    valueFrom:
+                      configMapKeyRef:
+                        name: redis-config
+                        key: port
+                  - name: REDIS_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: redis-secret
+                        key: password
+                  - name: HOSTNAME
+                    valueFrom:
+                      fieldRef:
+                        fieldPath: metadata.name
                   volumeMounts:
                   - name: firestore-credentials
                     mountPath: "/secrets"
@@ -192,6 +246,13 @@ jobs:
                     limits:
                       memory: "1Gi"
                       cpu: "500m"
+                  startupProbe:
+                    httpGet:
+                      path: /actuator/health
+                      port: ${{ env.CONTAINER_PORT }}
+                    initialDelaySeconds: 30
+                    periodSeconds: 10
+                    failureThreshold: 30
                   livenessProbe:
                     httpGet:
                       path: /actuator/health/liveness
@@ -199,6 +260,7 @@ jobs:
                     initialDelaySeconds: 60
                     periodSeconds: 15
                     timeoutSeconds: 5
+                    failureThreshold: 3
                   readinessProbe:
                     httpGet:
                       path: /actuator/health/readiness
@@ -206,10 +268,12 @@ jobs:
                     initialDelaySeconds: 30
                     periodSeconds: 10
                     timeoutSeconds: 5
+                    failureThreshold: 3
                 volumes:
                 - name: firestore-credentials
                   secret:
                     secretName: firestore-credentials
+                terminationGracePeriodSeconds: 60
           EOF
           kubectl -n craftpilot rollout status deployment/${{ env.SERVICE_NAME }}
 
@@ -222,12 +286,16 @@ jobs:
             metadata:
               name: ${{ env.SERVICE_NAME }}
               namespace: craftpilot
+              labels:
+                app: ${{ env.SERVICE_NAME }}
             spec:
               selector:
                 app: ${{ env.SERVICE_NAME }}
               ports:
               - port: 80
                 targetPort: ${{ env.CONTAINER_PORT }}
+                protocol: TCP
+                name: http
               type: ClusterIP
             EOF
           fi

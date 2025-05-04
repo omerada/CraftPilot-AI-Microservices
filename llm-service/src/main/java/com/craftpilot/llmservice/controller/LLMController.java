@@ -93,13 +93,17 @@ public class LLMController {
             @RequestBody AIRequest request,
             @RequestHeader(value = "X-User-Language", defaultValue = "en") String userLanguage,
             @RequestHeader(value = "X-Request-ID", required = false) String requestId,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
             ServerWebExchange exchange) {
         
         // RequestID yoksa bir tane oluştur (loglamada null görmemek için)
         final String trackingId = requestId != null ? requestId : UUID.randomUUID().toString();
         
-        log.info("Stream chat completion request received with language: {}, requestId: {}, model: {}", 
-                userLanguage, trackingId, request.getModel());
+        log.info("Stream chat completion request received with language: {}, requestId: {}, model: {}, userId: {}", 
+                userLanguage, trackingId, request.getModel(), userId);
+        
+        // Kullanıcı ID'sini AI isteğine ekle
+        request.setUserId(userId);
         
         // Tablo yanıtı olabilecek özel anahtar kelimeleri tespit et
         boolean potentialTableResponse = request.getPrompt() != null && 

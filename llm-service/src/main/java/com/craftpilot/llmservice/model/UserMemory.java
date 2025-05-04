@@ -1,11 +1,9 @@
-package com.craftpilot.usermemoryservice.model;
+package com.craftpilot.llmservice.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -15,10 +13,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "user_memories")
 public class UserMemory {
-    @Id
-    private String id;
     private String userId;
     
     @Builder.Default

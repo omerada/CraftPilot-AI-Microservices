@@ -16,11 +16,12 @@ public class AIRequest {
     private String requestId;
     private String userId;
     private String model;
-    private String prompt; // Geriye dönük uyumluluk için korundu
-    private List<Map<String, Object>> messages; // Sohbet geçmişi için
+    private String prompt;  
+    private List<Map<String, Object>> messages;  
     private Integer maxTokens;
     private Double temperature;
     private String requestType;
-    private String language; // Kullanıcı dil tercihi
+    private String language;  
     private String systemPrompt;
+    private Boolean stream;  
 }

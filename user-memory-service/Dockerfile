@@ -1,41 +1,28 @@
-# Build stage
-FROM eclipse-temurin:21-jdk as build
-WORKDIR /workspace/app
-
-# Önce bağımlılıkları kopyalayıp derleyelim (önbellek kullanmak için)
+FROM eclipse-temurin:21-jdk-alpine as builder
+WORKDIR /app
 COPY mvnw .
 COPY .mvn .mvn
 COPY pom.xml .
 COPY src src
-
-# Maven ile paketleme işlemi
 RUN ./mvnw package -DskipTests
-RUN mkdir -p target/dependency && (cd target/dependency; jar -xf ../*.jar)
 
-# Production stage
-FROM eclipse-temurin:21-jre
-VOLUME /tmp
-ARG DEPENDENCY=/workspace/app/target/dependency
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY --from=builder /app/target/*.jar app.jar
 
-# Google Cloud için kimlik doğrulama dosyaları için bir dizin oluştur
-RUN mkdir -p /secrets
+# Güvenlik için root olmayan kullanıcı oluştur
+RUN addgroup -S craftpilot && adduser -S appuser -G craftpilot
+USER appuser
 
-# Non-root kullanıcı ile çalıştır
-RUN addgroup --system --gid 1001 craftpilot && \
-    adduser --system --uid 1001 --ingroup craftpilot craftpilot
-USER craftpilot:craftpilot
-
-# Jar dosyasını katmanlı olarak kopyala
-COPY --from=build ${DEPENDENCY}/BOOT-INF/lib /app/lib
-COPY --from=build ${DEPENDENCY}/META-INF /app/META-INF
-COPY --from=build ${DEPENDENCY}/BOOT-INF/classes /app
-
-# Healthcheck yapılandırması
+# Healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8067/actuator/health || exit 1
+  CMD wget -q --spider http://localhost:8067/actuator/health/liveness || exit 1
 
-# Prometheus metrik toplayıcılar için gerekli port
+# JVM ayarları optimize edildi
+ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+ParallelRefProcEnabled -Xms512m -Xmx1g -Dfile.encoding=UTF-8"
+
+# Actuator port
 EXPOSE 8067
 
-# Uygulama çalıştırma komutu
-ENTRYPOINT ["java", "-cp", "app:app/lib/*", "com.craftpilot.usermemoryservice.UserMemoryServiceApplication"]
+# Daha iyi container sinyalleri için
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
