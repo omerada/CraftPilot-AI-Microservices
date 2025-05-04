@@ -1,6 +1,5 @@
 package com.craftpilot.llmservice.config;
 
-import com.craftpilot.llmservice.config.OpenRouterProperties;
 import com.craftpilot.llmservice.util.RequestBodyBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

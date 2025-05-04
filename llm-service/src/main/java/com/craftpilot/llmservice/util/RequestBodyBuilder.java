@@ -3,6 +3,7 @@ package com.craftpilot.llmservice.util;
 import com.craftpilot.llmservice.config.OpenRouterProperties;
 import com.craftpilot.llmservice.model.AIRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,6 +14,7 @@ import java.util.Map;
  * API istek gövdelerini oluşturmak için yardımcı sınıf
  */
 @Slf4j
+@Component
 public class RequestBodyBuilder {
     
     private final OpenRouterProperties properties;
