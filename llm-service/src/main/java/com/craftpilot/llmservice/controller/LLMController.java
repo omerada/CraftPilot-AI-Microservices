@@ -22,13 +22,20 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import com.craftpilot.llmservice.service.PromptService;
+import com.craftpilot.llmservice.service.ChatService;
+import com.craftpilot.llmservice.service.ChatEnhancementService;
+
 @Slf4j
 @RestController
 @RequestMapping("/")  
 @RequiredArgsConstructor 
 public class LLMController {
-    
     private final LLMService llmService;
+    private final PromptService promptService;
+    private final ChatService chatService;
+    // ChatEnhancementService'i ekleyin
+    private final ChatEnhancementService chatEnhancementService;
     // Aşırı uzun boşluk dizilerini tespit etmek için pattern
     private static final Pattern EXCESSIVE_WHITESPACE = Pattern.compile("\\s{100,}");
     // Maksimum izin verilen boşluk sayısı
@@ -324,5 +331,62 @@ public class LLMController {
                     .status(status)
                     .body(errorResponse));
             });
+    }
+
+    @PostMapping("/chat")
+    public Mono<ResponseEntity<AIResponse>> chat(@RequestBody AIRequest request,
+                                             @RequestHeader(value = "X-User-Id", required = false) String userId,
+                                             @RequestHeader(value = "X-User-Language", defaultValue = "en") String userLanguage) {
+        log.info("Chat request received with language: {}", userLanguage);
+        request.setRequestType("CHAT");
+        request.setLanguage(userLanguage);
+
+        // Model belirtilmemişse varsayılan bir model ata
+        if (request.getModel() == null || request.getModel().isEmpty()) {
+            request.setModel("google/gemini-pro");
+        }
+
+        // Yanıt üretildikten sonra kullanıcı bilgilerini işle
+        return llmService.processChatCompletion(request)
+                .doOnSuccess(response -> {
+                    if (userId != null && request.getPrompt() != null) {
+                        // Kullanıcı mesajından bilgileri çıkar ve kaydet
+                        // Bu işlemi burada subscribe ederek garanti altına alıyoruz
+                        chatEnhancementService.processUserMessage(userId, request.getPrompt(), "chat-request")
+                                .subscribe(
+                                        null,
+                                        error -> log.error("Error processing user message: {}", error.getMessage())
+                                );
+                    }
+                })
+                .map(response -> {
+                    // Null kontrolü ve varsayılan değer atama
+                    if (response == null) {
+                        response = AIResponse.builder()
+                                .response("Servis yanıtı alınamadı. Lütfen daha sonra tekrar deneyin.")
+                                .requestId(request.getRequestId())
+                                .success(false)
+                                .build();
+                    }
+
+                    return ResponseEntity.ok()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body(response);
+                })
+                .doOnError(error -> log.error("Chat completion error: {}", error.getMessage(), error))
+                .onErrorResume(error -> {
+                    AIResponse errorResponse = AIResponse.builder()
+                            .response("İşlem sırasında bir hata oluştu: " + error.getMessage())
+                            .requestId(request.getRequestId())
+                            .success(false)
+                            .build();
+
+                    HttpStatus status = (error instanceof APIException) ?
+                            HttpStatus.BAD_GATEWAY : HttpStatus.INTERNAL_SERVER_ERROR;
+
+                    return Mono.just(ResponseEntity
+                            .status(status)
+                            .body(errorResponse));
+                });
     }
 }

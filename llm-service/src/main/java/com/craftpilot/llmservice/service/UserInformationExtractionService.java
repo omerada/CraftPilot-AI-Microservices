@@ -11,7 +11,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import reactor.util.retry.Retry;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,6 +29,19 @@ public class UserInformationExtractionService {
 
     @Value("${ai.model.extraction:google/gemma-3-4b-it}")
     private String extractionModel;
+
+    // Performans ve ölçeklenebilirlik için yapılandırma parametreleri ekleyelim
+    @Value("${extraction.timeout.seconds:10}")
+    private int extractionTimeoutSeconds;
+    
+    @Value("${extraction.memory.timeout.seconds:5}")
+    private int memoryTimeoutSeconds;
+    
+    @Value("${extraction.retry.max:3}")
+    private int maxRetryAttempts;
+    
+    @Value("${extraction.retry.backoff.ms:500}")
+    private long retryBackoffMs;
 
     // Bazı yaygın kişisel bilgi kalıpları
     private static final Pattern NAME_PATTERN = Pattern.compile("(benim (adım|ismim)|adım|ismim) (\\w+)", Pattern.CASE_INSENSITIVE);
@@ -53,10 +69,17 @@ public class UserInformationExtractionService {
         log.debug("Sending extraction request to LLM service: {}", prompt.substring(0, Math.min(100, prompt.length())) + "...");
         
         return llmService.processChatCompletion(request)
+                .timeout(Duration.ofSeconds(extractionTimeoutSeconds))  // Timeout ekle
+                .publishOn(Schedulers.boundedElastic())  // Uzun işlemleri sınırlı bir thread havuzunda yap
                 .doOnSuccess(response -> log.info("Received AI response for extraction: length={}", 
                         response != null && response.getResponse() != null ? response.getResponse().length() : 0))
                 .doOnError(e -> log.error("Error during LLM extraction request: {}", e.getMessage()))
-                .flatMap(response -> parseExtractionResponse(userId, response, context, message));
+                .flatMap(response -> parseExtractionResponse(userId, response, context, message))
+                .retryWhen(Retry.backoff(maxRetryAttempts, Duration.ofMillis(retryBackoffMs))  // Retry ekle
+                        .filter(e -> !(e instanceof IllegalArgumentException))  // Geçici hataları filtrele
+                        .doBeforeRetry(signal -> 
+                            log.warn("Retrying extraction after error: {}, attempt: {}", 
+                                    signal.failure().getMessage(), signal.totalRetries() + 1)));
     }
 
     public Mono<Void> processAndStoreUserInfo(String userId, String message, String context) {
@@ -86,10 +109,16 @@ public class UserInformationExtractionService {
                             userId, extractedInfo.getInformation());
                     
                     return userMemoryClient.addMemoryEntry(extractedInfo)
+                            .timeout(Duration.ofSeconds(memoryTimeoutSeconds))  // Timeout ekle
                             .doOnSubscribe(s -> log.debug("Calling user-memory-service for user {}", userId))
                             .doOnSuccess(result -> log.info("Successfully stored AI-extracted information for user {}", userId))
                             .doOnError(error -> log.error("Failed to store AI-extracted information for user {}: {}", 
                                     userId, error.getMessage()))
+                            .retryWhen(Retry.backoff(maxRetryAttempts, Duration.ofMillis(retryBackoffMs))  // Retry ekle
+                                    .filter(e -> !(e instanceof IllegalArgumentException))
+                                    .doBeforeRetry(signal -> 
+                                        log.warn("Retrying memory storage after error: {}, attempt: {}", 
+                                                signal.failure().getMessage(), signal.totalRetries() + 1)))
                             .doFinally(signal -> log.debug("Memory storage completed with signal: {}", signal));
                 })
                 .then()

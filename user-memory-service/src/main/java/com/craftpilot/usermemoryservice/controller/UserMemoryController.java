@@ -6,9 +6,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+import com.craftpilot.usermemoryservice.model.dto.ExtractedUserInfo;
 
 @RestController
 @RequestMapping("/user-memory")
@@ -36,6 +38,31 @@ public class UserMemoryController {
         return userMemoryService.addMemoryEntry(userId, entry)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{userId}/entries")
+    @Operation(summary = "Add memory entry", description = "Adds a new entry to the user's memory")
+    public Mono<ResponseEntity<String>> addMemoryEntry(
+            @PathVariable String userId,
+            @RequestBody ExtractedUserInfo memoryEntry) {
+        
+        log.info("Memory entry addition request received for user: {}", userId);
+        log.debug("Memory entry content: {}", memoryEntry.getInformation());
+        
+        // userId değerini path'ten gelen değer ile güncelle, tutarsızlık olmaması için
+        memoryEntry.setUserId(userId);
+        
+        return userMemoryService.addMemoryEntry(memoryEntry)
+                .map(result -> {
+                    log.info("Successfully added memory entry for user {}", userId);
+                    return ResponseEntity.ok("Memory entry added successfully with ID: " + result);
+                })
+                .onErrorResume(e -> {
+                    log.error("Error adding memory entry for user {}: {}", userId, e.getMessage(), e);
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body("Error adding memory entry: " + e.getMessage()));
+                })
+                .defaultIfEmpty(ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid memory entry"));
     }
 
     @PutMapping

@@ -67,6 +67,18 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
+# WebClient yapılandırması
+webclient:
+  timeout: 30000
+  max-in-memory-size: 10485760
+
+# Kullanıcı bellek servisi yapılandırması
+user-memory:
+  service:
+    url: http://user-memory-service:8067
+    # Kubernetes veya Docker Compose ortamında servis adı kullanılır
+    # Lokal geliştirme için localhost:8067 olarak değiştirilebilir
+
 # Activity logging yapılandırması
 activity:
   service-name-prefix: LLM

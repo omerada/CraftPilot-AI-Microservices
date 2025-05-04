@@ -1,6 +1,7 @@
 package com.craftpilot.usermemoryservice.service;
 
 import com.craftpilot.usermemoryservice.model.UserMemory;
+import com.craftpilot.usermemoryservice.model.dto.ExtractedUserInfo;
 import com.craftpilot.usermemoryservice.repository.UserMemoryRepository;
 import com.google.cloud.Timestamp;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,26 @@ public class UserMemoryService {
                             userMemory.getEntries().size());
                     return userMemoryRepository.save(userMemory);
                 });
+    }
+
+    // ExtractedUserInfo tipinden gelen bilgiyi işleyecek yeni metot
+    public Mono<String> addMemoryEntry(ExtractedUserInfo extractedInfo) {
+        log.info("Processing extracted information for userId: {}", extractedInfo.getUserId());
+        
+        // ExtractedUserInfo'dan MemoryEntry oluştur
+        UserMemory.MemoryEntry entry = UserMemory.MemoryEntry.builder()
+                .id(UUID.randomUUID().toString())
+                .content(extractedInfo.getInformation())
+                .source(extractedInfo.getContext())
+                .timestamp(Timestamp.ofTimeSecondsAndNanos(
+                        extractedInfo.getTimestamp().getEpochSecond(),
+                        extractedInfo.getTimestamp().getNano()))
+                .importance(0.7) // Varsayılan önem derecesi
+                .category("user_info") // Varsayılan kategori
+                .build();
+        
+        return addMemoryEntry(extractedInfo.getUserId(), entry)
+                .map(userMemory -> entry.getId());
     }
 
     public Mono<UserMemory> updateUserMemory(UserMemory userMemory) {
