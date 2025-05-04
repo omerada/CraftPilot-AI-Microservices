@@ -1,36 +1,21 @@
-# 1. Builder aşaması: Java uygulamasını derle
-FROM eclipse-temurin:21-jdk-alpine AS builder
-WORKDIR /app
+# Build stage
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 
-# Gerekli paketleri yükle
-RUN apk add --no-cache curl
-
-# Maven yapılandırması
-ENV MAVEN_OPTS="-Dmaven.repo.local=./.m2/repository -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=WARN"
-
-# Bağımlılıkları önce kopyala ve derle (önbellek optimizasyonu için)
+WORKDIR /build
 COPY pom.xml .
-COPY mvnw .
-COPY .mvn .mvn
-RUN chmod +x ./mvnw
+COPY src ./src
 
-# Maven merkezini ve Google'ın Maven deposunu ekleyerek bağımlılıkları yükle
-RUN ./mvnw dependency:go-offline -B \
-    -DadditionalRemoteRepositories=https://maven-central.storage.googleapis.com/maven2/ \
-    -Dmaven.wagon.http.ssl.insecure=true \
-    -Dmaven.wagon.http.ssl.allowall=true
+# Maven build
+RUN mvn clean package -DskipTests
 
-# Kaynak kodları kopyala ve derle
-COPY src src
-RUN ./mvnw package -DskipTests
+# Run stage
+FROM eclipse-temurin:21-jdk
 
-# 2. Çalışma aşaması: Sadece JDK ile çalıştırma
-FROM eclipse-temurin:21-jdk-alpine AS runtime
 WORKDIR /app
-COPY --from=builder /app/target/*.jar app.jar
+COPY --from=build /build/target/*.jar app.jar
 
 # Sağlık kontrolü için curl ekle
-RUN apk add --no-cache curl jq
+RUN apt-get update && apt-get install -y curl jq
 
 # GCP credential dosyaları için dizini oluştur
 RUN mkdir -p /etc/gcp/credentials /secrets
@@ -38,14 +23,16 @@ RUN mkdir -p /etc/gcp/credentials /secrets
 # Firestore/GCP credential dosyası için beklenen ortam değişkenlerini ayarla
 ENV GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json
 ENV SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/etc/gcp/credentials/gcp-credentials.json
+
+# JVM ayarları
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 ENV SERVER_PORT=8067
 
-# Sistem özelliklerini ve Java opsiyonlarını ayarla
-ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+EXPOSE ${SERVER_PORT}
 
 # Güçlendirilmiş healthcheck ekleme
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD curl -s http://localhost:${SERVER_PORT}/actuator/health | jq -e '.status == "UP"' || exit 1
 
 # Uygulama'yı çalıştır
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS} -Dspring.profiles.active=prod -jar app.jar"]
