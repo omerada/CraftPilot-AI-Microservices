@@ -18,8 +18,12 @@ FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
 
+# GCP credentials için dizin oluşturma
+RUN mkdir -p /etc/gcp/credentials
+
 # Güvenlik için root olmayan kullanıcı oluştur
 RUN addgroup -S craftpilot && adduser -S appuser -G craftpilot
+RUN chown -R appuser:craftpilot /etc/gcp
 USER appuser
 
 # Healthcheck
