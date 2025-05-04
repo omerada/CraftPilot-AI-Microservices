@@ -28,11 +28,11 @@ public class CircuitBreakerConfig {
                     .slidingWindowType(SlidingWindowType.COUNT_BASED)
                     .slidingWindowSize(10)
                     .failureRateThreshold(50)
-                    .waitDurationInOpenState(Duration.ofSeconds(10))
-                    .permittedNumberOfCallsInHalfOpenState(3)
+                    .waitDurationInOpenState(Duration.ofSeconds(5))
+                    .permittedNumberOfCallsInHalfOpenState(2)
                     .build())
                 .timeLimiterConfig(TimeLimiterConfig.custom()
-                    .timeoutDuration(Duration.ofSeconds(15))
+                    .timeoutDuration(Duration.ofSeconds(10))
                     .build()), "openRouterClient");
         };
     }
