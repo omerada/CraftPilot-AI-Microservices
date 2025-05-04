@@ -43,21 +43,43 @@ public class UserInformationExtractionService {
     @Value("${extraction.retry.backoff.ms:500}")
     private long retryBackoffMs;
 
-    public Mono<ExtractedUserInfo> extractUserInfo(String userId, String message, String context) {
+    // Context parametresi kaldırıldı
+    public Mono<ExtractedUserInfo> extractUserInfo(String userId, String message) {
         if (userId == null || message == null || message.trim().isEmpty()) {
             log.debug("Skipping extraction for empty/null message or userId");
             return Mono.empty();
         }
         
-        log.info("Extracting info for user {} with AI model", userId);
-        String prompt = buildExtractionPrompt(message);
+        // Bellek yönetimi iyileştirmesi - uzun mesajları hem başından hem sonundan alarak özetleme
+        final String effectiveMessage;
+        if (message.length() > 4000) {
+            StringBuilder sb = new StringBuilder(4100); // Önceden belirlenmiş kapasite ile
+            sb.append(message.substring(0, 2000))
+              .append("\n...[içerik kısaltıldı]...\n")
+              .append(message.substring(message.length() - 2000));
+            effectiveMessage = sb.toString();
+            log.debug("Büyük mesaj kısaltıldı: {} -> {} karakter", message.length(), effectiveMessage.length());
+        } else {
+            effectiveMessage = message;
+        }
         
+        // Optimize edilmiş sistem promptu - mesajdan bilgi çıkarma amacını vurgula
+        String systemPrompt = "Sen bir kullanıcı bilgisi çıkarma asistanısın. Kullanıcının mesajını analiz et ve " +
+                "kişisel bilgilerini, tercihlerini, veya diğer önemli detayları belirle. " +
+                "Gerçeklere dayalı, doğrulanabilir bilgilere odaklan. " +
+                "Çıkardığın bilgileri JSON formatında döndür.";
+
+        // Sadece mesaj içeriğini kullan
+        String prompt = "Aşağıdaki mesajdan kullanıcıya ait bilgileri analiz et ve JSON formatında döndür:\n\n" +
+                "```\n" + effectiveMessage + "\n```\n\n" +
+                "JSON formatında döndür { \"information\": \"çıkarılan bilgi\" }";
+
         AIRequest request = AIRequest.builder()
                 .model(extractionModel)
                 .prompt(prompt)
-                .temperature(0.1) // Daha deterministik sonuçlar için düşük sıcaklık
-                .userId(userId) // UserId ekleyelim
-                .requestId(userId + "-" + Instant.now().toEpochMilli()) // Benzersiz bir requestId
+                .systemPrompt(systemPrompt)
+                .temperature(0.3)
+                .maxTokens(256)
                 .build();
 
         log.debug("Sending extraction request to LLM service: {}", prompt.substring(0, Math.min(100, prompt.length())) + "...");
@@ -68,7 +90,7 @@ public class UserInformationExtractionService {
                 .doOnSuccess(response -> log.info("Received AI response for extraction: length={}", 
                         response != null && response.getResponse() != null ? response.getResponse().length() : 0))
                 .doOnError(e -> log.error("Error during LLM extraction request: {}", e.getMessage()))
-                .flatMap(response -> parseExtractionResponse(userId, response, context, message))
+                .flatMap(response -> parseExtractionResponse(userId, response, message))
                 .retryWhen(Retry.backoff(maxRetryAttempts, Duration.ofMillis(retryBackoffMs))  // Retry ekle
                         .filter(e -> !(e instanceof IllegalArgumentException))  // Geçici hataları filtrele
                         .doBeforeRetry(signal -> 
@@ -76,7 +98,7 @@ public class UserInformationExtractionService {
                                     signal.failure().getMessage(), signal.totalRetries() + 1)));
     }
 
-    public Mono<Void> processAndStoreUserInfo(String userId, String message, String context) {
+    public Mono<Void> processAndStoreUserInfo(String userId, String message) {
         if (userId == null || message == null || message.trim().isEmpty()) {
             log.debug("Skipping extraction for empty/null message or userId");
             return Mono.empty();
@@ -85,7 +107,7 @@ public class UserInformationExtractionService {
         log.info("Processing message for user {}: {}", userId, message.substring(0, Math.min(50, message.length())));
         
         // AI tabanlı bilgi çıkarımını kullan
-        return extractUserInfo(userId, message, context)
+        return extractUserInfo(userId, message)
                 .doOnSubscribe(s -> log.debug("Starting extraction process for user {}", userId))
                 .flatMap(extractedInfo -> {
                     if (extractedInfo == null || extractedInfo.getInformation() == null || extractedInfo.getInformation().isEmpty()) {
@@ -97,6 +119,12 @@ public class UserInformationExtractionService {
                     
                     // Timestamp'i burada ayarlayalım (client'ta kaybolabilir)
                     extractedInfo.setTimestamp(Instant.now());
+                    
+                    // Context alanını doğrudan mesajdan oluştur
+                    extractedInfo.setContext("Mesajdan çıkarıldı: " + 
+                        (message.length() > 30 ? 
+                            message.substring(0, 30) + "..." : 
+                            message));
                     
                     // User Memory servisine bilgileri gönder
                     log.debug("Sending extracted information to user-memory-service: userId={}, info={}", 
@@ -129,7 +157,7 @@ public class UserInformationExtractionService {
                "\n\nKullanıcı mesajı: " + message;
     }
 
-    private Mono<ExtractedUserInfo> parseExtractionResponse(String userId, AIResponse response, String context, String originalMessage) {
+    private Mono<ExtractedUserInfo> parseExtractionResponse(String userId, AIResponse response, String originalMessage) {
         try {
             if (response == null || response.getResponse() == null) {
                 log.warn("Null response received from LLM service");

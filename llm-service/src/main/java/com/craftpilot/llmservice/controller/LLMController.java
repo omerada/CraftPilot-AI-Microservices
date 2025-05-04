@@ -35,7 +35,6 @@ public class LLMController {
     private final LLMService llmService;
     private final PromptService promptService;
     private final ChatService chatService;
-    // ChatEnhancementService'i ekleyin
     private final ChatEnhancementService chatEnhancementService;
     private final UserInformationExtractionService extractionService;
     // Aşırı uzun boşluk dizilerini tespit etmek için pattern
@@ -111,13 +110,13 @@ public class LLMController {
         log.info("Stream chat completion request received with language: {}, requestId: {}, model: {}, userId: {}", 
                 userLanguage, trackingId, request.getModel(), userId);
         
-        // Kullanıcı mesajını bilgi çıkarımı için asenkron olarak işle - sadece prompt kullanılacak
+        // Kullanıcı mesajını bilgi çıkarımı için asenkron olarak işle
         if (userId != null && request.getPrompt() != null && !request.getPrompt().isEmpty()) {
-            // Context yerine null veya boş string gönderiyoruz - sadece prompt kullanılacak
-            extractionService.processAndStoreUserInfo(userId, request.getPrompt(), null)
+            // Endpoint türünü context olarak kullan
+            extractionService.processAndStoreUserInfo(userId, request.getPrompt())
                 .subscribeOn(Schedulers.boundedElastic())
                 .subscribe(
-                    () -> log.debug("User information extraction started using only prompt for userId: {}", userId),
+                    result -> log.debug("User information extraction started asynchronously for userId: {}", userId),
                     error -> log.error("Error initiating user information extraction: {}", error.getMessage())
                 );
         }
@@ -363,8 +362,7 @@ public class LLMController {
         return llmService.processChatCompletion(request)
                 .doOnSuccess(response -> {
                     if (userId != null && request.getPrompt() != null) {
-                        // Kullanıcı mesajından bilgileri çıkar ve kaydet
-                        // Bu işlemi burada subscribe ederek garanti altına alıyoruz
+                        // Endpoint türünü context olarak kullan
                         chatEnhancementService.processUserMessage(userId, request.getPrompt(), "chat-request")
                                 .subscribe(
                                         null,

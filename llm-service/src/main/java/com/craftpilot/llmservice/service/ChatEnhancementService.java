@@ -37,7 +37,7 @@ public class ChatEnhancementService {
                 userId, message != null ? message.length() : 0);
         
         // Burada then() metodu kullanılarak Mono<Object> -> Mono<Void> dönüşümü yapılmalı
-        return extractionService.processAndStoreUserInfo(userId, message, context)
+        return extractionService.processAndStoreUserInfo(userId, message)
                 .doOnSubscribe(s -> log.debug("Started user message processing"))
                 .doOnSuccess(v -> log.info("Completed user message processing for user {}", userId))
                 .doOnError(e -> log.error("Error processing user message for user {}: {}", userId, e.getMessage()))
