@@ -41,11 +41,10 @@ public class PerformanceService {
     private final MeterRegistry meterRegistry;
     private final LLMService llmService;
     private final ObjectMapper objectMapper;
+    private final WebClient webClient;
 
     @Value("${lighthouse.service.url:http://lighthouse-service:8085}")
     private String lighthouseServiceUrl;
-
-    private final WebClient webClient = WebClient.builder().build();
 
     public Mono<PerformanceAnalysisResponse> analyzeWebsite(PerformanceAnalysisRequest request) {
         // URL'i önbellekte ara
