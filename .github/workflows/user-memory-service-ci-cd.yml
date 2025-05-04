@@ -133,6 +133,7 @@ jobs:
                 -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/etc/gcp/credentials/gcp-credentials.json \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=${{ env.CONTAINER_PORT }} \
+                -e MANAGEMENT_SERVER_PORT=${{ env.MANAGEMENT_PORT }} \
                 -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
                 -e EUREKA_INSTANCE_HOSTNAME=${{ env.SERVICE_NAME }} \
                 -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
@@ -150,11 +151,6 @@ jobs:
                 -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
                 -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_NETFLIX_EUREKA=DEBUG \
                 -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5008" \
-                --health-cmd="curl -f http://localhost:${{ env.CONTAINER_PORT }}/actuator/health || exit 1" \
-                --health-interval=10s \
-                --health-retries=10 \
-                --health-timeout=5s \
-                --health-start-period=60s \
                 ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
             else
               docker run -d \
@@ -167,6 +163,7 @@ jobs:
                 -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/etc/gcp/credentials/gcp-credentials.json \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=${{ env.CONTAINER_PORT }} \
+                -e MANAGEMENT_SERVER_PORT=${{ env.MANAGEMENT_PORT }} \
                 -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
                 -e EUREKA_INSTANCE_HOSTNAME=${{ env.SERVICE_NAME }} \
                 -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
@@ -181,11 +178,7 @@ jobs:
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
                 -e SPRING_APPLICATION_NAME=${{ env.SERVICE_NAME }} \
                 -e SPRING_CLOUD_GCP_PROJECT_ID=${SPRING_CLOUD_GCP_PROJECT_ID:-craft-pilot-ai} \
-                --health-cmd="curl -f http://localhost:${{ env.CONTAINER_PORT }}/actuator/health || exit 1" \
-                --health-interval=10s \
-                --health-retries=10 \
-                --health-timeout=5s \
-                --health-start-period=40s \
+                -e LOGGING_LEVEL_COM_CRAFTPILOT=INFO \
                 ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
             fi
 

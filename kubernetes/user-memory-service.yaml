@@ -22,19 +22,29 @@ spec:
         - name: user-memory-service
           image: ${DOCKER_REGISTRY}/user-memory-service:${IMAGE_TAG}
           ports:
-            - containerPort: 8086
+            - containerPort: 8067
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: prod
+            - name: SERVER_PORT
+              value: "8067"
+            - name: MANAGEMENT_SERVER_PORT
+              value: "8067"
             - name: SPRING_CLOUD_GCP_PROJECT_ID
               valueFrom:
                 secretKeyRef:
                   name: gcp-config
                   key: project-id
-            - name: GCP_CREDENTIALS_LOCATION
+            - name: SPRING_CLOUD_GCP_CREDENTIALS_LOCATION
               value: file:/etc/gcp/credentials/gcp-credentials.json
-            - name: EUREKA_SERVER_URL
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /etc/gcp/credentials/gcp-credentials.json
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
               value: http://craftpilot:13579ada@eureka-server:8761/eureka/
+            - name: EUREKA_INSTANCE_HOSTNAME
+              value: user-memory-service
+            - name: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+              value: "false"
           volumeMounts:
             - name: gcp-credentials
               mountPath: /etc/gcp/credentials
@@ -49,13 +59,13 @@ spec:
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
-              port: 8086
+              port: 8067
             initialDelaySeconds: 30
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
-              port: 8086
+              port: 8067
             initialDelaySeconds: 60
             periodSeconds: 20
 ---
@@ -67,6 +77,6 @@ spec:
   selector:
     app: user-memory-service
   ports:
-    - port: 8086
-      targetPort: 8086
+    - port: 8067
+      targetPort: 8067
   type: ClusterIP

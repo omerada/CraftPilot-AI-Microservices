@@ -47,6 +47,7 @@ springdoc:
     enabled: true
     path: /v3/api-docs
 
+# Actuator yapılandırmaları ekleniyor/düzenleniyor
 management:
   server:
     port: ${SERVER_PORT:8067}
@@ -56,30 +57,21 @@ management:
         include: health,info,metrics,prometheus
   endpoint:
     health:
-      show-details: always
       probes:
         enabled: true
+      show-details: always
       group:
         readiness:
-          include: readinessState,db
+          include: readinessState,diskSpace,ping
         liveness:
           include: livenessState
-    metrics:
-      enabled: true
-  metrics:
-    tags:
-      application: ${spring.application.name}
-    export:
-      prometheus:
-        enabled: true
   health:
-    circuitbreakers:
-      enabled: true
     livenessstate:
       enabled: true
     readinessstate:
       enabled: true
 
+# Mevcut yapılandırmayı koruyalım
 eureka:
   client:
     serviceUrl:
@@ -109,9 +101,8 @@ firebase:
 logging:
   level:
     root: ${LOGGING_LEVEL_ROOT:INFO}
-    com.craftpilot.usermemoryservice: ${LOGGING_LEVEL_APP:INFO}
-    org.springframework.cloud.netflix.eureka: ${LOGGING_LEVEL_EUREKA:INFO}
-    org.springframework.web.reactive: ${LOGGING_LEVEL_REACTIVE:INFO}
+    com.craftpilot: ${LOGGING_LEVEL_COM_CRAFTPILOT:INFO}
+    org.springframework.cloud.netflix.eureka: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_NETFLIX_EUREKA:INFO}
 
 resilience4j:
   circuitbreaker:

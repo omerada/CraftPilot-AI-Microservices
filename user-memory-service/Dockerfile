@@ -30,21 +30,22 @@ WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
 
 # Sağlık kontrolü için curl ekle
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl jq
 
 # GCP credential dosyaları için dizini oluştur
-RUN mkdir -p /etc/gcp/credentials
+RUN mkdir -p /etc/gcp/credentials /secrets
 
 # Firestore/GCP credential dosyası için beklenen ortam değişkenlerini ayarla
 ENV GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json
 ENV SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/etc/gcp/credentials/gcp-credentials.json
+ENV SERVER_PORT=8067
 
 # Sistem özelliklerini ve Java opsiyonlarını ayarla
 ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
 
-# Healthcheck ekleme
-HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:8067/actuator/health || exit 1
+# Güçlendirilmiş healthcheck ekleme
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD curl -s http://localhost:${SERVER_PORT}/actuator/health | jq -e '.status == "UP"' || exit 1
 
 # Uygulama'yı çalıştır
 ENTRYPOINT ["java", "-jar", "app.jar"]
