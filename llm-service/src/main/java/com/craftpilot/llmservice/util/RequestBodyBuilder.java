@@ -69,7 +69,6 @@ public class RequestBodyBuilder {
         // Değilse, prompt alanından messages oluştur (geriye dönük uyumluluk)
         else if (request.getPrompt() != null && !request.getPrompt().isEmpty()) {
             messages = new ArrayList<>();
-            
             // Sistem mesajını ekle
             Map<String, Object> systemMessage = new HashMap<>();
             systemMessage.put("role", "system");
