@@ -10,7 +10,8 @@ import org.springframework.context.annotation.ComponentScan;
     "com.craftpilot.llmservice.repository",
     "com.craftpilot.llmservice.controller",
     "com.craftpilot.llmservice.service",
-    "com.craftpilot.llmservice.util"
+    "com.craftpilot.llmservice.util",
+    "com.craftpilot.llmservice.cache"
 })
 public class LlmServiceApplication {
 
