@@ -4,7 +4,8 @@ import com.craftpilot.llmservice.config.OpenRouterProperties;
 import com.craftpilot.llmservice.model.AIRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+import org.springframework.context.annotation.Primary;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -14,7 +15,8 @@ import java.util.Map;
 /**
  * API istek gövdelerini oluşturmak için yardımcı sınıf
  */
-@Component
+@Service 
+@Primary 
 @RequiredArgsConstructor
 @Slf4j
 public class RequestBodyBuilder {
@@ -69,6 +71,7 @@ public class RequestBodyBuilder {
         // Değilse, prompt alanından messages oluştur (geriye dönük uyumluluk)
         else if (request.getPrompt() != null && !request.getPrompt().isEmpty()) {
             messages = new ArrayList<>();
+            
             // Sistem mesajını ekle
             Map<String, Object> systemMessage = new HashMap<>();
             systemMessage.put("role", "system");
