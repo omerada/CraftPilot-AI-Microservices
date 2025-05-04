@@ -1,11 +1,19 @@
+# 1. Build aşaması: Maven ile derleme
 FROM eclipse-temurin:21-jdk-alpine as builder
 WORKDIR /app
-COPY mvnw .
-COPY .mvn .mvn
-COPY pom.xml .
-COPY src src
-RUN ./mvnw package -DskipTests
 
+# Maven kurulumu
+RUN apk update && apk add maven
+
+# Bağımlılıkları önce kopyalayıp, güncel değilse tekrar yüklememesi için
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+
+# Kaynak kodunu kopyalayıp build et
+COPY src src
+RUN mvn package -DskipTests
+
+# 2. Çalışma aşaması: Sadece JRE ile çalıştırma
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
