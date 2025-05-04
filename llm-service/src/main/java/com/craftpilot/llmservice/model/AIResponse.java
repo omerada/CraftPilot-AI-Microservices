@@ -1,42 +1,31 @@
 package com.craftpilot.llmservice.model;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Slf4j
-@JsonInclude(JsonInclude.Include.NON_NULL) // Null değerleri JSON çıktısından çıkarır
 public class AIResponse {
     private String response;
     private String model;
-    private Integer tokensUsed;
-    private String requestId; // Added missing field
-    private Boolean success; 
-
-    public static AIResponse error(String errorMessage) {
-        return AIResponse.builder()
-            .response(errorMessage)
-            .success(false)
-            .build();
+    private String requestId;
+    private boolean success;
+    private String error;
+    private long tokenCount;
+    private double processingTime;
+    
+    // Eksik metodlar ekleniyor
+    public AIResponse error(String errorMessage) {
+        this.error = errorMessage;
+        this.success = false;
+        return this;
     }
-
-    /**
-     * Başarılı bir yanıt oluşturmak için builder metodunu kullandıran yardımcı statik metot
-     */
-    public static AIResponse success(String response, String model, Integer tokenCount, String requestId) {
-        return AIResponse.builder()
-            .response(response)
-            .model(model)
-            .tokensUsed(tokenCount) // Changed to match field name
-            .requestId(requestId)
-            .success(true)
-            .build();
+    
+    public long getTokensUsed() {
+        return this.tokenCount;
     }
 }

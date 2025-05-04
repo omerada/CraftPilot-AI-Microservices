@@ -14,15 +14,15 @@ import java.util.Map;
 @AllArgsConstructor
 public class PerformanceAnalysisResponse {
     private String id;
-    private String jobId; // Job ID'si ekle
+    private String jobId;
     private double performance;
     private Map<String, Object> audits;
     private long timestamp;
     private String url;
     private Map<String, Object> categories;
     private String error;
-    private String status; // İşlem durumu: PENDING, COMPLETED, ERROR
-    private String message; // Kullanıcıya gösterilecek mesaj
+    private String status;
+    private String message;
 
     @Data
     @Builder

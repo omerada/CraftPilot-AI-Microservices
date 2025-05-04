@@ -1,10 +1,14 @@
 package com.craftpilot.llmservice.model.performance;
 
-import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class PerformanceHistoryRequest {
-    @NotBlank(message = "URL boş olamaz")
     private String url;
 }

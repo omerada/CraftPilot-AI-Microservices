@@ -40,14 +40,14 @@ public class ChatService {
                 .map(aiResponse -> mapToChatResponse(aiResponse, chatRequest));
     }
 
-    private ChatResponse mapToChatResponse(AIResponse aiResponse, ChatRequest request) {
-        Integer tokensUsed = aiResponse.getTokensUsed();
+    private ChatResponse mapToChatResponse(AIResponse aiResponse, ChatRequest request) { 
+        long tokensUsed = aiResponse.getTokensUsed();
         return ChatResponse.builder()
                 .userId(request.getUserId())
                 .message(request.getMessage())
                 .response(aiResponse.getResponse())
                 .model(aiResponse.getModel())
-                .processedTokens(tokensUsed)
+                .processedTokens((int)tokensUsed) // long değeri int'e cast ediyoruz
                 .timestamp(System.currentTimeMillis())
                 .build();
     }

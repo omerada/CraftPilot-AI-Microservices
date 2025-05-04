@@ -71,6 +71,12 @@ spring:
 webclient:
   timeout: 30000
   max-in-memory-size: 10485760
+  connection:
+    max-connections: 50
+    acquire-timeout: 15
+    max-idle-time: 30
+    max-life-time: 300
+    eviction-interval: 120
 
 # Kullanıcı bellek servisi yapılandırması
 user-memory:
@@ -136,6 +142,10 @@ openrouter:
     retryAttempts: 3
     retryDelay: 1000
     http-referer: https://craftpilot.io
+  requestTimeoutSeconds: 60
+  streamTimeoutSeconds: 120
+  keepAliveIntervalSeconds: 5
+  defaultModel: google/gemini-pro
 
 # Logging ayarları
 logging:
@@ -166,11 +176,31 @@ resilience4j:
         slidingWindowSize: 50
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
+      openRouterApiCircuit:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        registerHealthIndicator: true
+        recordExceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.reactive.function.client.WebClientResponseException
+          - com.craftpilot.llmservice.exception.APIException
   ratelimiter:
     instances:
       llmService:
         limitForPeriod: 50
         limitRefreshPeriod: 1s
+  retry:
+    instances:
+      openRouterApiCircuit:
+        maxRetryAttempts: 3
+        waitDuration: 500ms
+        retryExceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.reactive.function.client.WebClientResponseException
 
 lighthouse:
   service:
@@ -183,3 +213,15 @@ service:
 ai:
   model:
     extraction: ${AI_MODEL_EXTRACTION:google/gemma-3-4b-it}
+
+# Extraksiyon ayarları
+extraction:
+  timeout:
+    seconds: 10
+  memory:
+    timeout:
+      seconds: 5
+  retry:
+    max: 3
+    backoff:
+      ms: 500

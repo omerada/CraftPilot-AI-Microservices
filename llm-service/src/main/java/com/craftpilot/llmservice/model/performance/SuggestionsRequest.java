@@ -19,7 +19,7 @@ public class SuggestionsRequest {
     private String language;
     
     // AI model configuration
-    private String model; // Optional - uses default if not specified
+    private String model;
     private Integer maxTokens;
     private Double temperature;
 }

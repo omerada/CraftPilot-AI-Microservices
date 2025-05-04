@@ -15,12 +15,6 @@ import lombok.NoArgsConstructor;
 public class StreamResponse {
     private String content;
     private boolean done;
-    
-    // Ping mesajlarını işaretlemek için
-    @Builder.Default
-    private boolean ping = false;
-    
-    // Hata durumlarını belirtmek için
-    @Builder.Default
-    private boolean error = false;
+    private boolean error;
+    private boolean ping;
 }

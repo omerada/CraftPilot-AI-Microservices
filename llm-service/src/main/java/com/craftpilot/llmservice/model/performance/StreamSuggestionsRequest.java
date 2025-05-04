@@ -14,6 +14,8 @@ public class StreamSuggestionsRequest {
     private String requestId;
     private String userId;
     private String language;
+    
+    // AI model configuration
     private String model;
     private Integer maxTokens;
     private Double temperature;
