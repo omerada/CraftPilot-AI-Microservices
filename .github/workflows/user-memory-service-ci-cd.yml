@@ -37,6 +37,7 @@ jobs:
       - uses: actions/checkout@v3
 
       # Maven build adımlarını kaldırdık, build işlemi Dockerfile içinde yapılacak
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
         with:
@@ -101,7 +102,8 @@ jobs:
             mkdir -p /opt/craftpilot/gcp/credentials
             # GCP credentials dosyasını oluştur
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp/credentials/gcp-credentials.json
-            chmod 600 /opt/craftpilot/gcp/credentials/gcp-credentials.json
+            # İzinleri ayarla - herkes tarafından okunabilsin (güvenliğe dikkat!)
+            chmod 644 /opt/craftpilot/gcp/credentials/gcp-credentials.json
 
             echo "=== Verifying Docker Status ==="
             if ! systemctl is-active --quiet docker; then

@@ -14,16 +14,26 @@ COPY src src
 RUN mvn package -DskipTests
 
 # 2. Çalışma aşaması: Sadece JRE ile çalıştırma
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:17-jre-alpine as runtime
 WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
 
-# GCP credentials için dizin oluşturma
+# Gerekli paketleri yükle
+RUN apk add --no-cache curl wget jq
+
+# GCP kimlik bilgileri için dizin yapısı oluştur
 RUN mkdir -p /etc/gcp/credentials
 
-# Güvenlik için root olmayan kullanıcı oluştur
+# craftpilot grubunu ve appuser kullanıcısını oluştur
 RUN addgroup -S craftpilot && adduser -S appuser -G craftpilot
-RUN chown -R appuser:craftpilot /etc/gcp
+
+# /etc/gcp dizininin sahibini ve izinlerini ayarla
+# Dizin yapısı ve izinleri önceden ayarla
+RUN chown -R appuser:craftpilot /etc/gcp && \
+    chmod -R 755 /etc/gcp && \
+    chmod 755 /etc/gcp/credentials
+
+# Kullanıcıyı değiştir
 USER appuser
 
 # Healthcheck
