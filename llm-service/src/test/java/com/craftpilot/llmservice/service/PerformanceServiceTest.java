@@ -1,5 +1,9 @@
 package com.craftpilot.llmservice.service;
 
+import com.craftpilot.llmservice.cache.PerformanceAnalysisCache;
+import com.craftpilot.llmservice.repository.PerformanceAnalysisRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,10 +18,8 @@ import reactor.core.publisher.Mono;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -25,6 +27,24 @@ class PerformanceServiceTest {
 
     @Mock
     private WebClient webClient;
+    
+    @Mock
+    private PerformanceAnalysisRepository performanceAnalysisRepository;
+    
+    @Mock
+    private PerformanceAnalysisCache performanceAnalysisCache;
+    
+    @Mock
+    private PromptService promptService;
+    
+    @Mock
+    private MeterRegistry meterRegistry;
+    
+    @Mock
+    private LLMService llmService;
+    
+    @Mock
+    private ObjectMapper objectMapper;
 
     @Mock
     private WebClient.RequestHeadersUriSpec requestHeadersUriSpec;
@@ -40,7 +60,15 @@ class PerformanceServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        performanceService = new PerformanceService(webClient);
+        performanceService = new PerformanceService(
+            performanceAnalysisRepository,
+            performanceAnalysisCache,
+            promptService,
+            meterRegistry,
+            llmService,
+            objectMapper,
+            webClient
+        );
     }
 
     @Test
@@ -52,7 +80,7 @@ class PerformanceServiceTest {
         when(webClient.get()).thenReturn(requestHeadersUriSpec);
         when(requestHeadersUriSpec.uri(anyString())).thenReturn(requestHeadersSpec);
         when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
-        when(responseSpec.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {}))
+        when(responseSpec.bodyToMono(eq(new ParameterizedTypeReference<Map<String, Object>>() {})))
             .thenReturn(Mono.just(responseMap));
 
         // Test the method
