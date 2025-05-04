@@ -20,6 +20,8 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.List;
+import java.util.Map;
 
 import com.craftpilot.llmservice.service.ChatEnhancementService;
 import com.craftpilot.llmservice.service.UserInformationExtractionService;
@@ -106,25 +108,30 @@ public class LLMController {
                 userLanguage, trackingId, request.getModel(), userId);
         
         // Kullanıcı mesajını bilgi çıkarımı için asenkron olarak işle
-        if (userId != null && request.getPrompt() != null && !request.getPrompt().isEmpty()) {
-            // Endpoint türünü context olarak kullan
-            extractionService.processAndStoreUserInfo(userId, request.getPrompt())
-                .subscribeOn(Schedulers.boundedElastic())
-                .subscribe(
-                    result -> log.debug("User information extraction started asynchronously for userId: {}", userId),
-                    error -> log.error("Error initiating user information extraction: {}", error.getMessage())
-                );
+        if (userId != null && request.getMessages() != null && !request.getMessages().isEmpty()) {
+            // Son kullanıcı mesajını al
+            String userMessage = extractLastUserMessage(request.getMessages());
+            if (userMessage != null && !userMessage.isEmpty()) {
+                // Endpoint türünü context olarak kullan
+                extractionService.processAndStoreUserInfo(userId, userMessage)
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .subscribe(
+                        result -> log.debug("User information extraction started asynchronously for userId: {}", userId),
+                        error -> log.error("Error initiating user information extraction: {}", error.getMessage())
+                    );
+            }
         }
         
         // Kullanıcı ID'sini AI isteğine ekle
         request.setUserId(userId);
         
-        // Tablo yanıtı olabilecek özel anahtar kelimeleri tespit et
-        boolean potentialTableResponse = request.getPrompt() != null && 
-            (request.getPrompt().contains("tablo") || 
-             request.getPrompt().contains("table") || 
-             request.getPrompt().contains("karşılaştır") ||
-             request.getPrompt().contains("compare"));
+        // Tablo yanıtı olabilecek özel anahtar kelimeleri tespit et - mesajlardan son kullanıcı mesajını kullan
+        String lastUserMessage = extractLastUserMessage(request.getMessages());
+        boolean potentialTableResponse = lastUserMessage != null && 
+            (lastUserMessage.contains("tablo") || 
+             lastUserMessage.contains("table") || 
+             lastUserMessage.contains("karşılaştır") ||
+             lastUserMessage.contains("compare"));
         
         request.setRequestType("CHAT");
         request.setLanguage(userLanguage);
@@ -253,6 +260,30 @@ public class LLMController {
         return content;
     }
 
+    /**
+     * Messages listesinden son kullanıcı mesajını çıkarır
+     * @param messages Mesaj listesi
+     * @return Son kullanıcı mesajı veya null
+     */
+    private String extractLastUserMessage(List<Map<String, Object>> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return null;
+        }
+        
+        // Sondan başlayarak ilk kullanıcı mesajını bul
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            Map<String, Object> message = messages.get(i);
+            if (message.containsKey("role") && "user".equals(message.get("role"))) {
+                Object content = message.get("content");
+                if (content != null) {
+                    return content.toString();
+                }
+            }
+        }
+        
+        return null;
+    }
+
     @PostMapping(value = "/images/generate", 
                 produces = MediaType.APPLICATION_JSON_VALUE,
                 consumes = MediaType.APPLICATION_JSON_VALUE) 
@@ -288,8 +319,11 @@ public class LLMController {
         request.setRequestType("ENHANCE");
         request.setLanguage(userLanguage);
         
+        // Get prompt from either the prompt field or messages
+        String promptToEnhance = request.getPrompt();
+        
         // Prompt kontrolü
-        if (request.getPrompt() == null || request.getPrompt().trim().isEmpty()) {
+        if (promptToEnhance == null || promptToEnhance.trim().isEmpty()) {
             AIResponse errorResponse = AIResponse.builder()
                 .response("İyileştirilecek bir prompt göndermelisiniz.")
                 .success(false)
@@ -356,13 +390,16 @@ public class LLMController {
         // Yanıt üretildikten sonra kullanıcı bilgilerini işle
         return llmService.processChatCompletion(request)
                 .doOnSuccess(response -> {
-                    if (userId != null && request.getPrompt() != null) {
-                        // Endpoint türünü context olarak kullan
-                        chatEnhancementService.processUserMessage(userId, request.getPrompt(), "chat-request")
-                                .subscribe(
-                                        null,
-                                        error -> log.error("Error processing user message: {}", error.getMessage())
-                                );
+                    if (userId != null && request.getMessages() != null && !request.getMessages().isEmpty()) {
+                        String userMessage = extractLastUserMessage(request.getMessages());
+                        if (userMessage != null && !userMessage.isEmpty()) {
+                            // Endpoint türünü context olarak kullan
+                            chatEnhancementService.processUserMessage(userId, userMessage, "chat-request")
+                                    .subscribe(
+                                            null,
+                                            error -> log.error("Error processing user message: {}", error.getMessage())
+                                    );
+                        }
                     }
                 })
                 .map(response -> {
