@@ -204,13 +204,13 @@ public class PerformanceService {
                     })
                     .doOnSuccess(resp -> log.info("Performans iyileştirme önerileri başarıyla alındı"))
                     .doOnError(error -> log.error("Öneri oluşturma hatası: {}", error.getMessage(), error));
-                    
+            
         } catch (JsonProcessingException e) {
             log.error("Analiz verileri işlenirken hata: {}", e.getMessage());
             return Mono.error(e);
         }
     }
-    
+
     /**
      * Performans iyileştirme önerilerini gerçek zamanlı olarak stream eder
      * Bu metod OpenRouter stream API'sini kullanarak yanıtları parça parça gönderir
@@ -234,7 +234,7 @@ public class PerformanceService {
                 "Her sorun için şunları belirt: problem açıklaması, önem derecesi (kritik/önemli/düşük), çözüm, " +
                 "kod örneği, faydalı kaynaklar ve uygulama zorluğu (kolay/orta/zor). " +
                 "Yanıtını geçerli bir JSON dizisi olarak formatla.";
-                
+        
         aiRequest.setSystemPrompt(systemPrompt);
         
         // URL'le prompt oluştur

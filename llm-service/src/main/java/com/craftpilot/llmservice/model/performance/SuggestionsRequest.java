@@ -12,8 +12,8 @@ import lombok.NoArgsConstructor;
 public class SuggestionsRequest {
     private String userId;
     private String model;
-    private int maxTokens;
-    private double temperature;
+    private Integer maxTokens;
+    private Double temperature;
     private String language;
     private String analysisData;
     private String url;
