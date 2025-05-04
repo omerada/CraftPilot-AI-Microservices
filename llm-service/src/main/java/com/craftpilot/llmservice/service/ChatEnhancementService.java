@@ -29,10 +29,22 @@ public class ChatEnhancementService {
 
     public Mono<Void> processUserMessage(String userId, String message, String context) {
         if (userId == null) {
+            log.debug("Skipping user message processing because userId is null");
             return Mono.empty();
         }
         
-        return extractionService.processAndStoreUserInfo(userId, message, context);
+        log.info("Processing user message for memory extraction: userId={}, messageLength={}", 
+                userId, message != null ? message.length() : 0);
+        
+        return extractionService.processAndStoreUserInfo(userId, message, context)
+                .doOnSubscribe(s -> log.debug("Started user message processing"))
+                .doOnSuccess(v -> log.info("Completed user message processing for user {}", userId))
+                .doOnError(e -> log.error("Error processing user message for user {}: {}", userId, e.getMessage()))
+                .onErrorResume(e -> {
+                    // Hatayı logla ama akışı kesme
+                    log.error("Caught error in processUserMessage but continuing: {}", e.getMessage(), e);
+                    return Mono.empty();
+                });
     }
 
     private AIRequest enhancePromptWithMemory(AIRequest request, UserMemory userMemory) {
