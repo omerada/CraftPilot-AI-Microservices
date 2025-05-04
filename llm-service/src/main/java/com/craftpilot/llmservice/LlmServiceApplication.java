@@ -7,6 +7,7 @@ import org.springframework.context.annotation.ComponentScan;
 @SpringBootApplication
 @ComponentScan(basePackages = {
     "com.craftpilot.llmservice.config",
+    "com.craftpilot.llmservice.repository",
     "com.craftpilot.llmservice.controller",
     "com.craftpilot.llmservice.service",
     "com.craftpilot.llmservice.util"

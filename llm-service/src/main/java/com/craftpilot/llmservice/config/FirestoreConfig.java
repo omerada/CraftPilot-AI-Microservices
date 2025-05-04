@@ -3,65 +3,50 @@ package com.craftpilot.llmservice.config;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.FirestoreOptions;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.Resource;
+import org.springframework.context.annotation.Primary;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 
 @Configuration
-@Slf4j
 public class FirestoreConfig {
 
+    @Value("${firestore.credential.path:/gcp-credentials.json}")
+    private String credentialPath;
+
     @Bean
+    @Primary
     public Firestore firestore() throws IOException {
-        // Önce çevreden servis hesabı kimlik dosyasını almayı deneyin
-        String credentialsPath = System.getenv("GOOGLE_APPLICATION_CREDENTIALS");
-        GoogleCredentials credentials;
-
-        if (credentialsPath != null && !credentialsPath.isEmpty()) {
-            log.info("Google Cloud kimliği için ortam değişkeni kullanılıyor: {}", credentialsPath);
-            try {
-                // Çevresel değişken ayarlanmışsa, doğrudan belirtilen dosyadan oku
-                if (Files.exists(Paths.get(credentialsPath))) {
-                    try (FileInputStream fileInputStream = new FileInputStream(credentialsPath)) {
-                        credentials = GoogleCredentials.fromStream(fileInputStream);
-                        log.info("Google Cloud kimliği başarıyla yüklendi: {}", credentialsPath);
-                    }
+        try {
+            // Google Cloud kimlik bilgilerini yükle
+            InputStream serviceAccount = getClass().getResourceAsStream(credentialPath);
+            if (serviceAccount == null) {
+                // Eğer resource olarak bulunamazsa, dosya sisteminden yüklemeyi dene
+                java.nio.file.Path path = java.nio.file.Paths.get(credentialPath);
+                if (java.nio.file.Files.exists(path)) {
+                    serviceAccount = java.nio.file.Files.newInputStream(path);
+                    System.out.println("Google Cloud kimliği için ortam değişkeni kullanılıyor: " + credentialPath);
                 } else {
-                    log.warn("Belirtilen kimlik dosyası bulunamadı: {}, varsayılan kimlik bilgileri kullanılacak", credentialsPath);
-                    credentials = GoogleCredentials.getApplicationDefault();
+                    throw new IOException("Credentials file not found: " + credentialPath);
                 }
-            } catch (IOException e) {
-                log.error("Kimlik dosyası okunurken hata oluştu: {}", e.getMessage());
-                // Dosya okunamazsa varsayılan kimlik bilgilerini kullan
-                credentials = GoogleCredentials.getApplicationDefault();
             }
-        } else {
-            log.info("GOOGLE_APPLICATION_CREDENTIALS ortam değişkeni tanımlanmamış, classpath'ten yüklemeye çalışılıyor");
-            // Veya projedeki servis hesabı anahtarını kullanın (geliştirme için)
-            try {
-                Resource resource = new ClassPathResource("serviceAccountKey.json");
-                InputStream serviceAccount = resource.getInputStream();
-                credentials = GoogleCredentials.fromStream(serviceAccount);
-                log.info("Servis hesabı anahtarı classpath'ten başarıyla yüklendi");
-            } catch (Exception e) {
-                log.warn("Classpath'ten yükleme başarısız, varsayılan kimlik bilgileri kullanılacak: {}", e.getMessage());
-                // Son çare olarak varsayılan kimlik bilgilerini almaya çalışın
-                credentials = GoogleCredentials.getApplicationDefault();
-            }
+
+            GoogleCredentials credentials = GoogleCredentials.fromStream(serviceAccount);
+            System.out.println("Google Cloud kimliği başarıyla yüklendi: " + credentialPath);
+
+            // Firestore yapılandırması
+            FirestoreOptions firestoreOptions = FirestoreOptions.getDefaultInstance().toBuilder()
+                    .setCredentials(credentials)
+                    .build();
+
+            // Firestore instance'ını döndür
+            return firestoreOptions.getService();
+        } catch (IOException e) {
+            System.err.println("Firestore yapılandırması oluşturulamadı: " + e.getMessage());
+            throw e;
         }
-
-        FirestoreOptions firestoreOptions = FirestoreOptions.getDefaultInstance().toBuilder()
-                .setCredentials(credentials)
-                .build();
-
-        return firestoreOptions.getService();
     }
 }
