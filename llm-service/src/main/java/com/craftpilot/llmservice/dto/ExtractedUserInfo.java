@@ -15,6 +15,5 @@ public class ExtractedUserInfo {
     private String userId;
     private String information;
     private String context;
-    @Builder.Default
-    private Instant timestamp = Instant.now();
+    private Instant timestamp;
 }

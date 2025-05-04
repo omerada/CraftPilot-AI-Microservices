@@ -10,6 +10,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -19,6 +23,12 @@ public class UserInformationExtractionService {
 
     @Value("${ai.model.extraction:google/gemma-3-4b-it}")
     private String extractionModel;
+
+    // Bazı yaygın kişisel bilgi kalıpları
+    private static final Pattern NAME_PATTERN = Pattern.compile("(benim (adım|ismim)|adım|ismim) (\\w+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern AGE_PATTERN = Pattern.compile("(yaşım|yaşındayım) (\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern LOCATION_PATTERN = Pattern.compile("(yaşıyorum|yaşamaktayım|şehrinde) (\\w+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PROFESSION_PATTERN = Pattern.compile("(mesleğim|işim|çalışıyorum) (\\w+)", Pattern.CASE_INSENSITIVE);
 
     public Mono<ExtractedUserInfo> extractUserInfo(String userId, String message, String context) {
         String prompt = buildExtractionPrompt(message);
@@ -34,8 +44,28 @@ public class UserInformationExtractionService {
     }
 
     public Mono<Void> processAndStoreUserInfo(String userId, String message, String context) {
+        if (userId == null || message == null || message.trim().isEmpty()) {
+            log.debug("Skipping extraction for empty/null message or userId");
+            return Mono.empty();
+        }
+        
+        log.info("Processing message for user {}: {}", userId, message.substring(0, Math.min(50, message.length())));
+        
+        // AI tabanlı bilgi çıkarımını kullan (regex yerine)
         return extractUserInfo(userId, message, context)
-                .flatMap(userMemoryClient::addMemoryEntry)
+                .flatMap(extractedInfo -> {
+                    if (extractedInfo == null || extractedInfo.getInformation() == null || extractedInfo.getInformation().isEmpty()) {
+                        log.debug("No information extracted from message using AI");
+                        return Mono.empty();
+                    }
+                    
+                    log.info("AI extracted user information: {}", extractedInfo.getInformation());
+                    
+                    // User Memory servisine bilgileri gönder
+                    return userMemoryClient.addMemoryEntry(extractedInfo)
+                            .doOnSuccess(result -> log.info("Successfully stored AI-extracted information for user {}", userId))
+                            .doOnError(error -> log.error("Failed to store AI-extracted information: {}", error.getMessage()));
+                })
                 .then();
     }
 
@@ -91,5 +121,35 @@ public class UserInformationExtractionService {
             log.error("Çıkarım yanıtı ayrıştırılırken hata oluştu", e);
             return Mono.empty();
         }
+    }
+
+    private String extractUserInformation(String message) {
+        StringBuilder extractedInfo = new StringBuilder();
+        
+        // İsim çıkarma
+        Matcher nameMatcher = NAME_PATTERN.matcher(message);
+        if (nameMatcher.find() && nameMatcher.groupCount() >= 3) {
+            extractedInfo.append("İsim: ").append(nameMatcher.group(3)).append(". ");
+        }
+        
+        // Yaş çıkarma
+        Matcher ageMatcher = AGE_PATTERN.matcher(message);
+        if (ageMatcher.find() && ageMatcher.groupCount() >= 2) {
+            extractedInfo.append("Yaş: ").append(ageMatcher.group(2)).append(". ");
+        }
+        
+        // Konum çıkarma
+        Matcher locationMatcher = LOCATION_PATTERN.matcher(message);
+        if (locationMatcher.find() && locationMatcher.groupCount() >= 2) {
+            extractedInfo.append("Konum: ").append(locationMatcher.group(2)).append(". ");
+        }
+        
+        // Meslek çıkarma
+        Matcher professionMatcher = PROFESSION_PATTERN.matcher(message);
+        if (professionMatcher.find() && professionMatcher.groupCount() >= 2) {
+            extractedInfo.append("Meslek: ").append(professionMatcher.group(2)).append(". ");
+        }
+        
+        return extractedInfo.toString().trim();
     }
 }

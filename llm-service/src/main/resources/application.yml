@@ -166,7 +166,7 @@ lighthouse:
 
 service:
   user-memory:
-    url: ${USER_MEMORY_SERVICE_URL:http://user-memory-service}
+    url: ${USER_MEMORY_SERVICE_URL:http://user-memory-service:8067}
 
 ai:
   model:
