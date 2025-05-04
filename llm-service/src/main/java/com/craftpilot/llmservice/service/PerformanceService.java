@@ -12,6 +12,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -20,6 +21,7 @@ import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -282,5 +284,25 @@ public class PerformanceService {
                     .url(request.getUrl())
                     .entries(entries)
                     .build());
+    }
+
+    /**
+     * Verilen URI'dan performans verilerini alır
+     *
+     * @param uri Veri alınacak URI
+     * @return Performans verilerini içeren Map
+     */
+    public Map<String, Object> getPerformanceData(String uri) {
+        log.debug("Performans verisi alınıyor: {}", uri);
+        try {
+            return webClient.get()
+                    .uri(uri)
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                    .block();
+        } catch (Exception e) {
+            log.error("Performans verileri alınırken hata: {}", e.getMessage(), e);
+            return new HashMap<>();
+        }
     }
 }

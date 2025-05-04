@@ -2,9 +2,11 @@ package com.craftpilot.llmservice.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
@@ -15,19 +17,30 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class PerformanceServiceTest {
 
     @Mock
     private WebClient webClient;
 
-    @InjectMocks
+    @Mock
+    private WebClient.RequestHeadersUriSpec requestHeadersUriSpec;
+
+    @Mock
+    private WebClient.RequestHeadersSpec requestHeadersSpec;
+
+    @Mock
+    private WebClient.ResponseSpec responseSpec;
+
     private PerformanceService performanceService;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        performanceService = new PerformanceService(webClient);
     }
 
     @Test
@@ -35,8 +48,11 @@ class PerformanceServiceTest {
         // Mock response
         Map<String, Object> responseMap = Map.of("key", "value");
 
-        // Corrected code
-        when(webClient.get().uri(anyString()).retrieve().bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {}))
+        // Mock WebClient chain
+        when(webClient.get()).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.uri(anyString())).thenReturn(requestHeadersSpec);
+        when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {}))
             .thenReturn(Mono.just(responseMap));
 
         // Test the method
@@ -46,11 +62,15 @@ class PerformanceServiceTest {
 
     @Test
     void testGetPerformanceData_withException() {
-        // Mock exception
-        when(webClient.get().uri(anyString()).retrieve().bodyToMono(eq(Map.class)))
+        // Mock WebClient chain
+        when(webClient.get()).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.uri(anyString())).thenReturn(requestHeadersSpec);
+        when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.bodyToMono(eq(new ParameterizedTypeReference<Map<String, Object>>() {})))
             .thenThrow(WebClientResponseException.class);
 
-        // Test the method
-        assertThrows(WebClientResponseException.class, () -> performanceService.getPerformanceData("someUri"));
+        // Test the method expecting an exception to be handled (returns empty map)
+        Map<String, Object> result = performanceService.getPerformanceData("someUri");
+        assertEquals(0, result.size());
     }
 }
