@@ -17,4 +17,6 @@ public class StreamResponse {
     private boolean done;
     private boolean error;
     private boolean ping;
+    
+    // Diğer alanlar...
 }

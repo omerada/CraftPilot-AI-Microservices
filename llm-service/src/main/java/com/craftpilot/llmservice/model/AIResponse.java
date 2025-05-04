@@ -10,22 +10,15 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AIResponse {
+    private String requestId;
+    private String userId;
     private String response;
     private String model;
-    private String requestId;
+    private Integer tokenCount;
+    private Double responseTime;
+    private Integer tokensUsed;
+    
+    // Eksik alanlar ekleniyor
     private boolean success;
     private String error;
-    private long tokenCount;
-    private double processingTime;
-    
-    // Eksik metodlar ekleniyor
-    public AIResponse error(String errorMessage) {
-        this.error = errorMessage;
-        this.success = false;
-        return this;
-    }
-    
-    public long getTokensUsed() {
-        return this.tokenCount;
-    }
 }

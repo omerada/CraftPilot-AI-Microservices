@@ -37,12 +37,12 @@ public class PromptEnhancementService {
      */
     public Mono<AIResponse> enhancePrompt(AIRequest request) {
         // Varsayılan değerler için sıcaklık ve maksimum token değerlerini ayarla
-        if (request.getTemperature() == null) {
+        if (request.getTemperature() != null && request.getTemperature() == 0.0) {
             request.setTemperature(0.3); // Daha kararlı sonuçlar için düşük sıcaklık
         }
         
         // Token limitini ayarla
-        if (request.getMaxTokens() == null) {
+        if (request.getMaxTokens() != null && request.getMaxTokens() == 0) {
             request.setMaxTokens(2000); // Prompt iyileştirme için daha küçük token limiti yeterli
         }
         

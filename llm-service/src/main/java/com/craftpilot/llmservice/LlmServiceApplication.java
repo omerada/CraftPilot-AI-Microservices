@@ -2,19 +2,14 @@ package com.craftpilot.llmservice;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.context.annotation.ComponentScan;
 
 @SpringBootApplication
-@ComponentScan(basePackages = {
-    "com.craftpilot.llmservice",
-    "com.craftpilot.llmservice.config",
-    "com.craftpilot.llmservice.util",
-    "com.craftpilot.llmservice.controller",
-    "com.craftpilot.llmservice.service"
-})
-public class LlmServiceApplication {
-
+@EnableDiscoveryClient
+@ComponentScan(basePackages = {"com.craftpilot.llmservice"})
+public class LLMServiceApplication {
     public static void main(String[] args) {
-        SpringApplication.run(LlmServiceApplication.class, args);
+        SpringApplication.run(LLMServiceApplication.class, args);
     }
 }

@@ -171,7 +171,7 @@ public class PerformanceService {
         // Varsayılan token limiti ve sıcaklık değerleri
         aiRequest.setMaxTokens(request.getMaxTokens() != null ? request.getMaxTokens() : 2000);
         aiRequest.setTemperature(request.getTemperature() != null ? request.getTemperature() : 0.7);
-        aiRequest.setLanguage(request.getLanguage() != null ? request.getLanguage() : "tr"); // Varsayılan olarak Türkçe yanıt
+        aiRequest.setLanguage(request.getLanguage() != null ? request.getLanguage() : "tr");  
         
         try {
             // Analiz verilerini JSON string'e dönüştür
@@ -280,7 +280,7 @@ public class PerformanceService {
                 .collectList()
                 .map(entries -> PerformanceHistoryResponse.builder()
                     .url(request.getUrl())
-                    .history(entries)
+                    .entries(entries)
                     .build());
     }
 }

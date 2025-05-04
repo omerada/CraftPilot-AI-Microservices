@@ -10,13 +10,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class StreamSuggestionsRequest {
-    private String url;
     private String requestId;
     private String userId;
-    private String language;
-    
-    // AI model configuration
     private String model;
-    private Integer maxTokens;
-    private Double temperature;
+    private int maxTokens;
+    private double temperature;
+    private String language;
+    private String url;
 }

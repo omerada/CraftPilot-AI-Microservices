@@ -3,6 +3,7 @@ package com.craftpilot.llmservice.cache;
 import com.craftpilot.llmservice.model.performance.PerformanceAnalysisResponse;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
@@ -11,6 +12,7 @@ import java.time.Duration;
 import java.util.function.Function;
 
 @Component
+@RequiredArgsConstructor
 @Slf4j
 public class PerformanceAnalysisCache {
     private final Cache<String, PerformanceAnalysisResponse> cache;

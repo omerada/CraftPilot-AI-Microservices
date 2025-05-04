@@ -14,8 +14,8 @@ import java.util.List;
 @AllArgsConstructor
 public class PerformanceHistoryResponse {
     private String url;
+    private List<PerformanceHistoryEntry> entries;
     private String error;
-    private List<PerformanceHistoryEntry> history;
 
     @Data
     @Builder
@@ -25,6 +25,6 @@ public class PerformanceHistoryResponse {
         private String id;
         private String url;
         private LocalDateTime timestamp;
-        private Double performance;
+        private double performance;
     }
 }

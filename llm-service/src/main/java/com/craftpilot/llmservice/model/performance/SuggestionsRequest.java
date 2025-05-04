@@ -5,21 +5,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Map;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class SuggestionsRequest {
-    private Object analysisData;
+    private String userId;
+    private String model;
+    private int maxTokens;
+    private double temperature;
+    private String language;
+    private String analysisData;
     private String url;
     private String requestId;
-    private String userId;
-    private String language;
-    
-    // AI model configuration
-    private String model;
-    private Integer maxTokens;
-    private Double temperature;
 }
