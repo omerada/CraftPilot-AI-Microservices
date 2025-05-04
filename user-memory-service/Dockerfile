@@ -1,50 +1,25 @@
-# 1. Build aşaması: Maven ile derleme
-FROM eclipse-temurin:21-jdk-alpine as builder
+# 1. Builder aşaması: Java uygulamasını derle
+FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /app
 
-# Maven kurulumu
-RUN apk update && apk add maven
-
-# Bağımlılıkları önce kopyalayıp, güncel değilse tekrar yüklememesi için
+# Bağımlılıkları önce kopyala ve derle (önbellek optimizasyonu için)
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
+COPY mvnw .
+COPY .mvn .mvn
+RUN chmod +x ./mvnw
+RUN ./mvnw dependency:go-offline -B
 
-# Kaynak kodunu kopyalayıp build et
+# Kaynak kodları kopyala ve derle
 COPY src src
-RUN mvn package -DskipTests
-
-# 2. Çalışma aşaması: Sadece JRE ile çalıştırma
-FROM eclipse-temurin:17-jre-alpine as runtime
+RUN ./mvnw package -DskipTests
+    
+# 2. Çalışma aşaması: Sadece JDK ile çalıştırma (JRE-alpine ARM64 için mevcut değil)
+FROM eclipse-temurin:21-jdk-alpine AS runtime
 WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
 
-# Gerekli paketleri yükle
-RUN apk add --no-cache curl wget jq
+# Sağlık kontrolü için curl ekle
+RUN apk add --no-cache curl
 
-# GCP kimlik bilgileri için dizin yapısı oluştur
-RUN mkdir -p /etc/gcp/credentials
-
-# craftpilot grubunu ve appuser kullanıcısını oluştur
-RUN addgroup -S craftpilot && adduser -S appuser -G craftpilot
-
-# /etc/gcp dizininin sahibini ve izinlerini ayarla
-# Dizin yapısı ve izinleri önceden ayarla
-RUN chown -R appuser:craftpilot /etc/gcp && \
-    chmod -R 755 /etc/gcp && \
-    chmod 755 /etc/gcp/credentials
-
-# Kullanıcıyı değiştir
-USER appuser
-
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-  CMD wget -q --spider http://localhost:8067/actuator/health/liveness || exit 1
-
-# JVM ayarları optimize edildi
-ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+ParallelRefProcEnabled -Xms512m -Xmx1g -Dfile.encoding=UTF-8"
-
-# Actuator port
-EXPOSE 8067
-
-# Daha iyi container sinyalleri için
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
+# Uygulama'yı çalıştır
+ENTRYPOINT ["java", "-jar", "app.jar"]
