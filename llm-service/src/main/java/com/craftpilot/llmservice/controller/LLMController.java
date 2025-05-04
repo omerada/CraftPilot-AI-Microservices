@@ -18,12 +18,9 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import jakarta.validation.Valid;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-import com.craftpilot.llmservice.service.PromptService;
-import com.craftpilot.llmservice.service.ChatService;
 import com.craftpilot.llmservice.service.ChatEnhancementService;
 import com.craftpilot.llmservice.service.UserInformationExtractionService;
 
@@ -33,8 +30,6 @@ import com.craftpilot.llmservice.service.UserInformationExtractionService;
 @RequiredArgsConstructor 
 public class LLMController {
     private final LLMService llmService;
-    private final PromptService promptService;
-    private final ChatService chatService;
     private final ChatEnhancementService chatEnhancementService;
     private final UserInformationExtractionService extractionService;
     // Aşırı uzun boşluk dizilerini tespit etmek için pattern
