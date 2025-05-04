@@ -7,49 +7,56 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.io.InputStream;
 
 @Configuration
 @Slf4j
 public class FirestoreConfig {
 
-    @Value("${firestore.project-id:craft-pilot}")
+    @Value("${spring.cloud.gcp.firestore.project-id:craft-pilot}")
     private String projectId;
+
+    @Value("${spring.cloud.gcp.firestore.credentials.location:classpath:service-account.json}")
+    private String credentialsLocation;
+
+    private final ResourceLoader resourceLoader;
+
+    public FirestoreConfig(ResourceLoader resourceLoader) {
+        this.resourceLoader = resourceLoader;
+    }
 
     @Bean
     public Firestore firestore() throws IOException {
-        GoogleCredentials credentials;
+        log.info("Initializing Firestore with project ID: {}", projectId);
         
-        // Check for credential file in /etc/gcp/credentials
-        if (Files.exists(Paths.get("/etc/gcp/credentials/gcp-credentials.json"))) {
-            log.info("Loading GCP credentials from /etc/gcp/credentials/gcp-credentials.json");
-            credentials = GoogleCredentials.fromStream(
-                Files.newInputStream(Paths.get("/etc/gcp/credentials/gcp-credentials.json"))
-            );
-        } 
-        // Try environment variable path
-        else if (System.getenv("GOOGLE_APPLICATION_CREDENTIALS") != null) {
-            log.info("Loading GCP credentials from GOOGLE_APPLICATION_CREDENTIALS: {}", 
-                    System.getenv("GOOGLE_APPLICATION_CREDENTIALS"));
-            credentials = GoogleCredentials.fromStream(
-                Files.newInputStream(Paths.get(System.getenv("GOOGLE_APPLICATION_CREDENTIALS")))
-            );
-        }
-        // Default credentials as fallback
-        else {
-            log.info("No explicit credentials file found, using application default credentials");
-            credentials = GoogleCredentials.getApplicationDefault();
+        FirestoreOptions.Builder builder = FirestoreOptions.getDefaultInstance().toBuilder()
+                .setProjectId(projectId);
+
+        try {
+            Resource resource = resourceLoader.getResource(credentialsLocation);
+            if (resource.exists()) {
+                log.info("Loading Firebase credentials from: {}", credentialsLocation);
+                try (InputStream is = resource.getInputStream()) {
+                    GoogleCredentials credentials = GoogleCredentials.fromStream(is);
+                    builder.setCredentials(credentials);
+                }
+            } else {
+                log.warn("Firebase credentials file not found at: {}. Using default application credentials.", credentialsLocation);
+                // Default credentials (for local development or Google Cloud)
+                GoogleCredentials credentials = GoogleCredentials.getApplicationDefault();
+                builder.setCredentials(credentials);
+            }
+        } catch (IOException e) {
+            log.error("Error loading Firebase credentials: {}", e.getMessage());
+            log.warn("Falling back to application default credentials");
+            GoogleCredentials credentials = GoogleCredentials.getApplicationDefault();
+            builder.setCredentials(credentials);
         }
 
-        FirestoreOptions firestoreOptions = FirestoreOptions.newBuilder()
-                .setProjectId(projectId)
-                .setCredentials(credentials)
-                .build();
-        
-        log.info("Firestore configured successfully with project ID: {}", projectId);
-        return firestoreOptions.getService();
+        return builder.build().getService();
     }
 }

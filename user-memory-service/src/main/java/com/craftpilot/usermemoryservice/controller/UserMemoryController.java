@@ -1,87 +1,81 @@
 package com.craftpilot.usermemoryservice.controller;
 
-import com.craftpilot.usermemoryservice.model.UserMemory;
+import com.craftpilot.usermemoryservice.dto.ErrorResponse;
+import com.craftpilot.usermemoryservice.dto.MemoryEntryRequest;
+import com.craftpilot.usermemoryservice.dto.MemoryResponse;
+import com.craftpilot.usermemoryservice.exception.FirebaseAuthException;
 import com.craftpilot.usermemoryservice.service.UserMemoryService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
-import com.craftpilot.usermemoryservice.model.dto.ExtractedUserInfo;
 
 @RestController
-@RequestMapping("/user-memory")
+@RequestMapping("/memories")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "User Memory", description = "User memory management endpoints")
 public class UserMemoryController {
     private final UserMemoryService userMemoryService;
 
-    @GetMapping("/{userId}")
-    @Operation(summary = "Get user memory", description = "Retrieves memory for a specific user")
-    public Mono<ResponseEntity<UserMemory>> getUserMemory(@PathVariable String userId) {
-        log.info("Retrieving memory for user: {}", userId);
-        return userMemoryService.getUserMemory(userId)
-                .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.notFound().build());
-    }
-
-    @PostMapping("/{userId}/entry")
-    @Operation(summary = "Add memory entry", description = "Adds a new memory entry for a specific user")
-    public Mono<ResponseEntity<UserMemory>> addMemoryEntry(
-            @PathVariable String userId,
-            @RequestBody UserMemory.MemoryEntry entry) {
-        log.info("Adding memory entry for user: {}", userId);
-        return userMemoryService.addMemoryEntry(userId, entry)
-                .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.notFound().build());
-    }
-
-    @PostMapping("/{userId}/entries")
-    @Operation(summary = "Add memory entry", description = "Adds a new entry to the user's memory")
-    public Mono<ResponseEntity<String>> addMemoryEntry(
-            @PathVariable String userId,
-            @RequestBody ExtractedUserInfo memoryEntry) {
+    @PostMapping("/entries")
+    public Mono<ResponseEntity<Object>> addMemoryEntry(
+            @RequestHeader("X-User-Id") String userId,
+            @RequestBody MemoryEntryRequest request) {
         
         log.info("Memory entry addition request received for user: {}", userId);
-        log.debug("Memory entry content: {}", memoryEntry.getInformation());
         
-        // userId değerini path'ten gelen değer ile güncelle, tutarsızlık olmaması için
-        memoryEntry.setUserId(userId);
-        
-        return userMemoryService.addMemoryEntry(memoryEntry)
-                .map(result -> {
-                    log.info("Successfully added memory entry for user {}", userId);
-                    return ResponseEntity.ok("Memory entry added successfully with ID: " + result);
+        return userMemoryService.addMemoryEntry(userId, request)
+                .map(memory -> ResponseEntity.ok().body((Object) 
+                    new MemoryResponse("Memory entry added successfully", true)))
+                .onErrorResume(FirebaseAuthException.class, e -> {
+                    log.error("Firebase authorization error for user {}: {}", userId, e.getMessage());
+                    return Mono.just(ResponseEntity
+                            .status(HttpStatus.FORBIDDEN)
+                            .body((Object) new ErrorResponse(
+                                    "firebase_auth_error",
+                                    "Firebase yetkilendirme hatası. Servis hesabı izinlerini kontrol edin.",
+                                    HttpStatus.FORBIDDEN.value()
+                            )));
                 })
                 .onErrorResume(e -> {
-                    log.error("Error adding memory entry for user {}: {}", userId, e.getMessage(), e);
-                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                            .body("Error adding memory entry: " + e.getMessage()));
+                    log.error("Error adding memory entry for user {}: {}", userId, e.getMessage());
+                    return Mono.just(ResponseEntity
+                            .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body((Object) new ErrorResponse(
+                                    "memory_processing_error",
+                                    "Bellek girişi eklenirken bir hata oluştu: " + e.getMessage(),
+                                    HttpStatus.INTERNAL_SERVER_ERROR.value()
+                            )));
+                });
+    }
+
+    @GetMapping("/{userId}")
+    public Mono<ResponseEntity<Object>> getUserMemory(@PathVariable String userId) {
+        log.info("Request to get memory for user: {}", userId);
+        
+        return userMemoryService.getUserMemory(userId)
+                .map(memory -> ResponseEntity.ok().body((Object) memory))
+                .onErrorResume(FirebaseAuthException.class, e -> {
+                    log.error("Firebase authorization error for user {}: {}", userId, e.getMessage());
+                    return Mono.just(ResponseEntity
+                            .status(HttpStatus.FORBIDDEN)
+                            .body((Object) new ErrorResponse(
+                                    "firebase_auth_error",
+                                    "Firebase yetkilendirme hatası. Servis hesabı izinlerini kontrol edin.",
+                                    HttpStatus.FORBIDDEN.value()
+                            )));
                 })
-                .defaultIfEmpty(ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid memory entry"));
-    }
-
-    @PutMapping
-    @Operation(summary = "Update user memory", description = "Updates the entire memory for a specific user")
-    public Mono<ResponseEntity<UserMemory>> updateUserMemory(@RequestBody UserMemory userMemory) {
-        log.info("Updating memory for user: {}", userMemory.getUserId());
-        return userMemoryService.updateUserMemory(userMemory)
-                .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.notFound().build());
-    }
-
-    @PostMapping("/{userId}/clean")
-    @Operation(summary = "Clean old entries", description = "Removes entries older than the specified threshold")
-    public Mono<ResponseEntity<UserMemory>> cleanOldEntries(
-            @PathVariable String userId,
-            @RequestParam(defaultValue = "30") int daysThreshold) {
-        log.info("Cleaning old entries for user: {} (threshold: {} days)", userId, daysThreshold);
-        return userMemoryService.cleanOldEntries(userId, daysThreshold)
-                .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.notFound().build());
+                .onErrorResume(e -> {
+                    log.error("Error retrieving memory for user {}: {}", userId, e.getMessage());
+                    return Mono.just(ResponseEntity
+                            .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body((Object) new ErrorResponse(
+                                    "memory_retrieval_error",
+                                    "Kullanıcı belleği alınırken bir hata oluştu: " + e.getMessage(),
+                                    HttpStatus.INTERNAL_SERVER_ERROR.value()
+                            )));
+                });
     }
 }

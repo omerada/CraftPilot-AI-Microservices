@@ -1,132 +1,69 @@
 package com.craftpilot.usermemoryservice.service;
 
+import com.craftpilot.usermemoryservice.dto.MemoryEntryRequest;
 import com.craftpilot.usermemoryservice.model.UserMemory;
-import com.craftpilot.usermemoryservice.model.dto.ExtractedUserInfo;
 import com.craftpilot.usermemoryservice.repository.UserMemoryRepository;
-import com.google.cloud.Timestamp;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.UUID;
-import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class UserMemoryService {
-
     private final UserMemoryRepository userMemoryRepository;
+
+    public Mono<UserMemory> addMemoryEntry(String userId, MemoryEntryRequest request) {
+        log.info("Processing extracted information for userId: {}", userId);
+        
+        return userMemoryRepository.findByUserId(userId)
+                .defaultIfEmpty(createNewUserMemory(userId))
+                .flatMap(userMemory -> {
+                    log.info("Adding memory entry for userId: {}", userId);
+                    
+                    // Memory entry'yi ekleyelim
+                    if (userMemory.getEntries() == null) {
+                        userMemory.setEntries(new ArrayList<>());
+                    }
+                    
+                    Map<String, Object> entry = new HashMap<>();
+                    entry.put("content", request.getContent());
+                    entry.put("source", request.getSource());
+                    entry.put("context", request.getContext());
+                    entry.put("metadata", request.getMetadata());
+                    entry.put("timestamp", request.getTimestamp() != null 
+                            ? request.getTimestamp() : LocalDateTime.now());
+                    entry.put("importance", request.getImportance() != null 
+                            ? request.getImportance() : 1.0);
+                    
+                    userMemory.getEntries().add(entry);
+                    
+                    // Son güncelleme zamanını ayarlayalım
+                    userMemory.setLastUpdated(LocalDateTime.now());
+                    
+                    return userMemoryRepository.save(userMemory)
+                            .thenReturn(userMemory);
+                });
+    }
 
     public Mono<UserMemory> getUserMemory(String userId) {
         return userMemoryRepository.findByUserId(userId);
     }
 
-    public Mono<UserMemory> addMemoryEntry(String userId, UserMemory.MemoryEntry entry) {
-        log.info("Adding memory entry for userId: {}", userId);
-        
-        // Generate ID if not present
-        if (entry.getId() == null) {
-            entry.setId(UUID.randomUUID().toString());
-        }
-        
-        // Set timestamp if not present
-        if (entry.getTimestamp() == null) {
-            entry.setTimestamp(Timestamp.now());
-        }
-        
-        return userMemoryRepository.findByUserId(userId)
-                .defaultIfEmpty(createNewUserMemory(userId))
-                .flatMap(userMemory -> {
-                    if (userMemory.getEntries() == null) {
-                        userMemory.setEntries(new ArrayList<>());
-                    }
-                    
-                    userMemory.getEntries().add(entry);
-                    userMemory.setUpdatedAt(Timestamp.now());
-                    
-                    log.info("Saving user memory with new entry, total entries: {}", 
-                            userMemory.getEntries().size());
-                    return userMemoryRepository.save(userMemory);
-                });
-    }
-
-    // ExtractedUserInfo tipinden gelen bilgiyi işleyecek yeni metot
-    public Mono<String> addMemoryEntry(ExtractedUserInfo extractedInfo) {
-        log.info("Processing extracted information for userId: {}", extractedInfo.getUserId());
-        
-        // ExtractedUserInfo'dan MemoryEntry oluştur
-        UserMemory.MemoryEntry entry = UserMemory.MemoryEntry.builder()
-                .id(UUID.randomUUID().toString())
-                .content(extractedInfo.getInformation())
-                .source(extractedInfo.getContext())
-                .timestamp(Timestamp.ofTimeSecondsAndNanos(
-                        extractedInfo.getTimestamp().getEpochSecond(),
-                        extractedInfo.getTimestamp().getNano()))
-                .importance(0.7) // Varsayılan önem derecesi
-                .category("user_info") // Varsayılan kategori
-                .build();
-        
-        return addMemoryEntry(extractedInfo.getUserId(), entry)
-                .map(userMemory -> entry.getId());
-    }
-
-    public Mono<UserMemory> updateUserMemory(UserMemory userMemory) {
-        log.info("Updating user memory for userId: {}", userMemory.getUserId());
-        userMemory.setUpdatedAt(Timestamp.now());
-        return userMemoryRepository.save(userMemory);
-    }
-
-    public Mono<UserMemory> cleanOldEntries(String userId, int daysThreshold) {
-        log.info("Cleaning entries older than {} days for userId: {}", daysThreshold, userId);
-        
-        Instant thresholdInstant = Instant.now().minus(daysThreshold, ChronoUnit.DAYS);
-        Timestamp thresholdTimestamp = Timestamp.ofTimeSecondsAndNanos(
-                thresholdInstant.getEpochSecond(), 
-                thresholdInstant.getNano());
-        
-        return userMemoryRepository.findByUserId(userId)
-                .flatMap(userMemory -> {
-                    if (userMemory.getEntries() == null || userMemory.getEntries().isEmpty()) {
-                        log.info("No entries to clean for userId: {}", userId);
-                        return Mono.just(userMemory);
-                    }
-                    
-                    int originalSize = userMemory.getEntries().size();
-                    
-                    userMemory.setEntries(
-                            userMemory.getEntries().stream()
-                                    .filter(entry -> entry.getTimestamp().compareTo(thresholdTimestamp) > 0)
-                                    .collect(Collectors.toList())
-                    );
-                    
-                    int newSize = userMemory.getEntries().size();
-                    int removedEntries = originalSize - newSize;
-                    
-                    log.info("Cleaned {} old entries for userId: {}", removedEntries, userId);
-                    
-                    if (removedEntries > 0) {
-                        userMemory.setUpdatedAt(Timestamp.now());
-                        return userMemoryRepository.save(userMemory);
-                    } else {
-                        return Mono.just(userMemory);
-                    }
-                });
-    }
-    
     private UserMemory createNewUserMemory(String userId) {
         log.info("Creating new user memory for userId: {}", userId);
-        Timestamp now = Timestamp.now();
-        return UserMemory.builder()
-                .userId(userId)
-                .id(userId)
-                .createdAt(now)
-                .updatedAt(now)
-                .entries(new ArrayList<>())
-                .build();
+        
+        UserMemory userMemory = new UserMemory();
+        userMemory.setUserId(userId);
+        userMemory.setEntries(new ArrayList<>());
+        userMemory.setCreated(LocalDateTime.now());
+        userMemory.setLastUpdated(LocalDateTime.now());
+        return userMemory;
     }
 }
