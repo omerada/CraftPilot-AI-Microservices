@@ -1,0 +1,94 @@
+server:
+  port: 8067
+  compression:
+    enabled: true
+    mime-types: application/json,text/plain
+    min-response-size: 1024
+  shutdown: graceful
+
+spring:
+  application:
+    name: user-memory-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:prod}
+  cloud:
+    gcp:
+      firestore:
+        project-id: ${GCP_PROJECT_ID:craftpilot-dev}
+        credentials:
+          location: ${GOOGLE_APPLICATION_CREDENTIALS:file:/secrets/firestore-credentials.json}
+        enabled: true
+    discovery:
+      enabled: true
+
+# Enable Swagger UI and API docs
+springdoc:
+  swagger-ui:
+    enabled: true
+  api-docs:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+    metrics:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_SERVER_URL:http://craftpilot:13579ada@eureka-server:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    hostname: ${HOSTNAME:user-memory-service}
+    lease-renewal-interval-in-seconds: 10
+    health-check-url-path: /actuator/health
+
+user-memory:
+  cleanup:
+    days: 30
+
+llm-service:
+  url: ${LLM_SERVICE_URL:http://localhost:8062}
+
+firebase:
+  database-url: ${FIREBASE_DATABASE_URL:https://craftpilot-dev.firebaseio.com}
+  storage-bucket: ${FIREBASE_STORAGE_BUCKET:craftpilot-dev.appspot.com}
+  credentials-path: ${FIREBASE_CREDENTIALS_PATH:/secrets/firebase-credentials.json}
+
+logging:
+  level:
+    com.craftpilot.usermemoryservice: DEBUG
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      default:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+  retry:
+    instances:
+      default:
+        maxAttempts: 3
+        waitDuration: 1s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
