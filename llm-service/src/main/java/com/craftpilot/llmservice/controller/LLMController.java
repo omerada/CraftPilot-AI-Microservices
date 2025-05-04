@@ -111,12 +111,13 @@ public class LLMController {
         log.info("Stream chat completion request received with language: {}, requestId: {}, model: {}, userId: {}", 
                 userLanguage, trackingId, request.getModel(), userId);
         
-        // Kullanıcı mesajını bilgi çıkarımı için asenkron olarak işle
+        // Kullanıcı mesajını bilgi çıkarımı için asenkron olarak işle - sadece prompt kullanılacak
         if (userId != null && request.getPrompt() != null && !request.getPrompt().isEmpty()) {
-            extractionService.processAndStoreUserInfo(userId, request.getPrompt(), request.getContext())
+            // Context yerine null veya boş string gönderiyoruz - sadece prompt kullanılacak
+            extractionService.processAndStoreUserInfo(userId, request.getPrompt(), null)
                 .subscribeOn(Schedulers.boundedElastic())
                 .subscribe(
-                    () -> log.debug("User information extraction started asynchronously for userId: {}", userId),
+                    () -> log.debug("User information extraction started using only prompt for userId: {}", userId),
                     error -> log.error("Error initiating user information extraction: {}", error.getMessage())
                 );
         }
