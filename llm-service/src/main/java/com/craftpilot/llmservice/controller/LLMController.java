@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
 import com.craftpilot.llmservice.service.PromptService;
 import com.craftpilot.llmservice.service.ChatService;
 import com.craftpilot.llmservice.service.ChatEnhancementService;
+import com.craftpilot.llmservice.service.UserInformationExtractionService;
 
 @Slf4j
 @RestController
@@ -36,6 +37,7 @@ public class LLMController {
     private final ChatService chatService;
     // ChatEnhancementService'i ekleyin
     private final ChatEnhancementService chatEnhancementService;
+    private final UserInformationExtractionService extractionService;
     // Aşırı uzun boşluk dizilerini tespit etmek için pattern
     private static final Pattern EXCESSIVE_WHITESPACE = Pattern.compile("\\s{100,}");
     // Maksimum izin verilen boşluk sayısı
@@ -108,6 +110,16 @@ public class LLMController {
         
         log.info("Stream chat completion request received with language: {}, requestId: {}, model: {}, userId: {}", 
                 userLanguage, trackingId, request.getModel(), userId);
+        
+        // Kullanıcı mesajını bilgi çıkarımı için asenkron olarak işle
+        if (userId != null && request.getPrompt() != null && !request.getPrompt().isEmpty()) {
+            extractionService.processAndStoreUserInfo(userId, request.getPrompt(), request.getContext())
+                .subscribeOn(Schedulers.boundedElastic())
+                .subscribe(
+                    () -> log.debug("User information extraction started asynchronously for userId: {}", userId),
+                    error -> log.error("Error initiating user information extraction: {}", error.getMessage())
+                );
+        }
         
         // Kullanıcı ID'sini AI isteğine ekle
         request.setUserId(userId);

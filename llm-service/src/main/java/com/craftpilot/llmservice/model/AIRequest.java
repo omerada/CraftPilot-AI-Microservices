@@ -24,4 +24,5 @@ public class AIRequest {
     private String language;  
     private String systemPrompt;
     private Boolean stream;  
+    private String context;
 }
