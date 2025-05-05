@@ -56,6 +56,34 @@ public class UserMemoryService {
         return userMemoryRepository.findByUserId(userId);
     }
 
+    public Mono<UserMemory> deleteMemoryEntry(String userId, int entryIndex) {
+        log.info("Deleting memory entry at index {} for userId: {}", entryIndex, userId);
+        
+        return userMemoryRepository.findByUserId(userId)
+                .flatMap(userMemory -> {
+                    if (userMemory.getEntries() == null || userMemory.getEntries().isEmpty()) {
+                        log.warn("No entries found for userId: {}", userId);
+                        return Mono.just(userMemory);
+                    }
+                    
+                    if (entryIndex < 0 || entryIndex >= userMemory.getEntries().size()) {
+                        log.error("Index out of bounds: {} for user: {}", entryIndex, userId);
+                        return Mono.error(new IndexOutOfBoundsException(
+                                "Index: " + entryIndex + ", Size: " + userMemory.getEntries().size()));
+                    }
+                    
+                    userMemory.getEntries().remove(entryIndex);
+                    userMemory.setLastUpdated(LocalDateTime.now());
+                    
+                    return userMemoryRepository.save(userMemory);
+                });
+    }
+
+    public Mono<Void> deleteAllMemories(String userId) {
+        log.info("Deleting all memories for userId: {}", userId);
+        return userMemoryRepository.deleteByUserId(userId);
+    }
+
     private UserMemory createNewUserMemory(String userId) {
         log.info("Creating new user memory for userId: {}", userId);
         

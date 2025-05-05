@@ -149,6 +149,23 @@ spring:
               args:
                 name: notificationServiceCircuitBreaker
 
+        # User Memory Service Route Tanımı
+        - id: user-memory-service
+          uri: lb://user-memory-service
+          predicates:
+            - Path=/memories/**,/user-instructions/**,/user-context/**,/user-preferences/**
+          filters:
+            - StripPrefix=0
+            - name: CircuitBreaker
+              args:
+                name: userMemoryServiceCircuitBreaker
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 25
+                redis-rate-limiter.burstCapacity: 50
+                key-resolver: "#{@userKeyResolver}"
+            - PreserveHostHeader
+
   data:
     redis:
       host: ${REDIS_HOST:redis}
@@ -253,35 +270,58 @@ logging:
     com.netflix.discovery: ${LOG_LEVEL:INFO}
     com.craftpilot.apigateway.security: ${SECURITY_LOG_LEVEL:INFO}
     org.springframework.security: INFO
-    reactor.netty.http.client: INFO
-    reactor.netty: INFO
-
-resilience4j:
-  circuitbreaker:
-    configs:
-      default:
-        slidingWindowType: TIME_BASED
-        slidingWindowSize: 60
-        minimumNumberOfCalls: 5
-        waitDurationInOpenState: 30s
-        failureRateThreshold: 50
-        permittedNumberOfCallsInHalfOpenState: 3
-        automaticTransitionFromOpenToHalfOpenEnabled: true
-        eventConsumerBufferSize: 100
-    instances:
-      llmServiceCircuitBreaker:
-        baseConfig: default
+        baseConfig: defaultnt: INFO
         slidingWindowSize: 30
         waitDurationInOpenState: 30s
         failureRateThreshold: 60
         permittedNumberOfCallsInHalfOpenState: 5
         registerHealthIndicator: true
         allowHealthIndicatorToFail: false
-        ignoreExceptions:
+        ignoreExceptions:: TIME_BASED
           - org.springframework.web.reactive.function.client.WebClientResponseException
       userServiceCircuitBreaker:
-        baseConfig: default
-  timelimiter:
+        baseConfig: defaulttate: 30s
+  timelimiter:eRateThreshold: 50
+    configs:ittedNumberOfCallsInHalfOpenState: 3
+      default:ticTransitionFromOpenToHalfOpenEnabled: true
+        timeoutDuration: 10size: 100
+        cancelRunningFuture: true
+    instances:ceCircuitBreaker:
+      userServiceTimeLimiter:
+        timeoutDuration: 5s30
+      llmServiceTimeLimiter:ate: 30s
+        timeoutDuration: 60s: 60
+      userMemoryServiceTimeLimiter:        permittedNumberOfCallsInHalfOpenState: 5
+        timeoutDuration: 8s  registerHealthIndicator: true
+llowHealthIndicatorToFail: false
+kafka:
+  topics:web.reactive.function.client.WebClientResponseException
+    user-preferences: user-preferences
+    user-activity: user-activity        baseConfig: default
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        registerHealthIndicator: true        permittedNumberOfCallsInHalfOpenState: 4        failureRateThreshold: 50        waitDurationInOpenState: 20s        slidingWindowSize: 20        baseConfig: default      userMemoryServiceCircuitBreaker:          - org.springframework.web.reactive.function.client.WebClientResponseException        ignoreExceptions:        allowHealthIndicatorToFail: false        registerHealthIndicator: true        permittedNumberOfCallsInHalfOpenState: 5        failureRateThreshold: 60        waitDurationInOpenState: 30s        slidingWindowSize: 30        baseConfig: default      userServiceCircuitBreaker:    instances:  circuitbreaker:resilience4j:    system-events: system-events  timelimiter:
     configs:
       default:
         timeoutDuration: 10s
