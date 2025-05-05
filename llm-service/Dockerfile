@@ -10,9 +10,12 @@ RUN cd craft-pilot-commons && mvn clean install -DskipTests
 
 WORKDIR /build
 
+# First copy only the POM file and download dependencies (for better caching)
 COPY llm-service/pom.xml .
-COPY llm-service/src ./src
+RUN mvn dependency:go-offline -B
 
+# Then copy source and build
+COPY llm-service/src ./src
 RUN mvn clean package -DskipTests
 
 # Run stage
