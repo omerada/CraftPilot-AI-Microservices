@@ -3,15 +3,11 @@ package com.craftpilot.llmservice.util;
 import com.craftpilot.llmservice.config.OpenRouterProperties;
 import com.craftpilot.llmservice.model.AIRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
-/**
- * API istek gövdelerini oluşturmak için yardımcı sınıf
- */
 @Slf4j
 public class RequestBodyBuilder {
 
@@ -22,73 +18,47 @@ public class RequestBodyBuilder {
         log.info("RequestBodyBuilder initialized with properties: {}", properties);
     }
 
-    /**
-     * AI isteğinden API istek gövdesi oluşturur
-     */
     public Map<String, Object> createRequestBody(AIRequest request) {
-        Map<String, Object> body = new HashMap<>();
+        Map<String, Object> requestBody = new HashMap<>();
 
-        // Model bilgisini ekle
-        body.put("model", request.getModel());
+        // Mevcut uygulamanın mantığına göre request body'yi oluştur
+        if (request != null) {
+            // Model bilgisini ayarla
+            if (request.getModel() != null) {
+                requestBody.put("model", request.getModel());
+            }
 
-        // Mesajları hazırla
-        List<Map<String, Object>> messages = prepareMessages(request);
-        body.put("messages", messages);
+            // Mesajları ayarla
+            if (request.getMessages() != null) {
+                requestBody.put("messages", request.getMessages());
+            }
 
-        // Diğer parametreleri ekle
-        body.put("max_tokens", request.getMaxTokens());
-        body.put("temperature", request.getTemperature());
+            // Temperature ayarla (varsayılan: 0.7)
+            requestBody.put("temperature", request.getTemperature() != null ? request.getTemperature() : 0.7);
 
-        log.debug("Oluşturulan request body: {}", body);
-        return body;
-    }
+            // Diğer parametreleri ekle
+            if (request.getMaxTokens() != null) {
+                requestBody.put("max_tokens", request.getMaxTokens());
+            }
 
-    /**
-     * Mesajları hazırlar, sistem mesajını ve kullanıcı mesajını ayarlar
-     */
-    private List<Map<String, Object>> prepareMessages(AIRequest request) {
-        List<Map<String, Object>> messages;
+            if (request.getTopP() != null) {
+                requestBody.put("top_p", request.getTopP());
+            }
 
-        // Eğer messages dizisi mevcutsa, onu kullan
-        if (request.getMessages() != null && !request.getMessages().isEmpty()) {
-            messages = new ArrayList<>(request.getMessages());
+            if (request.getFrequencyPenalty() != null) {
+                requestBody.put("frequency_penalty", request.getFrequencyPenalty());
+            }
 
-            // Sistem mesajı var mı kontrol et
-            boolean hasSystemMessage = messages.stream()
-                    .anyMatch(msg -> "system".equals(msg.get("role")));
+            if (request.getPresencePenalty() != null) {
+                requestBody.put("presence_penalty", request.getPresencePenalty());
+            }
 
-            // Yoksa ekle
-            if (!hasSystemMessage) {
-                Map<String, Object> systemMessage = new HashMap<>();
-                systemMessage.put("role", "system");
-                systemMessage.put("content", request.getSystemPrompt() != null ? request.getSystemPrompt()
-                        : properties.getDefaultSystemPrompt());
-
-                // Sistem mesajını listenin başına ekle
-                messages.add(0, systemMessage);
+            // Stream özelliğini ayarla
+            if (request.isStream() != null) {
+                requestBody.put("stream", request.isStream());
             }
         }
-        // Değilse, prompt alanından messages oluştur (geriye dönük uyumluluk)
-        else if (request.getPrompt() != null && !request.getPrompt().isEmpty()) {
-            messages = new ArrayList<>();
 
-            // Sistem mesajını ekle
-            Map<String, Object> systemMessage = new HashMap<>();
-            systemMessage.put("role", "system");
-            systemMessage.put("content", request.getSystemPrompt() != null ? request.getSystemPrompt()
-                    : properties.getDefaultSystemPrompt());
-            messages.add(systemMessage);
-
-            // Kullanıcı mesajını ekle
-            Map<String, Object> userMessage = new HashMap<>();
-            userMessage.put("role", "user");
-            userMessage.put("content", request.getPrompt());
-            messages.add(userMessage);
-        } else {
-            // Her iki alan da boşsa, hata fırlat
-            throw new IllegalArgumentException("Request must contain either 'prompt' or 'messages'");
-        }
-
-        return messages;
+        return requestBody;
     }
 }
