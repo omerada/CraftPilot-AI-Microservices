@@ -187,6 +187,18 @@ resilience4j:
           - java.util.concurrent.TimeoutException
           - org.springframework.web.reactive.function.client.WebClientResponseException
           - com.craftpilot.llmservice.exception.APIException
+      userMemoryService:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        recordExceptions:
+          - org.springframework.web.reactive.function.client.WebClientResponseException
+          - java.util.concurrent.TimeoutException
+          - java.io.IOException
+
   ratelimiter:
     instances:
       llmService:
@@ -201,6 +213,11 @@ resilience4j:
           - java.io.IOException
           - java.util.concurrent.TimeoutException
           - org.springframework.web.reactive.function.client.WebClientResponseException
+      userMemoryService:
+        maxAttempts: 3
+        waitDuration: 1s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
 
 lighthouse:
   service:
@@ -217,11 +234,22 @@ ai:
 # Extraksiyon ayarları
 extraction:
   timeout:
-    seconds: 10
+    seconds: 30
   memory:
     timeout:
-      seconds: 5
+      seconds: 15
   retry:
     max: 3
     backoff:
       ms: 500
+
+memory:
+  timeout:
+    seconds: 15
+
+user-memory:
+  service:
+    url: ${USER_MEMORY_SERVICE_URL:http://user-memory-service:8067}
+  request:
+    timeout:
+      seconds: 15

@@ -24,11 +24,19 @@ public class UserMemoryController {
             @RequestHeader("X-User-Id") String userId,
             @RequestBody MemoryEntryRequest request) {
         
-        log.info("Memory entry addition request received for user: {}", userId);
+        log.info("Memory entry addition request received for user: {}, content length: {}", 
+                userId, request.getContent() != null ? request.getContent().length() : 0);
+        
+        // Request detaylarını debug log'a ekle
+        log.debug("Memory entry details: source={}, context={}, metadata={}", 
+                request.getSource(), request.getContext(), request.getMetadata());
         
         return userMemoryService.addMemoryEntry(userId, request)
-                .map(memory -> ResponseEntity.ok().body((Object) 
-                    new MemoryResponse("Memory entry added successfully", true)))
+                .map(memory -> {
+                    log.info("Memory entry successfully added for user: {}", userId);
+                    return ResponseEntity.ok().body((Object) 
+                        new MemoryResponse("Memory entry added successfully", true));
+                })
                 .onErrorResume(FirebaseAuthException.class, e -> {
                     log.error("Firebase authorization error for user {}: {}", userId, e.getMessage());
                     return Mono.just(ResponseEntity
@@ -40,7 +48,7 @@ public class UserMemoryController {
                             )));
                 })
                 .onErrorResume(e -> {
-                    log.error("Error adding memory entry for user {}: {}", userId, e.getMessage());
+                    log.error("Error adding memory entry for user {}: {}", userId, e.getMessage(), e);
                     return Mono.just(ResponseEntity
                             .status(HttpStatus.INTERNAL_SERVER_ERROR)
                             .body((Object) new ErrorResponse(

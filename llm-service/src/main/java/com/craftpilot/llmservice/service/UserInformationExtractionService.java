@@ -17,6 +17,7 @@ import reactor.util.retry.Retry;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @RequiredArgsConstructor
@@ -29,14 +30,14 @@ public class UserInformationExtractionService {
     @Value("${ai.model.extraction:google/gemma-3-4b-it}")
     private String extractionModel;
 
-    @Value("${extraction.timeout.seconds:10}")
+    @Value("${extraction.timeout.seconds:30}")
     private int extractionTimeoutSeconds;
     
-    @Value("${extraction.memory.timeout.seconds:5}")
+    @Value("${memory.timeout.seconds:10}")
     private int memoryTimeoutSeconds;
     
-    @Value("${extraction.retry.max:3}")
-    private int maxRetryAttempts;
+    @Value("${extraction.retries:3}")
+    private int maxRetries;
     
     @Value("${extraction.retry.backoff.ms:500}")
     private long retryBackoffMs;
@@ -85,8 +86,14 @@ public class UserInformationExtractionService {
                 .doOnSuccess(response -> log.info("Received AI response for extraction: length={}", 
                         response != null && response.getResponse() != null ? response.getResponse().length() : 0))
                 .doOnError(e -> log.error("Error during LLM extraction request: {}", e.getMessage()))
+                .onErrorResume(e -> {
+                    log.error("Error while extracting user info: {}", e.getMessage());
+                    return Mono.just(AIResponse.builder()
+                            .response("{\"information\": \"EXTRACTION_ERROR\"}")
+                            .build());
+                })
                 .flatMap(response -> parseExtractionResponse(userId, response, message))
-                .retryWhen(Retry.backoff(maxRetryAttempts, Duration.ofMillis(retryBackoffMs))
+                .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryBackoffMs))
                         .filter(e -> !(e instanceof IllegalArgumentException))
                         .doBeforeRetry(signal -> 
                             log.warn("Retrying extraction after error: {}, attempt: {}", 
@@ -104,16 +111,27 @@ public class UserInformationExtractionService {
         log.info("Processing message for user {}: {}", userId, 
                 LoggingUtils.truncateForLogging(message, 50));
         
-        return extractUserInfo(userId, message)
-                .doOnSubscribe(s -> log.debug("Starting extraction process for user {}", userId))
+        AtomicInteger retryCount = new AtomicInteger(0);
+        
+        return Mono.defer(() -> extractUserInfo(userId, message)
+                .timeout(Duration.ofSeconds(extractionTimeoutSeconds + 5))
+                .onErrorResume(e -> {
+                    int attempt = retryCount.getAndIncrement();
+                    if (attempt < maxRetries) {
+                        log.warn("Retrying extraction after error: {}, attempt: {}", e.getMessage(), attempt);
+                        return Mono.delay(Duration.ofSeconds(1)).then(Mono.empty());
+                    }
+                    log.error("Failed to extract user info after {} attempts: {}", maxRetries, e.getMessage());
+                    return Mono.empty();
+                })
                 .flatMap(extractedInfo -> {
-                    if (extractedInfo == null || extractedInfo.getInformation() == null || extractedInfo.getInformation().isEmpty()) {
-                        log.debug("No information extracted from message using AI for user {}", userId);
+                    if (extractedInfo == null || "NO_INFORMATION".equals(extractedInfo.getInformation()) 
+                            || "EXTRACTION_ERROR".equals(extractedInfo.getInformation())) {
+                        log.info("No useful information extracted for user {}, skipping memory storage", userId);
                         return Mono.empty();
                     }
-                    
-                    log.info("AI extracted user information: {}", extractedInfo.getInformation());
-                    
+
+                    extractedInfo.setUserId(userId);
                     extractedInfo.setTimestamp(Instant.now());
                     
                     extractedInfo.setContext("Mesajdan çıkarıldı: " + 
@@ -127,14 +145,9 @@ public class UserInformationExtractionService {
                             .doOnSubscribe(s -> log.debug("Calling user-memory-service for user {}", userId))
                             .doOnSuccess(result -> log.info("Successfully stored AI-extracted information for user {}", userId))
                             .doOnError(error -> log.error("Failed to store AI-extracted information for user {}: {}", 
-                                    userId, error.getMessage()))
-                            .retryWhen(Retry.backoff(maxRetryAttempts, Duration.ofMillis(retryBackoffMs))
-                                    .filter(e -> !(e instanceof IllegalArgumentException))
-                                    .doBeforeRetry(signal -> 
-                                        log.warn("Retrying memory storage after error: {}, attempt: {}", 
-                                                signal.failure().getMessage(), signal.totalRetries() + 1)))
-                            .doFinally(signal -> log.debug("Memory storage completed with signal: {}", signal));
-                })
+                                    userId, error.getMessage()));
+                }))
+                .retry(maxRetries)
                 .then()
                 .doOnSuccess(v -> log.info("Completed entire extraction and storage process for user {}", userId))
                 .doOnError(e -> log.error("Error in extraction and storage process: {}", e.getMessage()))
@@ -159,7 +172,7 @@ public class UserInformationExtractionService {
             
             String content = response.getResponse();
             
-            if (content.contains("NO_INFORMATION")) {
+            if (content.contains("NO_INFORMATION") || content.contains("EXTRACTION_ERROR")) {
                 log.debug("Mesajdan bilgi çıkarılamadı");
                 return Mono.empty();
             }
