@@ -112,7 +112,11 @@ public class ActivityLogAspect {
                             Object value = expression.getValue(context);
                             metadata.put(key, value);
                         } catch (Exception e) {
-                            log.warn("Failed to evaluate expression for key {}: {}", key, e.getMessage());
+                            // Improve error logging with more detailed information
+                            log.warn("Failed to evaluate expression '{}' for key {}: {}", 
+                                    valueExpr, key, e.getMessage());
+                            // Don't fail the entire metadata extraction, just skip this key
+                            // and continue with the others
                         }
                     }
                 }
@@ -132,7 +136,7 @@ public class ActivityLogAspect {
                 }
             }
         } catch (Exception e) {
-            log.error("Failed to evaluate metadata expression: {}", e.getMessage());
+            log.error("Failed to extract metadata: {}", e.getMessage(), e);
             return new HashMap<>();
         }
     }

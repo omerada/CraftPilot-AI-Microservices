@@ -147,7 +147,7 @@ public class ChatHistoryService {
     @LogActivity(
         actionType = ActivityEventTypes.CONVERSATION_CREATE,
         userIdParam = "#result.userId",
-        metadata = "{historyId: #result.id, conversationId: #result.conversations[-1].id}"
+        metadata = "{historyId: #result.id, conversationId: #result.conversations[#result.conversations.size()-1].id}"
     )
     public Mono<ChatHistory> addConversation(String historyId, Conversation conversation) {
         if (historyId == null || historyId.isEmpty()) {

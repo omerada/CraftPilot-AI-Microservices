@@ -83,25 +83,22 @@ public class WebClientConfig {
 
     @Bean
     public WebClient.Builder webClientBuilder() {
-        ConnectionProvider provider = ConnectionProvider.builder("general-connection-pool")
-                .maxConnections(100)
-                .maxIdleTime(Duration.ofSeconds(30))
-                .maxLifeTime(Duration.ofMinutes(5))
-                .pendingAcquireTimeout(Duration.ofSeconds(10))
-                .evictInBackground(Duration.ofSeconds(60))
-                .build();
-                
-        HttpClient httpClient = HttpClient.create(provider)
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
-                .responseTimeout(Duration.ofSeconds(10))
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
+                .responseTimeout(Duration.ofSeconds(15))
                 .doOnConnected(conn -> conn
-                        .addHandlerLast(new ReadTimeoutHandler(10, TimeUnit.SECONDS))
-                        .addHandlerLast(new WriteTimeoutHandler(10, TimeUnit.SECONDS)));
+                        .addHandlerLast(new ReadTimeoutHandler(15, TimeUnit.SECONDS))
+                        .addHandlerLast(new WriteTimeoutHandler(15, TimeUnit.SECONDS)));
+
+        // Memory limit'ini arttıralım (default: 256KB)
+        ExchangeStrategies exchangeStrategies = ExchangeStrategies.builder()
+                .codecs(configurer -> configurer
+                        .defaultCodecs()
+                        .maxInMemorySize(2 * 1024 * 1024)) // 2MB
+                .build();
 
         return WebClient.builder()
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .codecs(configurer -> configurer
-                        .defaultCodecs()
-                        .maxInMemorySize(5 * 1024 * 1024));
+                .exchangeStrategies(exchangeStrategies);
     }
 }

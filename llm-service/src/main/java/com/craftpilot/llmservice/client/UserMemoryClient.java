@@ -28,7 +28,6 @@ import java.util.concurrent.TimeoutException;
 @RequiredArgsConstructor
 @Slf4j
 public class UserMemoryClient {
-
     private final WebClient.Builder webClientBuilder;
 
     @Value("${user-memory.service.url:http://user-memory-service:8067}")
@@ -40,18 +39,27 @@ public class UserMemoryClient {
     @CircuitBreaker(name = "userMemoryService", fallbackMethod = "addMemoryEntryFallback")
     @Retry(name = "userMemoryService")
     public Mono<String> addMemoryEntry(ExtractedUserInfo extractedInfo) {
+        // userId kontrolü ekleyelim
+        if (extractedInfo == null || extractedInfo.getUserId() == null || extractedInfo.getUserId().trim().isEmpty()) {
+            log.warn("User ID is null or empty. Cannot send memory entry to user-memory-service.");
+            return Mono.just("ERROR-NULL-USER-ID");
+        }
+        
         log.info("Sending memory entry to user-memory-service for user: {}", extractedInfo.getUserId());
         
         MemoryEntryRequest request = new MemoryEntryRequest();
         request.setContent(extractedInfo.getInformation());
-        request.setSource(extractedInfo.getSource() != null ? extractedInfo.getSource() : "AI analizi");
+        request.setSource(extractedInfo.getSource() != null ? extractedInfo.getSource() : "Varsayılan kayıt");
         request.setContext(extractedInfo.getContext());
         request.setTimestamp(LocalDateTime.ofInstant(extractedInfo.getTimestamp(), ZoneId.systemDefault()));
         
+        // userId'yi metadata içine ekleyelim (request nesnesine doğrudan ekleyemiyoruz)
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("extractionMethod", "ai-llm");
         metadata.put("messageLength", extractedInfo.getInformation().length());
         metadata.put("extractionTimestamp", System.currentTimeMillis());
+        metadata.put("userId", extractedInfo.getUserId()); // userId'yi metadata içinde taşıyalım
+        
         request.setMetadata(metadata);
         
         // Önemlik seviyesi - şimdilik sabit 2.0
@@ -60,23 +68,18 @@ public class UserMemoryClient {
         log.debug("Memory entry request details: content={}, source={}", 
             extractedInfo.getInformation(), request.getSource());
         
-        // AI yanıtını detaylı şekilde logla - extractedInfo.getInformation() içeriği önemli
+        // AI yanıtını detaylı şekilde logla
         log.info("AI extracted information for user {}: {}", 
             extractedInfo.getUserId(), 
             extractedInfo.getInformation().length() > 100 ? 
                 extractedInfo.getInformation().substring(0, 100) + "..." : 
                 extractedInfo.getInformation());
         
-        // Rastgele CSRF token oluştur
-        String csrfToken = UUID.randomUUID().toString();
-        
         return webClientBuilder.build()
                 .post()
                 .uri(userMemoryServiceUrl + "/memories/entries")
                 .header("X-User-Id", extractedInfo.getUserId())
-                .header("Content-Type", "application/json")
-                .header("X-CSRF-TOKEN", csrfToken) // CSRF token eklendi
-                .header("Cookie", "XSRF-TOKEN=" + csrfToken) // Cookie olarak da gönder
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .body(BodyInserters.fromValue(request))
                 .retrieve()
                 .bodyToMono(String.class)
@@ -98,19 +101,32 @@ public class UserMemoryClient {
 
     // Circuit breaker için fallback metodu
     private Mono<String> addMemoryEntryFallback(ExtractedUserInfo extractedInfo, Throwable e) {
+        // Eğer extractedInfo null ise güvenli bir şekilde işlem yapalım
+        if (extractedInfo == null) {
+            log.warn("Circuit breaker triggered for memory storage but extractedInfo is null");
+            return Mono.just("FALLBACK-RESPONSE-NULL-USER-INFO");
+        }
+        
+        // userId null ise güvenli bir şekilde işlem yapalım
+        String userId = extractedInfo.getUserId();
+        if (userId == null || userId.isEmpty()) {
+            log.warn("Circuit breaker triggered for memory storage with null/empty userId, error: {}", e.getMessage());
+            return Mono.just("FALLBACK-RESPONSE-NULL-USER-ID");
+        }
+        
         log.warn("Circuit breaker triggered for memory storage: userId={}, error={}", 
-                extractedInfo.getUserId(), e.getMessage());
+            userId, e.getMessage());
         
         // Hata ayrıntılarını kaydet
         if (e instanceof TimeoutException) {
-            log.error("Memory service timeout for user {}: {}", extractedInfo.getUserId(), e.getMessage());
+            log.error("Memory service timeout for user {}: {}", userId, e.getMessage());
         } else if (e instanceof WebClientResponseException) {
             WebClientResponseException wcre = (WebClientResponseException) e;
             log.error("Memory service HTTP error for user {}: {} - {}", 
-                    extractedInfo.getUserId(), wcre.getStatusCode(), wcre.getResponseBodyAsString());
+                    userId, wcre.getStatusCode(), wcre.getResponseBodyAsString());
         } else {
             log.error("Unexpected error type for user {}: {} (Type: {})", 
-                    extractedInfo.getUserId(), e.getMessage(), e.getClass().getName());
+                    userId, e.getMessage(), e.getClass().getName());
         }
         
         // Cache'e veya retry queue'ya kaydetme işlemi buraya eklenebilir
@@ -119,6 +135,11 @@ public class UserMemoryClient {
     }
 
     private void logClientError(Throwable e, String userId) {
+        // userId null güvenlik kontrolü
+        if (userId == null || userId.isEmpty()) {
+            userId = "UNKNOWN_USER";
+        }
+        
         if (e instanceof WebClientResponseException) {
             WebClientResponseException wcre = (WebClientResponseException) e;
             log.error("User memory service error for user {}: Status={}, Response={}", 
@@ -130,11 +151,18 @@ public class UserMemoryClient {
     }
 
     public Mono<UserMemory> getUserMemory(String userId) {
+        // userId null güvenlik kontrolü
+        if (userId == null || userId.trim().isEmpty()) {
+            log.warn("Cannot fetch memory for null or empty user ID");
+            return Mono.just(new UserMemory()); // Boş bir bellek döndür
+        }
+        
         log.info("Fetching memory for user: {}", userId);
         
         return webClientBuilder.build()
                 .get()
-                .uri(userMemoryServiceUrl + "/memories/{userId}", userId) // Düzeltilmiş endpoint
+                .uri(userMemoryServiceUrl + "/memories/{userId}", userId)
+                .header("X-User-Id", userId)
                 .retrieve()
                 .bodyToMono(UserMemory.class)
                 .doOnSubscribe(s -> log.info("API isteği gönderiliyor: /memories/{}", userId))

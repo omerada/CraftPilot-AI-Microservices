@@ -187,8 +187,14 @@ public class UserInformationExtractionService {
     }
 
     public Mono<Void> processAndStoreUserInfo(String userId, String message) {
-        if (userId == null || message == null || message.trim().isEmpty()) {
-            log.debug("Skipping extraction for empty/null message or userId");
+        // UserId kontrolü ekleyelim
+        if (userId == null || userId.trim().isEmpty()) {
+            log.warn("Cannot process user message with null or empty userId");
+            return Mono.empty();
+        }
+        
+        if (message == null || message.trim().isEmpty()) {
+            log.warn("Cannot process empty message for user: {}", userId);
             return Mono.empty();
         }
         
@@ -293,5 +299,85 @@ public class UserInformationExtractionService {
                "Örneğin, 'Benim adım Ömer' için yanıt şu olmalıdır: {\"information\": \"Kullanıcının adı Ömer\"}\n\n" +
                "Eğer hiçbir bilgi bulamazsan, şunu döndür: {\"information\": \"NO_INFORMATION\"}\n\n" +
                "Mesaj: " + message;
+    }
+
+    public Mono<ExtractedUserInfo> extractUserInformation(String userId, String message, String context) {
+        // UserId kontrolü ekleyelim
+        if (userId == null || userId.trim().isEmpty()) {
+            log.warn("Cannot extract information for null or empty userId");
+            return Mono.error(new IllegalArgumentException("User ID cannot be null or empty"));
+        }
+        
+        log.info("Processing message for user {}: {}", userId, message.length() > 50 ? 
+                message.substring(0, 50) + "..." : message);
+        
+        // Mesaj çok kısa ise anlamlı bilgi çıkarmaya çalışmayalım
+        if (message.trim().length() < 10) {
+            log.info("Message too short for information extraction (length: {})", message.length());
+            return Mono.just(ExtractedUserInfo.builder()
+                    .userId(userId)
+                    .information("Kullanıcı kısa bir mesaj gönderdi")
+                    .source("Mesaj çok kısa")
+                    .context(context)
+                    .timestamp(Instant.now())
+                    .build());
+        }
+        
+        log.debug("Extraction request created for userId={}, messageLength={}", userId, message.length());
+        
+        return callExtractionService(userId, message)
+                .timeout(Duration.ofSeconds(10))
+                .doOnSuccess(response -> {
+                    log.info("Received AI response for extraction: length={}, content snippet: {}", 
+                        response != null ? response.length() : 0,
+                        response != null && !response.isEmpty() ? 
+                            (response.length() > 30 ? response.substring(0, 30) + "..." : response) : "EMPTY");
+                })
+                .onErrorResume(e -> {
+                    log.error("Error extracting information with AI: {}", e.getMessage());
+                    return Mono.just("Kullanıcı bir mesaj gönderdi");
+                })
+                .map(extractedInfo -> {
+                    // Boş yanıt kontrolü
+                    if (extractedInfo == null || extractedInfo.trim().isEmpty()) {
+                        extractedInfo = "Kullanıcı mesaj gönderdi";
+                    }
+                    
+                    log.info("Information extracted successfully for user {}: {}", userId, extractedInfo);
+                    log.info("Çıkarılan bilgi: {}", extractedInfo);
+                    
+                    // Bilgiyi kullanıcı belleğine kaydet
+                    return ExtractedUserInfo.builder()
+                            .userId(userId)
+                            .information(extractedInfo)
+                            .source("AI analizi")
+                            .context(context)
+                            .timestamp(Instant.now())
+                            .build();
+                });
+    }
+
+    // ExtractionRequest sınıfını kullanmak yerine mevcut modelleri kullanalım
+    private Mono<String> callExtractionService(String userId, String message) {
+        if (userId == null || userId.isEmpty() || message == null || message.isEmpty()) {
+            log.warn("Cannot extract information with null/empty userId or message");
+            return Mono.empty();
+        }
+        
+        // AIRequest veya başka bir uygun request modelini kullanın
+        AIRequest request = new AIRequest();
+        request.setUserId(userId);
+        request.setPrompt(message);
+        request.setRequestType("EXTRACTION");
+        // Model varsayılan olarak Gemini kullanılabilir
+        request.setModel("google/gemini-pro");
+        
+        // LLMService'deki doğru metodu çağıralım (processChatCompletion)
+        return llmService.processChatCompletion(request)
+            .map(response -> response.getResponse())
+            .onErrorResume(e -> {
+                log.error("Error while extracting information: {}", e.getMessage());
+                return Mono.empty();
+            });
     }
 }

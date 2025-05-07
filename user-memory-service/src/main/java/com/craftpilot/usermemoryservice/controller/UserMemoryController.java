@@ -27,6 +27,18 @@ public class UserMemoryController {
         log.info("Memory entry addition request received for user: {}, content length: {}", 
                 userId, request.getContent() != null ? request.getContent().length() : 0);
         
+        // Boş içerik kontrolü ekleyelim
+        if (request.getContent() == null || request.getContent().trim().isEmpty()) {
+            log.warn("Empty content in memory entry request for user: {}", userId);
+            return Mono.just(ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body((Object) new ErrorResponse(
+                            "empty_content",
+                            "Bellek içeriği boş olamaz",
+                            HttpStatus.BAD_REQUEST.value()
+                    )));
+        }
+        
         // Request detaylarını debug log'a ekle
         log.debug("Memory entry details: source={}, context={}, metadata={}", 
                 request.getSource(), request.getContext(), request.getMetadata());
