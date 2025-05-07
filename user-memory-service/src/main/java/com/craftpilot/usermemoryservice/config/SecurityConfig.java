@@ -8,6 +8,7 @@ import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.csrf.CookieServerCsrfTokenRepository;
 import org.springframework.security.web.server.csrf.ServerCsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import reactor.core.publisher.Mono;
@@ -52,11 +53,11 @@ public class SecurityConfig {
                             
                             // Public paths veya internal API paths ise CSRF kontrolü yapma
                             if (isPublicPath(path) || isInternalApiPath(path)) {
-                                return Mono.just(false);
+                                return ServerWebExchangeMatcher.MatchResult.notMatch();
                             }
                             
                             // Diğer tüm istekler için CSRF kontrolü yap
-                            return Mono.just(true);
+                            return ServerWebExchangeMatcher.MatchResult.match();
                         })
                 )
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
