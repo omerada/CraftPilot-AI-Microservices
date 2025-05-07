@@ -48,10 +48,7 @@ public class OpenRouterClient {
 
         // Endpoint normalizasyonu
         String uri = normalizeEndpoint(endpoint);
-
-        log.debug("OpenRouter isteği: {} - Body: {}", uri,
-                LoggingUtils.truncateForLogging(requestBody.toString(), 200));
-
+ 
         return openRouterWebClient.post()
                 .uri(uri)
                 .bodyValue(requestBody)
@@ -79,10 +76,7 @@ public class OpenRouterClient {
     public Flux<String> streamFromOpenRouter(AIRequest request) {
         Map<String, Object> requestBody = createRequestBody(request);
         requestBody.put("stream", true);
-
-        log.debug("OpenRouter stream isteği gönderiliyor: {}",
-                LoggingUtils.truncateForLogging(requestBody.toString(), 200));
-
+ 
         return openRouterWebClient.post()
                 .uri("/chat/completions")
                 .bodyValue(requestBody)
@@ -94,9 +88,7 @@ public class OpenRouterClient {
                 .onStatus(status -> status.is5xxServerError(), response -> response.bodyToMono(String.class)
                         .flatMap(error -> Mono.error(new APIException("OpenRouter sunucu hatası: " + error))))
                 .bodyToFlux(String.class)
-                .timeout(Duration.ofSeconds(properties.getStreamTimeoutSeconds()))
-                .doOnSubscribe(s -> log.debug("OpenRouter stream'e abone olundu"))
-                .doOnComplete(() -> log.info("OpenRouter stream başarıyla tamamlandı"))
+                .timeout(Duration.ofSeconds(properties.getStreamTimeoutSeconds())) 
                 .doOnError(e -> log.error("OpenRouter stream hatası: {}", e.getMessage(), e))
                 // Backpressure stratejisi
                 .onBackpressureBuffer(10000, bufferOverflowException -> log.warn("Stream backpressure buffer aşıldı"))
@@ -233,8 +225,7 @@ public class OpenRouterClient {
         body.put("max_tokens", request.getMaxTokens() != null ? request.getMaxTokens() : properties.getMaxTokens());
         body.put("temperature",
                 request.getTemperature() != null ? request.getTemperature() : properties.getTemperature());
-
-        log.debug("Oluşturulan request body: {}", body);
+ 
         return body;
     }
 
