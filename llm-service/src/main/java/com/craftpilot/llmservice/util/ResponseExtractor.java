@@ -148,6 +148,7 @@ public class ResponseExtractor {
      */
     public void checkAndSendStandardFormats(JsonNode jsonNode, FluxSink<StreamResponse> sink) {
         boolean contentSent = false;
+        StringBuilder fullContent = new StringBuilder();
 
         // OpenAI format: choices[0].delta.content
         if (jsonNode.has("choices") && jsonNode.get("choices").isArray()) {
@@ -155,16 +156,12 @@ public class ResponseExtractor {
             if (choices.size() > 0) {
                 JsonNode choice = choices.get(0);
                 
-                // Delta format
+                // Delta format - bilgi çıkarımında parçalar toplanmalı
                 if (choice.has("delta") && choice.get("delta").has("content")) {
                     String content = choice.get("delta").get("content").asText();
                     if (content != null && !content.isEmpty()) {
-                        log.debug("Extracted delta.content: {}", 
-                            content.length() > 30 ? content.substring(0, 30) + "..." : content);
-                        sink.next(StreamResponse.builder()
-                            .content(content)
-                            .done(false)
-                            .build());
+                        // Her parça için değil, bütün içerik için log yazmak daha efektif
+                        fullContent.append(content);
                         contentSent = true;
                     }
                 }
@@ -173,11 +170,7 @@ public class ResponseExtractor {
                 if (!contentSent && choice.has("text")) {
                     String content = choice.get("text").asText();
                     if (content != null && !content.isEmpty()) {
-                        log.debug("Extracted text: {}", content);
-                        sink.next(StreamResponse.builder()
-                            .content(content)
-                            .done(false)
-                            .build());
+                        fullContent.append(content);
                         contentSent = true;
                     }
                 }
@@ -186,11 +179,7 @@ public class ResponseExtractor {
                 if (!contentSent && choice.has("message") && choice.get("message").has("content")) {
                     String content = choice.get("message").get("content").asText();
                     if (content != null && !content.isEmpty()) {
-                        log.debug("Extracted message.content: {}", content);
-                        sink.next(StreamResponse.builder()
-                            .content(content)
-                            .done(false)
-                            .build());
+                        fullContent.append(content);
                         contentSent = true;
                     }
                 }
@@ -212,16 +201,11 @@ public class ResponseExtractor {
                             contentSent = true;
                         } catch (Exception e) {
                             log.debug("Could not parse inner content as JSON, sending as text");
+                            fullContent.append(content);
+                            contentSent = true;
                         }
-                    }
-                    
-                    if (!contentSent) {
-                        log.debug("Using direct content: {}", 
-                            content.length() > 30 ? content.substring(0, 30) + "..." : content);
-                        sink.next(StreamResponse.builder()
-                            .content(content)
-                            .done(false)
-                            .build());
+                    } else {
+                        fullContent.append(content);
                         contentSent = true;
                     }
                 }
@@ -231,6 +215,19 @@ public class ResponseExtractor {
             if (!contentSent) {
                 log.warn("Could not extract content from JSON: {}", jsonNode);
             }
+        }
+        
+        // Toplanan tüm içeriği bir kerede gönder (bilgi çıkarımı için)
+        if (fullContent.length() > 0) {
+            String completeContent = fullContent.toString();
+            // Uzun içeriği kısaltarak logla
+            log.debug("Extracted complete content: {}", 
+                completeContent.length() > 100 ? completeContent.substring(0, 97) + "..." : completeContent);
+            
+            sink.next(StreamResponse.builder()
+                .content(completeContent)
+                .done(false)
+                .build());
         }
     }
 }

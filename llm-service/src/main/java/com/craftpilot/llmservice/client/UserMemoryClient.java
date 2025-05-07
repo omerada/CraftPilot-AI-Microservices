@@ -41,7 +41,7 @@ public class UserMemoryClient {
         
         MemoryEntryRequest request = new MemoryEntryRequest();
         request.setContent(extractedInfo.getInformation());
-        request.setSource(extractedInfo.getSource());
+        request.setSource(extractedInfo.getSource() != null ? extractedInfo.getSource() : "AI analizi");
         request.setContext(extractedInfo.getContext());
         request.setTimestamp(LocalDateTime.ofInstant(extractedInfo.getTimestamp(), ZoneId.systemDefault()));
         
@@ -62,7 +62,7 @@ public class UserMemoryClient {
                 .retrieve()
                 .bodyToMono(String.class)
                 .timeout(Duration.ofSeconds(requestTimeoutSeconds))
-                .doOnSubscribe(s -> log.debug("API request başlatıldı: /memories/entries"))
+                .doOnSubscribe(s -> log.info("API isteği gönderiliyor: /memories/entries, userId: {}", extractedInfo.getUserId()))
                 .doOnSuccess(result -> log.info("Memory entry successfully added for user: {}", extractedInfo.getUserId()))
                 .doOnError(e -> logClientError(e, extractedInfo.getUserId()));
     }
@@ -104,11 +104,10 @@ public class UserMemoryClient {
                 .uri(userMemoryServiceUrl + "/memories/{userId}", userId) // Düzeltilmiş endpoint
                 .retrieve()
                 .bodyToMono(UserMemory.class)
-                .doOnSubscribe(s -> log.debug("API request başlatıldı: /memories/{}", userId))
+                .doOnSubscribe(s -> log.info("API isteği gönderiliyor: /memories/{}", userId))
                 .doOnSuccess(memory -> log.info("Memory fetched successfully for user {}: {} entries", 
                         userId, memory != null && memory.getMemory() != null ? memory.getMemory().size() : 0))
                 .doOnError(e -> {
-                    // Daha detaylı hata loglaması
                     if (e instanceof WebClientResponseException) {
                         WebClientResponseException wcre = (WebClientResponseException) e;
                         log.error("Memory service HTTP error for user {}: Status={}, Body={}", 

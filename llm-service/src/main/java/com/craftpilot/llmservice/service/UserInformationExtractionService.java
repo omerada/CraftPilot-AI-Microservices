@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.retry.Retry;
@@ -74,6 +75,7 @@ public class UserInformationExtractionService {
                 .systemPrompt(systemPrompt)
                 .temperature(0.3)
                 .maxTokens(256)
+                .stream(false) // Bilgi çıkarımı için stream modu kapatıldı
                 .build();
 
         LoggingUtils.setRequestContext(request.getRequestId(), userId);
@@ -136,15 +138,16 @@ public class UserInformationExtractionService {
                     
                     extractedInfo.setContext("Mesajdan çıkarıldı: " + 
                         LoggingUtils.truncateForLogging(message, 30));
+
+                    log.info("Çıkarılan bilgi: {}", extractedInfo.getInformation());
                     
-                    log.debug("Sending extracted information to user-memory-service: userId={}, info={}, contextLength={}", 
-                            userId, extractedInfo.getInformation(), 
-                            extractedInfo.getContext() != null ? extractedInfo.getContext().length() : 0);
+                    log.debug("Sending extracted information to user-memory-service: userId={}, info={}", 
+                            userId, extractedInfo.getInformation());
                     
                     return userMemoryClient.addMemoryEntry(extractedInfo)
                             .timeout(Duration.ofSeconds(memoryTimeoutSeconds))
                             .doOnSubscribe(s -> log.info("Calling user-memory-service for user {}", userId))
-                            .doOnSuccess(result -> log.info("Successfully stored AI-extracted information for user {}: {}", userId, result))
+                            .doOnSuccess(result -> log.info("Successfully stored AI-extracted information for user {}"))
                             .doOnError(error -> {
                                 log.error("Failed to store AI-extracted information for user {}: {} (Type: {})", 
                                         userId, error.getMessage(), error.getClass().getName());
