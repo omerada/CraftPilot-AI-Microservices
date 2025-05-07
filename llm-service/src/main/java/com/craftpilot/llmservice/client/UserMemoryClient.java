@@ -48,6 +48,7 @@ public class UserMemoryClient {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("extractionMethod", "ai-llm");
         metadata.put("messageLength", extractedInfo.getInformation().length());
+        metadata.put("extractionTimestamp", System.currentTimeMillis());
         request.setMetadata(metadata);
         
         // Önemlik seviyesi - şimdilik sabit 2.0
@@ -70,7 +71,9 @@ public class UserMemoryClient {
                 .doOnError(e -> {
                     log.error("Error sending memory entry to user-memory-service: {}", e.getMessage());
                     logClientError(e, extractedInfo.getUserId());
-                });
+                })
+                .retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500))
+                    .filter(ex -> !(ex instanceof WebClientResponseException.BadRequest)));
     }
 
     // Circuit breaker için fallback metodu
@@ -85,9 +88,13 @@ public class UserMemoryClient {
             WebClientResponseException wcre = (WebClientResponseException) e;
             log.error("Memory service HTTP error for user {}: {} - {}", 
                     extractedInfo.getUserId(), wcre.getStatusCode(), wcre.getResponseBodyAsString());
+        } else {
+            log.error("Unexpected error type for user {}: {} (Type: {})", 
+                    extractedInfo.getUserId(), e.getMessage(), e.getClass().getName());
         }
         
-        // Burada retry queue veya cache'e kaydedilebilir
+        // Cache'e veya retry queue'ya kaydetme işlemi buraya eklenebilir
+        
         return Mono.just("FALLBACK-RESPONSE-MEMORY-STORAGE-DEFERRED");
     }
 

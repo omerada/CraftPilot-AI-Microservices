@@ -37,7 +37,7 @@ public class UserInformationExtractionService {
     @Value("${memory.timeout.seconds:10}")
     private int memoryTimeoutSeconds;
     
-    @Value("${extraction.retries:3}")
+    @Value("${extraction.retry.max:3}")
     private int maxRetries;
     
     @Value("${extraction.retry.backoff.ms:500}")
@@ -48,46 +48,25 @@ public class UserInformationExtractionService {
             log.debug("Skipping extraction for empty/null message or userId");
             return Mono.empty();
         }
-        
-        // Bellek yönetimi iyileştirmesi - uzun mesajları kısalt
-        final String effectiveMessage;
-        if (message.length() > 4000) {
-            StringBuilder sb = new StringBuilder(4100);
-            sb.append(message.substring(0, 2000))
-              .append("\n...[içerik kısaltıldı]...\n")
-              .append(message.substring(message.length() - 2000));
-            effectiveMessage = sb.toString();
-            log.debug("Büyük mesaj kısaltıldı: {} -> {} karakter", message.length(), effectiveMessage.length());
-        } else {
-            effectiveMessage = message;
-        }
-        
-        String systemPrompt = "Sen bir kullanıcı bilgisi çıkarma asistanısın. Kullanıcının mesajını analiz et ve " +
-                "kişisel bilgilerini, tercihlerini, veya diğer önemli detayları belirle. " +
-                "Gerçeklere dayalı, doğrulanabilir bilgilere odaklan. " +
-                "Çıkardığın bilgileri JSON formatında döndür.";
 
-        String prompt = buildExtractionPrompt(effectiveMessage);
+        String prompt = buildExtractionPrompt(message);
+        log.debug("Extraction request created for userId={}, messageLength={}", userId, message.length());
 
-        AIRequest request = AIRequest.builder()
+        AIRequest extractionRequest = AIRequest.builder()
                 .model(extractionModel)
                 .prompt(prompt)
-                .systemPrompt(systemPrompt)
-                .temperature(0.3)
-                .maxTokens(256)
-                .stream(false) // Bilgi çıkarımı için stream modu kapatıldı
+                .maxTokens(500)
+                .temperature(0.2)
                 .build();
 
-        LoggingUtils.setRequestContext(request.getRequestId(), userId);
-        log.debug("Extraction request created for userId={}, messageLength={}", 
-                userId, effectiveMessage.length());
-        
-        return llmService.processChatCompletion(request)
+        return llmService.processChatCompletion(extractionRequest)
                 .timeout(Duration.ofSeconds(extractionTimeoutSeconds))
-                .publishOn(Schedulers.boundedElastic())
-                .doOnSuccess(response -> log.info("Received AI response for extraction: length={}", 
-                        response != null && response.getResponse() != null ? response.getResponse().length() : 0))
-                .doOnError(e -> log.error("Error during LLM extraction request: {}", e.getMessage()))
+                .doOnSubscribe(s -> log.debug("Sending extraction request to AI for user {}", userId))
+                .doOnSuccess(response -> {
+                    String content = response != null && response.getResponse() != null 
+                                    ? response.getResponse() : "";
+                    log.info("Received AI response for extraction: length={}", content.length());
+                })
                 .onErrorResume(e -> {
                     log.error("Error while extracting user info: {}", e.getMessage());
                     return Mono.just(AIResponse.builder()
@@ -101,6 +80,108 @@ public class UserInformationExtractionService {
                             log.warn("Retrying extraction after error: {}, attempt: {}", 
                                     signal.failure().getMessage(), signal.totalRetries() + 1)))
                 .doFinally(s -> LoggingUtils.clearRequestContext());
+    }
+
+    // Yeni eklenen metod: Boş ya da null AI yanıtı için fallback
+    private Mono<AIResponse> handleEmptyResponse(AIResponse response) {
+        if (response == null || response.getResponse() == null || response.getResponse().isEmpty()) {
+            log.warn("Empty AI response received, using fallback response");
+            return Mono.just(AIResponse.builder()
+                    .response("{\"information\": \"NO_EXTRACTION_POSSIBLE\"}")
+                    .build());
+        }
+        return Mono.just(response);
+    }
+
+    private Mono<ExtractedUserInfo> parseExtractionResponse(String userId, AIResponse response, String originalMessage) {
+        if (response == null || response.getResponse() == null || response.getResponse().isEmpty()) {
+            log.warn("AI response is null or empty for user {}", userId);
+            ExtractedUserInfo fallbackInfo = new ExtractedUserInfo();
+            fallbackInfo.setUserId(userId);
+            fallbackInfo.setInformation("Kullanıcıdan bilgi çıkarılamadı");
+            fallbackInfo.setSource("Fallback extraction");
+            fallbackInfo.setContext("Boş AI yanıtı");
+            fallbackInfo.setTimestamp(Instant.now());
+            return Mono.just(fallbackInfo);
+        }
+
+        try {
+            String jsonResponse = response.getResponse().trim();
+            // JSON yanıtı düzeltme girişimi
+            if (!jsonResponse.startsWith("{")) {
+                log.warn("Non-JSON response received: {}", jsonResponse.substring(0, Math.min(50, jsonResponse.length())));
+                jsonResponse = extractJsonFromText(jsonResponse);
+            }
+            
+            JsonNode root = objectMapper.readTree(jsonResponse);
+            JsonNode infoNode = root.get("information");
+            
+            if (infoNode == null || infoNode.isNull() || infoNode.asText().isEmpty()) {
+                log.warn("No information field found in JSON response for user {}", userId);
+                ExtractedUserInfo emptyInfo = new ExtractedUserInfo();
+                emptyInfo.setUserId(userId);
+                emptyInfo.setInformation("NO_INFORMATION");
+                emptyInfo.setSource("AI extraction");
+                emptyInfo.setContext("Mesaj analizi");
+                emptyInfo.setTimestamp(Instant.now());
+                return Mono.just(emptyInfo);
+            }
+            
+            String extractedInfo = infoNode.asText();
+            
+            // Anlamsız ya da işlenemez yanıt kontrolü
+            if (extractedInfo.equals("EXTRACTION_ERROR") || extractedInfo.equals("NO_INFORMATION")) {
+                log.warn("AI returned non-useful extraction result: {}", extractedInfo);
+                ExtractedUserInfo basicInfo = new ExtractedUserInfo();
+                basicInfo.setUserId(userId);
+                basicInfo.setInformation(extractedInfo);
+                basicInfo.setSource("AI extraction - limited result");
+                basicInfo.setContext("Mesaj: " + shortenMessage(originalMessage));
+                basicInfo.setTimestamp(Instant.now());
+                return Mono.just(basicInfo);
+            }
+            
+            ExtractedUserInfo info = new ExtractedUserInfo();
+            info.setUserId(userId);
+            info.setInformation(extractedInfo);
+            info.setSource("AI extraction");
+            info.setContext("Mesaj analizi");
+            info.setTimestamp(Instant.now());
+            
+            log.debug("Successfully parsed extraction response for user {}: {}", 
+                      userId, shortenMessage(extractedInfo));
+            return Mono.just(info);
+            
+        } catch (Exception e) {
+            log.error("Error parsing extraction response: {}", e.getMessage());
+            ExtractedUserInfo errorInfo = new ExtractedUserInfo();
+            errorInfo.setUserId(userId);
+            errorInfo.setInformation("PARSING_ERROR");
+            errorInfo.setSource("Failed extraction");
+            errorInfo.setContext("Hata: " + e.getMessage());
+            errorInfo.setTimestamp(Instant.now());
+            return Mono.just(errorInfo);
+        }
+    }
+
+    // Yeni eklenen yardımcı metod
+    private String extractJsonFromText(String text) {
+        int jsonStart = text.indexOf('{');
+        int jsonEnd = text.lastIndexOf('}');
+        
+        if (jsonStart >= 0 && jsonEnd > jsonStart) {
+            return text.substring(jsonStart, jsonEnd + 1);
+        }
+        
+        return "{\"information\": \"INVALID_RESPONSE_FORMAT\"}";
+    }
+    
+    // Yeni eklenen yardımcı metod
+    private String shortenMessage(String message) {
+        if (message == null) return "";
+        int maxLength = 30;
+        if (message.length() <= maxLength) return message;
+        return message.substring(0, maxLength) + "...";
     }
 
     public Mono<Void> processAndStoreUserInfo(String userId, String message) {
@@ -117,6 +198,7 @@ public class UserInformationExtractionService {
         
         return extractUserInfo(userId, message)
                 .timeout(Duration.ofSeconds(extractionTimeoutSeconds + 5))
+                .defaultIfEmpty(createDefaultExtractedInfo(userId, message))
                 .doOnSuccess(extractedInfo -> {
                     if (extractedInfo == null) {
                         log.warn("Extraction result is null for user {}", userId);
@@ -132,15 +214,28 @@ public class UserInformationExtractionService {
                         return Mono.delay(Duration.ofSeconds(1)).then(Mono.empty());
                     }
                     log.error("Failed to extract user info after {} attempts: {}", maxRetries, e.getMessage());
-                    return Mono.empty();
+                    return Mono.just(createDefaultExtractedInfo(userId, message));
                 })
                 .flatMap(extractedInfo -> {
-                    if (extractedInfo == null || "NO_INFORMATION".equals(extractedInfo.getInformation()) 
-                            || "EXTRACTION_ERROR".equals(extractedInfo.getInformation())) {
-                        log.info("No useful information extracted for user {}, skipping memory storage", userId);
+                    if (extractedInfo == null) {
+                        log.warn("Extraction failed with null result for user {}", userId);
+                        return Mono.empty(); // Bilgi yoksa işlemi sonlandır
+                    }
+                    
+                    // Anlamlı bilgi var mı kontrol et
+                    String info = extractedInfo.getInformation();
+                    if (info == null || info.isEmpty() || 
+                        "NO_INFORMATION".equals(info) || 
+                        "EXTRACTION_ERROR".equals(info) ||
+                        "PARSING_ERROR".equals(info) ||
+                        "INVALID_RESPONSE_FORMAT".equals(info)) {
+                        
+                        // Anlamlı bilgi yoksa, belleğe kaydetme
+                        log.info("No meaningful information extracted for user {}, skipping memory storage", userId);
                         return Mono.empty();
                     }
 
+                    // Sadece anlamlı bilgi çıkarıldığında memory'ye kaydet
                     extractedInfo.setUserId(userId);
                     extractedInfo.setTimestamp(Instant.now());
                     
@@ -174,101 +269,23 @@ public class UserInformationExtractionService {
                 .doFinally(s -> LoggingUtils.clearRequestContext());
     }
 
-    private String buildExtractionPrompt(String message) {
-        return "Aşağıdaki mesajdan kullanıcı hakkında kişisel bilgileri çıkar. " +
-               "Eğer kişisel bilgi bulunamazsa, 'NO_INFORMATION' şeklinde yanıt ver. " +
-               "Şu bilgileri çıkarmaya odaklan: isim, yaş, meslek, konum, ilgi alanları, hobiler, tercihler, aile detayları. " +
-               "JSON formatında yanıt ver, sadece 'information' alanı içinde çıkarılan bilgiyi veya 'NO_INFORMATION' değerini döndür. " +
-               "Örnek yanıt: {\"information\": \"İsim: Ahmet. Yaş: 30. Konum: İstanbul. İlgi alanları: Teknoloji, yazılım.\"}" +
-               "\n\nKullanıcı mesajı: " + message;
+    // Yeni eklenen yardımcı metod
+    private ExtractedUserInfo createDefaultExtractedInfo(String userId, String message) {
+        ExtractedUserInfo defaultInfo = new ExtractedUserInfo();
+        defaultInfo.setUserId(userId);
+        defaultInfo.setInformation("Kullanıcı mesaj gönderdi");
+        defaultInfo.setSource("Varsayılan kayıt");
+        defaultInfo.setContext("Mesaj: " + shortenMessage(message));
+        defaultInfo.setTimestamp(Instant.now());
+        return defaultInfo;
     }
 
-    private Mono<ExtractedUserInfo> parseExtractionResponse(String userId, AIResponse response, String originalMessage) {
-        try {
-            if (response == null || response.getResponse() == null) {
-                log.warn("Null response received from LLM service");
-                return Mono.empty();
-            }
-            
-            String content = response.getResponse();
-            
-            if (content.contains("NO_INFORMATION") || content.contains("EXTRACTION_ERROR")) {
-                log.debug("Mesajdan bilgi çıkarılamadı");
-                return Mono.empty();
-            }
-
-            // JSON ayrıştırma deneyin
-            try {
-                String jsonContent = content;
-                
-                // İçerikten JSON bölümünü çıkar
-                int jsonStart = content.indexOf('{');
-                int jsonEnd = content.lastIndexOf('}');
-                
-                if (jsonStart >= 0 && jsonEnd > jsonStart) {
-                    jsonContent = content.substring(jsonStart, jsonEnd + 1);
-                }
-                
-                JsonNode jsonNode = objectMapper.readTree(jsonContent);
-                
-                if (jsonNode.has("information")) {
-                    String information = jsonNode.get("information").asText();
-                    
-                    if (information.isEmpty() || "NO_INFORMATION".equals(information)) {
-                        return Mono.empty();
-                    }
-                    
-                    log.info("Successfully parsed information from AI response: {}", information);
-                    
-                    return Mono.just(ExtractedUserInfo.builder()
-                            .userId(userId)
-                            .information(information)
-                            .context("Mesajdan çıkarıldı: " + 
-                                    LoggingUtils.truncateForLogging(originalMessage, 30))
-                            .timestamp(Instant.now())
-                            .build());
-                } else {
-                    log.warn("information field not found in JSON response");
-                }
-            } catch (Exception ex) {
-                log.warn("Failed to parse JSON from AI response, falling back to string parsing: {}", ex.getMessage());
-                // JSON parse hatası durumunda string parsing
-            }
-            
-            // Alternatif manuel parsing (eski yöntem - yedek olarak)
-            int start = content.indexOf("\"information\"");
-            if (start == -1) {
-                log.debug("AI yanıtında information alanı bulunamadı");
-                return Mono.empty();
-            }
-
-            // Bilgi değerini çıkar
-            start = content.indexOf(":", start) + 1;
-            int end = content.indexOf("\"", content.indexOf("\"", start) + 1) + 1;
-            String information = content.substring(start, end).trim();
-            
-            // Tırnak işaretlerini kaldır
-            if (information.startsWith("\"") && information.endsWith("\"")) {
-                information = information.substring(1, information.length() - 1);
-            }
-
-            if (information.isEmpty() || information.equals("NO_INFORMATION")) {
-                return Mono.empty();
-            }
-
-            log.info("Successfully extracted information using string parsing: {}", information);
-            
-            return Mono.just(ExtractedUserInfo.builder()
-                    .userId(userId)
-                    .information(information)
-                    .context("Mesajdan çıkarıldı: " + 
-                             LoggingUtils.truncateForLogging(originalMessage, 30))
-                    .timestamp(Instant.now())
-                    .build());
-
-        } catch (Exception e) {
-            log.error("Çıkarım yanıtı ayrıştırılırken hata oluştu: {}", e.getMessage(), e);
-            return Mono.empty();
-        }
+    private String buildExtractionPrompt(String message) {
+        return "Aşağıdaki kullanıcı mesajını analiz et ve kullanıcı hakkında bilgi çıkar. " +
+               "Sadece belirgin, açık bilgileri al, tahmin yürütme. " +
+               "İsim, yaş, konum, meslek, ilgi alanları, tercihler gibi bilgileri JSON formatında döndür.\n\n" +
+               "Örnek yanıt format:\n{\"information\": \"[çıkarılan bilgi]\"}\n\n" +
+               "Eğer hiçbir bilgi bulamazsan, şunu döndür: {\"information\": \"NO_INFORMATION\"}\n\n" +
+               "Mesaj: " + message;
     }
 }
