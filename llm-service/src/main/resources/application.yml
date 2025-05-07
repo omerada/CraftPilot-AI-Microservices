@@ -246,10 +246,3 @@ extraction:
 memory:
   timeout:
     seconds: 15
-
-user-memory:
-  service:
-    url: ${USER_MEMORY_SERVICE_URL:http://user-memory-service:8067}
-  request:
-    timeout:
-      seconds: 15
