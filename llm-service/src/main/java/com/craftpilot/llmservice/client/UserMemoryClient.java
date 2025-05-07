@@ -1,17 +1,19 @@
 package com.craftpilot.llmservice.client;
 
 import com.craftpilot.llmservice.dto.ExtractedUserInfo;
+import com.craftpilot.llmservice.dto.MemoryEntryRequest;
 import com.craftpilot.llmservice.model.UserMemory;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 
 import java.time.Duration;
 import java.time.LocalDateTime;

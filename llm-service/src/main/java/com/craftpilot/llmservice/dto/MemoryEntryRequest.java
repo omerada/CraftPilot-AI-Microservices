@@ -1,20 +1,20 @@
 package com.craftpilot.llmservice.dto;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.Map;
 
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ExtractedUserInfo {
-    private String userId;
-    private String information;
-    private Instant timestamp;
+public class MemoryEntryRequest {
+    private String content;
     private String source;
     private String context;
+    private Map<String, Object> metadata;
+    private LocalDateTime timestamp;
+    private Double importance;
 }
