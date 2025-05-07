@@ -39,12 +39,9 @@ public class ChatCompletionService {
         if (request.getModel() == null || request.getModel().isEmpty()) {
             request.setModel(properties.getDefaultModel());
         }
+         
         
-        log.debug("Chat tamamlama isteği gönderiliyor: model={}, requestId={}", 
-                request.getModel(), request.getRequestId());
-        
-        return openRouterClient.callOpenRouter("chat/completions", request)
-            .doOnNext(response -> log.debug("OpenRouter yanıtı alındı: {}", response))
+        return openRouterClient.callOpenRouter("chat/completions", request) 
             .map(response -> mapToAIResponse(response, request))
             .timeout(Duration.ofSeconds(properties.getRequestTimeoutSeconds()))
             .doOnError(e -> log.error("Chat completion error: {}", e.getMessage(), e))
@@ -70,8 +67,7 @@ public class ChatCompletionService {
     /**
      * OpenRouter yanıtını AIResponse'a dönüştürür
      */
-    private AIResponse mapToAIResponse(Map<String, Object> openRouterResponse, AIRequest request) {
-        log.debug("OpenRouter yanıtı haritalanıyor: {}", openRouterResponse);
+    private AIResponse mapToAIResponse(Map<String, Object> openRouterResponse, AIRequest request) { 
         String responseText = responseExtractor.extractResponseText(openRouterResponse);
         
         if (responseText == null || responseText.trim().isEmpty()) {
@@ -86,8 +82,7 @@ public class ChatCompletionService {
             .requestId(request.getRequestId())
             .success(true)
             .build();
-            
-        log.debug("Haritalanan yanıt: {}", response);
+             
         return response;
     }
 }
