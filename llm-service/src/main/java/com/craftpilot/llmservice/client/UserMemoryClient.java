@@ -4,22 +4,24 @@ import com.craftpilot.llmservice.dto.ExtractedUserInfo;
 import com.craftpilot.llmservice.dto.MemoryEntryRequest;
 import com.craftpilot.llmservice.model.UserMemory;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
-import reactor.util.retry.Retry;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 @Component
@@ -36,6 +38,7 @@ public class UserMemoryClient {
     private int requestTimeoutSeconds;
 
     @CircuitBreaker(name = "userMemoryService", fallbackMethod = "addMemoryEntryFallback")
+    @Retry(name = "userMemoryService")
     public Mono<String> addMemoryEntry(ExtractedUserInfo extractedInfo) {
         log.info("Sending memory entry to user-memory-service for user: {}", extractedInfo.getUserId());
         
@@ -57,22 +60,39 @@ public class UserMemoryClient {
         log.debug("Memory entry request details: content={}, source={}", 
             extractedInfo.getInformation(), request.getSource());
         
+        // AI yanıtını detaylı şekilde logla - extractedInfo.getInformation() içeriği önemli
+        log.info("AI extracted information for user {}: {}", 
+            extractedInfo.getUserId(), 
+            extractedInfo.getInformation().length() > 100 ? 
+                extractedInfo.getInformation().substring(0, 100) + "..." : 
+                extractedInfo.getInformation());
+        
+        // Rastgele CSRF token oluştur
+        String csrfToken = UUID.randomUUID().toString();
+        
         return webClientBuilder.build()
                 .post()
                 .uri(userMemoryServiceUrl + "/memories/entries")
                 .header("X-User-Id", extractedInfo.getUserId())
                 .header("Content-Type", "application/json")
+                .header("X-CSRF-TOKEN", csrfToken) // CSRF token eklendi
+                .header("Cookie", "XSRF-TOKEN=" + csrfToken) // Cookie olarak da gönder
                 .body(BodyInserters.fromValue(request))
                 .retrieve()
                 .bodyToMono(String.class)
                 .timeout(Duration.ofSeconds(requestTimeoutSeconds))
                 .doOnSubscribe(s -> log.info("API isteği gönderiliyor: /memories/entries, userId: {}", extractedInfo.getUserId()))
-                .doOnSuccess(result -> log.info("Memory entry successfully added for user: {}", extractedInfo.getUserId()))
+                .doOnSuccess(result -> {
+                    log.info("Memory entry successfully added for user: {}", extractedInfo.getUserId());
+                    log.debug("Stored AI extraction content: {}", extractedInfo.getInformation().length() > 50 ? 
+                        extractedInfo.getInformation().substring(0, 50) + "..." : 
+                        extractedInfo.getInformation());
+                })
                 .doOnError(e -> {
                     log.error("Error sending memory entry to user-memory-service: {}", e.getMessage());
                     logClientError(e, extractedInfo.getUserId());
                 })
-                .retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500))
+                .retryWhen(reactor.util.retry.Retry.fixedDelay(3, Duration.ofMillis(500))
                     .filter(ex -> !(ex instanceof WebClientResponseException.BadRequest)));
     }
 

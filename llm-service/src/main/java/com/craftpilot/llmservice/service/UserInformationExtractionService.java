@@ -65,10 +65,12 @@ public class UserInformationExtractionService {
                 .doOnSuccess(response -> {
                     String content = response != null && response.getResponse() != null 
                                     ? response.getResponse() : "";
-                    log.info("Received AI response for extraction: length={}", content.length());
+                    log.info("Received AI response for extraction: length={}, content snippet: {}", 
+                            content.length(), 
+                            content.length() > 0 ? content.substring(0, Math.min(50, content.length())) : "EMPTY");
                 })
                 .onErrorResume(e -> {
-                    log.error("Error while extracting user info: {}", e.getMessage());
+                    log.error("Error while extracting user info: {} (Type: {})", e.getMessage(), e.getClass().getName());
                     return Mono.just(AIResponse.builder()
                             .response("{\"information\": \"EXTRACTION_ERROR\"}")
                             .build());
@@ -231,7 +233,8 @@ public class UserInformationExtractionService {
                         "INVALID_RESPONSE_FORMAT".equals(info)) {
                         
                         // Anlamlı bilgi yoksa, belleğe kaydetme
-                        log.info("No meaningful information extracted for user {}, skipping memory storage", userId);
+                        log.info("No meaningful information extracted for user {}, skipping memory storage. Content: '{}'", 
+                                userId, info != null ? info : "null");
                         return Mono.empty();
                     }
 
@@ -247,14 +250,16 @@ public class UserInformationExtractionService {
                     return userMemoryClient.addMemoryEntry(extractedInfo)
                             .timeout(Duration.ofSeconds(memoryTimeoutSeconds))
                             .doOnSubscribe(s -> log.info("Calling user-memory-service for user {}", userId))
-                            .doOnSuccess(result -> log.info("Successfully stored AI-extracted information for user {}", userId))
+                            .doOnSuccess(result -> log.info("Successfully stored AI-extracted information for user {}, response: {}", 
+                                    userId, result))
                             .doOnError(error -> {
                                 log.error("Failed to store AI-extracted information for user {}: {} (Type: {})", 
                                         userId, error.getMessage(), error.getClass().getName());
                                 if (error instanceof WebClientResponseException) {
                                     WebClientResponseException wcre = (WebClientResponseException) error;
-                                    log.error("Response details: Status={}, Body={}", 
-                                            wcre.getStatusCode(), wcre.getResponseBodyAsString());
+                                    log.error("Response details: Status={}, Body={}, Headers={}", 
+                                            wcre.getStatusCode(), wcre.getResponseBodyAsString(), 
+                                            wcre.getHeaders());
                                 }
                             })
                             .onErrorResume(error -> {
@@ -285,6 +290,7 @@ public class UserInformationExtractionService {
                "Sadece belirgin, açık bilgileri al, tahmin yürütme. " +
                "İsim, yaş, konum, meslek, ilgi alanları, tercihler gibi bilgileri JSON formatında döndür.\n\n" +
                "Örnek yanıt format:\n{\"information\": \"[çıkarılan bilgi]\"}\n\n" +
+               "Örneğin, 'Benim adım Ömer' için yanıt şu olmalıdır: {\"information\": \"Kullanıcının adı Ömer\"}\n\n" +
                "Eğer hiçbir bilgi bulamazsan, şunu döndür: {\"information\": \"NO_INFORMATION\"}\n\n" +
                "Mesaj: " + message;
     }
