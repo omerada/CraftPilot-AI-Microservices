@@ -158,6 +158,7 @@ logging:
     reactor.netty: INFO
     io.netty: INFO
     com.craftpilot.llmservice: DEBUG
+    com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
 
 netty:
   native:

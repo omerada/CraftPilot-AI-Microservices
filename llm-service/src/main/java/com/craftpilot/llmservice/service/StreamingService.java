@@ -159,6 +159,6 @@ public class StreamingService {
                 });
         }, FluxSink.OverflowStrategy.BUFFER) 
         .onBackpressureBuffer(256)
-        .timeout(Duration.ofSeconds(properties.getStreamTimeoutSeconds()), timeoutFlux) 
+        .timeout(Duration.ofSeconds(properties.getStreamTimeoutSeconds()), timeoutFlux); 
     }
 }

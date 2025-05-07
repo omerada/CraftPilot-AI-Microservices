@@ -51,7 +51,8 @@ public class LightSecurityConfig {
                 return chain.filter(exchange);
             }  
             // Debug için tüm headerları yazdıralım
-            request.getHeaders().forEach((key, values) ->  
+            request.getHeaders().forEach((key, values) -> 
+                log.debug("Header: {} = {}", key, values));
             
             // X-User-Id header'ı kontrolü
             String userId = request.getHeaders().getFirst("X-User-Id");
