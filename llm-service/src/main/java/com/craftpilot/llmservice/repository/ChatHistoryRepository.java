@@ -27,10 +27,7 @@ public class ChatHistoryRepository {
         return Flux.create(emitter -> {
             try {
                 // Başlangıç indeksini hesapla
-                int startIndex = (page - 1) * pageSize;
-                
-                log.debug("Sohbet geçmişleri alınıyor, userId: {}, startIndex: {}, pageSize: {}", 
-                         userId, startIndex, pageSize);
+                int startIndex = (page - 1) * pageSize; 
                 
                 // Firestore sorgusu oluştur
                 Query query = firestore.collection(COLLECTION_NAME)
@@ -63,8 +60,7 @@ public class ChatHistoryRepository {
                 future.addListener(() -> {
                     try {
                         List<QueryDocumentSnapshot> documents = future.get().getDocuments();
-                        log.debug("Sorgu sonucu {} sohbet geçmişi bulundu", documents.size());
-                        
+                         
                         for (DocumentSnapshot document : documents) {
                             ChatHistory history = document.toObject(ChatHistory.class);
                             if (history != null) {
@@ -173,8 +169,7 @@ public class ChatHistoryRepository {
                     // Ensure conversation has an ID
                     if (conversation.getId() == null || conversation.getId().isEmpty()) {
                         conversation.setId(UUID.randomUUID().toString());
-                        log.debug("Generated new conversation ID: {}", conversation.getId());
-                    }
+                      }
                     
                     // If conversations list is null, initialize it
                     if (history.getConversations() == null) {
@@ -191,19 +186,10 @@ public class ChatHistoryRepository {
                                 highestIndex = existingConv.getOrderIndex();
                             }
                         }
-                        conversation.setOrderIndex(highestIndex + 1);
-                        log.info("OrderIndex was null, assigned: {} for conversation {}", 
-                                 conversation.getOrderIndex(), conversation.getId());
-                    } else {
-                        // Frontend'den gelen değeri kullan, çakışma kontrolü yapma
-                        log.info("Using frontend-provided orderIndex: {} for conversation {}", 
-                                 conversation.getOrderIndex(), conversation.getId());
-                    }
+                        conversation.setOrderIndex(highestIndex + 1); 
+                    }  
                     
-                    log.info("Using orderIndex: {} for conversation {}, role {}", 
-                            conversation.getOrderIndex(), conversation.getId(), conversation.getRole());
-                    
-                    // Ensure timestamp is set
+                      // Ensure timestamp is set
                     if (conversation.getTimestamp() == null) {
                         conversation.setTimestamp(Timestamp.now());
                     }
@@ -239,28 +225,10 @@ public class ChatHistoryRepository {
                 try {
                     // Get the latest version of the history after the transaction
                     ChatHistory updatedHistory = findById(historyId).block();
+                     
                     
-                    // Yanıtta atanan orderIndex'i loglayalım (debug için)
-                    if (conversation != null) {
-                        log.info("Added conversation: role={}, orderIndex={}, content={}", 
-                            conversation.getRole(), conversation.getOrderIndex(), 
-                            conversation.getContent() != null ? conversation.getContent().substring(0, Math.min(20, conversation.getContent().length())) + "..." : "null");
-                    }
-                    
-                    emitter.success(updatedHistory);
-                    log.info("Successfully added conversation {} to chat {}, total conversations: {}", 
-                            conversation.getId(), historyId, 
-                            updatedHistory != null && updatedHistory.getConversations() != null ? 
-                                updatedHistory.getConversations().size() : 0);
-                    
-                    // Detaylı loglama ekleyelim
-                    if (updatedHistory != null && updatedHistory.getConversations() != null) {
-                        StringBuilder orderLog = new StringBuilder("Current orderIndex sequence: ");
-                        for (Conversation c : updatedHistory.getConversations()) {
-                            orderLog.append(c.getOrderIndex()).append("(").append(c.getRole()).append("), ");
-                        }
-                        log.info(orderLog.toString());
-                    }
+                    emitter.success(updatedHistory); 
+                     
                 } catch (Exception e) {
                     log.error("Error retrieving updated chat history after adding conversation: {}", e.getMessage(), e);
                     emitter.error(e);
