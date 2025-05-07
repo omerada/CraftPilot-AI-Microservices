@@ -86,4 +86,75 @@ public class UserMemoryController {
                             )));
                 });
     }
+    
+    @DeleteMapping("/{userId}/{entryIndex}")
+    public Mono<ResponseEntity<Object>> deleteMemoryEntry(
+            @PathVariable String userId,
+            @PathVariable int entryIndex) {
+        
+        log.info("Deleting memory entry at index {} for user: {}", entryIndex, userId);
+        
+        return userMemoryService.deleteMemoryEntry(userId, entryIndex)
+                .map(deleted -> ResponseEntity.ok().body((Object) 
+                    new MemoryResponse("Memory entry deleted successfully", true)))
+                .onErrorResume(FirebaseAuthException.class, e -> {
+                    log.error("Firebase authorization error for user {}: {}", userId, e.getMessage());
+                    return Mono.just(ResponseEntity
+                            .status(HttpStatus.FORBIDDEN)
+                            .body((Object) new ErrorResponse(
+                                    "firebase_auth_error",
+                                    "Firebase yetkilendirme hatası. Servis hesabı izinlerini kontrol edin.",
+                                    HttpStatus.FORBIDDEN.value()
+                            )));
+                })
+                .onErrorResume(IndexOutOfBoundsException.class, e -> {
+                    log.error("Index out of bounds for user {}: {}", userId, e.getMessage());
+                    return Mono.just(ResponseEntity
+                            .status(HttpStatus.BAD_REQUEST)
+                            .body((Object) new ErrorResponse(
+                                    "index_out_of_bounds",
+                                    "Belirtilen indeks geçerli değil: " + e.getMessage(),
+                                    HttpStatus.BAD_REQUEST.value()
+                            )));
+                })
+                .onErrorResume(e -> {
+                    log.error("Error deleting memory entry for user {}: {}", userId, e.getMessage());
+                    return Mono.just(ResponseEntity
+                            .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body((Object) new ErrorResponse(
+                                    "memory_deletion_error",
+                                    "Bellek girişi silinirken bir hata oluştu: " + e.getMessage(),
+                                    HttpStatus.INTERNAL_SERVER_ERROR.value()
+                            )));
+                });
+    }
+
+    @DeleteMapping("/{userId}")
+    public Mono<ResponseEntity<Object>> deleteAllMemories(@PathVariable String userId) {
+        log.info("Deleting all memories for user: {}", userId);
+        
+        return userMemoryService.deleteAllMemories(userId)
+                .then(Mono.just(ResponseEntity.ok().body((Object) 
+                    new MemoryResponse("All memory entries deleted successfully", true))))
+                .onErrorResume(FirebaseAuthException.class, e -> {
+                    log.error("Firebase authorization error for user {}: {}", userId, e.getMessage());
+                    return Mono.just(ResponseEntity
+                            .status(HttpStatus.FORBIDDEN)
+                            .body((Object) new ErrorResponse(
+                                    "firebase_auth_error",
+                                    "Firebase yetkilendirme hatası. Servis hesabı izinlerini kontrol edin.",
+                                    HttpStatus.FORBIDDEN.value()
+                            )));
+                })
+                .onErrorResume(e -> {
+                    log.error("Error deleting all memories for user {}: {}", userId, e.getMessage());
+                    return Mono.just(ResponseEntity
+                            .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body((Object) new ErrorResponse(
+                                    "memory_deletion_error",
+                                    "Tüm bellek girişleri silinirken bir hata oluştu: " + e.getMessage(),
+                                    HttpStatus.INTERNAL_SERVER_ERROR.value()
+                            )));
+                });
+    }
 }

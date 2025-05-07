@@ -101,24 +101,29 @@ public class LLMController {
             @RequestHeader(value = "X-User-Id", required = false) String userId,
             ServerWebExchange exchange) {
         
-        // RequestID yoksa bir tane oluştur (loglamada null görmemek için)
         final String trackingId = requestId != null ? requestId : UUID.randomUUID().toString();
         
         log.info("Stream chat completion request received with language: {}, requestId: {}, model: {}, userId: {}", 
                 userLanguage, trackingId, request.getModel(), userId);
         
-        // Kullanıcı mesajını bilgi çıkarımı için asenkron olarak işle
+        // Kullanıcı bilgi çıkarımı işlemi
         if (userId != null && request.getMessages() != null && !request.getMessages().isEmpty()) {
-            // Son kullanıcı mesajını al
             String userMessage = extractLastUserMessage(request.getMessages());
             if (userMessage != null && !userMessage.isEmpty()) {
-                // Endpoint türünü context olarak kullan
+                log.debug("Starting user information extraction for message length: {}", userMessage.length());
+                
+                // Stream endpoint'i için özel context kullan
                 extractionService.processAndStoreUserInfo(userId, userMessage)
                     .subscribeOn(Schedulers.boundedElastic())
-                    .subscribe(
-                        result -> log.debug("User information extraction started asynchronously for userId: {}", userId),
-                        error -> log.error("Error initiating user information extraction: {}", error.getMessage())
-                    );
+                    .doOnSubscribe(s -> log.debug("User info extraction started for userId: {} in stream endpoint", userId))
+                    .doOnError(error -> {
+                        log.error("User info extraction failed for userId: {} - Error: {}", userId, error.getMessage());
+                        // Metrik veya izleme sistemi için hata kaydı eklenebilir
+                    })
+                    .doOnSuccess(v -> log.debug("User info extraction completed successfully for userId: {}", userId))
+                    .subscribe();
+            } else {
+                log.debug("No valid user message found for extraction in stream request");
             }
         }
         

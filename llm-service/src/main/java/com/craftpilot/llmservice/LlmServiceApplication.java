@@ -13,15 +13,14 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 @EnableDiscoveryClient
 @EnableScheduling
-@ComponentScan(basePackages = {"com.craftpilot.llmservice"})
+@ComponentScan(basePackages = {
+        "com.craftpilot.llmservice",
+        "com.craftpilot.llmservice.util",
+        "com.craftpilot.llmservice.config",
+        "com.craftpilot.llmservice.service"
+})
 @Import(LightSecurityConfig.class)
-@OpenAPIDefinition(
-    info = @Info(
-        title = "LLM Service API",
-        version = "1.0.0",
-        description = "Service for AI-powered language model interactions"
-    )
-)
+@OpenAPIDefinition(info = @Info(title = "LLM Service API", version = "1.0.0", description = "Service for AI-powered language model interactions"))
 public class LlmServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(LlmServiceApplication.class, args);

@@ -149,6 +149,23 @@ spring:
               args:
                 name: notificationServiceCircuitBreaker
 
+        # User Memory Service Route Tanımı
+        - id: user-memory-service
+          uri: lb://user-memory-service
+          predicates:
+            - Path=/memories/**,/user-instructions/**,/user-context/**,/user-preferences/**
+          filters:
+            - StripPrefix=0
+            - name: CircuitBreaker
+              args:
+                name: userMemoryServiceCircuitBreaker
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 25
+                redis-rate-limiter.burstCapacity: 50
+                key-resolver: "#{@userKeyResolver}"
+            - PreserveHostHeader
+
   data:
     redis:
       host: ${REDIS_HOST:redis}
@@ -253,24 +270,25 @@ logging:
     com.netflix.discovery: ${LOG_LEVEL:INFO}
     com.craftpilot.apigateway.security: ${SECURITY_LOG_LEVEL:INFO}
     org.springframework.security: INFO
-    reactor.netty.http.client: INFO
-    reactor.netty: INFO
 
 resilience4j:
   circuitbreaker:
     configs:
       default:
         slidingWindowType: TIME_BASED
-        slidingWindowSize: 60
-        minimumNumberOfCalls: 5
-        waitDurationInOpenState: 30s
+        slidingWindowSize: 100
         failureRateThreshold: 50
+        waitDurationInOpenState: 30s
         permittedNumberOfCallsInHalfOpenState: 3
         automaticTransitionFromOpenToHalfOpenEnabled: true
-        eventConsumerBufferSize: 100
+        registerHealthIndicator: true
+        allowHealthIndicatorToFail: false
+        ignoreExceptions:
+          - org.springframework.web.reactive.function.client.WebClientResponseException
     instances:
-      llmServiceCircuitBreaker:
+      userServiceCircuitBreaker:
         baseConfig: default
+      llmServiceCircuitBreaker:
         slidingWindowSize: 30
         waitDurationInOpenState: 30s
         failureRateThreshold: 60
@@ -279,7 +297,7 @@ resilience4j:
         allowHealthIndicatorToFail: false
         ignoreExceptions:
           - org.springframework.web.reactive.function.client.WebClientResponseException
-      userServiceCircuitBreaker:
+      userMemoryServiceCircuitBreaker:
         baseConfig: default
   timelimiter:
     configs:
@@ -291,6 +309,8 @@ resilience4j:
         timeoutDuration: 5s
       llmServiceTimeLimiter:
         timeoutDuration: 60s
+      userMemoryServiceTimeLimiter:
+        timeoutDuration: 8s
 
 kafka:
   topics:
