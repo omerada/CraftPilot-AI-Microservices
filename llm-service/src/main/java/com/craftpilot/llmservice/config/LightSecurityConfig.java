@@ -46,28 +46,21 @@ public class LightSecurityConfig {
         return (exchange, chain) -> {
             ServerHttpRequest request = exchange.getRequest();
             String path = request.getPath().value();
-            
-            
+             
             if (isPublicPath(path)) { 
                 return chain.filter(exchange);
-            } 
-            
-            log.debug("İstek geldi: {} {}", request.getMethod(), path);
-            
+            }  
             // Debug için tüm headerları yazdıralım
-            request.getHeaders().forEach((key, values) -> 
-                log.debug("Header: {} = {}", key, values));
+            request.getHeaders().forEach((key, values) ->  
             
             // X-User-Id header'ı kontrolü
             String userId = request.getHeaders().getFirst("X-User-Id");
             
-            if (userId == null || userId.isEmpty()) {
-                log.warn("Gerekli X-User-Id header eksik, ancak isteğe devam ediliyor");
-                // İsteği reddetmek yerine loga yazıp devam edelim
-                // API Gateway zaten yetkilendirmeyi yapıyor
-            } else {
-                log.debug("İstek kimlik doğrulaması başarılı: {}", userId);
-            }
+            if (userId == null || userId.isEmpty()) { 
+                // İsteğe devam edilmiyor, 401 Unauthorized yanıtı dönülüyor
+                exchange.getResponse().setStatusCode(org.springframework.http.HttpStatus.UNAUTHORIZED);
+                return exchange.getResponse().setComplete();
+            }  
             
             return chain.filter(exchange);
         };

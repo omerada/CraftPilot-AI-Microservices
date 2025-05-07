@@ -37,9 +37,7 @@ public class StreamingService {
             // Add the system prompt to the request
             request.setSystemPrompt(properties.getDefaultSystemPrompt()); 
         }
-        
-        log.info("Starting streaming request for model: {}", request.getModel());
-        
+         
         // Timeout yanıtı
         StreamResponse timeoutResponse = StreamResponse.builder()
             .content("Stream timeout occurred after " + properties.getStreamTimeoutSeconds() + " seconds")
@@ -55,16 +53,14 @@ public class StreamingService {
         AtomicReference<StringBuilder> jsonBuffer = new AtomicReference<>(new StringBuilder());
         
         return Flux.<StreamResponse>create(sink -> {
-            log.debug("Creating stream flux for model: {}", request.getModel());
-            
+             
             // İstemciye periyodik ping göndermek için timer başlat
             Disposable keepAliveTicker = Flux.interval(Duration.ofSeconds(properties.getKeepAliveIntervalSeconds()))
                 .doOnNext(tick -> {
-                    log.debug("Sending keep-alive ping, tick: {}", tick);
-                    sink.next(StreamResponse.builder()
+                     sink.next(StreamResponse.builder()
                         .content("")
                         .done(false)
-                        .ping(true)  // Ping olduğunu belirt
+                        .ping(true)   
                         .build());
                 })
                 .subscribe();
@@ -72,8 +68,7 @@ public class StreamingService {
             // OpenRouter'dan stream al
             openRouterClient.streamFromOpenRouter(request)
                 .doOnComplete(() -> {
-                    log.info("OpenRouter stream completed successfully");
-                    keepAliveTicker.dispose();
+                      keepAliveTicker.dispose();
                     
                     // Eğer biriken JSON varsa, son bir işleme deneyin
                     if (jsonBuffer.get().length() > 0) {
@@ -93,8 +88,7 @@ public class StreamingService {
                     sink.complete();
                 })
                 .doOnCancel(() -> {
-                    log.warn("OpenRouter stream was cancelled");
-                    keepAliveTicker.dispose();
+                     keepAliveTicker.dispose();
                     sink.complete();
                 })
                 .doOnError(e -> {
@@ -109,12 +103,9 @@ public class StreamingService {
                     sink.complete();
                 })
                 .subscribe(chunk -> {
-                    // Always log the raw chunk for debugging
-                    log.debug("Raw OpenRouter chunk: {}", chunk);
-                    
+                     
                     if (chunk == null || chunk.isEmpty()) {
-                        log.debug("Empty chunk received, skipping");
-                        return;
+                         return;
                     }
                     
                     // SSE veri formatını işle
@@ -122,7 +113,6 @@ public class StreamingService {
                         String data = chunk.substring(5).trim();
                         
                         if ("[DONE]".equals(data)) {
-                            log.debug("Received completion marker [DONE]");
                             sink.next(StreamResponse.builder()
                                 .content("")
                                 .done(true)
@@ -146,13 +136,11 @@ public class StreamingService {
                                 // Başarılı ise buffer'ı temizle
                                 jsonBuffer.set(new StringBuilder());
                             } catch (Exception e2) {
-                                // Hala eksik
-                                log.debug("Buffer still incomplete");
+                                // Hala eksik 
                             }
                         }
                     } else if (chunk.startsWith(":")) {
-                        // Yorum veya keep-alive, görmezden gel
-                        log.debug("Comment line received: {}", chunk);
+                        // Yorum veya keep-alive, görmezden gel 
                     } else {
                         // Non-SSE format, may be direct content
                         StringBuilder buffer = jsonBuffer.get();
@@ -169,10 +157,8 @@ public class StreamingService {
                         }
                     }
                 });
-        }, FluxSink.OverflowStrategy.BUFFER)
-        .doOnRequest(n -> log.debug("Requested {} items from stream", n))
+        }, FluxSink.OverflowStrategy.BUFFER) 
         .onBackpressureBuffer(256)
-        .timeout(Duration.ofSeconds(properties.getStreamTimeoutSeconds()), timeoutFlux)
-        .doOnTerminate(() -> log.info("Stream terminated"));
+        .timeout(Duration.ofSeconds(properties.getStreamTimeoutSeconds()), timeoutFlux) 
     }
 }
