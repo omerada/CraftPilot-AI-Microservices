@@ -50,10 +50,7 @@ public class ChatHistoryService {
         if (pageSize < 1 || pageSize > 100) { // Maksimum sayfa boyutunu sınırla
             pageSize = 10;
         }
-        
-        log.info("Kullanıcının sohbet geçmişleri getiriliyor: {}, sayfa: {}, sayfa boyutu: {}", 
-                userId, page, pageSize);
-        
+         
         return chatHistoryRepository.findAllByUserId(userId, page, pageSize)
                 .doOnError(error -> log.error("Sohbet geçmişi getirirken hata: {}", error.getMessage()))
                 .onErrorResume(e -> Flux.empty());
@@ -64,8 +61,7 @@ public class ChatHistoryService {
             log.warn("Geçersiz ID ile sohbet geçmişi istendi");
             return Mono.empty();
         }
-        
-        log.debug("Sohbet geçmişi getiriliyor, ID: {}", id);
+         
         return chatHistoryRepository.findById(id)
                 .doOnError(error -> log.error("ID ile sohbet geçmişi getirirken hata, ID {}: {}", id, error.getMessage()))
                 .onErrorResume(e -> Mono.empty());
@@ -99,8 +95,7 @@ public class ChatHistoryService {
         if (chatHistory.getConversations() == null) {
             chatHistory.setConversations(new ArrayList<>());
         }
-        
-        log.debug("Sohbet geçmişi oluşturuluyor: {}", chatHistory.getId());
+         
         return chatHistoryRepository.save(chatHistory)
                 .doOnError(error -> log.error("Sohbet geçmişi oluştururken hata: {}", error.getMessage()))
                 .onErrorMap(e -> new RuntimeException("Sohbet geçmişi oluşturulamadı: " + e.getMessage(), e));
@@ -119,8 +114,7 @@ public class ChatHistoryService {
         
         // UpdatedAt'i her zaman güncelle
         chatHistory.setUpdatedAt(Timestamp.now());
-        
-        log.debug("Sohbet geçmişi güncelleniyor, ID: {}", chatHistory.getId());
+         
         return chatHistoryRepository.save(chatHistory)
                 .doOnError(error -> log.error("Sohbet geçmişi güncellenirken hata, ID {}: {}", chatHistory.getId(), error.getMessage()))
                 .onErrorMap(e -> new RuntimeException("Sohbet geçmişi güncellenemedi: " + e.getMessage(), e));
@@ -136,8 +130,7 @@ public class ChatHistoryService {
             log.warn("Geçersiz ID ile sohbet geçmişi silme isteği");
             return Mono.error(new IllegalArgumentException("Geçerli bir ID gerekli"));
         }
-        
-        log.debug("Sohbet geçmişi siliniyor, ID: {}", historyId);
+         
         return chatHistoryRepository.findById(historyId)
                 .flatMap(history -> {
                     // Önce silme işlemini yap
@@ -176,11 +169,8 @@ public class ChatHistoryService {
         if (conversation.getTimestamp() == null) {
             conversation.setTimestamp(Timestamp.now());
         }
-        
-        log.debug("Sohbete mesaj ekleniyor, Chat ID: {}, OrderIndex: {}", historyId, conversation.getOrderIndex());
-        return chatHistoryRepository.addConversation(historyId, conversation)
-                .doOnSuccess(result -> log.info("Mesaj başarıyla eklendi, Chat ID: {}, OrderIndex: {}", 
-                                          historyId, conversation.getOrderIndex()))
+         
+        return chatHistoryRepository.addConversation(historyId, conversation) 
                 .doOnError(error -> log.error("Mesaj eklenirken hata, Chat ID {}, OrderIndex {}: {}", 
                                         historyId, conversation.getOrderIndex(), error.getMessage()))
                 .onErrorMap(e -> new RuntimeException("Mesaj eklenemedi: " + e.getMessage(), e));
@@ -201,8 +191,7 @@ public class ChatHistoryService {
             log.warn("Null başlık ile sohbet başlığı güncelleme isteği, ID: {}", historyId);
             newTitle = "Yeni Sohbet"; // Varsayılan başlık
         }
-        
-        log.debug("Sohbet başlığı güncelleniyor, ID: {}, Yeni başlık: {}", historyId, newTitle);
+         
         return chatHistoryRepository.updateTitle(historyId, newTitle)
                 .doOnError(error -> log.error("Sohbet başlığı güncellenirken hata, ID {}: {}", historyId, error.getMessage()))
                 .onErrorMap(e -> new RuntimeException("Sohbet başlığı güncellenemedi: " + e.getMessage(), e));
@@ -213,21 +202,17 @@ public class ChatHistoryService {
         userIdParam = "#userId",
         metadata = "{\"id\": #historyId}"
     )
-    public Mono<ChatHistory> archiveChatHistory(String userId, String historyId) {
-        log.info("Sohbet arşivleniyor, ID: {}", historyId);
+    public Mono<ChatHistory> archiveChatHistory(String userId, String historyId) { 
         
         return chatHistoryRepository.findById(historyId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, 
                         "Chat history with ID " + historyId + " not found")))
-                .flatMap(chatHistory -> {
-                    log.debug("Sohbet geçmişi bulundu, şu anki enable değeri: {}", chatHistory.isEnable());
+                .flatMap(chatHistory -> { 
                     chatHistory.setEnable(false);
                     chatHistory.setUpdatedAt(Timestamp.now());
                     
-                    return chatHistoryRepository.save(chatHistory)
-                            .doOnSuccess(updatedChat -> 
-                                log.info("Sohbet başarıyla arşivlendi, ID: {}", updatedChat.getId()));
-                })
+                    return chatHistoryRepository.save(chatHistory); 
+                })  // Eksik parantez eklendi
                 .onErrorResume(e -> {
                     if (e instanceof ResponseStatusException) {
                         log.error("Sohbet arşivlenemedi: {}", e.getMessage());
@@ -244,21 +229,17 @@ public class ChatHistoryService {
         userIdParam = "#userId",
         metadata = "{\"id\": #historyId}"
     )
-    public Mono<ChatHistory> unarchiveChatHistory(String userId, String historyId) {
-        log.info("Sohbet arşivden çıkarılıyor, ID: {}", historyId);
+    public Mono<ChatHistory> unarchiveChatHistory(String userId, String historyId) { 
         
         return chatHistoryRepository.findById(historyId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, 
                         "Chat history with ID " + historyId + " not found")))
-                .flatMap(chatHistory -> {
-                    log.debug("Sohbet geçmişi bulundu, şu anki enable değeri: {}", chatHistory.isEnable());
+                .flatMap(chatHistory -> { 
                     chatHistory.setEnable(true);
                     chatHistory.setUpdatedAt(Timestamp.now());
                     
-                    return chatHistoryRepository.save(chatHistory)
-                            .doOnSuccess(updatedChat -> 
-                                log.info("Sohbet başarıyla arşivden çıkarıldı, ID: {}", updatedChat.getId()));
-                })
+                    return chatHistoryRepository.save(chatHistory); 
+                })  // Eksik parantez eklendi
                 .onErrorResume(e -> {
                     if (e instanceof ResponseStatusException) {
                         log.error("Sohbet arşivden çıkarılamadı: {}", e.getMessage());
@@ -274,8 +255,7 @@ public class ChatHistoryService {
      * Belirli kullanıcının arşivlediği sohbet geçmişlerini sayfalanmış olarak getirir
      */
     public Mono<PaginatedChatHistoryResponse> getArchivedChatHistories(
-            String userId, int page, int pageSize, String searchQuery, String sortBy, String sortOrder) {
-        log.info("Arşivlenmiş sohbet geçmişleri alınıyor: {}", userId);
+            String userId, int page, int pageSize, String searchQuery, String sortBy, String sortOrder) { 
         
         // Sayfalama mantığını doğru hesaplamak için önce tüm kayıtları getirelim
         return chatHistoryRepository.findAllByUserId(userId, 1, Integer.MAX_VALUE)
@@ -382,8 +362,7 @@ public class ChatHistoryService {
 
     public Mono<PaginatedChatHistoryResponse> getChatHistoriesByUserIdCategorized(
             String userId, int page, int pageSize, List<String> categoryFilters, 
-            String searchQuery, String sortBy, String sortOrder, Boolean showArchived) {
-        log.info("Kategorize edilmiş sohbet geçmişi alınıyor: {}, showArchived: {}", userId, showArchived);
+            String searchQuery, String sortBy, String sortOrder, Boolean showArchived) { 
         
         // If no categories are specified, use all categories in correct order
         final List<String> finalCategoryFilters = categoryFilters == null || categoryFilters.isEmpty() 
@@ -398,9 +377,7 @@ public class ChatHistoryService {
                     List<ChatHistory> archiveFilteredHistories = filterByArchiveStatus(allHistories, showArchived);
                     
                     // Veritabanındaki toplam kayıt sayısı (filtrelemeden sonce)
-                    int totalDatabaseRecords = archiveFilteredHistories.size();
-                    
-                    log.debug("Toplam kayıt sayısı: {}", totalDatabaseRecords);
+                    int totalDatabaseRecords = archiveFilteredHistories.size(); 
                     
                     // Apply search filter if specified
                     List<ChatHistory> filteredHistories = archiveFilteredHistories;
@@ -449,8 +426,7 @@ public class ChatHistoryService {
                         categoryTotals.put(category, size);
                         totalFilteredRecords += size;
                     }
-                    
-                    log.info("👤 Kullanıcı: {}, Toplam filtrelenmiş kayıt: {}", userId, totalFilteredRecords);
+                     
                     
                     // Sayfalama için skip ve limit değerlerini hesapla
                     int skipCount = (page - 1) * pageSize;
@@ -465,8 +441,7 @@ public class ChatHistoryService {
                             if (skipCount >= categorySize) {
                                 // Bu kategorinin tüm öğelerini atla
                                 skipCount -= categorySize;
-                                categories.put(category, new CategoryData(Collections.emptyList(), categorySize));
-                                log.info("⏭️ Kategori atlandı: {}, boyut: {}", category, categorySize);
+                                categories.put(category, new CategoryData(Collections.emptyList(), categorySize)); 
                             } else {
                                 // Bu kategoriden bazı öğeleri al
                                 int itemsToTake = Math.min(remainingItems, categorySize - skipCount);
@@ -478,15 +453,12 @@ public class ChatHistoryService {
                                             .map(this::convertToChatItem)
                                             .collect(Collectors.toList());
                                     
-                                    categories.put(category, new CategoryData(items, categorySize));
-                                    log.info("📝 Kategori eklendi: {}, alınan öğe: {}, toplam: {}", 
-                                            category, items.size(), categorySize);
+                                    categories.put(category, new CategoryData(items, categorySize)); 
                                     
                                     remainingItems -= itemsToTake;
                                     skipCount = 0;
                                 } else {
-                                    categories.put(category, new CategoryData(Collections.emptyList(), categorySize));
-                                    log.info("📝 Kategori eklendi (içi boş): {}, toplam: {}", category, categorySize);
+                                    categories.put(category, new CategoryData(Collections.emptyList(), categorySize)); 
                                 }
                             }
                             
@@ -500,8 +472,7 @@ public class ChatHistoryService {
                     for (String category : finalCategoryFilters) {
                         if (!categories.containsKey(category)) {
                             int categorySize = categoryTotals.getOrDefault(category, 0);
-                            categories.put(category, new CategoryData(Collections.emptyList(), categorySize));
-                            log.info("➕ Kalan kategori eklendi: {}, toplam: {}", category, categorySize);
+                            categories.put(category, new CategoryData(Collections.emptyList(), categorySize)); 
                         }
                     }
                     
@@ -512,9 +483,7 @@ public class ChatHistoryService {
                     
                     // hasMore değerini filtrelenmiş kayıt sayısına göre hesapla
                     boolean hasMore = totalFilteredRecords > page * pageSize;
-                    
-                    log.info("📊 Sayfalama bilgileri: toplam sayfa {}, toplam kayıt {}, daha fazla? {}", 
-                            totalPages, totalFilteredRecords, hasMore);
+                     
                     
                     PaginationInfo paginationInfo = PaginationInfo.builder()
                             .currentPage(page)
@@ -543,10 +512,7 @@ public class ChatHistoryService {
         Instant nowInstant = Instant.now();
         LocalDate today = LocalDate.ofInstant(nowInstant, ZoneOffset.UTC);
         LocalDate yesterday = today.minusDays(1);
-        
-        // Debug bilgisi için - şu anki UTC zaman
-        log.info("🕒 Kategorilendirme zamanı (UTC): {}", nowInstant);
-        log.info("📅 Bugün (UTC): {}, Dün (UTC): {}", today, yesterday);
+         
         
         // Son hafta ve son ay aralıkları
         LocalDate lastWeekStart = today.minusDays(7); // 7 gün öncesi
@@ -559,9 +525,7 @@ public class ChatHistoryService {
         categorized.put("lastWeek", new ArrayList<>());
         categorized.put("lastMonth", new ArrayList<>());
         categorized.put("older", new ArrayList<>());
-        
-        // Debug bilgisi için kayıt sayısı
-        log.info("📋 Kategorize edilecek toplam kayıt sayısı: {}", histories.size());
+         
         
         for (ChatHistory history : histories) {
             // Use updatedAt if available, otherwise use createdAt
@@ -569,8 +533,7 @@ public class ChatHistoryService {
             
             if (timestamp == null) {
                 // Zaman damgası yoksa bugüne ekle ve devam et
-                categorized.get("today").add(history);
-                log.info("⚠️ Zaman damgası olmayan kayıt bugüne eklendi - ID: {}", history.getId());
+                categorized.get("today").add(history); 
                 continue;
             }
             
@@ -579,42 +542,29 @@ public class ChatHistoryService {
             
             // Timestamp'i direkt Instant ve sonra LocalDate'e dönüştür
             Instant historyInstant = Instant.ofEpochSecond(epochSeconds);
-            LocalDate historyDate = LocalDate.ofInstant(historyInstant, ZoneOffset.UTC);
-            
-            log.info("🔍 Kayıt tarih analizi - ID: {}, Başlık: {}, Unix Time: {} sn, Tarih: {}", 
-                    history.getId(), history.getTitle(), epochSeconds, historyDate);
+            LocalDate historyDate = LocalDate.ofInstant(historyInstant, ZoneOffset.UTC); 
             
             // Karşılaştırma yaparken doğrudan tarihleri karşılaştır
             if (historyDate.isEqual(today)) {
-                categorized.get("today").add(history);
-                log.info("✅ Bugün kategorisine eklendi - ID: {}", history.getId());
+                categorized.get("today").add(history); 
             } 
             else if (historyDate.isEqual(yesterday)) {
-                categorized.get("yesterday").add(history);
-                log.info("✅ Dün kategorisine eklendi - ID: {}", history.getId());
+                categorized.get("yesterday").add(history); 
             }
             // lastWeek: dün ve bugün hariç son 7 gün
             else if (historyDate.isAfter(lastWeekStart) && historyDate.isBefore(yesterday)) {
-                categorized.get("lastWeek").add(history);
-                log.info("✅ Son hafta kategorisine eklendi - ID: {}", history.getId());
+                categorized.get("lastWeek").add(history); 
             }
             // lastMonth: son hafta hariç son 30 gün
             else if (historyDate.isAfter(lastMonthStart) && historyDate.isBefore(lastWeekStart)) {
-                categorized.get("lastMonth").add(history);
-                log.info("✅ Son ay kategorisine eklendi - ID: {}", history.getId());
+                categorized.get("lastMonth").add(history); 
             }
             // 30 günden daha eski
             else {
-                categorized.get("older").add(history);
-                log.info("✅ Daha eski kategorisine eklendi - ID: {}", history.getId());
+                categorized.get("older").add(history); 
             }
         }
-        
-        // Her kategorinin gerçek sayısını logla
-        log.info("📊 Kategori içerikleri:");
-        for (Map.Entry<String, List<ChatHistory>> entry : categorized.entrySet()) {
-            log.info("   - {}: {} adet kayıt", entry.getKey(), entry.getValue().size());
-        }
+          
         
         return categorized;
     }
@@ -661,9 +611,7 @@ public class ChatHistoryService {
     /**
      * ChatGPT benzeri düz liste halinde sohbet geçmişlerini döndüren metot
      */
-    public Mono<Map<String, Object>> getFlatChatHistoriesByUserId(String userId, int offset, int limit, String order, Boolean showArchived) {
-        log.info("Düz liste halinde sohbet geçmişi alınıyor: {}, offset: {}, limit: {}, showArchived: {}", 
-                userId, offset, limit, showArchived);
+    public Mono<Map<String, Object>> getFlatChatHistoriesByUserId(String userId, int offset, int limit, String order, Boolean showArchived) { 
         
         // Tüm kayıtları getir ve sonra filtreleme, sıralama yap
         return chatHistoryRepository.findAllByUserId(userId, 1, Integer.MAX_VALUE)

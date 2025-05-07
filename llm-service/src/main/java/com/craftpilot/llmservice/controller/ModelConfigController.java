@@ -38,7 +38,7 @@ public class ModelConfigController {
     @PostConstruct
     public void init() {
         // Uygulamanın başlangıcında modelleri yükle
-        loadModelsFromResource();
+       // loadModelsFromResource();
     }
     
     private void loadModelsFromResource() {
