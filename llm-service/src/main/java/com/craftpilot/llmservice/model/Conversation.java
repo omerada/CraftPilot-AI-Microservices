@@ -23,4 +23,14 @@ public class Conversation {
     
     // orderIndex konuşma sıralaması için kullanılır
     private Integer orderIndex;
+    
+    private Boolean isCanceled;
+
+    public Boolean getIsCanceled() {
+        return isCanceled;
+    }
+    
+    public void setIsCanceled(Boolean isCanceled) {
+        this.isCanceled = isCanceled;
+    }
 }

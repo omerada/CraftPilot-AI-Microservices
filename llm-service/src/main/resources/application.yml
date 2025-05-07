@@ -159,6 +159,7 @@ logging:
     io.netty: INFO
     com.craftpilot.llmservice: DEBUG
     com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
+    com.google.cloud.firestore.CustomClassMapper: ERROR
 
 netty:
   native:

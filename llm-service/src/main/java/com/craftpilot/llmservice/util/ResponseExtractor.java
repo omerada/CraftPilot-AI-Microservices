@@ -27,10 +27,8 @@ public class ResponseExtractor {
         if (response == null) {
             log.warn("extractResponseText: Yanıt null");
             return null;
-        }
-        
-        log.debug("extractResponseText işleniyor: {}", response);
-        
+        } 
+
         try {
             // choices[0].message.content alanını kontrol et
             if (response.containsKey("choices") && response.get("choices") instanceof List) {
@@ -40,16 +38,14 @@ public class ResponseExtractor {
                     if (choice.containsKey("message") && choice.get("message") instanceof Map) {
                         Map<?, ?> message = (Map<?, ?>) choice.get("message");
                         if (message.containsKey("content")) {
-                            String content = String.valueOf(message.get("content"));
-                            log.debug("Content bulundu: {}", content.length() > 100 ? content.substring(0, 100) + "..." : content);
+                            String content = String.valueOf(message.get("content")); 
                             return content;
                         }
                     }
                     
                     // Alternatif: doğrudan "text" alanı var mı kontrol et
                     if (choice.containsKey("text")) {
-                        String text = String.valueOf(choice.get("text"));
-                        log.debug("Text bulundu: {}", text.length() > 100 ? text.substring(0, 100) + "..." : text);
+                        String text = String.valueOf(choice.get("text")); 
                         return text;
                     }
                 }
@@ -57,8 +53,7 @@ public class ResponseExtractor {
             
             // En üst seviyede content var mı kontrol et
             if (response.containsKey("content")) {
-                String content = String.valueOf(response.get("content"));
-                log.debug("Üst seviye content bulundu: {}", content.length() > 100 ? content.substring(0, 100) + "..." : content);
+                String content = String.valueOf(response.get("content")); 
                 return content;
             }
             
@@ -219,10 +214,7 @@ public class ResponseExtractor {
         
         // Toplanan tüm içeriği bir kerede gönder (bilgi çıkarımı için)
         if (fullContent.length() > 0) {
-            String completeContent = fullContent.toString();
-            // Uzun içeriği kısaltarak logla
-            log.debug("Extracted complete content: {}", 
-                completeContent.length() > 100 ? completeContent.substring(0, 97) + "..." : completeContent);
+            String completeContent = fullContent.toString(); 
             
             sink.next(StreamResponse.builder()
                 .content(completeContent)
