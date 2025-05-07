@@ -44,8 +44,7 @@ public class LLMController {
                 consumes = MediaType.APPLICATION_JSON_VALUE) 
     public Mono<ResponseEntity<AIResponse>> chatCompletion(@RequestBody AIRequest request,
                                                          @RequestHeader(value = "X-User-Language", defaultValue = "en") String userLanguage) {
-        log.info("Chat completion request received with language: {}", userLanguage);
-        request.setRequestType("CHAT");
+         request.setRequestType("CHAT");
         request.setLanguage(userLanguage);
         
         // Model belirtilmemişse varsayılan bir model ata
@@ -53,15 +52,7 @@ public class LLMController {
             request.setModel("google/gemini-pro");
         }
         
-        return llmService.processChatCompletion(request)
-            .doOnSuccess(response -> {
-                if (response == null) {
-                    log.warn("Chat completion returned null response");
-                } else {
-                    log.debug("Chat completion success with response length: {}", 
-                        response.getResponse() != null ? response.getResponse().length() : 0);
-                }
-            })
+        return llmService.processChatCompletion(request) 
             .map(response -> {
                 // Null kontrolü ve varsayılan değer atama
                 if (response == null) {
@@ -102,10 +93,7 @@ public class LLMController {
             ServerWebExchange exchange) {
         
         final String trackingId = requestId != null ? requestId : UUID.randomUUID().toString();
-        
-        log.info("Stream chat completion request received with language: {}, requestId: {}, model: {}, userId: {}", 
-                userLanguage, trackingId, request.getModel(), userId);
-        
+         
         // Kullanıcı bilgi çıkarımı işlemi
         if (userId != null && request.getMessages() != null && !request.getMessages().isEmpty()) {
             String userMessage = extractLastUserMessage(request.getMessages());
@@ -153,8 +141,7 @@ public class LLMController {
         exchange.getResponse().getHeaders().add("X-Accel-Buffering", "no"); // Nginx proxy için buffering kapatma
         
         // İstemci tarafı bağlantı kopması için daha güvenilir tespit
-        exchange.getResponse().beforeCommit(() -> {
-            log.debug("Response commit starting for request: {}", trackingId);
+        exchange.getResponse().beforeCommit(() -> { 
             return Mono.empty();
         });
         
@@ -175,15 +162,7 @@ public class LLMController {
             
             // LLM servisi ile gerçek akışı başlat
             llmService.streamChatCompletion(request)
-                .doOnNext(chunk -> {
-                    // Log every chunk to track what we're getting from the service
-                    log.debug("Stream chunk received from service: type={}, done={}, content={}",
-                        chunk.isPing() ? "ping" : (chunk.isError() ? "error" : "content"),
-                        chunk.isDone(),
-                        chunk.getContent() != null ? 
-                            (chunk.getContent().length() > 100 ? chunk.getContent().substring(0, 100) + "..." : chunk.getContent())
-                            : "<null>");
-                    
+                .doOnNext(chunk -> {  
                     // Only forward non-ping chunks to the client (pings are for internal connection health)
                     if (!chunk.isPing()) {
                         // İçeriği temizle - Özellikle tablo yanıtı olabilecek durumlarda
@@ -217,12 +196,10 @@ public class LLMController {
                             .build());
                     }
                 })
-                .doOnComplete(() -> {
-                    log.info("LLM stream completed for request: {}", trackingId);
+                .doOnComplete(() -> { 
                     sink.complete();
                 })
-                .doOnError(error -> {
-                    log.error("LLM stream error: {}", error.getMessage(), error);
+                .doOnError(error -> { 
                     sink.next(ServerSentEvent.<StreamResponse>builder()
                         .id(trackingId)
                         .event("error")
@@ -236,9 +213,7 @@ public class LLMController {
                 })
                 .subscribe();
         })
-        .onBackpressureBuffer(256)
-        .doOnCancel(() -> log.warn("Stream response was cancelled for request: {}", trackingId))
-        .doOnComplete(() -> log.info("Stream response completed for request: {}", trackingId))
+        .onBackpressureBuffer(256) 
         .doOnError(error -> log.error("Stream response error: {}", error.getMessage(), error));
     }
     
