@@ -17,6 +17,23 @@ public class ChatService {
     private final ChatEnhancementService enhancementService;
 
     public Mono<ChatResponse> processChat(ChatRequest chatRequest) {
+        log.info("Processing chat request: userId={}, messageLength={}", 
+            chatRequest.getUserId(), 
+            chatRequest.getMessage() != null ? chatRequest.getMessage().length() : 0);
+        
+        // Kullanıcı mesajını bellek servisi için asenkron olarak işle
+        if (chatRequest.getUserId() != null && chatRequest.getMessage() != null) {
+            // subscribe() eklenerek asenkron işlemi başlat
+            enhancementService.processUserMessage(
+                    chatRequest.getUserId(), 
+                    chatRequest.getMessage(),
+                    chatRequest.getContext())
+                .subscribe(
+                    unused -> log.debug("User message memory processing triggered for userId: {}", chatRequest.getUserId()),
+                    error -> log.error("Failed to process user message for memory: {}", error.getMessage())
+                );
+        }
+
         String userId = chatRequest.getUserId();
         String message = chatRequest.getMessage();
         String context = chatRequest.getContext();
@@ -28,12 +45,8 @@ public class ChatService {
                 .temperature(chatRequest.getTemperature())
                 .maxTokens(chatRequest.getMaxTokens())
                 .stream(Boolean.TRUE)
-                .build();
-
-        // Bilgi çıkarımı için mesajı işle (asenkron)
-        enhancementService.processUserMessage(userId, message, context)
-                .subscribe();
-
+                .build(); 
+                
         // İsteği kullanıcı belleği ile zenginleştir
         return enhancementService.enhanceRequestWithUserMemory(aiRequest, userId)
                 .flatMap(llmService::processChatCompletion)

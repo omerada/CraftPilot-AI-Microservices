@@ -115,8 +115,16 @@ public class UserInformationExtractionService {
         
         AtomicInteger retryCount = new AtomicInteger(0);
         
-        return Mono.defer(() -> extractUserInfo(userId, message)
+        return extractUserInfo(userId, message)
                 .timeout(Duration.ofSeconds(extractionTimeoutSeconds + 5))
+                .doOnSuccess(extractedInfo -> {
+                    if (extractedInfo == null) {
+                        log.warn("Extraction result is null for user {}", userId);
+                    } else {
+                        log.info("Information extracted successfully for user {}: {}", 
+                            userId, LoggingUtils.truncateForLogging(extractedInfo.getInformation(), 50));
+                    }
+                })
                 .onErrorResume(e -> {
                     int attempt = retryCount.getAndIncrement();
                     if (attempt < maxRetries) {
@@ -141,13 +149,10 @@ public class UserInformationExtractionService {
 
                     log.info("Çıkarılan bilgi: {}", extractedInfo.getInformation());
                     
-                    log.debug("Sending extracted information to user-memory-service: userId={}, info={}", 
-                            userId, extractedInfo.getInformation());
-                    
                     return userMemoryClient.addMemoryEntry(extractedInfo)
                             .timeout(Duration.ofSeconds(memoryTimeoutSeconds))
                             .doOnSubscribe(s -> log.info("Calling user-memory-service for user {}", userId))
-                            .doOnSuccess(result -> log.info("Successfully stored AI-extracted information for user {}"))
+                            .doOnSuccess(result -> log.info("Successfully stored AI-extracted information for user {}", userId))
                             .doOnError(error -> {
                                 log.error("Failed to store AI-extracted information for user {}: {} (Type: {})", 
                                         userId, error.getMessage(), error.getClass().getName());
@@ -156,8 +161,12 @@ public class UserInformationExtractionService {
                                     log.error("Response details: Status={}, Body={}", 
                                             wcre.getStatusCode(), wcre.getResponseBodyAsString());
                                 }
+                            })
+                            .onErrorResume(error -> {
+                                log.error("Error resuming from memory storage failure: {}", error.getMessage());
+                                return Mono.empty();
                             });
-                }))
+                })
                 .retry(maxRetries)
                 .then()
                 .doOnSuccess(v -> log.info("Completed entire extraction and storage process for user {}", userId))

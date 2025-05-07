@@ -53,6 +53,9 @@ public class UserMemoryClient {
         // Önemlik seviyesi - şimdilik sabit 2.0
         request.setImportance(2.0);
         
+        log.debug("Memory entry request details: content={}, source={}", 
+            extractedInfo.getInformation(), request.getSource());
+        
         return webClientBuilder.build()
                 .post()
                 .uri(userMemoryServiceUrl + "/memories/entries")
@@ -64,7 +67,10 @@ public class UserMemoryClient {
                 .timeout(Duration.ofSeconds(requestTimeoutSeconds))
                 .doOnSubscribe(s -> log.info("API isteği gönderiliyor: /memories/entries, userId: {}", extractedInfo.getUserId()))
                 .doOnSuccess(result -> log.info("Memory entry successfully added for user: {}", extractedInfo.getUserId()))
-                .doOnError(e -> logClientError(e, extractedInfo.getUserId()));
+                .doOnError(e -> {
+                    log.error("Error sending memory entry to user-memory-service: {}", e.getMessage());
+                    logClientError(e, extractedInfo.getUserId());
+                });
     }
 
     // Circuit breaker için fallback metodu

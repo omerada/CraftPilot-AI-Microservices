@@ -36,18 +36,16 @@ public class ChatEnhancementService {
         log.info("Processing user message for memory extraction: userId={}, messageLength={}", 
                 userId, message != null ? message.length() : 0);
         
-        // Burada then() metodu kullanılarak Mono<Object> -> Mono<Void> dönüşümü yapılmalı
+        // Düzeltme: .then() eklenerek reaktif zincir düzgün şekilde kapatılıyor
         return extractionService.processAndStoreUserInfo(userId, message)
+                .then() // Reaktif akışı düzgün bir şekilde sonlandırmak için then ekledik
                 .doOnSubscribe(s -> log.debug("Started user message processing"))
                 .doOnSuccess(v -> log.info("Completed user message processing for user {}", userId))
                 .doOnError(e -> log.error("Error processing user message for user {}: {}", userId, e.getMessage()))
                 .onErrorResume(e -> {
-                    // Hatayı logla ama akışı kesme
-                    log.error("Caught error in processUserMessage but continuing: {}", e.getMessage(), e);
-                    return Mono.empty();
-                })
-                // then() kullanarak akışı Mono<Void>'e dönüştür
-                .then();
+                    log.warn("Error during user message processing, but continuing: {}", e.getMessage());
+                    return Mono.empty(); // Hata olsa bile işleme devam et
+                });
     }
 
     private AIRequest enhancePromptWithMemory(AIRequest request, UserMemory userMemory) {
