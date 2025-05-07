@@ -101,12 +101,23 @@ public class UserMemoryClient {
         
         return webClientBuilder.build()
                 .get()
-                .uri(userMemoryServiceUrl + "/user-memory/{userId}", userId)
+                .uri(userMemoryServiceUrl + "/memories/{userId}", userId) // Düzeltilmiş endpoint
                 .retrieve()
                 .bodyToMono(UserMemory.class)
+                .doOnSubscribe(s -> log.debug("API request başlatıldı: /memories/{}", userId))
                 .doOnSuccess(memory -> log.info("Memory fetched successfully for user {}: {} entries", 
                         userId, memory != null && memory.getMemory() != null ? memory.getMemory().size() : 0))
-                .doOnError(e -> log.error("Error fetching memory for user {}: {}", userId, e.getMessage()))
+                .doOnError(e -> {
+                    // Daha detaylı hata loglaması
+                    if (e instanceof WebClientResponseException) {
+                        WebClientResponseException wcre = (WebClientResponseException) e;
+                        log.error("Memory service HTTP error for user {}: Status={}, Body={}", 
+                                userId, wcre.getStatusCode(), wcre.getResponseBodyAsString());
+                    } else {
+                        log.error("Error fetching memory for user {}: {} (Type: {})", 
+                                userId, e.getMessage(), e.getClass().getName());
+                    }
+                })
                 .onErrorResume(e -> {
                     log.error("Failed to retrieve memory. Returning empty memory. Error: {}", e.getMessage());
                     return Mono.just(new UserMemory());

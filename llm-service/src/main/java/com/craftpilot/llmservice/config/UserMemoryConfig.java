@@ -17,12 +17,14 @@ public class UserMemoryConfig {
                 .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
                 .slidingWindowSize(10)
                 .failureRateThreshold(50)
-                .waitDurationInOpenState(Duration.ofSeconds(5))
-                .permittedNumberOfCallsInHalfOpenState(2)
+                .waitDurationInOpenState(Duration.ofSeconds(10)) // Arttırıldı
+                .permittedNumberOfCallsInHalfOpenState(3)        // Arttırıldı
+                .ignoreExceptions(java.net.ConnectException.class, 
+                                  org.springframework.web.reactive.function.client.WebClientRequestException.class)
                 .build();
 
         TimeLimiterConfig timeLimiterConfig = TimeLimiterConfig.custom()
-                .timeoutDuration(Duration.ofSeconds(2))
+                .timeoutDuration(Duration.ofSeconds(5))  // Arttırıldı
                 .build();
 
         return CircuitBreakerRegistry.of(circuitBreakerConfig);

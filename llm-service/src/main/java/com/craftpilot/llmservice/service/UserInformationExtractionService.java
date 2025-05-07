@@ -137,15 +137,23 @@ public class UserInformationExtractionService {
                     extractedInfo.setContext("Mesajdan çıkarıldı: " + 
                         LoggingUtils.truncateForLogging(message, 30));
                     
-                    log.debug("Sending extracted information to user-memory-service: userId={}, info={}", 
-                            userId, extractedInfo.getInformation());
+                    log.debug("Sending extracted information to user-memory-service: userId={}, info={}, contextLength={}", 
+                            userId, extractedInfo.getInformation(), 
+                            extractedInfo.getContext() != null ? extractedInfo.getContext().length() : 0);
                     
                     return userMemoryClient.addMemoryEntry(extractedInfo)
                             .timeout(Duration.ofSeconds(memoryTimeoutSeconds))
-                            .doOnSubscribe(s -> log.debug("Calling user-memory-service for user {}", userId))
-                            .doOnSuccess(result -> log.info("Successfully stored AI-extracted information for user {}", userId))
-                            .doOnError(error -> log.error("Failed to store AI-extracted information for user {}: {}", 
-                                    userId, error.getMessage()));
+                            .doOnSubscribe(s -> log.info("Calling user-memory-service for user {}", userId))
+                            .doOnSuccess(result -> log.info("Successfully stored AI-extracted information for user {}: {}", userId, result))
+                            .doOnError(error -> {
+                                log.error("Failed to store AI-extracted information for user {}: {} (Type: {})", 
+                                        userId, error.getMessage(), error.getClass().getName());
+                                if (error instanceof WebClientResponseException) {
+                                    WebClientResponseException wcre = (WebClientResponseException) error;
+                                    log.error("Response details: Status={}, Body={}", 
+                                            wcre.getStatusCode(), wcre.getResponseBodyAsString());
+                                }
+                            });
                 }))
                 .retry(maxRetries)
                 .then()
