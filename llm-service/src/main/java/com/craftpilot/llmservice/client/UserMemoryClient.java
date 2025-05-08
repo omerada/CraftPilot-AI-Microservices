@@ -25,100 +25,68 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class UserMemoryClient {
-    private final WebClient.Builder webClientBuilder;
 
-    @Value("${user-memory.service.url:http://user-memory-service:8067}")
-    private String userMemoryServiceUrl;
+    private final WebClient webClient;
+    
+    @Value("${user-memory.non-meaningful-strings:Kullanıcı mesaj gönderdi,Mesajdan bilgi çıkarılamadı,Kullanıcıdan bilgi çıkarılamadı}")
+    private String nonMeaningfulStrings;
 
-    @Value("${user-memory.request.timeout.seconds:15}")
-    private int requestTimeoutSeconds;
+    public UserMemoryClient(@Value("${user-memory-service.url:http://user-memory-service:8080}") String baseUrl) {
+        this.webClient = WebClient.builder()
+                .baseUrl(baseUrl)
+                .build();
+    }
 
     @CircuitBreaker(name = "userMemoryService", fallbackMethod = "addMemoryEntryFallback")
     @Retry(name = "userMemoryService")
     public Mono<String> addMemoryEntry(ExtractedUserInfo extractedInfo) {
-        // userId kontrolü ekleyelim
-        if (extractedInfo == null || extractedInfo.getUserId() == null || extractedInfo.getUserId().trim().isEmpty()) {
-            log.warn("User ID is null or empty. Cannot send memory entry to user-memory-service.");
-            return Mono.just("ERROR-NULL-USER-ID");
+        if (extractedInfo == null) {
+            log.warn("Cannot add null memory entry");
+            return Mono.just("NULL-ENTRY-SKIPPED");
         }
         
-        // Boş veya anlamlı olmayan bilgi kontrolü iyileştirildi
-        String information = extractedInfo.getInformation();
-        if (information == null || information.trim().isEmpty()) {
-            log.info("Information is empty, skipping storage");
-            return Mono.just("SKIPPED-EMPTY-INFO");
-        }
+        String info = extractedInfo.getInformation();
         
-        // Anlamsız bilgi kontrolü iyileştirildi - sadece boş varsayılan mesajları filtrele
-        if (information.equals("Kullanıcı mesaj gönderdi") || 
-            information.equals("Kullanıcı bilgisi çıkarılamadı")) {
-            log.info("Skipping storage for non-meaningful information: {}", information);
+        // Anlamsız bilgileri filtrele
+        if (info == null || info.isEmpty() || isNonMeaningfulInformation(info)) {
+            log.info("Skipping storage for non-meaningful information: {}", info);
             return Mono.just("SKIPPED-NON-MEANINGFUL-INFO");
         }
         
-        // Anlamlı bilgileri kaydet - "Mesajdan bilgi çıkarılamadı" bile kaydet
-        // çünkü bu mesaj işlemin yapıldığını ama bilgi bulunamadığını gösteriyor
-        if (information.equals("Mesajdan bilgi çıkarılamadı")) {
-            log.info("No extractable information found, but recording the attempt: {}", information);
-        } else {
-            log.info("Sending meaningful memory entry to user-memory-service for user: {}", extractedInfo.getUserId());
-        }
+        log.debug("Sending memory entry to user-memory-service: {}", extractedInfo);
         
-        MemoryEntryRequest request = new MemoryEntryRequest();
-        request.setContent(extractedInfo.getInformation());
-        request.setSource(extractedInfo.getSource() != null ? extractedInfo.getSource() : "AI analizi");
-        request.setContext(extractedInfo.getContext());
-        request.setTimestamp(LocalDateTime.ofInstant(extractedInfo.getTimestamp(), ZoneId.systemDefault()));
-        
-        // userId'yi metadata içine ekleyelim (request nesnesine doğrudan ekleyemiyoruz)
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("extractionMethod", "ai-llm");
-        metadata.put("messageLength", extractedInfo.getInformation().length());
-        metadata.put("extractionTimestamp", System.currentTimeMillis());
-        metadata.put("userId", extractedInfo.getUserId()); // userId'yi metadata içinde taşıyalım
-        
-        request.setMetadata(metadata);
-        
-        // Önemlik seviyesi - şimdilik sabit 2.0
-        request.setImportance(2.0);
-        
-        log.debug("Memory entry request details: content={}, source={}", 
-            extractedInfo.getInformation(), request.getSource());
-        
-        // AI yanıtını detaylı şekilde logla
-        log.info("AI extracted information for user {}: {}", 
-            extractedInfo.getUserId(), 
-            extractedInfo.getInformation().length() > 100 ? 
-                extractedInfo.getInformation().substring(0, 100) + "..." : 
-                extractedInfo.getInformation());
-        
-        return webClientBuilder.build()
-                .post()
-                .uri(userMemoryServiceUrl + "/memories/entries")
-                .header("X-User-Id", extractedInfo.getUserId())
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                // İç servis kimlik doğrulaması için header ekleme
-                .header("X-Internal-Service", "llm-service")
-                .body(BodyInserters.fromValue(request))
+        return webClient.post()
+                .uri("/api/memory")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(extractedInfo)
                 .retrieve()
                 .bodyToMono(String.class)
-                .timeout(Duration.ofSeconds(requestTimeoutSeconds))
-                .doOnSubscribe(s -> log.info("API isteği gönderiliyor: /memories/entries, userId: {}", extractedInfo.getUserId()))
-                .doOnSuccess(result -> {
-                    log.info("Memory entry successfully added for user: {}", extractedInfo.getUserId());
-                    log.debug("Stored AI extraction content: {}", extractedInfo.getInformation().length() > 50 ? 
-                        extractedInfo.getInformation().substring(0, 50) + "..." : 
-                        extractedInfo.getInformation());
-                })
-                .doOnError(e -> {
-                    log.error("Error sending memory entry to user-memory-service: {}", e.getMessage());
-                    logClientError(e, extractedInfo.getUserId());
-                })
-                .retryWhen(reactor.util.retry.Retry.fixedDelay(3, Duration.ofMillis(500))
-                    .filter(ex -> !(ex instanceof WebClientResponseException.BadRequest)));
+                .doOnSuccess(response -> log.debug("Memory entry added successfully: {}", response))
+                .doOnError(error -> log.error("Error adding memory entry: {}", error.getMessage()));
+    }
+    
+    // Anlamsız bilgileri daha esnek bir şekilde kontrol et
+    private boolean isNonMeaningfulInformation(String info) {
+        if (info == null || info.isEmpty()) {
+            return true;
+        }
+        
+        // Yapılandırılabilir anlamsız string listesi
+        String[] nonMeaningfulList = nonMeaningfulStrings.split(",");
+        for (String nonMeaningful : nonMeaningfulList) {
+            if (info.trim().equalsIgnoreCase(nonMeaningful.trim())) {
+                return true;
+            }
+        }
+        
+        // Çok kısa ve herhangi bir spesifik bilgi içermeyen metinleri filtrele
+        if (info.length() < 10 && !info.contains(":")) {
+            return true;
+        }
+        
+        return false;
     }
 
     // Circuit breaker için fallback metodu
@@ -181,9 +149,8 @@ public class UserMemoryClient {
         
         log.info("Fetching memory for user: {}", userId);
         
-        return webClientBuilder.build()
-                .get()
-                .uri(userMemoryServiceUrl + "/memories/{userId}", userId)
+        return webClient.get()
+                .uri("/memories/{userId}", userId)
                 .header("X-User-Id", userId)
                 .retrieve()
                 .bodyToMono(UserMemory.class)

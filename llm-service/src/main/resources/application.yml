@@ -231,7 +231,7 @@ service:
 
 ai:
   model:
-    extraction: ${AI_MODEL_EXTRACTION:google/gemma-3-4b-it}
+    extraction: anthropic/claude-3-haiku  # Daha güçlü bir model kullan
 
 # Extraksiyon ayarları
 extraction:
@@ -247,4 +247,18 @@ extraction:
 
 memory:
   timeout:
-    seconds: 15
+    seconds: 10
+
+user-info-extraction:
+  debug: true
+  save-all-messages: false
+
+user-memory:
+  non-meaningful-strings: >
+    Kullanıcı mesaj gönderdi,
+    Mesajdan bilgi çıkarılamadı,
+    Kullanıcıdan bilgi çıkarılamadı,
+    NO_INFORMATION,
+    EXTRACTION_ERROR,
+    PARSING_ERROR,
+    INVALID_RESPONSE_FORMAT
