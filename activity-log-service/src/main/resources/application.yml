@@ -29,12 +29,10 @@ spring:
       write-dates-as-timestamps: false
     date-format: com.fasterxml.jackson.databind.util.ISO8601DateFormat
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    bootstrap-servers: kafka:9092
     consumer:
-      group-id: ${spring.application.name}-group
-      concurrency: 3
-      auto-offset-reset: earliest
-      max-poll-records: 100
+      group-id: activity-log-service
+      auto-offset-reset: latest
 
 # Redis yapılandırması ekleniyor
 spring.data.redis:
@@ -72,6 +70,8 @@ logging:
     org.springframework.web: INFO
     org.springframework.kafka: INFO
     com.google.cloud.firestore: INFO
+    com.craftpilot.activitylogservice: INFO
+    org.apache.kafka: WARN
 
 kafka:
   topics:
@@ -105,3 +105,11 @@ eureka:
     metadata-map:
       management:
         context-path: /actuator
+
+activity:
+  kafka:
+    consumer:
+      topic: user-activity
+    retry:
+      max-attempts: 3
+      initial-backoff: 1000

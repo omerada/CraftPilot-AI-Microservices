@@ -23,41 +23,42 @@ public class ActivityEventListener {
     private final KafkaReceiver<String, ActivityEvent> receiver;
     private final ActivityLogService activityLogService;
     
-    @Value("${kafka.consumer.concurrency:3}")
-    private int concurrency;
+    @Value("${activity.kafka.retry.max-attempts:3}")
+    private int maxRetryAttempts;
     
+    @Value("${activity.kafka.retry.initial-backoff:1000}")
+    private long initialBackoffMillis;
+    
+    @Value("${activity.kafka.consumer.topic:user-activity}")
+    private String activityTopic;
+
     public ActivityEventListener(KafkaReceiver<String, ActivityEvent> receiver, ActivityLogService activityLogService) {
         this.receiver = receiver;
         this.activityLogService = activityLogService;
     }
-    
+
     @EventListener(ApplicationStartedEvent.class)
-    public void startKafkaConsumer() {
-        log.info("Starting Kafka consumer with concurrency: {}", concurrency);
+    public void startListener() {
+        log.info("Starting Kafka consumer for activity events on topic: {}", activityTopic);
+        
+        Retry retrySpec = Retry.backoff(maxRetryAttempts, Duration.ofMillis(initialBackoffMillis))
+                .doBeforeRetry(signal -> log.warn("Retrying Kafka consumer after error: {}", 
+                        signal.failure().getMessage()));
         
         receiver.receive()
-            .doOnNext(record -> {
-                log.info("Received activity event: key={}, topic={}, partition={}, offset={}, value={}",
-                    record.key(), record.topic(), record.partition(), record.offset(), record.value());
-            })
-            .flatMap(this::processRecord, concurrency)
-            .doOnError(error -> log.error("Error processing Kafka record: {}", error.getMessage(), error))
-            .retryWhen(Retry.backoff(3, Duration.ofSeconds(1))
-                    .maxBackoff(Duration.ofSeconds(10))
-                    .jitter(0.5))
-            .onErrorResume(error -> {
-                log.error("Error processing Kafka event: {}", error.getMessage(), error);
-                return Mono.empty();
-            })
-            .subscribe(
-                success -> {}, 
-                error -> log.error("Fatal error in Kafka consumer: {}", error.getMessage(), error),
-                () -> log.error("Kafka consumer completed unexpectedly")
-            );
+                .flatMap(this::processRecord)
+                .doOnError(error -> log.error("Error in Kafka consumer: {}", error.getMessage(), error))
+                .retryWhen(retrySpec)
+                .subscribe(
+                    null,
+                    error -> log.error("Fatal error in Kafka consumer, gave up after retries: {}", 
+                        error.getMessage(), error),
+                    () -> log.info("Kafka consumer completed (this should not happen normally)")
+                );
         
-        log.info("Kafka consumer started successfully");
+        log.info("Kafka consumer started successfully and listening for activity events");
     }
-
+    
     private Mono<Void> processRecord(ReceiverRecord<String, ActivityEvent> record) {
         log.info("Processing activity event: {}", record.value());
         return activityLogService.processEvent(record.value())
