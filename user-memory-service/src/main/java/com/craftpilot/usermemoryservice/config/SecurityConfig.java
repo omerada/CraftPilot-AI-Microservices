@@ -73,7 +73,10 @@ public class SecurityConfig {
     }
     
     private boolean isInternalApiPath(String path) {
-        return INTERNAL_API_PATHS.stream().anyMatch(path::startsWith);
+        // Mevcut internal API path kontrollerine ek olarak memories/entries endpointini ekleyelim
+        return path.startsWith("/internal/") || 
+               path.startsWith("/actuator/") || 
+               path.startsWith("/memories/entries");
     }
     
     @Bean

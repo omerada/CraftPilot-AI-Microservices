@@ -19,6 +19,9 @@ import reactor.util.retry.Retry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicInteger;
+// Import eksiklikleri için gereken sınıflar
+import org.json.JSONObject;
+import java.util.Iterator;
 
 @Service
 @RequiredArgsConstructor
@@ -379,5 +382,72 @@ public class UserInformationExtractionService {
                 log.error("Error while extracting information: {}", e.getMessage());
                 return Mono.empty();
             });
+    }
+    
+    private String createExtractionPrompt(String message) {
+        return "Kullanıcının mesajından kişisel bilgileri çıkar ve JSON formatında dön. Eğer anlam çıkarılamıyorsa \"bilgi_yok\" döndür. " +
+               "Kullanıcı mesajı: \"" + message + "\"\n\n" +
+               "Örneğin: Eğer kullanıcı \"Benim adım Ali, İstanbul'da yaşıyorum ve 30 yaşındayım\" derse, " +
+               "JSON olarak: {\"ad\": \"Ali\", \"konum\": \"İstanbul\", \"yaş\": 30}\n\n" +
+               "Cevap sadece JSON formatında olmalı, ekstra açıklama yapma.";
+    }
+    
+    private ExtractedUserInfo processAIResponse(String aiResponse, String userId) {
+        if (aiResponse == null || aiResponse.isEmpty() || aiResponse.equals("EMPTY")) {
+            log.warn("Empty or null AI response for user {}", userId);
+            return new ExtractedUserInfo(
+                userId,
+                "Kullanıcı bilgisi çıkarılamadı",
+                Instant.now(),
+                "AI extraction",
+                "Chat message analysis"
+            );
+        }
+        
+        // JSON formatı kontrolü ve işleme
+        if (aiResponse.trim().startsWith("{") && aiResponse.trim().endsWith("}")) {
+            try {
+                // JSON'ı anlamlı metin haline çevirme
+                JSONObject jsonObj = new JSONObject(aiResponse);
+                StringBuilder info = new StringBuilder();
+                
+                if (jsonObj.has("bilgi_yok")) {
+                    return new ExtractedUserInfo(
+                        userId,
+                        "Kullanıcı mesajından bilgi çıkarılamadı",
+                        Instant.now(),
+                        "AI extraction",
+                        "Chat message analysis"
+                    );
+                }
+                
+                Iterator<String> keys = jsonObj.keys();
+                while (keys.hasNext()) {
+                    String key = keys.next();
+                    info.append(key).append(": ").append(jsonObj.get(key)).append(". ");
+                }
+                
+                if (info.length() > 0) {
+                    return new ExtractedUserInfo(
+                        userId,
+                        info.toString(),
+                        Instant.now(),
+                        "AI extraction",
+                        "Chat message analysis"
+                    );
+                }
+            } catch (Exception e) {
+                log.error("Error parsing AI response JSON for user {}: {}", userId, e.getMessage());
+            }
+        }
+        
+        // Fallback: default format
+        return new ExtractedUserInfo(
+            userId,
+            aiResponse,
+            Instant.now(),
+            "AI extraction",
+            "Chat message analysis"
+        );
     }
 }

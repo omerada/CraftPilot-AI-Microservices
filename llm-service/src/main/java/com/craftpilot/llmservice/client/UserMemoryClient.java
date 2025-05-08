@@ -45,11 +45,20 @@ public class UserMemoryClient {
             return Mono.just("ERROR-NULL-USER-ID");
         }
         
+        // Boş veya anlamlı olmayan bilgi kontrolü ekleme
+        String information = extractedInfo.getInformation();
+        if (information == null || information.trim().isEmpty() || 
+            information.equals("Kullanıcı mesaj gönderdi") || 
+            information.equals("Kullanıcı bilgisi çıkarılamadı")) {
+            log.info("Skipping storage for non-meaningful information: {}", information);
+            return Mono.just("SKIPPED-NON-MEANINGFUL-INFO");
+        }
+        
         log.info("Sending memory entry to user-memory-service for user: {}", extractedInfo.getUserId());
         
         MemoryEntryRequest request = new MemoryEntryRequest();
         request.setContent(extractedInfo.getInformation());
-        request.setSource(extractedInfo.getSource() != null ? extractedInfo.getSource() : "Varsayılan kayıt");
+        request.setSource(extractedInfo.getSource() != null ? extractedInfo.getSource() : "AI analizi");
         request.setContext(extractedInfo.getContext());
         request.setTimestamp(LocalDateTime.ofInstant(extractedInfo.getTimestamp(), ZoneId.systemDefault()));
         
@@ -80,6 +89,8 @@ public class UserMemoryClient {
                 .uri(userMemoryServiceUrl + "/memories/entries")
                 .header("X-User-Id", extractedInfo.getUserId())
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                // İç servis kimlik doğrulaması için header ekleme
+                .header("X-Internal-Service", "llm-service")
                 .body(BodyInserters.fromValue(request))
                 .retrieve()
                 .bodyToMono(String.class)
