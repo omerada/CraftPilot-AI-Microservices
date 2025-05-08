@@ -45,16 +45,27 @@ public class UserMemoryClient {
             return Mono.just("ERROR-NULL-USER-ID");
         }
         
-        // Boş veya anlamlı olmayan bilgi kontrolü ekleme
+        // Boş veya anlamlı olmayan bilgi kontrolü iyileştirildi
         String information = extractedInfo.getInformation();
-        if (information == null || information.trim().isEmpty() || 
-            information.equals("Kullanıcı mesaj gönderdi") || 
+        if (information == null || information.trim().isEmpty()) {
+            log.info("Information is empty, skipping storage");
+            return Mono.just("SKIPPED-EMPTY-INFO");
+        }
+        
+        // Anlamsız bilgi kontrolü iyileştirildi - sadece boş varsayılan mesajları filtrele
+        if (information.equals("Kullanıcı mesaj gönderdi") || 
             information.equals("Kullanıcı bilgisi çıkarılamadı")) {
             log.info("Skipping storage for non-meaningful information: {}", information);
             return Mono.just("SKIPPED-NON-MEANINGFUL-INFO");
         }
         
-        log.info("Sending memory entry to user-memory-service for user: {}", extractedInfo.getUserId());
+        // Anlamlı bilgileri kaydet - "Mesajdan bilgi çıkarılamadı" bile kaydet
+        // çünkü bu mesaj işlemin yapıldığını ama bilgi bulunamadığını gösteriyor
+        if (information.equals("Mesajdan bilgi çıkarılamadı")) {
+            log.info("No extractable information found, but recording the attempt: {}", information);
+        } else {
+            log.info("Sending meaningful memory entry to user-memory-service for user: {}", extractedInfo.getUserId());
+        }
         
         MemoryEntryRequest request = new MemoryEntryRequest();
         request.setContent(extractedInfo.getInformation());

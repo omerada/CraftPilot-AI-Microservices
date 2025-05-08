@@ -46,6 +46,12 @@ public class UserInformationExtractionService {
     @Value("${extraction.retry.backoff.ms:500}")
     private long retryBackoffMs;
 
+    @Value("${user-info-extraction.debug:false}")
+    private boolean debugMode;
+
+    @Value("${user-info-extraction.save-all-messages:false}")
+    private boolean saveAllMessages;
+
     public Mono<ExtractedUserInfo> extractUserInfo(String userId, String message) {
         if (userId == null || message == null || message.trim().isEmpty()) {
             log.debug("Skipping extraction for empty/null message or userId");
@@ -294,14 +300,26 @@ public class UserInformationExtractionService {
         return defaultInfo;
     }
 
+    /**
+     * Kullanıcı mesajından bilgi çıkarmak için AI istek içeriğini oluşturur
+     */
     private String buildExtractionPrompt(String message) {
-        return "Aşağıdaki kullanıcı mesajını analiz et ve kullanıcı hakkında bilgi çıkar. " +
-               "Sadece belirgin, açık bilgileri al, tahmin yürütme. " +
-               "İsim, yaş, konum, meslek, ilgi alanları, tercihler gibi bilgileri JSON formatında döndür.\n\n" +
-               "Örnek yanıt format:\n{\"information\": \"[çıkarılan bilgi]\"}\n\n" +
-               "Örneğin, 'Benim adım Ömer' için yanıt şu olmalıdır: {\"information\": \"Kullanıcının adı Ömer\"}\n\n" +
-               "Eğer hiçbir bilgi bulamazsan, şunu döndür: {\"information\": \"NO_INFORMATION\"}\n\n" +
-               "Mesaj: " + message;
+        return """
+                Lütfen bu kullanıcı mesajından kullanıcı hakkında bilgileri çıkart:
+                
+                "%s"
+                
+                Bu mesajdan kullanıcının adı, yaşadığı yer, ilgi alanları, mesleği, tercih ettiği şeyler gibi 
+                kişisel bilgilerini çıkarmaya çalış.
+                
+                Format:
+                - Eğer mesajda kullanıcının adı varsa: "Kullanıcının adı [isim]"
+                - Eğer mesajda yaşadığı yer varsa: "Kullanıcı [yer] yaşıyor"
+                - Eğer mesajda başka bir kişisel bilgi varsa, benzer formatta belirt.
+                
+                Yanıtı boş bırakma. Eğer hiçbir bilgi çıkaramıyorsan, "Çıkarılabilecek bilgi bulunamadı" yaz.
+                Sadece kesin olan bilgileri belirt, tahmin yürütme.
+                """.formatted(message);
     }
 
     public Mono<ExtractedUserInfo> extractUserInformation(String userId, String message, String context) {
@@ -449,5 +467,58 @@ public class UserInformationExtractionService {
             "AI extraction",
             "Chat message analysis"
         );
+    }
+    
+    /**
+     * AI tarafından döndürülen yanıtı işleyerek anlamlı bilgiye dönüştürür
+     */
+    private ExtractedUserInfo processExtractionResponse(String aiResponse, String originalMessage) {
+        log.info("Processing AI extraction response: {}", LoggingUtils.truncateForLogging(aiResponse, 100));
+        
+        ExtractedUserInfo extractedInfo = new ExtractedUserInfo();
+        
+        // AI yanıtı boş veya null ise, daha akıllı bir varsayılan yanıt oluştur
+        if (aiResponse == null || aiResponse.trim().isEmpty() || aiResponse.equals("EMPTY")) {
+            // Basit bir bilgi çıkarma denemesi yap
+            String extractedDefault = attemptBasicExtraction(originalMessage);
+            extractedInfo.setInformation(extractedDefault);
+            log.info("AI yanıtı boş, basit çıkarım yapıldı: {}", extractedDefault);
+        } else {
+            extractedInfo.setInformation(aiResponse.trim());
+        }
+        
+        extractedInfo.setSource("AI çıkarımı");
+        return extractedInfo;
+    }
+
+    /**
+     * AI yanıtı boş olduğunda basit bir bilgi çıkarma dener
+     */
+    private String attemptBasicExtraction(String message) {
+        // Basit düzenli ifadelerle bilgi çıkarma
+        StringBuilder extracted = new StringBuilder();
+        
+        // İsim çıkarma (basit örnek)
+        if (message.toLowerCase().contains("adım") || message.toLowerCase().contains("ismim")) {
+            String[] parts = message.split("\\s+");
+            for (int i = 0; i < parts.length; i++) {
+                if ((parts[i].equalsIgnoreCase("adım") || parts[i].equalsIgnoreCase("ismim")) && i < parts.length - 1) {
+                    extracted.append("Kullanıcının adı ").append(parts[i+1]).append(". ");
+                    break;
+                }
+            }
+        }
+        
+        // Şehir/yer çıkarma (basit örnek)
+        String[] cities = {"ankara", "istanbul", "izmir", "bursa", "antalya"}; // Örnekler
+        String lowerMessage = message.toLowerCase();
+        for (String city : cities) {
+            if (lowerMessage.contains(city)) {
+                extracted.append("Kullanıcı ").append(city.substring(0, 1).toUpperCase() + city.substring(1)).append("'da yaşıyor. ");
+                break;
+            }
+        }
+        
+        return extracted.length() > 0 ? extracted.toString() : "Mesajdan bilgi çıkarılamadı";
     }
 }
