@@ -2,6 +2,7 @@ package com.craftpilot.activitylogservice.model;
 
 import com.google.cloud.Timestamp;
 import com.google.cloud.firestore.annotation.DocumentId;
+import com.google.cloud.firestore.annotation.Exclude;
 import com.google.cloud.firestore.annotation.ServerTimestamp;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -42,6 +43,7 @@ public class ActivityLog {
                 .build();
     }
     
+    @Exclude
     public ZonedDateTime getZonedTimestamp() {
         return timestamp != null 
             ? timestamp.atZone(ZoneId.systemDefault()) 

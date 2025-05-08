@@ -13,12 +13,14 @@ import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverRecord;
 import reactor.util.retry.Retry;
 
+import java.lang.reflect.InaccessibleObjectException;
 import java.time.Duration;
 
 @Component
 @Slf4j
 @ConditionalOnProperty(name = "spring.kafka.bootstrap-servers")
 public class ActivityEventListener {
+    
     private final KafkaReceiver<String, ActivityEvent> receiver;
     private final ActivityLogService activityLogService;
     
@@ -30,23 +32,30 @@ public class ActivityEventListener {
     
     @Value("${activity.kafka.consumer.topic:user-activity}")
     private String activityTopic;
-
+    
     public ActivityEventListener(KafkaReceiver<String, ActivityEvent> receiver, ActivityLogService activityLogService) {
         this.receiver = receiver;
         this.activityLogService = activityLogService;
     }
-
+    
     @EventListener(ApplicationStartedEvent.class)
     public void startListener() {
         log.info("Starting Kafka consumer for activity events on topic: {}", activityTopic);
         
         Retry retrySpec = Retry.backoff(maxRetryAttempts, Duration.ofMillis(initialBackoffMillis))
+                .filter(throwable -> !(throwable instanceof InaccessibleObjectException))
                 .doBeforeRetry(signal -> log.warn("Retrying Kafka consumer after error: {}", 
                         signal.failure().getMessage()));
         
         receiver.receive()
                 .flatMap(this::processRecord)
-                .doOnError(error -> log.error("Error in Kafka consumer: {}", error.getMessage(), error))
+                .doOnError(error -> {
+                    if (error instanceof InaccessibleObjectException) {
+                        log.error("Java reflection error - this requires code changes, not retrying: {}", error.getMessage());
+                    } else {
+                        log.error("Error in Kafka consumer: {}", error.getMessage(), error);
+                    }
+                })
                 .retryWhen(retrySpec)
                 .subscribe(
                     null,
@@ -59,27 +68,25 @@ public class ActivityEventListener {
     }
     
     private Mono<Void> processRecord(ReceiverRecord<String, ActivityEvent> record) {
-        log.info("Processing activity event: {}", record.value());
+        ActivityEvent event = record.value();
         
-        // Commons ActivityEvent'i ActivityLogService'in beklediği ActivityEvent formatına dönüştür
-        com.craftpilot.activitylogservice.model.ActivityEvent serviceEvent = 
-            convertToServiceEvent(record.value());
+        if (event == null) {
+            log.warn("Received null activity event, acknowledging and skipping");
+            return Mono.fromRunnable(record::receiverOffset).then();
+        }
         
-        return activityLogService.processEvent(serviceEvent)
-            .doOnSuccess(result -> {
-                record.receiverOffset().acknowledge();
-                log.info("Successfully processed and acknowledged activity event");
-            })
-            .doOnError(error -> log.error("Failed to process activity event: {}", error.getMessage(), error))
-            .then();
-    }
-    
-    private com.craftpilot.activitylogservice.model.ActivityEvent convertToServiceEvent(ActivityEvent commonsEvent) {
-        return com.craftpilot.activitylogservice.model.ActivityEvent.builder()
-                .userId(commonsEvent.getUserId())
-                .timestamp(commonsEvent.getTimestamp())
-                .actionType(commonsEvent.getActionType())
-                .metadata(commonsEvent.getMetadata())
-                .build();
+        if (!event.isValid()) {
+            log.warn("Received invalid activity event: {}, acknowledging and skipping", event);
+            return Mono.fromRunnable(record::receiverOffset).then();
+        }
+        
+        log.debug("Processing activity event: {}", event);
+        
+        return activityLogService.saveActivityEvent(event)
+                .doOnSuccess(v -> {
+                    record.receiverOffset().acknowledge();
+                    log.debug("Successfully processed and acknowledged activity event");
+                })
+                .doOnError(e -> log.error("Failed to process activity event: {}", e.getMessage(), e));
     }
 }
