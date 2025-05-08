@@ -1,5 +1,5 @@
 server:
-  port: 8062
+  port: 8066
   compression:
     enabled: true
     mime-types: text/event-stream,application/json,text/plain
@@ -84,6 +84,14 @@ user-memory:
     url: http://user-memory-service:8067
     # Kubernetes veya Docker Compose ortamında servis adı kullanılır
     # Lokal geliştirme için localhost:8067 olarak değiştirilebilir
+  non-meaningful-strings: >
+    Kullanıcı mesaj gönderdi,
+    Mesajdan bilgi çıkarılamadı,
+    Kullanıcıdan bilgi çıkarılamadı,
+    NO_INFORMATION,
+    EXTRACTION_ERROR,
+    PARSING_ERROR,
+    INVALID_RESPONSE_FORMAT
 
 # Activity logging yapılandırması
 activity:
@@ -231,7 +239,7 @@ service:
 
 ai:
   model:
-    extraction: anthropic/claude-3-haiku  # Daha güçlü bir model kullan
+    extraction: anthropic/claude-3-haiku # Daha güçlü bir model kullan
 
 # Extraksiyon ayarları
 extraction:
@@ -252,13 +260,3 @@ memory:
 user-info-extraction:
   debug: true
   save-all-messages: false
-
-user-memory:
-  non-meaningful-strings: >
-    Kullanıcı mesaj gönderdi,
-    Mesajdan bilgi çıkarılamadı,
-    Kullanıcıdan bilgi çıkarılamadı,
-    NO_INFORMATION,
-    EXTRACTION_ERROR,
-    PARSING_ERROR,
-    INVALID_RESPONSE_FORMAT
