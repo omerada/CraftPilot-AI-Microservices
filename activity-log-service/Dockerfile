@@ -1,16 +1,18 @@
 # Build stage
 FROM maven:3.9.6-eclipse-temurin-17 AS build
 
-# Clone/copy the craft-pilot-commons source (if needed)
-WORKDIR /build-lib
-COPY craft-pilot-commons ./craft-pilot-commons
-
-# Build and install the craft-pilot-commons to local Maven repository (if needed)
-RUN cd craft-pilot-commons && mvn clean install -DskipTests
-
+# CI/CD ortamında doğru dizin yapısını kullan
 WORKDIR /build
-COPY pom.xml .
-COPY src ./src
+
+# Önce sadece proje dosyalarını kopyala
+COPY activity-log-service/pom.xml ./pom.xml
+COPY activity-log-service/src ./src
+
+# Eğer craft-pilot-commons gerekiyorsa şartlı olarak kopyala
+COPY craft-pilot-commons /build-lib/craft-pilot-commons
+RUN if [ -d "/build-lib/craft-pilot-commons" ]; then \
+    cd /build-lib/craft-pilot-commons && mvn clean install -DskipTests; \
+    fi
 
 # Maven build
 RUN mvn clean package -DskipTests
