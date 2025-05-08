@@ -1,11 +1,21 @@
 # Build stage
 FROM maven:3.9.6-eclipse-temurin-17 AS build
 
-WORKDIR /build
-COPY pom.xml .
-COPY src ./src
+# Clone/copy the craft-pilot-commons source
+WORKDIR /build-lib
+COPY craft-pilot-commons ./craft-pilot-commons
 
-# Maven build
+# Build and install the craft-pilot-commons to local Maven repository
+RUN cd craft-pilot-commons && mvn clean install -DskipTests
+
+WORKDIR /build
+
+# First copy only the POM file and download dependencies (for better caching)
+COPY activity-log-service/pom.xml .
+RUN mvn dependency:go-offline -B
+
+# Then copy source and build
+COPY activity-log-service/src ./src
 RUN mvn clean package -DskipTests
 
 # Run stage
