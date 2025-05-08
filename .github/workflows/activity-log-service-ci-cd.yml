@@ -5,6 +5,7 @@ on:
     branches: [master]
     paths:
       - "activity-log-service/**"
+      - "craft-pilot-commons/**"
       - ".github/workflows/activity-log-service-ci-cd.yml"
   workflow_dispatch:
     inputs:
@@ -36,6 +37,13 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
+      - name: Build commons library (if needed)
+        run: |
+          if [ -d "craft-pilot-commons" ]; then
+            cd craft-pilot-commons
+            mvn clean install -DskipTests
+          fi
+
       - name: Build with Maven
         run: |
           cd activity-log-service
@@ -55,11 +63,42 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Prepare build context
+        run: |
+          # Create a temporary directory for build context
+          mkdir -p /tmp/docker-build-context
+
+          # Check source directories and files
+          echo "Current directory: $(pwd)"
+          echo "Checking activity-log-service directory:"
+          ls -la activity-log-service/
+
+          # Ensure activity-log-service directory exists
+          if [ ! -d "activity-log-service" ]; then
+            echo "ERROR: activity-log-service directory not found"
+            exit 1
+          fi
+
+          # Copy directories to build context
+          cp -r activity-log-service /tmp/docker-build-context/
+
+          # Copy craft-pilot-commons if it exists
+          if [ -d "craft-pilot-commons" ]; then
+            cp -r craft-pilot-commons /tmp/docker-build-context/
+          fi
+
+          # Verify build context contents
+          echo "Checking build context:"
+          ls -la /tmp/docker-build-context/
+          echo "Checking activity-log-service directory in build context:"
+          ls -la /tmp/docker-build-context/activity-log-service/
+
       - name: Build and Push Docker image
         id: docker_build
         uses: docker/build-push-action@v4
         with:
-          context: ./activity-log-service
+          context: /tmp/docker-build-context
+          file: /tmp/docker-build-context/activity-log-service/Dockerfile
           platforms: linux/arm64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
