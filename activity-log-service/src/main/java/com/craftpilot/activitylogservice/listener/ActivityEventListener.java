@@ -1,6 +1,6 @@
 package com.craftpilot.activitylogservice.listener;
 
-import com.craftpilot.activitylogservice.model.ActivityEvent;
+import com.craftpilot.commons.activity.model.ActivityEvent;
 import com.craftpilot.activitylogservice.service.ActivityLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,7 +8,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverRecord;
@@ -61,12 +60,26 @@ public class ActivityEventListener {
     
     private Mono<Void> processRecord(ReceiverRecord<String, ActivityEvent> record) {
         log.info("Processing activity event: {}", record.value());
-        return activityLogService.processEvent(record.value())
+        
+        // Commons ActivityEvent'i ActivityLogService'in beklediği ActivityEvent formatına dönüştür
+        com.craftpilot.activitylogservice.model.ActivityEvent serviceEvent = 
+            convertToServiceEvent(record.value());
+        
+        return activityLogService.processEvent(serviceEvent)
             .doOnSuccess(result -> {
                 record.receiverOffset().acknowledge();
                 log.info("Successfully processed and acknowledged activity event");
             })
             .doOnError(error -> log.error("Failed to process activity event: {}", error.getMessage(), error))
             .then();
+    }
+    
+    private com.craftpilot.activitylogservice.model.ActivityEvent convertToServiceEvent(ActivityEvent commonsEvent) {
+        return com.craftpilot.activitylogservice.model.ActivityEvent.builder()
+                .userId(commonsEvent.getUserId())
+                .timestamp(commonsEvent.getTimestamp())
+                .actionType(commonsEvent.getActionType())
+                .metadata(commonsEvent.getMetadata())
+                .build();
     }
 }

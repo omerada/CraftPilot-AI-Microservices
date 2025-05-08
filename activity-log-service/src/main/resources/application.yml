@@ -33,6 +33,11 @@ spring:
     consumer:
       group-id: activity-log-service
       auto-offset-reset: latest
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.craftpilot.commons.activity.model,com.craftpilot.activitylogservice.model
+        spring.json.value.default.type: com.craftpilot.commons.activity.model.ActivityEvent
+        spring.json.use.type.headers: false
 
 # Redis yapılandırması ekleniyor
 spring.data.redis:

@@ -134,6 +134,12 @@
             <artifactId>spring-kafka-test</artifactId>
             <scope>test</scope>
         </dependency>
+        
+        <dependency>
+            <groupId>com.craftpilot</groupId>
+            <artifactId>craft-pilot-commons</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
     
     <dependencyManagement>

@@ -1,6 +1,6 @@
 package com.craftpilot.activitylogservice.config;
 
-import com.craftpilot.activitylogservice.model.ActivityEvent;
+import com.craftpilot.commons.activity.model.ActivityEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -28,31 +28,25 @@ public class KafkaConfig {
     private String groupId;
 
     @Value("${activity.kafka.consumer.topic:user-activity}")
-    private String activityTopic;
-
-    @Value("${spring.kafka.consumer.auto-offset-reset:latest}")
-    private String autoOffsetReset;
+    private String topic;
 
     @Bean
-    public KafkaReceiver<String, ActivityEvent> kafkaReceiver() {
+    public KafkaReceiver<String, ActivityEvent> activityEventReceiver() {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, autoOffsetReset);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-        props.put(JsonDeserializer.TRUSTED_PACKAGES, "*"); // Daha güvenli bir yapılandırma için spesifik paketler tanımlanabilir
-        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, ActivityEvent.class.getName());
-        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false); // Manuel acknowledge kullanıyoruz
-
-        ReceiverOptions<String, ActivityEvent> receiverOptions = ReceiverOptions
-                .<String, ActivityEvent>create(props)
-                .subscription(Collections.singleton(activityTopic))
-                .addAssignListener(partitions -> 
-                    log.info("Assigned: {}", partitions))
-                .addRevokeListener(partitions -> 
-                    log.info("Revoked: {}", partitions));
-
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.craftpilot.commons.activity.model,com.craftpilot.activitylogservice.model");
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "com.craftpilot.commons.activity.model.ActivityEvent");
+        props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+        
+        ReceiverOptions<String, ActivityEvent> receiverOptions = ReceiverOptions.<String, ActivityEvent>create(props)
+                .subscription(Collections.singleton(topic))
+                .addAssignListener(partitions -> log.info("Assigned: {}", partitions))
+                .addRevokeListener(partitions -> log.info("Revoked: {}", partitions));
+                
         return KafkaReceiver.create(receiverOptions);
     }
 }
