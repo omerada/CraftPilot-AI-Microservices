@@ -68,25 +68,44 @@ public class ActivityEventListener {
     }
     
     private Mono<Void> processRecord(ReceiverRecord<String, ActivityEvent> record) {
-        ActivityEvent event = record.value();
+        ActivityEvent commonsEvent = record.value();
         
-        if (event == null) {
+        if (commonsEvent == null) {
             log.warn("Received null activity event, acknowledging and skipping");
             return Mono.fromRunnable(record::receiverOffset).then();
         }
         
-        if (!event.isValid()) {
-            log.warn("Received invalid activity event: {}, acknowledging and skipping", event);
+        if (!commonsEvent.isValid()) {
+            log.warn("Received invalid activity event: {}, acknowledging and skipping", commonsEvent);
             return Mono.fromRunnable(record::receiverOffset).then();
         }
         
-        log.debug("Processing activity event: {}", event);
+        log.debug("Processing activity event: {}", commonsEvent);
         
-        return activityLogService.saveActivityEvent(event)
+        // Convert from commons ActivityEvent to service ActivityEvent
+        com.craftpilot.activitylogservice.model.ActivityEvent serviceEvent = 
+            convertToServiceActivityEvent(commonsEvent);
+        
+        return activityLogService.processEvent(serviceEvent)
                 .doOnSuccess(v -> {
                     record.receiverOffset().acknowledge();
                     log.debug("Successfully processed and acknowledged activity event");
                 })
-                .doOnError(e -> log.error("Failed to process activity event: {}", e.getMessage(), e));
+                .doOnError(e -> log.error("Failed to process activity event: {}", e.getMessage(), e))
+                .then();
+    }
+    
+    /**
+     * Converts a commons ActivityEvent to the service-specific ActivityEvent
+     */
+    private com.craftpilot.activitylogservice.model.ActivityEvent convertToServiceActivityEvent(
+            com.craftpilot.commons.activity.model.ActivityEvent commonsEvent) {
+        
+        return com.craftpilot.activitylogservice.model.ActivityEvent.builder()
+                .userId(commonsEvent.getUserId())
+                .timestamp(commonsEvent.getTimestamp())
+                .actionType(commonsEvent.getActionType())
+                .metadata(commonsEvent.getMetadata())
+                .build();
     }
 }
