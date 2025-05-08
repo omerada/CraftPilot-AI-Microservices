@@ -58,7 +58,7 @@ ENV JAVA_TOOL_OPTIONS="\
 ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
 
 # Health check düzeltmesi
-HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=5s --timeout=5s --start-period=30s --retries=3 \
   CMD curl -f http://localhost:8062/health || curl -f http://localhost:8062/actuator/health || exit 1
 
 EXPOSE 8062

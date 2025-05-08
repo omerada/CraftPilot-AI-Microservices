@@ -1,0 +1,19 @@
+# ...existing code...
+
+# Actuator yapılandırması ekleyelim/güncelleyelim
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+# ...existing code...
