@@ -14,6 +14,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -111,7 +113,7 @@ public class ActivityLogRepository {
             int limit, 
             String lastDocumentId) {
                 
-        Query query = getCollection().orderBy("timestamp", Query.Direction.DESCENDING);
+        Query query = getCollection().orderBy("eventTime", Query.Direction.DESCENDING);
         
         if (userId != null && !userId.isEmpty()) {
             query = query.whereEqualTo("userId", userId);
@@ -122,11 +124,13 @@ public class ActivityLogRepository {
         }
         
         if (fromDate != null) {
-            query = query.whereGreaterThanOrEqualTo("timestamp", fromDate);
+            Date fromDateAsDate = Date.from(fromDate.atZone(ZoneId.systemDefault()).toInstant());
+            query = query.whereGreaterThanOrEqualTo("eventTime", fromDateAsDate);
         }
         
         if (toDate != null) {
-            query = query.whereLessThanOrEqualTo("timestamp", toDate);
+            Date toDateAsDate = Date.from(toDate.atZone(ZoneId.systemDefault()).toInstant());
+            query = query.whereLessThanOrEqualTo("eventTime", toDateAsDate);
         }
         
         if (lastDocumentId != null && !lastDocumentId.isEmpty()) {
@@ -167,11 +171,13 @@ public class ActivityLogRepository {
         }
         
         if (fromDate != null) {
-            query = query.whereGreaterThanOrEqualTo("timestamp", fromDate);
+            Date fromDateAsDate = Date.from(fromDate.atZone(ZoneId.systemDefault()).toInstant());
+            query = query.whereGreaterThanOrEqualTo("eventTime", fromDateAsDate);
         }
         
         if (toDate != null) {
-            query = query.whereLessThanOrEqualTo("timestamp", toDate);
+            Date toDateAsDate = Date.from(toDate.atZone(ZoneId.systemDefault()).toInstant());
+            query = query.whereLessThanOrEqualTo("eventTime", toDateAsDate);
         }
         
         ApiFuture<QuerySnapshot> future = query.get();

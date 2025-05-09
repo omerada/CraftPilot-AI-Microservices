@@ -76,8 +76,9 @@ logging:
     org.springframework.web: INFO
     org.springframework.kafka: INFO
     com.google.cloud.firestore: INFO
-    com.craftpilot.activitylogservice: INFO
+    com.craftpilot.activitylogservice: DEBUG
     org.apache.kafka: WARN
+    com.google.cloud.firestore.CustomClassMapper: ERROR # Add this line to reduce noise from the CustomClassMapper errors
 
 kafka:
   topics:
