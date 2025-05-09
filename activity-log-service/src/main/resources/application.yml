@@ -29,13 +29,14 @@ spring:
       write-dates-as-timestamps: false
     date-format: com.fasterxml.jackson.databind.util.ISO8601DateFormat
   kafka:
-    bootstrap-servers: kafka:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     consumer:
       group-id: activity-log-service
       auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: com.craftpilot.commons.activity.model,com.craftpilot.activitylogservice.model
+        spring.json.trusted.packages: "*"
         spring.json.value.default.type: com.craftpilot.commons.activity.model.ActivityEvent
         spring.json.use.type.headers: false
 
@@ -114,7 +115,7 @@ eureka:
 activity:
   kafka:
     consumer:
-      topic: user-activity
+      topic: ${kafka.topics.user-activity}
     retry:
       max-attempts: 3
       initial-backoff: 1000
