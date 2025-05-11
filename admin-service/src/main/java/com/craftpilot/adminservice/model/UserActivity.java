@@ -1,10 +1,12 @@
 package com.craftpilot.adminservice.model;
 
-import com.google.cloud.firestore.annotation.DocumentId;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -13,19 +15,32 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Document(collection = "user_activities")
 public class UserActivity {
-    @DocumentId
+    @Id
     private String id;
     
+    @Indexed
     private String userId;
+    
+    @Indexed
     private String serviceId;
+    
+    @Indexed
     private ActivityType activityType;
+    
     private Map<String, Object> activityData;
     private String ipAddress;
     private String userAgent;
+    
+    @Indexed
     private ActivityStatus status;
+    
     private Map<String, Object> metadata;
+    
+    @Indexed
     private LocalDateTime timestamp;
+    
     private LocalDateTime createdAt;
 
     public enum ActivityType {
@@ -49,4 +64,4 @@ public class UserActivity {
         SUSPICIOUS,
         PENDING
     }
-} 
+}

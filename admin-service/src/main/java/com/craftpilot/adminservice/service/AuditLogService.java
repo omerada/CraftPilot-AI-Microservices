@@ -50,7 +50,7 @@ public class AuditLogService {
 
     public Flux<AuditLog> getLogsByTimeRange(LocalDateTime start, LocalDateTime end) {
         log.info("Retrieving audit logs between {} and {}", start, end);
-        return auditLogRepository.findByTimeRange(start, end);
+        return auditLogRepository.findByTimestampBetween(start, end);
     }
 
     public Flux<AuditLog> getLogsByResource(String resource) {
@@ -77,7 +77,7 @@ public class AuditLogService {
 
     public Mono<List<AuditLog>> getRecentLogs(LocalDateTime since) {
         log.info("Retrieving recent audit logs since {}", since);
-        return auditLogRepository.findByTimeRange(since, LocalDateTime.now())
+        return auditLogRepository.findByTimestampBetween(since, LocalDateTime.now())
                 .collectList();
     }
 
@@ -130,4 +130,4 @@ public class AuditLogService {
         return auditLogRepository.findByUserId(userId)
                 .count();
     }
-} 
+}

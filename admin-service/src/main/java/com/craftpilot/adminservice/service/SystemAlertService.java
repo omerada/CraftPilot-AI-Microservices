@@ -49,7 +49,7 @@ public class SystemAlertService {
 
     public Flux<SystemAlert> getAlertsByTimeRange(LocalDateTime start, LocalDateTime end) {
         log.info("Retrieving alerts between {} and {}", start, end);
-        return systemAlertRepository.findByTimeRange(start, end);
+        return systemAlertRepository.findByTimestampBetween(start, end);
     }
 
     public Flux<SystemAlert> getAlertsByAssignee(String assignedTo) {
@@ -118,4 +118,4 @@ public class SystemAlertService {
                         alert.getSeverity() == SystemAlert.AlertSeverity.CRITICAL)
                 .hasElements();
     }
-} 
+}

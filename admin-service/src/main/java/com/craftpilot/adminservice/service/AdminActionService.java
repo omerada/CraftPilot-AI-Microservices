@@ -44,7 +44,7 @@ public class AdminActionService {
 
     public Flux<AdminAction> getActionsByTimeRange(LocalDateTime start, LocalDateTime end) {
         log.info("Retrieving actions between {} and {}", start, end);
-        return adminActionRepository.findByTimeRange(start, end);
+        return adminActionRepository.findByTimestampBetween(start, end);
     }
 
     public Flux<AdminAction> getActionsByTarget(String targetId) {
@@ -74,7 +74,7 @@ public class AdminActionService {
 
     public Mono<List<AdminAction>> getRecentActions(LocalDateTime since) {
         log.info("Retrieving recent actions since {}", since);
-        return adminActionRepository.findByTimeRange(since, LocalDateTime.now())
+        return adminActionRepository.findByTimestampBetween(since, LocalDateTime.now())
                 .collectList();
     }
 
@@ -96,4 +96,4 @@ public class AdminActionService {
         // Şimdilik basit bir kontrol yapıyoruz
         return Mono.just(true);
     }
-} 
+}

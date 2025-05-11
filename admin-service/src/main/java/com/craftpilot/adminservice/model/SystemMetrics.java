@@ -1,10 +1,12 @@
 package com.craftpilot.adminservice.model;
 
-import com.google.cloud.firestore.annotation.DocumentId;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -13,18 +15,28 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Document(collection = "system_metrics")
 public class SystemMetrics {
-    @DocumentId
+    @Id
     private String id;
     
+    @Indexed(unique = true)
     private String serviceId;
+    
+    @Indexed
     private ServiceType serviceType;
+    
+    @Indexed
     private ServiceStatus status;
+    
     private Map<String, Double> resourceUsage; // CPU, Memory, Disk, Network
     private Map<String, Long> requestMetrics; // Total, Success, Failed
     private Map<String, Double> performanceMetrics; // Response Time, Throughput
     private Map<String, Object> customMetrics;
+    
+    @Indexed
     private LocalDateTime timestamp;
+    
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -47,4 +59,4 @@ public class SystemMetrics {
         MAINTENANCE,
         UNKNOWN
     }
-} 
+}

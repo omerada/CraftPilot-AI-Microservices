@@ -13,13 +13,6 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:prod}
     include: kafka-base
   cloud:
-    gcp:
-      credentials:
-        location: file:${GCP_SA_KEY}
-      project-id: ${GCP_PROJECT_ID}
-      firestore:
-        project-id: ${GCP_PROJECT_ID:craft-pilot-ai}
-        enabled: true
     discovery:
       enabled: true
     loadbalancer:
@@ -38,6 +31,13 @@ spring:
           min-idle: 2
           max-wait: 1000ms
         shutdown-timeout: 200ms
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://admin:password@localhost:27017/admindb}
+      database: ${MONGODB_DATABASE:admindb}
+      connection-timeout: 5000
+      max-connection-idle-time: 60000
+      connection-pool-max-size: 20
+      auto-index-creation: true
 
 eureka:
   client:
@@ -70,11 +70,13 @@ management:
         enabled: true
       group:
         readiness:
-          include: redis,diskSpace
+          include: mongo,redis,diskSpace
         liveness:
           include: ping
   health:
     redis:
+      enabled: true
+    mongodb:
       enabled: true
     circuitbreakers:
       enabled: true
@@ -92,4 +94,5 @@ logging:
     com.craftpilot: DEBUG
     org.springframework.web: INFO
     org.springframework.data.redis: INFO
+    org.springframework.data.mongodb: INFO
     org.springframework.cloud: INFO

@@ -54,6 +54,23 @@ public class CircuitBreakerConfig {
     }
 
     @Bean
+    public Customizer<ReactiveResilience4JCircuitBreakerFactory> mongoServiceCustomizer() {
+        return factory -> {
+            factory.configure(builder -> builder
+                .circuitBreakerConfig(io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
+                    .slidingWindowType(SlidingWindowType.COUNT_BASED)
+                    .slidingWindowSize(10)
+                    .failureRateThreshold(50)
+                    .waitDurationInOpenState(Duration.ofSeconds(5))
+                    .permittedNumberOfCallsInHalfOpenState(2)
+                    .build())
+                .timeLimiterConfig(TimeLimiterConfig.custom()
+                    .timeoutDuration(Duration.ofSeconds(3))
+                    .build()), "mongoService");
+        };
+    }
+
+    @Bean
     public Customizer<ReactiveResilience4JCircuitBreakerFactory> redisServiceCustomizer() {
         return factory -> {
             factory.configure(builder -> builder
@@ -87,4 +104,4 @@ public class CircuitBreakerConfig {
                 .build());
         };
     }
-} 
+}

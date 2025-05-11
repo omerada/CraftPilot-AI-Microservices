@@ -44,7 +44,7 @@ public class UserActivityService {
 
     public Flux<UserActivity> getActivitiesByTimeRange(LocalDateTime start, LocalDateTime end) {
         log.info("Retrieving activities between {} and {}", start, end);
-        return userActivityRepository.findByTimeRange(start, end);
+        return userActivityRepository.findByTimestampBetween(start, end);
     }
 
     public Mono<Void> deleteActivity(String id) {
@@ -75,7 +75,7 @@ public class UserActivityService {
 
     public Mono<List<UserActivity>> getRecentActivities(LocalDateTime since) {
         log.info("Retrieving recent activities since {}", since);
-        return userActivityRepository.findByTimeRange(since, LocalDateTime.now())
+        return userActivityRepository.findByTimestampBetween(since, LocalDateTime.now())
                 .collectList();
     }
 
@@ -84,4 +84,4 @@ public class UserActivityService {
         return userActivityRepository.findByUserId(userId)
                 .count();
     }
-} 
+}
