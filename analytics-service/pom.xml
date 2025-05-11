@@ -190,6 +190,12 @@
             <artifactId>hibernate-validator</artifactId>
         </dependency>
 
+        <!-- Jakarta EL Implementation - Bean Validation için gerekli -->
+        <dependency>
+            <groupId>org.glassfish</groupId>
+            <artifactId>jakarta.el</artifactId>
+        </dependency>
+
         <!-- Spring Retry for MongoDB connection retry -->
         <dependency>
             <groupId>org.springframework.retry</groupId>
