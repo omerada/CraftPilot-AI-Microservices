@@ -1,6 +1,8 @@
 package com.craftpilot.analyticsservice.model;
 
-import com.google.cloud.firestore.annotation.DocumentId;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,20 +16,33 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Document(collection = "analytics_reports")
 public class AnalyticsReport {
-    @DocumentId
+    @Id
     private String id;
     
     private String name;
+    
+    @Indexed
     private ReportType type;
+    
     private String description;
     private Map<String, Object> parameters;
     private Map<String, Object> data;
     private List<String> tags;
+    
+    @Indexed
     private ReportStatus status;
+    
+    @Indexed
     private String createdBy;
+    
+    @Indexed
     private LocalDateTime reportStartTime;
+    
+    @Indexed
     private LocalDateTime reportEndTime;
+    
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -48,4 +63,4 @@ public class AnalyticsReport {
         FAILED,
         ARCHIVED
     }
-} 
+}

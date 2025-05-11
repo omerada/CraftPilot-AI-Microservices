@@ -15,7 +15,9 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -32,6 +34,18 @@ public class AnalyticsService {
 
     // Usage Metrics
     public Mono<UsageMetrics> recordUsageMetrics(UsageMetrics metrics) {
+        // ID yoksa oluştur
+        if (metrics.getId() == null) {
+            metrics.setId(UUID.randomUUID().toString());
+        }
+        
+        // Timestamp kontrolü
+        LocalDateTime now = LocalDateTime.now();
+        if (metrics.getCreatedAt() == null) {
+            metrics.setCreatedAt(now);
+        }
+        metrics.setUpdatedAt(now);
+        
         return usageMetricsRepository.save(metrics)
                 .doOnSuccess(saved -> {
                     log.info("Recorded usage metrics for user: {}, service: {}", 
@@ -50,6 +64,18 @@ public class AnalyticsService {
 
     // Performance Metrics
     public Mono<PerformanceMetrics> recordPerformanceMetrics(PerformanceMetrics metrics) {
+        // ID yoksa oluştur
+        if (metrics.getId() == null) {
+            metrics.setId(UUID.randomUUID().toString());
+        }
+        
+        // Timestamp kontrolü
+        LocalDateTime now = LocalDateTime.now();
+        if (metrics.getCreatedAt() == null) {
+            metrics.setCreatedAt(now);
+        }
+        metrics.setUpdatedAt(now);
+        
         return performanceMetricsRepository.save(metrics)
                 .doOnSuccess(saved -> {
                     log.info("Recorded performance metrics for model: {}, type: {}", 
@@ -68,7 +94,19 @@ public class AnalyticsService {
 
     // Analytics Reports
     public Mono<AnalyticsReport> generateReport(AnalyticsReport report) {
+        // ID yoksa oluştur
+        if (report.getId() == null) {
+            report.setId(UUID.randomUUID().toString());
+        }
+        
+        // Timestamp kontrolü
+        LocalDateTime now = LocalDateTime.now();
+        if (report.getCreatedAt() == null) {
+            report.setCreatedAt(now);
+        }
+        report.setUpdatedAt(now);
         report.setStatus(AnalyticsReport.ReportStatus.GENERATING);
+        
         return analyticsReportRepository.save(report)
                 .flatMap(this::processReport)
                 .doOnSuccess(saved -> {

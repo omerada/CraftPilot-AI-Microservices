@@ -91,7 +91,8 @@
             <artifactId>spring-kafka</artifactId>
         </dependency>
 
-        <!-- Google Cloud -->
+        <!-- Google Cloud bağımlılıklarını kaldır -->
+        <!--
         <dependency>
             <groupId>com.google.cloud</groupId>
             <artifactId>spring-cloud-gcp-starter</artifactId>
@@ -100,6 +101,21 @@
         <dependency>
             <groupId>com.google.cloud</groupId>
             <artifactId>google-cloud-firestore</artifactId>
+        </dependency>
+        -->
+
+        <!-- MongoDB Reactive bağımlılığı ekle -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-mongodb-reactive</artifactId>
+        </dependency>
+
+        <!-- Test MongoDB için embedded MongoDB -->
+        <dependency>
+            <groupId>de.flapdoodle.embed</groupId>
+            <artifactId>de.flapdoodle.embed.mongo.spring3x</artifactId>
+            <version>4.11.0</version>
+            <scope>test</scope>
         </dependency>
 
         <!-- Analytics & Monitoring -->
@@ -229,6 +245,9 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+
+            <!-- Google Cloud dependencyManagement bölümünü kaldır -->
+            <!--
             <dependency>
                 <groupId>com.google.cloud</groupId>
                 <artifactId>spring-cloud-gcp-dependencies</artifactId>
@@ -236,6 +255,7 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            -->
         </dependencies>
     </dependencyManagement>
 

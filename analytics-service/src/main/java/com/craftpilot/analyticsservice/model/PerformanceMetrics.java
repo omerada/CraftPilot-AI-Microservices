@@ -1,6 +1,8 @@
 package com.craftpilot.analyticsservice.model;
 
-import com.google.cloud.firestore.annotation.DocumentId;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,26 +15,38 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Document(collection = "performance_metrics")
 public class PerformanceMetrics {
-    @DocumentId
+    @Id
     private String id;
     
+    @Indexed
     private String modelId;
+    
+    @Indexed
     private String serviceId;
+    
+    @Indexed
     private MetricType type;
-    private Map<String, Double> metrics;
-    private Map<String, Long> counts;
-    private Map<String, Object> dimensions;
+    
+    private Double responseTime;
+    private Long tokensPerSecond;
+    private Double accuracy;
+    private Double relevanceScore;
+    private Map<String, Double> customScores;
+    private Map<String, Object> metadata;
+    
+    @Indexed
     private LocalDateTime timestamp;
+    
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     public enum MetricType {
-        LATENCY,
+        RESPONSE_TIME,
         THROUGHPUT,
-        ERROR_RATE,
-        SUCCESS_RATE,
-        RESOURCE_USAGE,
+        ACCURACY,
+        RELEVANCE,
         CUSTOM
     }
-} 
+}

@@ -17,12 +17,17 @@ spring:
       enabled: true
   main:
     web-application-type: reactive
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/analytics}
+      auto-index-creation: true
 
 # Kafka topic yapılandırması
 kafka:
   topics:
     analytics-events: analytics-events
     metrics-events: metrics-events
+  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
 
 management:
   endpoints:
@@ -79,3 +84,4 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] [%X{userId}] %-5level %logger{36} - %msg%n"
   level:
     com.craftpilot.analyticsservice: ${LOG_LEVEL:INFO}
+    org.springframework.data.mongodb: INFO
