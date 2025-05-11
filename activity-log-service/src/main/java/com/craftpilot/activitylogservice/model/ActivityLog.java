@@ -28,4 +28,16 @@ public class ActivityLog {
     private LocalDateTime timestamp;
     private String ipAddress;
     private String userAgent;
+    
+    /**
+     * ActivityEvent nesnesinden ActivityLog nesnesi oluşturur
+     */
+    public static ActivityLog fromEvent(ActivityEvent event) {
+        return ActivityLog.builder()
+                .userId(event.getUserId())
+                .actionType(event.getActionType())
+                .timestamp(event.getTimestamp())
+                .metadata(event.getMetadata())
+                .build();
+    }
 }
