@@ -8,7 +8,8 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.util.Date;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -22,12 +23,22 @@ public class Credit {
     @Indexed(unique = true)
     private String userId;
     
-    private double balance;
+    // Standard credits
+    private BigDecimal balance;
+    private BigDecimal totalCreditsEarned;
+    private BigDecimal totalCreditsUsed;
+    
+    // Advanced credits
+    private BigDecimal advancedBalance;
+    private BigDecimal totalAdvancedCreditsEarned;
+    private BigDecimal totalAdvancedCreditsUsed;
+    
+    // For backward compatibility
     private double lifetimeEarned;
     private double lifetimeSpent;
     
     private boolean deleted;
     
-    private Date lastUpdated;
-    private Date createdAt;
+    private LocalDateTime lastUpdated;
+    private LocalDateTime createdAt;
 }

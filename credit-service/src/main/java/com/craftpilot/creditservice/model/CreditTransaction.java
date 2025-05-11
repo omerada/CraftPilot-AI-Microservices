@@ -25,19 +25,22 @@ public class CreditTransaction {
     @Indexed
     private String userId;
     
-    private double amount;
+    private String serviceId;
+    
+    private BigDecimal amount;
     private String description;
-    private TransactionType type;
+    private String type; // String representation (CREDIT/DEBIT)
+    private TransactionType type2; // Enum representation
     private TransactionStatus status;
-    private CreditType creditType;
+    private String creditType; // String representation
+    private CreditType creditTypeEnum; // Enum representation
     private String relatedTransactionId;
     private Map<String, Object> metadata;
     
     private boolean deleted;
     
     @Indexed
-    private Date timestamp;
-    
+    private LocalDateTime timestamp;
     private Date updatedAt;
     
     public enum TransactionType {

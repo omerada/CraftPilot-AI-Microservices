@@ -4,6 +4,7 @@ import com.craftpilot.creditservice.event.CreditEvent;
 import com.craftpilot.creditservice.exception.InsufficientCreditsException;
 import com.craftpilot.creditservice.model.Credit;
 import com.craftpilot.creditservice.model.CreditTransaction;
+import com.craftpilot.creditservice.model.CreditType;
 import com.craftpilot.creditservice.repository.CreditRepository;
 import com.craftpilot.creditservice.repository.CreditTransactionRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Date;
 
 @Service
 @RequiredArgsConstructor
@@ -60,7 +62,7 @@ public class CreditService {
                             .amount(amount)
                             .description(description)
                             .status(CreditTransaction.TransactionStatus.PENDING)
-                            .createdAt(LocalDateTime.now())
+                            .timestamp(LocalDateTime.now())
                             .build();
 
                     return transactionRepository.save(transaction)
@@ -159,7 +161,7 @@ public class CreditService {
     }
 
     public Flux<CreditTransaction> getUserTransactions(String userId) {
-        return transactionRepository.findByUserId(userId);
+        return transactionRepository.findByUserIdAndDeletedFalse(userId);
     }
 
     /**
@@ -250,12 +252,17 @@ public class CreditService {
                     log.info("Creating new credit record for user: {}", userId);
                     Credit newCredit = Credit.builder()
                             .userId(userId)
-                            .balance(0.0)
+                            .balance(new BigDecimal("0.0"))
+                            .totalCreditsEarned(new BigDecimal("0.0"))
+                            .totalCreditsUsed(new BigDecimal("0.0"))
+                            .advancedBalance(new BigDecimal("0.0"))
+                            .totalAdvancedCreditsEarned(new BigDecimal("0.0"))
+                            .totalAdvancedCreditsUsed(new BigDecimal("0.0"))
                             .lifetimeEarned(0.0)
                             .lifetimeSpent(0.0)
                             .deleted(false)
-                            .createdAt(new Date())
-                            .lastUpdated(new Date())
+                            .createdAt(LocalDateTime.now())
+                            .lastUpdated(LocalDateTime.now())
                             .build();
                     return creditRepository.save(newCredit);
                 }));
@@ -264,12 +271,14 @@ public class CreditService {
     public Mono<CreditTransaction> addCredits(String userId, double amount, CreditType creditType, String description) {
         CreditTransaction transaction = CreditTransaction.builder()
                 .userId(userId)
-                .amount(amount)
-                .type(CreditTransaction.TransactionType.CREDIT)
+                .amount(BigDecimal.valueOf(amount))
+                .type(CreditTransaction.TransactionType.CREDIT.toString())
+                .type2(CreditTransaction.TransactionType.CREDIT)
                 .status(CreditTransaction.TransactionStatus.PENDING)
-                .creditType(creditType)
+                .creditType(creditType.toString())
+                .creditTypeEnum(creditType)
                 .description(description)
-                .timestamp(new Date())
+                .timestamp(LocalDateTime.now())
                 .deleted(false)
                 .build();
                 
@@ -279,16 +288,17 @@ public class CreditService {
 
     public Mono<CreditTransaction> useCredits(String userId, double amount, String description) {
         return getUserCredit(userId)
-                .filter(credit -> credit.getBalance() >= amount)
+                .filter(credit -> credit.getBalance().doubleValue() >= amount)
                 .switchIfEmpty(Mono.error(new InsufficientCreditsException("Insufficient credits")))
                 .flatMap(credit -> {
                     CreditTransaction transaction = CreditTransaction.builder()
                             .userId(userId)
-                            .amount(amount)
-                            .type(CreditTransaction.TransactionType.DEBIT)
+                            .amount(BigDecimal.valueOf(amount))
+                            .type(CreditTransaction.TransactionType.DEBIT.toString())
+                            .type2(CreditTransaction.TransactionType.DEBIT)
                             .status(CreditTransaction.TransactionStatus.PENDING)
                             .description(description)
-                            .timestamp(new Date())
+                            .timestamp(LocalDateTime.now())
                             .deleted(false)
                             .build();
                     return transactionRepository.save(transaction);
@@ -299,14 +309,14 @@ public class CreditService {
     private Mono<CreditTransaction> processTransaction(CreditTransaction transaction) {
         return creditRepository.findByUserIdAndDeletedFalse(transaction.getUserId())
                 .flatMap(credit -> {
-                    if (transaction.getType() == CreditTransaction.TransactionType.CREDIT) {
-                        credit.setBalance(credit.getBalance() + transaction.getAmount());
-                        credit.setLifetimeEarned(credit.getLifetimeEarned() + transaction.getAmount());
+                    if (transaction.getType2() == CreditTransaction.TransactionType.CREDIT) {
+                        credit.setBalance(credit.getBalance().add(transaction.getAmount()));
+                        credit.setLifetimeEarned(credit.getLifetimeEarned() + transaction.getAmount().doubleValue());
                     } else {
-                        credit.setBalance(credit.getBalance() - transaction.getAmount());
-                        credit.setLifetimeSpent(credit.getLifetimeSpent() + transaction.getAmount());
+                        credit.setBalance(credit.getBalance().subtract(transaction.getAmount()));
+                        credit.setLifetimeSpent(credit.getLifetimeSpent() + transaction.getAmount().doubleValue());
                     }
-                    credit.setLastUpdated(new Date());
+                    credit.setLastUpdated(LocalDateTime.now());
                     return creditRepository.save(credit);
                 })
                 .then(Mono.fromCallable(() -> {
@@ -315,10 +325,6 @@ public class CreditService {
                     return transaction;
                 }))
                 .flatMap(transactionRepository::save);
-    }
-
-    public Flux<CreditTransaction> getUserTransactions(String userId) {
-        return transactionRepository.findByUserIdAndDeletedFalse(userId);
     }
 
     public Mono<Void> processPendingTransactions() {

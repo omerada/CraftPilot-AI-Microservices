@@ -13,12 +13,12 @@ public class CreditDto {
     private String id;
     private String userId;
     
-    // Standart kredi bilgileri
+    // Standard credit information
     private BigDecimal balance;
     private BigDecimal totalCreditsEarned;
     private BigDecimal totalCreditsUsed;
     
-    // Gelişmiş kredi bilgileri
+    // Advanced credit information
     private BigDecimal advancedBalance;
     private BigDecimal totalAdvancedCreditsEarned;
     private BigDecimal totalAdvancedCreditsUsed;
