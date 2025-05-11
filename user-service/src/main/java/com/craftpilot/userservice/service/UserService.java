@@ -67,6 +67,7 @@ public class UserService {
 
     @Transactional
     public Mono<UserEntity> createUser(UserEntity user) {
+        userCreationCounter.increment();
         return userRepository.save(user)
                 .doOnSuccess(savedUser -> {
                     kafkaService.sendUserCreatedEvent(savedUser);

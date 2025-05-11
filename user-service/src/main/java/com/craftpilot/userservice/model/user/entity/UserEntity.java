@@ -7,9 +7,14 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import java.util.Map;
 
 @Data
@@ -18,29 +23,35 @@ import java.util.Map;
 @AllArgsConstructor
 @Document(collection = "users")
 public class UserEntity {
+
     @Id
     private String id;
-    
+
     @Indexed(unique = true)
+    @NotEmpty(message = "Email cannot be empty")
+    @Email(message = "Invalid email format")
     private String email;
-    
+
     @Indexed(unique = true)
+    @NotEmpty(message = "Username cannot be empty")
+    @Size(min = 3, max = 30, message = "Username must be between 3 and 30 characters")
     private String username;
-    
+
     private String displayName;
     private String photoUrl;
-    
-    @Indexed
-    private UserRole role;
-    
-    @Indexed
-    private UserStatus status;
-    
-    private Map<String, Object> preferences;
     private Map<String, Object> metadata;
-    
-    @Indexed
+
+    @Builder.Default
+    private UserRole role = UserRole.USER;
+
+    @Builder.Default
+    private UserStatus status = UserStatus.PENDING;
+
+    @CreatedDate
     private Long createdAt;
-    
+
+    @LastModifiedDate
     private Long updatedAt;
+    
+    private Long lastLoginAt;
 }
