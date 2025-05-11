@@ -303,7 +303,6 @@ jobs:
                   -v "$(pwd)/mongo-config:/data/configdb" \
                   -v "$(pwd)/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro" \
                   -p "${MONGO_PORT:-27017}:27017" \
-                  --command "--wiredTigerCacheSizeGB ${MONGO_CACHE_SIZE_GB:-0.5} --setParameter maxTransactionLockRequestTimeoutMillis=5000 --auth --bind_ip_all" \
                   --health-cmd="echo 'db.runCommand(\"ping\").ok' | mongosh localhost:27017/admin --quiet --username ${MONGO_ROOT_USERNAME:-craftpilot} --password ${MONGO_ROOT_PASSWORD:-secure_password} --authenticationDatabase admin | grep 1" \
                   --health-interval=10s \
                   --health-timeout=5s \
@@ -312,7 +311,8 @@ jobs:
                   --log-driver json-file \
                   --log-opt max-size=50m \
                   --log-opt max-file=3 \
-                  mongo:6.0
+                  mongo:6.0 \
+                  --wiredTigerCacheSizeGB ${MONGO_CACHE_SIZE_GB:-0.5} --setParameter maxTransactionLockRequestTimeoutMillis=5000 --auth --bind_ip_all
 
                 echo "==== MongoDB Express Servisini Başlatma ===="
                 # MongoDB'nin başlamasını bekle
