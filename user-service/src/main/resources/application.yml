@@ -18,6 +18,9 @@ spring:
     redis:
       repositories:
         enabled: false
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority}
+      database: ${MONGO_INITDB_DATABASE:craftpilot}
   firebase:
     config:
       path: ${FIREBASE_CONFIG_PATH:/etc/gcp/credentials/gcp-credentials.json}

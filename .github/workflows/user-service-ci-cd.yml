@@ -136,6 +136,8 @@ jobs:
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
+                -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
+                -e MONGO_INITDB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }} \
                 -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
                 -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
                 -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
@@ -146,6 +148,7 @@ jobs:
                 -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
                 -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_NETFLIX_EUREKA=DEBUG \
                 -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_REDIS=DEBUG \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB=DEBUG \
                 -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5007" \
                 --health-cmd="curl -f http://localhost:8060/actuator/health || exit 1" \
                 --health-interval=10s \
@@ -171,6 +174,8 @@ jobs:
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
+                -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
+                -e MONGO_INITDB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }} \
                 -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
                 -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
                 -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \

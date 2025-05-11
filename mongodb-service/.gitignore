@@ -1,0 +1,18 @@
+# Veritabanı dosyaları
+mongo-data/
+mongo-config/
+
+# Yedekler
+backups/
+
+# Çevre değişkenleri dosyası
+.env
+
+# Geçici dosyalar
+*.tmp
+*.log
+
+# IDE dosyaları
+.idea/
+.vscode/
+*.iml

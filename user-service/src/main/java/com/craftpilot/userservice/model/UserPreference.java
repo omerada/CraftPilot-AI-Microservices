@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.TypeAlias;
-import com.google.cloud.firestore.annotation.DocumentId;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -18,10 +18,10 @@ import java.util.Map;
 @AllArgsConstructor
 @Builder
 @TypeAlias("userPreference")
+@Document(collection = "user_preferences")
 public class UserPreference {
     @Id
-    @DocumentId
-    private String userId;
+    private String id;
 
     // Tema modu (light, dark, system)
     @Builder.Default

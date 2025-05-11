@@ -209,7 +209,7 @@ public class UserService {
                     // Kullanıcı tercihlerini sil
                     return userPreferenceService.deleteUserPreferences(userId)
                             .then(Mono.defer(() -> {
-                                // Firestore'dan kullanıcıyı sil
+                                // MongoDB'den kullanıcıyı sil
                                 return userRepository.deleteById(userId);
                             }))
                             .then(Mono.fromRunnable(() -> {

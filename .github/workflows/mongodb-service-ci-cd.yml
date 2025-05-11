@@ -1,0 +1,180 @@
+name: MongoDB Service CI/CD
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "mongodb-service/**"
+      - ".github/workflows/mongodb-service-ci-cd.yml"
+  workflow_dispatch:
+    inputs:
+      action:
+        type: choice
+        description: "Action to perform"
+        options:
+          - deploy
+          - restart
+          - backup
+          - restore
+          - status
+        default: "restart"
+      clean_data:
+        type: boolean
+        description: "⚠️ TEHLİKE: Volume'ları temizle (tüm veriler silinir!)"
+        default: false
+      backup_file:
+        type: string
+        description: "Geri yüklenecek yedek dosyası (restore işlemi için)"
+        required: false
+
+jobs:
+  deploy-mongodb:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: "10m"
+          script: |
+            echo "==== MongoDB Servisi Yönetimi Başlatılıyor ===="
+
+            set -e
+
+            # MongoDB dizinini oluştur
+            mkdir -p /opt/craftpilot/mongodb-service
+            cd /opt/craftpilot/mongodb-service
+
+            # Docker ağını oluştur
+            docker network create craftpilot-network || true
+
+            # İşlem türünü belirle
+            ACTION="${{ github.event.inputs.action }}"
+            CLEAN_DATA="${{ github.event.inputs.clean_data }}"
+            BACKUP_FILE="${{ github.event.inputs.backup_file }}"
+
+            # Eğer volume'ları temizleme isteniyorsa ve onay verildiyse
+            if [ "$CLEAN_DATA" == "true" ]; then
+              echo "==== ⚠️ TEHLİKE: MongoDB Volume'ları Temizleniyor! ===="
+              docker-compose down || true
+              sudo rm -rf ./mongo-data ./mongo-config ./backups || true
+              mkdir -p ./mongo-data ./mongo-config ./backups
+              echo "==== Volume'lar Temizlendi! ===="
+            fi
+
+            # Repository'den dosyaları kopyala
+            echo "Configürasyon dosyalarını kopyalama"
+            cp $GITHUB_WORKSPACE/mongodb-service/docker-compose.yml .
+            cp $GITHUB_WORKSPACE/mongodb-service/init-mongo.js .
+
+            # Scripts dizinini oluştur
+            mkdir -p scripts
+            cp $GITHUB_WORKSPACE/mongodb-service/scripts/backup.sh scripts/
+            cp $GITHUB_WORKSPACE/mongodb-service/scripts/restore.sh scripts/
+            chmod +x scripts/backup.sh scripts/restore.sh
+
+            # .env dosyasını oluştur
+            cat > .env << EOL
+            MONGO_ROOT_USERNAME=${{ secrets.MONGO_ROOT_USERNAME }}
+            MONGO_ROOT_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }}
+            MONGO_INITDB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}
+            MONGO_PORT=27017
+            MONGO_CACHE_SIZE_GB=0.5
+            MONGO_EXPRESS_USER=${{ secrets.MONGO_EXPRESS_USER }}
+            MONGO_EXPRESS_PASSWORD=${{ secrets.MONGO_EXPRESS_PASSWORD }}
+            MONGO_EXPRESS_PORT=8081
+            MONGODB_URI=mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@mongodb:27017/${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}?authSource=admin&retryWrites=true&w=majority
+            MONGODB_URI_EXTERNAL=mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@localhost:27017/${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}?authSource=admin&retryWrites=true&w=majority
+            EOL
+
+            # Dizin yapısını oluştur
+            mkdir -p ./backups
+
+            case "$ACTION" in
+              deploy|restart)
+                echo "==== MongoDB Servisi Başlatılıyor ===="
+                docker-compose down || true
+                docker-compose up -d
+                
+                # Servisin başlamasını bekle
+                echo "==== MongoDB'nin başlaması bekleniyor ===="
+                sleep 20
+                
+                # Sağlık kontrolü
+                if docker exec craftpilot-mongodb mongosh --quiet --eval "db.runCommand('ping').ok" admin -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }} | grep -q 1; then
+                  echo "✅ MongoDB başarıyla çalışıyor!"
+                else
+                  echo "❌ MongoDB başlatılamadı!"
+                  docker-compose logs mongodb
+                  exit 1
+                fi
+
+                # Mongo Express'in sağlık kontrolü
+                if curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.MONGO_EXPRESS_USER }}:${{ secrets.MONGO_EXPRESS_PASSWORD }}@localhost:8081 | grep -q 200; then
+                  echo "✅ Mongo Express başarıyla çalışıyor!"
+                else
+                  echo "⚠️ Mongo Express başlatılamadı, loglar kontrol ediliyor..."
+                  docker-compose logs mongo-express
+                fi
+                ;;
+                
+              backup)
+                echo "==== MongoDB Yedeği Alınıyor ===="
+                cd scripts
+                ./backup.sh
+                echo "==== En Son Alınan Yedekler ===="
+                ls -lh ../backups
+                ;;
+              
+              restore)
+                if [ -z "$BACKUP_FILE" ]; then
+                  echo "Hata: Geri yüklenecek yedek dosyası belirtilmedi!"
+                  echo "Kullanım: backup_20230301_120000.tar.gz formatında bir dosya adı belirtin"
+                  exit 1
+                fi
+                
+                echo "==== MongoDB Yedeği Geri Yükleniyor: $BACKUP_FILE ===="
+                cd scripts
+                ./restore.sh $BACKUP_FILE
+                ;;
+                
+              status)
+                echo "==== MongoDB Servis Durumu ===="
+                docker-compose ps
+                
+                echo "==== MongoDB Bağlantı Bilgileri ===="
+                docker exec craftpilot-mongodb mongosh --quiet --eval "db.serverStatus().connections" admin -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }}
+                
+                echo "==== MongoDB Depolama Bilgileri ===="
+                docker exec craftpilot-mongodb df -h /data/db
+                
+                echo "==== MongoDB Veritabanları ===="
+                docker exec craftpilot-mongodb mongosh --quiet --eval "db.adminCommand('listDatabases')" admin -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }}
+                
+                echo "==== MongoDB İstatistikleri ===="
+                docker exec craftpilot-mongodb mongosh --quiet --eval "db.stats()" admin -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }}
+                ;;
+                
+              *)
+                echo "Geçersiz işlem: $ACTION"
+                exit 1
+                ;;
+            esac
+
+            echo "==== MongoDB Servisi Yönetimi Tamamlandı ===="
+
+            # Bağlantı bilgilerini görüntüle
+            if [ "$ACTION" = "deploy" ] || [ "$ACTION" = "restart" ]; then
+              echo ""
+              echo "==== MongoDB Bağlantı Bilgileri ===="
+              echo "MongoDB URI (service): $MONGODB_URI"
+              echo "MongoDB URI (external): $MONGODB_URI_EXTERNAL"
+              echo "Mongo Express: http://localhost:8081"
+              echo ""
+              echo "Bu bilgilerin GitHub Secrets'a eklenmesi gerekiyor!"
+            fi

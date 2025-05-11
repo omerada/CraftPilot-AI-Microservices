@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Import;
 @Import(LightSecurityConfig.class)
 @SpringBootApplication
 @EnableDiscoveryClient
-@EnableScheduling  // Düzenli görevleri etkinleştir
+@EnableScheduling  
 public class UserServiceApplication {
 
     public static void main(String[] args) {
