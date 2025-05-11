@@ -61,7 +61,8 @@ jobs:
             # Eğer volume'ları temizleme isteniyorsa ve onay verildiyse
             if [ "$CLEAN_DATA" == "true" ]; then
               echo "==== ⚠️ TEHLİKE: MongoDB Volume'ları Temizleniyor! ===="
-              docker-compose down || true
+              docker stop craftpilot-mongodb craftpilot-mongo-express || true
+              docker rm craftpilot-mongodb craftpilot-mongo-express || true
               sudo rm -rf ./mongo-data ./mongo-config ./backups || true
               mkdir -p ./mongo-data ./mongo-config ./backups
               echo "==== Volume'lar Temizlendi! ===="
@@ -69,78 +70,8 @@ jobs:
 
             # Repository'den dosyaları kopyala
             echo "Configürasyon dosyalarını kopyalama"
-            # GITHUB_WORKSPACE yerine doğrudan dosyaları scp ile VPS'e aktaracağız
 
-            cat > docker-compose.yml << 'EOL'
-            version: "3.8"
-
-            services:
-              mongodb:
-                image: mongo:6.0
-                container_name: craftpilot-mongodb
-                restart: unless-stopped
-                environment:
-                  MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-craftpilot}
-                  MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-secure_password}
-                  MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-craftpilot}
-                  TZ: UTC
-                volumes:
-                  - ./mongo-data:/data/db
-                  - ./mongo-config:/data/configdb
-                  - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
-                ports:
-                  - "${MONGO_PORT:-27017}:27017"
-                networks:
-                  - craftpilot-network
-                command: >
-                  --wiredTigerCacheSizeGB ${MONGO_CACHE_SIZE_GB:-0.5}
-                  --setParameter maxTransactionLockRequestTimeoutMillis=5000
-                  --auth
-                  --bind_ip_all
-                healthcheck:
-                  test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/admin --quiet --username ${MONGO_ROOT_USERNAME:-craftpilot} --password ${MONGO_ROOT_PASSWORD:-secure_password} --authenticationDatabase admin | grep 1
-                  interval: 10s
-                  timeout: 5s
-                  retries: 5
-                  start_period: 30s
-                logging:
-                  driver: "json-file"
-                  options:
-                    max-size: "50m"
-                    max-file: "3"
-
-              mongo-express:
-                image: mongo-express:latest
-                container_name: craftpilot-mongo-express
-                restart: unless-stopped
-                depends_on:
-                  - mongodb
-                environment:
-                  ME_CONFIG_MONGODB_SERVER: mongodb
-                  ME_CONFIG_MONGODB_PORT: 27017
-                  ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USERNAME:-craftpilotadmin}
-                  ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD:-secure_password}
-                  ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER:-admin}
-                  ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-admin_pass}
-                  ME_CONFIG_SITE_BASEURL: /mongo-express
-                  ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
-                  ME_CONFIG_OPTIONS_EDITORTHEME: ambiance
-                ports:
-                  - "${MONGO_EXPRESS_PORT:-8081}:8081"
-                networks:
-                  - craftpilot-network
-                healthcheck:
-                  test: wget --quiet --tries=1 --spider http://${MONGO_EXPRESS_USER:-admin}:${MONGO_EXPRESS_PASSWORD:-admin_pass}@localhost:8081 || exit 1
-                  interval: 30s
-                  timeout: 10s
-                  retries: 3
-                  start_period: 30s
-
-            networks:
-              craftpilot-network:
-                external: true
-            EOL
-
+            # init-mongo.js oluştur
             cat > init-mongo.js << 'EOL'
             // MongoDB başlangıç yapılandırma dosyası
             db = db.getSiblingDB("admin");
@@ -340,14 +271,73 @@ jobs:
             MONGODB_URI_EXTERNAL=mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@localhost:27017/${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}?authSource=admin&retryWrites=true&w=majority
             EOL
 
+            # Yükleme için gerekli değişkenleri tanımla
+            export MONGO_ROOT_USERNAME="${{ secrets.MONGO_ROOT_USERNAME }}"
+            export MONGO_ROOT_PASSWORD="${{ secrets.MONGO_ROOT_PASSWORD }}"
+            export MONGO_INITDB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}"
+            export MONGO_PORT="27017"
+            export MONGO_CACHE_SIZE_GB="0.5"
+            export MONGO_EXPRESS_USER="${{ secrets.MONGO_EXPRESS_USER }}"
+            export MONGO_EXPRESS_PASSWORD="${{ secrets.MONGO_EXPRESS_PASSWORD }}"
+            export MONGO_EXPRESS_PORT="8081"
+
             # Dizin yapısını oluştur
             mkdir -p ./backups
 
             case "$ACTION" in
               deploy|restart)
-                echo "==== MongoDB Servisi Başlatılıyor ===="
-                docker-compose down || true
-                docker-compose up -d
+                echo "==== MongoDB Servislerini Durdurma ===="
+                docker stop craftpilot-mongodb craftpilot-mongo-express || true
+                docker rm craftpilot-mongodb craftpilot-mongo-express || true
+                
+                echo "==== MongoDB Servisini Başlatma ===="
+                docker run -d \
+                  --name craftpilot-mongodb \
+                  --network craftpilot-network \
+                  --restart unless-stopped \
+                  -e MONGO_INITDB_ROOT_USERNAME="${MONGO_ROOT_USERNAME:-craftpilot}" \
+                  -e MONGO_INITDB_ROOT_PASSWORD="${MONGO_ROOT_PASSWORD:-secure_password}" \
+                  -e MONGO_INITDB_DATABASE="${MONGO_INITDB_DATABASE:-craftpilot}" \
+                  -e TZ="UTC" \
+                  -v "$(pwd)/mongo-data:/data/db" \
+                  -v "$(pwd)/mongo-config:/data/configdb" \
+                  -v "$(pwd)/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro" \
+                  -p "${MONGO_PORT:-27017}:27017" \
+                  --command "--wiredTigerCacheSizeGB ${MONGO_CACHE_SIZE_GB:-0.5} --setParameter maxTransactionLockRequestTimeoutMillis=5000 --auth --bind_ip_all" \
+                  --health-cmd="echo 'db.runCommand(\"ping\").ok' | mongosh localhost:27017/admin --quiet --username ${MONGO_ROOT_USERNAME:-craftpilot} --password ${MONGO_ROOT_PASSWORD:-secure_password} --authenticationDatabase admin | grep 1" \
+                  --health-interval=10s \
+                  --health-timeout=5s \
+                  --health-retries=5 \
+                  --health-start-period=30s \
+                  --log-driver json-file \
+                  --log-opt max-size=50m \
+                  --log-opt max-file=3 \
+                  mongo:6.0
+
+                echo "==== MongoDB Express Servisini Başlatma ===="
+                # MongoDB'nin başlamasını bekle
+                sleep 10
+
+                docker run -d \
+                  --name craftpilot-mongo-express \
+                  --network craftpilot-network \
+                  --restart unless-stopped \
+                  -e ME_CONFIG_MONGODB_SERVER="mongodb" \
+                  -e ME_CONFIG_MONGODB_PORT="27017" \
+                  -e ME_CONFIG_MONGODB_ADMINUSERNAME="${MONGO_ROOT_USERNAME:-craftpilot}" \
+                  -e ME_CONFIG_MONGODB_ADMINPASSWORD="${MONGO_ROOT_PASSWORD:-secure_password}" \
+                  -e ME_CONFIG_BASICAUTH_USERNAME="${MONGO_EXPRESS_USER:-admin}" \
+                  -e ME_CONFIG_BASICAUTH_PASSWORD="${MONGO_EXPRESS_PASSWORD:-admin_pass}" \
+                  -e ME_CONFIG_SITE_BASEURL="/" \
+                  -e ME_CONFIG_MONGODB_ENABLE_ADMIN="true" \
+                  -e ME_CONFIG_OPTIONS_EDITORTHEME="ambiance" \
+                  -p "${MONGO_EXPRESS_PORT:-8081}:8081" \
+                  --health-cmd="wget --quiet --tries=1 --spider http://${MONGO_EXPRESS_USER:-admin}:${MONGO_EXPRESS_PASSWORD:-admin_pass}@localhost:8081 || exit 1" \
+                  --health-interval=30s \
+                  --health-timeout=10s \
+                  --health-retries=3 \
+                  --health-start-period=30s \
+                  mongo-express:latest
                 
                 # Servisin başlamasını bekle
                 echo "==== MongoDB'nin başlaması bekleniyor ===="
@@ -358,7 +348,7 @@ jobs:
                   echo "✅ MongoDB başarıyla çalışıyor!"
                 else
                   echo "❌ MongoDB başlatılamadı!"
-                  docker-compose logs mongodb
+                  docker logs craftpilot-mongodb
                   exit 1
                 fi
 
@@ -367,7 +357,7 @@ jobs:
                   echo "✅ Mongo Express başarıyla çalışıyor!"
                 else
                   echo "⚠️ Mongo Express başlatılamadı, loglar kontrol ediliyor..."
-                  docker-compose logs mongo-express
+                  docker logs craftpilot-mongo-express
                 fi
                 ;;
                 
@@ -393,7 +383,8 @@ jobs:
                 
               status)
                 echo "==== MongoDB Servis Durumu ===="
-                docker-compose ps
+                docker ps -a | grep craftpilot-mongodb
+                docker ps -a | grep craftpilot-mongo-express
                 
                 echo "==== MongoDB Bağlantı Bilgileri ===="
                 docker exec craftpilot-mongodb mongosh --quiet --eval "db.serverStatus().connections" admin -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }}
