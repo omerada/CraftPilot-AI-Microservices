@@ -4,29 +4,30 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.util.Date;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Document(collection = "credits")
 public class Credit {
+    @Id
     private String id;
+    
+    @Indexed(unique = true)
     private String userId;
     
-    // Standart kredi bakiyesi
-    private BigDecimal balance;
-    private BigDecimal totalCreditsEarned;
-    private BigDecimal totalCreditsUsed;
+    private double balance;
+    private double lifetimeEarned;
+    private double lifetimeSpent;
     
-    // Gelişmiş kredi bakiyesi
-    private BigDecimal advancedBalance;
-    private BigDecimal totalAdvancedCreditsEarned;
-    private BigDecimal totalAdvancedCreditsUsed;
-    
-    private LocalDateTime lastUpdated;
-    private LocalDateTime createdAt;
     private boolean deleted;
+    
+    private Date lastUpdated;
+    private Date createdAt;
 }

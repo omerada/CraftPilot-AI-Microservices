@@ -243,4 +243,87 @@ public class CreditService {
         meterRegistry.counter(metricName, "userId", userId)
                 .increment(amount.doubleValue());
     }
+
+    public Mono<Credit> getUserCredit(String userId) {
+        return creditRepository.findByUserIdAndDeletedFalse(userId)
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.info("Creating new credit record for user: {}", userId);
+                    Credit newCredit = Credit.builder()
+                            .userId(userId)
+                            .balance(0.0)
+                            .lifetimeEarned(0.0)
+                            .lifetimeSpent(0.0)
+                            .deleted(false)
+                            .createdAt(new Date())
+                            .lastUpdated(new Date())
+                            .build();
+                    return creditRepository.save(newCredit);
+                }));
+    }
+
+    public Mono<CreditTransaction> addCredits(String userId, double amount, CreditType creditType, String description) {
+        CreditTransaction transaction = CreditTransaction.builder()
+                .userId(userId)
+                .amount(amount)
+                .type(CreditTransaction.TransactionType.CREDIT)
+                .status(CreditTransaction.TransactionStatus.PENDING)
+                .creditType(creditType)
+                .description(description)
+                .timestamp(new Date())
+                .deleted(false)
+                .build();
+                
+        return transactionRepository.save(transaction)
+                .flatMap(savedTransaction -> processTransaction(savedTransaction));
+    }
+
+    public Mono<CreditTransaction> useCredits(String userId, double amount, String description) {
+        return getUserCredit(userId)
+                .filter(credit -> credit.getBalance() >= amount)
+                .switchIfEmpty(Mono.error(new InsufficientCreditsException("Insufficient credits")))
+                .flatMap(credit -> {
+                    CreditTransaction transaction = CreditTransaction.builder()
+                            .userId(userId)
+                            .amount(amount)
+                            .type(CreditTransaction.TransactionType.DEBIT)
+                            .status(CreditTransaction.TransactionStatus.PENDING)
+                            .description(description)
+                            .timestamp(new Date())
+                            .deleted(false)
+                            .build();
+                    return transactionRepository.save(transaction);
+                })
+                .flatMap(this::processTransaction);
+    }
+    
+    private Mono<CreditTransaction> processTransaction(CreditTransaction transaction) {
+        return creditRepository.findByUserIdAndDeletedFalse(transaction.getUserId())
+                .flatMap(credit -> {
+                    if (transaction.getType() == CreditTransaction.TransactionType.CREDIT) {
+                        credit.setBalance(credit.getBalance() + transaction.getAmount());
+                        credit.setLifetimeEarned(credit.getLifetimeEarned() + transaction.getAmount());
+                    } else {
+                        credit.setBalance(credit.getBalance() - transaction.getAmount());
+                        credit.setLifetimeSpent(credit.getLifetimeSpent() + transaction.getAmount());
+                    }
+                    credit.setLastUpdated(new Date());
+                    return creditRepository.save(credit);
+                })
+                .then(Mono.fromCallable(() -> {
+                    transaction.setStatus(CreditTransaction.TransactionStatus.COMPLETED);
+                    transaction.setUpdatedAt(new Date());
+                    return transaction;
+                }))
+                .flatMap(transactionRepository::save);
+    }
+
+    public Flux<CreditTransaction> getUserTransactions(String userId) {
+        return transactionRepository.findByUserIdAndDeletedFalse(userId);
+    }
+
+    public Mono<Void> processPendingTransactions() {
+        return transactionRepository.findByStatusAndDeletedFalse(CreditTransaction.TransactionStatus.PENDING)
+                .flatMap(this::processTransaction)
+                .then();
+    }
 }

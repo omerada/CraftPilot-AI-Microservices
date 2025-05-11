@@ -58,6 +58,15 @@ spring:
           contentType: application/json
   main:
     web-application-type: reactive
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority}
+      database: ${MONGODB_DATABASE:craftpilot}
+      connection-timeout: 30000
+      socket-timeout: 60000
+      max-connection-idle-time: 300000
+      connection-pool-max-size: 20
+      auto-index-creation: true
 
 # Kafka özel yapılandırmaları
 kafka:

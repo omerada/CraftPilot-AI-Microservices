@@ -4,27 +4,41 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Date;
+import java.util.Map;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Document(collection = "credit_transactions")
 public class CreditTransaction {
+    @Id
     private String id;
+    
+    @Indexed
     private String userId;
-    private String serviceId;
-    private BigDecimal amount;
-    private String type; // CREDIT veya DEBIT
-    private TransactionType type2; // Enum representation of type
+    
+    private double amount;
     private String description;
-    private String creditType; // STANDARD veya ADVANCED
-    private LocalDateTime timestamp;
-    private LocalDateTime createdAt;
+    private TransactionType type;
     private TransactionStatus status;
+    private CreditType creditType;
+    private String relatedTransactionId;
+    private Map<String, Object> metadata;
+    
     private boolean deleted;
+    
+    @Indexed
+    private Date timestamp;
+    
+    private Date updatedAt;
     
     public enum TransactionType {
         CREDIT,
