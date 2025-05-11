@@ -8,11 +8,13 @@ import org.springframework.context.annotation.Import;
 import org.springframework.web.reactive.config.EnableWebFlux;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.info.Info;
+import org.springframework.retry.annotation.EnableRetry;
 
 @SpringBootApplication
 @EnableDiscoveryClient 
 @EnableWebFlux
 @Import(LightSecurityConfig.class)
+@EnableRetry
 @OpenAPIDefinition(info = @Info(
     title = "Analytics Service API",
     version = "1.0",
