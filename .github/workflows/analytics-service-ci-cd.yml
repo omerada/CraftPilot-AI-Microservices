@@ -83,6 +83,10 @@ jobs:
             docker stop analytics-service || true
             docker rm analytics-service || true
 
+            echo "=== Setting up MongoDB credentials ==="
+            mkdir -p /opt/craftpilot/mongodb-config
+            chmod 755 /opt/craftpilot/mongodb-config
+
             echo "=== Starting New Container ==="
             docker run -d \
               --name analytics-service \
@@ -95,17 +99,20 @@ jobs:
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
-              -e SPRING_CLOUD_GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
               -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
               -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/gcp-credentials.json \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
-              -e LOGGING_LEVEL_COM_GOOGLE_CLOUD=DEBUG \
               -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-              -e KAFKA_ENABLED=${KAFKA_ENABLED:-false} \
+              -e KAFKA_ENABLED=true \
+              --health-cmd="curl -f http://localhost:8064/actuator/health || exit 1" \
+              --health-interval=30s \
+              --health-timeout=10s \
+              --health-retries=5 \
+              --health-start-period=120s \
               ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
@@ -115,15 +122,35 @@ jobs:
             docker logs analytics-service
 
             echo "=== Health Check ==="
-            for i in {1..5}; do
+            max_attempts=12
+            counter=0
+
+            while [ $counter -lt $max_attempts ]; do
+              echo "Health check attempt $((counter + 1))/$max_attempts"
+              
+              # Container durumu kontrolü
+              if ! docker ps --filter "name=analytics-service" --format '{{.Status}}' | grep -q "Up"; then
+                echo "Container is not running anymore. Checking logs..."
+                docker logs analytics-service --tail 100
+                exit 1
+              fi
+              
+              # Health check
               if curl -f http://localhost:8064/actuator/health; then
-                echo "Service is healthy"
+                echo "Service is healthy!"
                 exit 0
               fi
-              echo "Waiting for service to start... Attempt $i"
-              sleep 10
+              
+              echo "Waiting for service to start... Attempt $((counter + 1))/$max_attempts"
+              sleep 20
+              counter=$((counter + 1))
             done
 
             echo "Service failed health check"
+            echo "=== Detailed Container Logs ==="
             docker logs analytics-service
+            echo "=== Container Status ==="
+            docker inspect analytics-service --format='{{.State.Status}}'
+            echo "=== Health Check Status ==="
+            docker inspect analytics-service --format='{{.State.Health.Status}}'
             exit 1

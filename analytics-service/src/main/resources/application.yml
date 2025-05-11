@@ -27,6 +27,13 @@ spring:
       max-connection-idle-time: 300000
       retry-writes: true
       retry-reads: true
+      server-selection-timeout: 20000
+      max-wait-time: 15000
+      connection-pool:
+        max-size: 20
+        min-size: 5
+        max-wait-time: 15000
+        max-connection-lifetime: 30000
 
 # Kafka topic yapılandırması
 kafka:
@@ -42,7 +49,7 @@ kafka:
     operations-timeout: 10000
     close-timeout: 5000
 
-# Add MongoDB resilience configuration
+# MongoDB resilience configuration
 mongodb:
   connection:
     retry:
@@ -63,6 +70,13 @@ management:
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: mongo,redis,diskSpace
+        liveness:
+          include: ping
   metrics:
     tags:
       application: ${spring.application.name}
@@ -76,9 +90,13 @@ eureka:
       defaultZone: ${EUREKA_SERVER_URL:http://craftpilot:13579ada@eureka-server:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
+    registry-fetch-interval-seconds: 5
   instance:
     prefer-ip-address: true
     hostname: ${HOSTNAME:analytics-service}
+    instance-id: ${spring.application.name}:${spring.cloud.client.hostname}:${server.port}
+    lease-renewal-interval-in-seconds: 10
+    health-check-url-path: /actuator/health
 
 springdoc:
   swagger-ui:
@@ -104,6 +122,16 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
         permittedNumberOfCallsInHalfOpenState: 3
+  retry:
+    instances:
+      mongoRetry:
+        maxAttempts: 5
+        waitDuration: 1s
+        retryExceptions:
+          - org.springframework.dao.DataAccessResourceFailureException
+          - org.springframework.data.mongodb.UncategorizedMongoDbException
+          - com.mongodb.MongoSocketOpenException
+          - com.mongodb.MongoTimeoutException
 
 logging:
   pattern:
@@ -111,3 +139,5 @@ logging:
   level:
     com.craftpilot.analyticsservice: ${LOG_LEVEL:INFO}
     org.springframework.data.mongodb: INFO
+    org.springframework.data.redis: INFO
+    org.springframework.boot: INFO
