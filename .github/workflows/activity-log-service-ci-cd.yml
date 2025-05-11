@@ -44,6 +44,11 @@ jobs:
             mvn clean install -DskipTests
           fi
 
+      - name: Clean activity-log-service project
+        run: |
+          cd activity-log-service
+          mvn clean
+
       - name: Build with Maven
         run: |
           cd activity-log-service
