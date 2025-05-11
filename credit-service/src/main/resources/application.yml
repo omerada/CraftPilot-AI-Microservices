@@ -60,7 +60,7 @@ spring:
     web-application-type: reactive
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority}
+      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=5000}
       database: ${MONGODB_DATABASE:craftpilot}
       connection-timeout: 30000
       socket-timeout: 60000

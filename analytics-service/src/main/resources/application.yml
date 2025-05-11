@@ -20,7 +20,7 @@ spring:
     fail-fast: false
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://mongodb:27017/analytics}
+      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/analytics?authSource=admin&retryWrites=true&w=majority}
       auto-index-creation: true
       connection-timeout: 30000
       socket-timeout: 60000
@@ -38,6 +38,9 @@ kafka:
   admin:
     fail-fast: false
     auto-create: true
+    bootstrap-timeout: 10000
+    operations-timeout: 10000
+    close-timeout: 5000
 
 # Add MongoDB resilience configuration
 mongodb:

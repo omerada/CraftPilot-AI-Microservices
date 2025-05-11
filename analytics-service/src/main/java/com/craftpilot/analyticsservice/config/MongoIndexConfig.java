@@ -14,12 +14,17 @@ import org.springframework.retry.annotation.Retryable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.EnableAsync;
 
+import com.mongodb.MongoSocketException;
 import com.mongodb.MongoSocketOpenException;
 import com.mongodb.MongoTimeoutException;
+import com.mongodb.ServerAddress;
+import com.mongodb.connection.ServerSettings;
 
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 import java.time.Duration;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 @Configuration
 @Slf4j
@@ -44,6 +49,9 @@ public class MongoIndexConfig {
     
     @Value("${mongodb.indexes.creation.startup-fail-fast:false}")
     private boolean startupFailFast;
+    
+    @Value("${spring.data.mongodb.uri}")
+    private String mongoUri;
 
     @Autowired
     public MongoIndexConfig(ReactiveMongoTemplate mongoTemplate) {
@@ -62,8 +70,51 @@ public class MongoIndexConfig {
             return;
         }
         
+        // MongoDB URI'dan host adresini çıkar ve bağlantı kontrolü yap
+        try {
+            String host = extractHostFromUri(mongoUri);
+            if (host != null) {
+                log.info("Testing connection to MongoDB host: {}", host);
+                boolean hostResolvable = isHostResolvable(host);
+                log.info("MongoDB host resolution test: {}", hostResolvable ? "SUCCESS" : "FAILED");
+                if (!hostResolvable) {
+                    log.warn("MongoDB host cannot be resolved. This may cause connection problems.");
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not extract or validate MongoDB host: {}", e.getMessage());
+        }
+        
         // Indeks oluşturmayı async olarak başlat
         asyncCreateIndexes(0);
+    }
+    
+    private String extractHostFromUri(String uri) {
+        try {
+            // mongodb://username:password@host:port/database
+            if (uri != null && uri.contains("@")) {
+                String hostPart = uri.split("@")[1];
+                if (hostPart.contains("/")) {
+                    hostPart = hostPart.split("/")[0];
+                }
+                if (hostPart.contains(":")) {
+                    return hostPart.split(":")[0];
+                }
+                return hostPart;
+            }
+        } catch (Exception e) {
+            log.warn("Error extracting host from MongoDB URI: {}", e.getMessage());
+        }
+        return null;
+    }
+    
+    private boolean isHostResolvable(String host) {
+        try {
+            InetAddress.getByName(host);
+            return true;
+        } catch (UnknownHostException e) {
+            return false;
+        }
     }
 
     @Async
@@ -128,7 +179,7 @@ public class MongoIndexConfig {
     }
 
     @Retryable(
-        value = {MongoSocketOpenException.class, MongoTimeoutException.class},
+        value = {MongoSocketException.class, MongoTimeoutException.class},
         maxAttempts = 3,
         backoff = @Backoff(delay = 1000, multiplier = 2)
     )
@@ -158,7 +209,7 @@ public class MongoIndexConfig {
     }
 
     @Retryable(
-        value = {MongoSocketOpenException.class, MongoTimeoutException.class},
+        value = {MongoSocketException.class, MongoTimeoutException.class},
         maxAttempts = 3,
         backoff = @Backoff(delay = 1000, multiplier = 2)
     )
@@ -182,7 +233,7 @@ public class MongoIndexConfig {
     }
 
     @Retryable(
-        value = {MongoSocketOpenException.class, MongoTimeoutException.class},
+        value = {MongoSocketException.class, MongoTimeoutException.class},
         maxAttempts = 3,
         backoff = @Backoff(delay = 1000, multiplier = 2)
     )

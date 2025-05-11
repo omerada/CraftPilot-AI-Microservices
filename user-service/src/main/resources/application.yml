@@ -19,7 +19,7 @@ spring:
       repositories:
         enabled: false
     mongodb:
-      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority}
+      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=5000}
       database: ${MONGODB_DATABASE:craftpilot}
       auto-index-creation: true
       connection-timeout: 30000
@@ -30,21 +30,25 @@ spring:
     config:
       path: ${FIREBASE_CONFIG_PATH:/etc/gcp/credentials/gcp-credentials.json}
   kafka:
-    enabled: true
+    enabled: ${KAFKA_ENABLED:true}
     bootstrap-servers: ${KAFKA_BROKERS:kafka:9092}
     producer:
-      retries: 3
+      retries: 2
       acks: 1
       batch-size: 16384
       buffer-memory: 33554432
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
-        request.timeout.ms: 5000
+        request.timeout.ms: 3000
         retry.backoff.ms: 1000
-        max.block.ms: 5000
+        max.block.ms: 3000
         # Bağlantı sorunlarında daha hızlı hata vermesi için
-        delivery.timeout.ms: 10000
+        delivery.timeout.ms: 5000
+    admin:
+      fail-fast: false
+      operations-timeout: 5000
+      close-timeout: 3000
 
 eureka:
   instance:

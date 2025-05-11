@@ -103,6 +103,9 @@ jobs:
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
               -e LOGGING_LEVEL_COM_GOOGLE_CLOUD=DEBUG \
+              -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
+              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+              -e KAFKA_ENABLED=${KAFKA_ENABLED:-false} \
               ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
