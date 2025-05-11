@@ -37,6 +37,14 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
+      - name: Check and remove Firestore configuration if exists
+        run: |
+          FIRESTORE_CONFIG_PATH="activity-log-service/src/main/java/com/craftpilot/activitylogservice/config/FirestoreConfig.java"
+          if [ -f "$FIRESTORE_CONFIG_PATH" ]; then
+            echo "Removing FirestoreConfig.java file"
+            rm "$FIRESTORE_CONFIG_PATH"
+          fi
+
       - name: Build commons library (if needed)
         run: |
           if [ -d "craft-pilot-commons" ]; then
