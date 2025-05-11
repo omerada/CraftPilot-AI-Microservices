@@ -50,8 +50,8 @@ jobs:
             mkdir -p /opt/craftpilot/mongodb-service
             cd /opt/craftpilot/mongodb-service
 
-            # Docker ağını oluştur
-            docker network create craftpilot-network || true
+            # Docker ağını oluştur (eğer yoksa)
+            docker network inspect craftpilot-network >/dev/null 2>&1 || docker network create craftpilot-network
 
             # İşlem türünü belirle
             ACTION="${{ github.event.inputs.action }}"
@@ -69,13 +69,261 @@ jobs:
 
             # Repository'den dosyaları kopyala
             echo "Configürasyon dosyalarını kopyalama"
-            cp $GITHUB_WORKSPACE/mongodb-service/docker-compose.yml .
-            cp $GITHUB_WORKSPACE/mongodb-service/init-mongo.js .
+            # GITHUB_WORKSPACE yerine doğrudan dosyaları scp ile VPS'e aktaracağız
+
+            cat > docker-compose.yml << 'EOL'
+            version: "3.8"
+
+            services:
+              mongodb:
+                image: mongo:6.0
+                container_name: craftpilot-mongodb
+                restart: unless-stopped
+                environment:
+                  MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-craftpilot}
+                  MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-secure_password}
+                  MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-craftpilot}
+                  TZ: UTC
+                volumes:
+                  - ./mongo-data:/data/db
+                  - ./mongo-config:/data/configdb
+                  - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+                ports:
+                  - "${MONGO_PORT:-27017}:27017"
+                networks:
+                  - craftpilot-network
+                command: >
+                  --wiredTigerCacheSizeGB ${MONGO_CACHE_SIZE_GB:-0.5}
+                  --setParameter maxTransactionLockRequestTimeoutMillis=5000
+                  --auth
+                  --bind_ip_all
+                healthcheck:
+                  test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/admin --quiet --username ${MONGO_ROOT_USERNAME:-craftpilot} --password ${MONGO_ROOT_PASSWORD:-secure_password} --authenticationDatabase admin | grep 1
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+                  start_period: 30s
+                logging:
+                  driver: "json-file"
+                  options:
+                    max-size: "50m"
+                    max-file: "3"
+
+              mongo-express:
+                image: mongo-express:latest
+                container_name: craftpilot-mongo-express
+                restart: unless-stopped
+                depends_on:
+                  - mongodb
+                environment:
+                  ME_CONFIG_MONGODB_SERVER: mongodb
+                  ME_CONFIG_MONGODB_PORT: 27017
+                  ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USERNAME:-craftpilotadmin}
+                  ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD:-secure_password}
+                  ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER:-admin}
+                  ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-admin_pass}
+                  ME_CONFIG_SITE_BASEURL: /mongo-express
+                  ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
+                  ME_CONFIG_OPTIONS_EDITORTHEME: ambiance
+                ports:
+                  - "${MONGO_EXPRESS_PORT:-8081}:8081"
+                networks:
+                  - craftpilot-network
+                healthcheck:
+                  test: wget --quiet --tries=1 --spider http://${MONGO_EXPRESS_USER:-admin}:${MONGO_EXPRESS_PASSWORD:-admin_pass}@localhost:8081 || exit 1
+                  interval: 30s
+                  timeout: 10s
+                  retries: 3
+                  start_period: 30s
+
+            networks:
+              craftpilot-network:
+                external: true
+            EOL
+
+            cat > init-mongo.js << 'EOL'
+            // MongoDB başlangıç yapılandırma dosyası
+            db = db.getSiblingDB("admin");
+
+            // Uygulama veritabanı oluşturma
+            db = db.getSiblingDB("craftpilot");
+
+            // Koleksiyonlar oluşturma
+            db.createCollection("users");
+            db.createCollection("subscriptions");
+            db.createCollection("credits");
+            db.createCollection("projects");
+            db.createCollection("analytics");
+            db.createCollection("logs");
+
+            // Uygulama için ayrı kullanıcı oluşturma (daha kısıtlı yetkilerle)
+            db = db.getSiblingDB("admin");
+            db.createUser({
+              user: "application_user",
+              pwd: "app_secure_password",
+              roles: [{ role: "readWrite", db: "craftpilot" }],
+            });
+
+            // Kritik koleksiyonlar için indeksler oluşturma
+            db = db.getSiblingDB("craftpilot");
+
+            // Users koleksiyonu için indeksler
+            db.users.createIndex({ email: 1 }, { unique: true });
+            db.users.createIndex({ uid: 1 }, { unique: true });
+            db.users.createIndex({ createdAt: 1 });
+
+            // Subscriptions koleksiyonu için indeksler
+            db.subscriptions.createIndex({ userId: 1 });
+            db.subscriptions.createIndex({ status: 1 });
+            db.subscriptions.createIndex({ expiresAt: 1 });
+
+            // Credits koleksiyonu için indeksler
+            db.credits.createIndex({ userId: 1 });
+            db.credits.createIndex({ createdAt: 1 });
+
+            // Projects koleksiyonu için indeksler
+            db.projects.createIndex({ userId: 1 });
+            db.projects.createIndex({ createdAt: 1 });
+
+            // Log koleksiyonu için TTL indeksi (30 gün sonra otomatik silme)
+            db.logs.createIndex({ timestamp: 1 }, { expireAfterSeconds: 2592000 });
+
+            // Analytics koleksiyonu için indeksler
+            db.analytics.createIndex({ userId: 1 });
+            db.analytics.createIndex({ eventDate: 1 });
+            db.analytics.createIndex({ eventType: 1 });
+
+            print("MongoDB başlatma işlemi tamamlandı");
+            EOL
 
             # Scripts dizinini oluştur
             mkdir -p scripts
-            cp $GITHUB_WORKSPACE/mongodb-service/scripts/backup.sh scripts/
-            cp $GITHUB_WORKSPACE/mongodb-service/scripts/restore.sh scripts/
+
+            cat > scripts/backup.sh << 'EOL'
+            #!/bin/bash
+            set -e
+
+            # Env dosyasını yükle
+            if [ -f "../.env" ]; then
+              source ../.env
+            else
+              echo "Uyarı: .env dosyası bulunamadı, varsayılan değerler kullanılıyor..."
+              MONGO_ROOT_USERNAME=${MONGO_ROOT_USERNAME:-craftpilot}
+              MONGO_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-secure_password}
+              MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-craftpilot}
+              MONGO_PORT=${MONGO_PORT:-27017}
+            fi
+
+            # Yedekleme dizini oluştur
+            BACKUP_DIR="../backups"
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            BACKUP_PATH="$BACKUP_DIR/backup_$TIMESTAMP"
+
+            mkdir -p $BACKUP_DIR
+            mkdir -p $BACKUP_PATH
+
+            echo "MongoDB yedeklemesi başlatılıyor: $BACKUP_PATH"
+
+            # Docker container üzerinden mongodump çalıştır
+            docker exec craftpilot-mongodb mongodump \
+              --host localhost \
+              --port 27017 \
+              --username $MONGO_ROOT_USERNAME \
+              --password $MONGO_ROOT_PASSWORD \
+              --authenticationDatabase admin \
+              --db $MONGO_INITDB_DATABASE \
+              --out /data/db/backup
+
+            # Yedeklenen dosyaları host sistemine kopyala
+            docker cp craftpilot-mongodb:/data/db/backup/. $BACKUP_PATH
+
+            # Container içindeki yedek dosyalarını temizle
+            docker exec craftpilot-mongodb rm -rf /data/db/backup
+
+            # Yedekleri sıkıştır
+            cd $BACKUP_DIR
+            tar -czf "backup_$TIMESTAMP.tar.gz" "backup_$TIMESTAMP"
+            rm -rf "backup_$TIMESTAMP"
+
+            echo "Yedekleme tamamlandı: $BACKUP_DIR/backup_$TIMESTAMP.tar.gz"
+
+            # Eski yedekleri temizle (30 günden eski)
+            find $BACKUP_DIR -name "backup_*.tar.gz" -type f -mtime +30 -delete
+            echo "30 günden eski yedekler temizlendi"
+            EOL
+
+            cat > scripts/restore.sh << 'EOL'
+            #!/bin/bash
+            set -e
+
+            # Env dosyasını yükle
+            if [ -f "../.env" ]; then
+              source ../.env
+            else
+              echo "Uyarı: .env dosyası bulunamadı, varsayılan değerler kullanılıyor..."
+              MONGO_ROOT_USERNAME=${MONGO_ROOT_USERNAME:-craftpilot}
+              MONGO_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-secure_password}
+              MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-craftpilot}
+              MONGO_PORT=${MONGO_PORT:-27017}
+            fi
+
+            # Yedekleme dosyasını kontrol et
+            if [ -z "$1" ]; then
+              echo "Hata: Geri yüklenecek yedek dosyası belirtilmedi!"
+              echo "Kullanım: $0 backup_dosyası.tar.gz"
+              exit 1
+            fi
+
+            BACKUP_FILE=$1
+            BACKUP_DIR="../backups"
+            TEMP_DIR="$BACKUP_DIR/temp_restore"
+
+            # Dosyanın varlığını kontrol et
+            if [ ! -f "$BACKUP_DIR/$BACKUP_FILE" ]; then
+              echo "Hata: $BACKUP_DIR/$BACKUP_FILE bulunamadı!"
+              exit 1
+            fi
+
+            echo "MongoDB geri yükleme işlemi başlatılıyor: $BACKUP_FILE"
+
+            # Geçici dizini temizle ve oluştur
+            rm -rf $TEMP_DIR
+            mkdir -p $TEMP_DIR
+
+            # Yedek dosyasını aç
+            tar -xzf "$BACKUP_DIR/$BACKUP_FILE" -C $TEMP_DIR
+
+            # Geri yüklenecek veritabanını belirle
+            RESTORE_DB_DIR=$(find $TEMP_DIR -type d -name "$MONGO_INITDB_DATABASE")
+
+            if [ -z "$RESTORE_DB_DIR" ]; then
+              echo "Hata: Yedek içinde $MONGO_INITDB_DATABASE veritabanı bulunamadı!"
+              rm -rf $TEMP_DIR
+              exit 1
+            fi
+
+            # Veritabanını Docker container'ına kopyala
+            docker exec -it craftpilot-mongodb mkdir -p /data/db/restore
+            docker cp $RESTORE_DB_DIR/. craftpilot-mongodb:/data/db/restore
+
+            # mongorestore komutunu çalıştır
+            docker exec -it craftpilot-mongodb mongorestore \
+              --host localhost \
+              --port 27017 \
+              --username $MONGO_ROOT_USERNAME \
+              --password $MONGO_ROOT_PASSWORD \
+              --authenticationDatabase admin \
+              --db $MONGO_INITDB_DATABASE \
+              --drop \
+              /data/db/restore
+
+            # Geçici dizinleri temizle
+            docker exec craftpilot-mongodb rm -rf /data/db/restore
+            rm -rf $TEMP_DIR
+
+            echo "Geri yükleme işlemi tamamlandı: $BACKUP_FILE -> $MONGO_INITDB_DATABASE"
+            EOL
+
             chmod +x scripts/backup.sh scripts/restore.sh
 
             # .env dosyasını oluştur
@@ -172,8 +420,8 @@ jobs:
             if [ "$ACTION" = "deploy" ] || [ "$ACTION" = "restart" ]; then
               echo ""
               echo "==== MongoDB Bağlantı Bilgileri ===="
-              echo "MongoDB URI (service): $MONGODB_URI"
-              echo "MongoDB URI (external): $MONGODB_URI_EXTERNAL"
+              echo "MongoDB URI (service): mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@mongodb:27017/${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}?authSource=admin&retryWrites=true&w=majority"
+              echo "MongoDB URI (external): mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@localhost:27017/${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}?authSource=admin&retryWrites=true&w=majority"
               echo "Mongo Express: http://localhost:8081"
               echo ""
               echo "Bu bilgilerin GitHub Secrets'a eklenmesi gerekiyor!"
