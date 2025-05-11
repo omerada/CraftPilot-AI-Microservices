@@ -24,29 +24,32 @@ db.createUser({
 db = db.getSiblingDB("craftpilot");
 
 // Users koleksiyonu için indeksler
-db.users.createIndex({ email: 1 }, { unique: true });
-db.users.createIndex({ uid: 1 }, { unique: true });
-db.users.createIndex({ createdAt: 1 });
+db.users.createIndex({ email: 1 }, { unique: true, background: true });
+db.users.createIndex({ uid: 1 }, { unique: true, background: true });
+db.users.createIndex({ createdAt: 1 }, { background: true });
 
 // Subscriptions koleksiyonu için indeksler
-db.subscriptions.createIndex({ userId: 1 });
-db.subscriptions.createIndex({ status: 1 });
-db.subscriptions.createIndex({ expiresAt: 1 });
+db.subscriptions.createIndex({ userId: 1 }, { background: true });
+db.subscriptions.createIndex({ status: 1 }, { background: true });
+db.subscriptions.createIndex({ expiresAt: 1 }, { background: true });
 
 // Credits koleksiyonu için indeksler
-db.credits.createIndex({ userId: 1 });
-db.credits.createIndex({ createdAt: 1 });
+db.credits.createIndex({ userId: 1 }, { background: true });
+db.credits.createIndex({ createdAt: 1 }, { background: true });
 
 // Projects koleksiyonu için indeksler
-db.projects.createIndex({ userId: 1 });
-db.projects.createIndex({ createdAt: 1 });
+db.projects.createIndex({ userId: 1 }, { background: true });
+db.projects.createIndex({ createdAt: 1 }, { background: true });
 
 // Log koleksiyonu için TTL indeksi (30 gün sonra otomatik silme)
-db.logs.createIndex({ timestamp: 1 }, { expireAfterSeconds: 2592000 });
+db.logs.createIndex(
+  { timestamp: 1 },
+  { expireAfterSeconds: 2592000, background: true }
+);
 
 // Analytics koleksiyonu için indeksler
-db.analytics.createIndex({ userId: 1 });
-db.analytics.createIndex({ eventDate: 1 });
-db.analytics.createIndex({ eventType: 1 });
+db.analytics.createIndex({ userId: 1 }, { background: true });
+db.analytics.createIndex({ eventDate: 1 }, { background: true });
+db.analytics.createIndex({ eventType: 1 }, { background: true });
 
 print("MongoDB başlatma işlemi tamamlandı");

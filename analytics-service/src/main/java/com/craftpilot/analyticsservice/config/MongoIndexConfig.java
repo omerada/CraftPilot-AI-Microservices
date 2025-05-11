@@ -16,7 +16,7 @@ import reactor.core.publisher.Mono;
 public class MongoIndexConfig {
 
     private final ReactiveMongoTemplate mongoTemplate;
-    private boolean indexesInitialized = false;
+    private boolean indexesInitialized = false;  // İndekslerin sadece bir kez oluşturulmasını sağlayan flag
 
     @Autowired
     public MongoIndexConfig(ReactiveMongoTemplate mongoTemplate) {
@@ -26,7 +26,7 @@ public class MongoIndexConfig {
     @EventListener(ContextRefreshedEvent.class)
     public void initIndexesAfterStartup() {
         if (indexesInitialized) {
-            return;
+            return;  // İndeksler zaten oluşturulmuşsa tekrar oluşturma
         }
         
         log.info("Creating MongoDB indexes");
