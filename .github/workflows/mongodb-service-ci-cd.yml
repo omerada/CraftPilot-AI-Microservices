@@ -322,7 +322,7 @@ jobs:
                   --name craftpilot-mongo-express \
                   --network craftpilot-network \
                   --restart unless-stopped \
-                  -e ME_CONFIG_MONGODB_SERVER="mongodb" \
+                  -e ME_CONFIG_MONGODB_SERVER="craftpilot-mongodb" \
                   -e ME_CONFIG_MONGODB_PORT="27017" \
                   -e ME_CONFIG_MONGODB_ADMINUSERNAME="${MONGO_ROOT_USERNAME:-craftpilot}" \
                   -e ME_CONFIG_MONGODB_ADMINPASSWORD="${MONGO_ROOT_PASSWORD:-secure_password}" \
@@ -331,6 +331,10 @@ jobs:
                   -e ME_CONFIG_SITE_BASEURL="/" \
                   -e ME_CONFIG_MONGODB_ENABLE_ADMIN="true" \
                   -e ME_CONFIG_OPTIONS_EDITORTHEME="ambiance" \
+                  -e ME_CONFIG_MONGODB_CONNECTTIMEOUTMS="30000" \
+                  -e ME_CONFIG_MONGODB_SOCKETTIMEOUTMS="30000" \
+                  -e ME_CONFIG_SITE_SSL_ENABLED="false" \
+                  -e ME_CONFIG_MONGODB_AUTH_DATABASE="admin" \
                   -p "${MONGO_EXPRESS_PORT:-8081}:8081" \
                   --health-cmd="wget --quiet --tries=1 --spider http://${MONGO_EXPRESS_USER:-admin}:${MONGO_EXPRESS_PASSWORD:-admin_pass}@localhost:8081 || exit 1" \
                   --health-interval=30s \
@@ -353,11 +357,23 @@ jobs:
                 fi
 
                 # Mongo Express'in sağlık kontrolü
+                echo "Waiting for Mongo Express to start (30 seconds)..."
+                sleep 30
+                
                 if curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.MONGO_EXPRESS_USER }}:${{ secrets.MONGO_EXPRESS_PASSWORD }}@localhost:8081 | grep -q 200; then
                   echo "✅ Mongo Express başarıyla çalışıyor!"
                 else
                   echo "⚠️ Mongo Express başlatılamadı, loglar kontrol ediliyor..."
                   docker logs craftpilot-mongo-express
+                  
+                  echo "MongoDB durumu kontrol ediliyor..."
+                  docker ps -a | grep craftpilot-mongodb
+                  
+                  echo "MongoDB ve Mongo Express arasındaki network bağlantısı test ediliyor..."
+                  docker exec craftpilot-mongo-express ping -c 3 craftpilot-mongodb || echo "Network bağlantısı başarısız"
+                  
+                  echo "MongoDB kimlik bilgilerini kontrol ediliyor..."
+                  docker exec craftpilot-mongodb mongosh --quiet --eval "db.version()" admin -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }} || echo "MongoDB kimlik doğrulama başarısız"
                 fi
                 ;;
                 

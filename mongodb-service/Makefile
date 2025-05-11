@@ -1,4 +1,4 @@
-.PHONY: help up down status logs backup restore shell mongo-shell create-network
+.PHONY: help up down status logs backup restore shell mongo-shell create-network test-connection
 
 # Yardım mesajı
 help:
@@ -15,6 +15,7 @@ help:
 	@echo "  make shell           - MongoDB container'ında shell aç"
 	@echo "  make mongo-shell     - MongoDB console'a bağlan"
 	@echo "  make create-network  - Craftpilot ağını oluştur (eğer oluşturulmadıysa)"
+	@echo "  make test-connection - MongoDB ve Mongo Express arasındaki bağlantıyı test et"
 
 # Docker ağını oluştur
 create-network:
@@ -69,3 +70,12 @@ shell:
 # MongoDB console'a bağlan
 mongo-shell:
 	docker exec -it craftpilot-mongodb mongosh -u $$(grep MONGO_ROOT_USERNAME .env | cut -d '=' -f2) -p $$(grep MONGO_ROOT_PASSWORD .env | cut -d '=' -f2) --authenticationDatabase admin
+
+# Docker servisleri arasındaki bağlantıyı test et
+test-connection:
+	@echo "MongoDB ve Mongo Express arasındaki bağlantıyı test etme..."
+	@docker exec craftpilot-mongo-express ping -c 3 craftpilot-mongodb || echo "Network bağlantısı başarısız"
+	@echo "\nMongoDB'ye bağlantı testi..."
+	@docker exec craftpilot-mongo-express curl -s craftpilot-mongodb:27017 | grep "MongoDB" || echo "MongoDB bağlantısı başarısız"
+	@echo "\nKimlik doğrulama testi..."
+	@docker exec craftpilot-mongodb mongosh --quiet --eval "db.version()" admin -u $$(grep MONGO_ROOT_USERNAME .env | cut -d '=' -f2) -p $$(grep MONGO_ROOT_PASSWORD .env | cut -d '=' -f2) || echo "MongoDB kimlik doğrulama başarısız"

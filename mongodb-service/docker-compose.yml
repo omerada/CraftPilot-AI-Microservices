@@ -1,0 +1,66 @@
+version: "3.8"
+
+services:
+  mongodb:
+    container_name: craftpilot-mongodb
+    image: mongo:6.0
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-craftpilot}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-secure_password}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-craftpilot}
+      TZ: UTC
+    volumes:
+      - ./mongo-data:/data/db
+      - ./mongo-config:/data/configdb
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    networks:
+      - craftpilot-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/admin --quiet --username ${MONGO_ROOT_USERNAME:-craftpilot} --password ${MONGO_ROOT_PASSWORD:-secure_password} --authenticationDatabase admin | grep 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: --wiredTigerCacheSizeGB ${MONGO_CACHE_SIZE_GB:-0.5} --setParameter maxTransactionLockRequestTimeoutMillis=5000 --auth --bind_ip_all
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  mongo-express:
+    container_name: craftpilot-mongo-express
+    image: mongo-express:latest
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    environment:
+      ME_CONFIG_MONGODB_SERVER: craftpilot-mongodb
+      ME_CONFIG_MONGODB_PORT: 27017
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USERNAME:-craftpilot}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD:-secure_password}
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-admin_pass}
+      ME_CONFIG_SITE_BASEURL: /
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
+      ME_CONFIG_OPTIONS_EDITORTHEME: ambiance
+      ME_CONFIG_MONGODB_CONNECTTIMEOUTMS: 30000
+      ME_CONFIG_MONGODB_SOCKETTIMEOUTMS: 30000
+      ME_CONFIG_MONGODB_AUTH_DATABASE: admin
+    ports:
+      - "${MONGO_EXPRESS_PORT:-8081}:8081"
+    networks:
+      - craftpilot-network
+    healthcheck:
+      test: wget --quiet --tries=1 --spider http://${MONGO_EXPRESS_USER:-admin}:${MONGO_EXPRESS_PASSWORD:-admin_pass}@localhost:8081 || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  craftpilot-network:
+    external: true
