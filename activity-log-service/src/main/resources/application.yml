@@ -19,8 +19,8 @@ spring:
         location: file:${GOOGLE_APPLICATION_CREDENTIALS:/app/credentials/gcp-credentials.json}
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority}
-      database: ${MONGO_INITDB_DATABASE:craftpilot}
+      uri: ${MONGODB_URI:mongodb://localhost:27017/activitylog}
+      database: ${MONGODB_DATABASE:activitylog}
       connection-timeout: 30000
       socket-timeout: 60000
       max-connection-idle-time: 300000
