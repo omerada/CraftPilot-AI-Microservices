@@ -181,8 +181,29 @@ jobs:
                 ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
             fi
 
+            # MongoDB'nin hazır olduğunu kontrol et
+            echo "=== MongoDB'nin hazır olduğunu kontrol ediliyor ==="
+            mongo_ready=false
+            for i in {1..10}; do
+              if docker exec -t activity-log-service curl -s mongodb:27017 > /dev/null 2>&1; then
+                echo "✓ MongoDB erişilebilir durumdadır"
+                mongo_ready=true
+                break
+              else
+                echo "Deneme $i: MongoDB henüz hazır değil, 10 saniye bekleniyor..."
+                sleep 10
+              fi
+            done
+
+            if [ "$mongo_ready" = false ]; then
+              echo "× MongoDB'ye erişilemiyor! MongoDB ve ağ durumunu kontrol ediniz."
+              docker logs craftpilot-mongodb || echo "MongoDB container'ı bulunamadı"
+              echo "Şu andaki ağ durumu:"
+              docker network inspect craftpilot-network
+            fi
+
             echo "=== Waiting for service startup ==="
-            max_attempts=15
+            max_attempts=20
             counter=0
 
             while [ $counter -lt $max_attempts ]; do
@@ -204,7 +225,7 @@ jobs:
               fi
               
               echo "Waiting for service to start... ($((counter + 1))/$max_attempts)"
-              sleep 10
+              sleep 15  # Bekleme süresini artırdım
               counter=$((counter + 1))
             done
 

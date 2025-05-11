@@ -306,18 +306,38 @@ jobs:
                   --health-cmd="echo 'db.runCommand(\"ping\").ok' | mongosh localhost:27017/admin --quiet --username ${MONGO_ROOT_USERNAME:-craftpilot} --password ${MONGO_ROOT_PASSWORD:-secure_password} --authenticationDatabase admin | grep 1" \
                   --health-interval=10s \
                   --health-timeout=5s \
-                  --health-retries=5 \
-                  --health-start-period=30s \
+                  --health-retries=10 \
+                  --health-start-period=45s \
                   --log-driver json-file \
                   --log-opt max-size=50m \
                   --log-opt max-file=3 \
                   mongo:6.0 \
                   --wiredTigerCacheSizeGB ${MONGO_CACHE_SIZE_GB:-0.5} --setParameter maxTransactionLockRequestTimeoutMillis=5000 --auth --bind_ip_all
 
-                echo "==== MongoDB Express Servisini Başlatma ===="
-                # MongoDB'nin başlamasını bekle
-                sleep 10
+                # MongoDB'nin başlamasını bekle - iyileştirilmiş bekleme süresi
+                echo "==== MongoDB'nin başlaması bekleniyor (45 saniye) ===="
+                sleep 45
+                
+                # MongoDB'nin başarıyla başlatıldığını kontrol et
+                MONGO_RUNNING=0
+                for i in {1..10}; do
+                  if docker exec craftpilot-mongodb mongosh --quiet --eval "db.runCommand('ping').ok" admin -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }} | grep -q 1; then
+                    echo "✅ MongoDB başarıyla çalışıyor (deneme $i)!"
+                    MONGO_RUNNING=1
+                    break
+                  else
+                    echo "⏳ MongoDB henüz hazır değil, bekleniyor (deneme $i)..."
+                    sleep 10
+                  fi
+                done
 
+                if [ $MONGO_RUNNING -eq 0 ]; then
+                  echo "❌ MongoDB başlatılamadı!"
+                  docker logs craftpilot-mongodb
+                  exit 1
+                fi
+                
+                echo "==== MongoDB Express Servisini Başlatma ===="
                 docker run -d \
                   --name craftpilot-mongo-express \
                   --network craftpilot-network \
@@ -331,16 +351,16 @@ jobs:
                   -e ME_CONFIG_SITE_BASEURL="/" \
                   -e ME_CONFIG_MONGODB_ENABLE_ADMIN="true" \
                   -e ME_CONFIG_OPTIONS_EDITORTHEME="ambiance" \
-                  -e ME_CONFIG_MONGODB_CONNECTTIMEOUTMS="30000" \
-                  -e ME_CONFIG_MONGODB_SOCKETTIMEOUTMS="30000" \
+                  -e ME_CONFIG_MONGODB_CONNECTTIMEOUTMS="60000" \
+                  -e ME_CONFIG_MONGODB_SOCKETTIMEOUTMS="60000" \
                   -e ME_CONFIG_SITE_SSL_ENABLED="false" \
                   -e ME_CONFIG_MONGODB_AUTH_DATABASE="admin" \
                   -p "${MONGO_EXPRESS_PORT:-8081}:8081" \
                   --health-cmd="wget --quiet --tries=1 --spider http://${MONGO_EXPRESS_USER:-admin}:${MONGO_EXPRESS_PASSWORD:-admin_pass}@localhost:8081 || exit 1" \
                   --health-interval=30s \
                   --health-timeout=10s \
-                  --health-retries=3 \
-                  --health-start-period=30s \
+                  --health-retries=5 \
+                  --health-start-period=45s \
                   mongo-express:latest
                 
                 # Servisin başlamasını bekle

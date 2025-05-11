@@ -21,6 +21,12 @@ spring:
     mongodb:
       uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority}
       database: ${MONGO_INITDB_DATABASE:craftpilot}
+      connection-timeout: 30000
+      socket-timeout: 60000
+      max-connection-idle-time: 300000
+      retry-writes: true
+      retry-reads: true
+      auto-index-creation: true
   jackson:
     default-property-inclusion: non_null
     serialization:
@@ -118,3 +124,12 @@ activity:
     retry:
       max-attempts: 3
       initial-backoff: 1000
+
+# MongoDB bağlantı yeniden deneme yapılandırması
+mongodb:
+  connection:
+    retry:
+      max-attempts: 10
+      initial-interval: 1000
+      max-interval: 30000
+      multiplier: 2.0
