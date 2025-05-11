@@ -11,23 +11,46 @@ spring:
     name: analytics-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:prod}
-    include: kafka-base
+    include: ${KAFKA_ENABLED:true} ? kafka-base
   cloud:
     discovery:
       enabled: true
   main:
     web-application-type: reactive
+    fail-fast: false
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/analytics}
+      uri: ${MONGODB_URI:mongodb://mongodb:27017/analytics}
       auto-index-creation: true
+      connection-timeout: 30000
+      socket-timeout: 60000
+      max-connection-idle-time: 300000
+      retry-writes: true
+      retry-reads: true
 
 # Kafka topic yapılandırması
 kafka:
   topics:
     analytics-events: analytics-events
     metrics-events: metrics-events
-  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+  enabled: ${KAFKA_ENABLED:true}
+  admin:
+    fail-fast: false
+    auto-create: true
+
+# Add MongoDB resilience configuration
+mongodb:
+  connection:
+    retry:
+      max-attempts: 10
+      initial-interval: 1000
+      max-interval: 30000
+      multiplier: 2.0
+  indexes:
+    creation:
+      enabled: ${MONGODB_INDEX_CREATION_ENABLED:true}
+      startup-fail-fast: false
 
 management:
   endpoints:

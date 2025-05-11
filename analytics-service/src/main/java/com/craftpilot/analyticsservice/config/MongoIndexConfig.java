@@ -2,6 +2,7 @@ package com.craftpilot.analyticsservice.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
@@ -23,22 +24,26 @@ import java.time.Duration;
 @Configuration
 @Slf4j
 @EnableAsync
+@ConditionalOnProperty(name = "mongodb.indexes.creation.enabled", havingValue = "true", matchIfMissing = true)
 public class MongoIndexConfig {
 
     private final ReactiveMongoTemplate mongoTemplate;
     private boolean indexesInitialized = false;
 
-    @Value("${mongo.indexes.creation.enabled:true}")
+    @Value("${mongodb.indexes.creation.enabled:true}")
     private boolean indexCreationEnabled;
 
-    @Value("${mongo.indexes.creation.retry.max-attempts:5}")
+    @Value("${mongodb.indexes.creation.retry.max-attempts:5}")
     private int maxRetryAttempts;
 
-    @Value("${mongo.indexes.creation.retry.delay:10000}")
+    @Value("${mongodb.indexes.creation.retry.delay:10000}")
     private long retryDelayMs;
 
-    @Value("${mongo.indexes.creation.retry.max-delay:60000}")
+    @Value("${mongodb.indexes.creation.retry.max-delay:60000}")
     private long maxRetryDelayMs;
+    
+    @Value("${mongodb.indexes.creation.startup-fail-fast:false}")
+    private boolean startupFailFast;
 
     @Autowired
     public MongoIndexConfig(ReactiveMongoTemplate mongoTemplate) {

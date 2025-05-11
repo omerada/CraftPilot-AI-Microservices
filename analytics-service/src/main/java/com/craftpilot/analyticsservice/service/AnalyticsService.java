@@ -205,13 +205,22 @@ public class AnalyticsService {
     }
 
     private void publishAnalyticsEvent(String key, Object event) {
-        kafkaTemplate.send(analyticsEventsTopic, key, event)
-            .whenComplete((result, ex) -> {
-                if (ex != null) {
-                    log.error("Failed to publish analytics event", ex);
-                } else {
-                    log.debug("Analytics event published successfully");
-                }
-            });
+        try {
+            if (kafkaTemplate == null) {
+                log.warn("KafkaTemplate is null, Kafka may be disabled. Skipping event publishing for key: {}", key);
+                return;
+            }
+            
+            kafkaTemplate.send(analyticsEventsTopic, key, event)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("Failed to publish analytics event", ex);
+                    } else {
+                        log.debug("Analytics event published successfully");
+                    }
+                });
+        } catch (Exception e) {
+            log.error("Error attempting to publish Kafka message: {}", e.getMessage(), e);
+        }
     }
 }
