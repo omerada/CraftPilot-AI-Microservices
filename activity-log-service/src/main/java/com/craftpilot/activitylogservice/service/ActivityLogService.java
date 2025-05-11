@@ -9,13 +9,16 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.UUID;
+import java.util.Date;
 
 @Service
 @Slf4j
@@ -76,7 +79,6 @@ public class ActivityLogService {
     
     private ActivityLog convertToActivityLog(ActivityEvent event) {
         ActivityLog log = ActivityLog.fromEvent(event);
-        log.setId(UUID.randomUUID().toString()); // Ensure ID is set
         return log;
     }
 
@@ -90,22 +92,30 @@ public class ActivityLogService {
         
         return Mono.defer(() -> {
             // Validate and parse input parameters
-            LocalDateTime fromDateTime = parseDateTime(fromDate, null);
-            LocalDateTime toDateTime = parseDateTime(toDate, null);
+            final Date fromDateTime = parseDateTime(fromDate, null);
+            final Date toDateTime = parseDateTime(toDate, null);
             
-            int validatedPage = page != null && page >= 0 ? page : 0;
-            int validatedSize = validatePageSize(size);
-            int limit = validatedSize;
-            int skip = validatedPage * validatedSize;
-            String lastDocId = null; // We would need cursor-based pagination for efficient Firestore queries
+            // Null kontrolü ve boş string kontrolü
+            final String effectiveUserId = (userId == null || userId.trim().isEmpty()) ? ".*" : userId;
+            final String effectiveActionType = (actionType == null || actionType.trim().isEmpty()) ? ".*" : actionType;
+            
+            final int validatedPage = page != null && page >= 0 ? page : 0;
+            final int validatedSize = validatePageSize(size);
+            
+            // MongoDB pagination için PageRequest kullanma
+            PageRequest pageRequest = PageRequest.of(
+                validatedPage, 
+                validatedSize, 
+                Sort.by(Sort.Direction.DESC, "eventTime")
+            );
             
             // Count total elements for pagination metadata
             Mono<Long> countMono = activityLogRepository.countByFilters(
-                userId, actionType, fromDateTime, toDateTime);
+                effectiveUserId, effectiveActionType, fromDateTime, toDateTime);
             
             // Get the actual page of logs
             Mono<java.util.List<ActivityLog>> logsMono = activityLogRepository
-                .findByFilters(userId, actionType, fromDateTime, toDateTime, limit, lastDocId)
+                .findByFilters(effectiveUserId, effectiveActionType, fromDateTime, toDateTime, pageRequest)
                 .collectList();
             
             // Combine into a PageResponse
@@ -117,7 +127,7 @@ public class ActivityLogService {
                     tuple.getT2()   // total elements
                 ))
                 .doOnSubscribe(s -> log.debug("Querying logs: userId={}, actionType={}, fromDate={}, toDate={}, page={}, size={}", 
-                    userId, actionType, fromDate, toDate, validatedPage, validatedSize))
+                    effectiveUserId, effectiveActionType, fromDate, toDate, validatedPage, validatedSize))
                 .doOnSuccess(response -> log.debug("Found {} logs", response.getContent().size()));
         })
         .name("getLogs")
@@ -131,14 +141,15 @@ public class ActivityLogService {
         return Math.min(size, maxPageSize);
     }
     
-    private LocalDateTime parseDateTime(String dateTimeStr, LocalDateTime defaultValue) {
+    private Date parseDateTime(String dateTimeStr, Date defaultValue) {
         if (dateTimeStr == null || dateTimeStr.trim().isEmpty()) {
             return defaultValue;
         }
         
         try {
             DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
-            return LocalDateTime.parse(dateTimeStr, formatter);
+            LocalDateTime dateTime = LocalDateTime.parse(dateTimeStr, formatter);
+            return Date.from(dateTime.atZone(ZoneId.systemDefault()).toInstant());
         } catch (DateTimeParseException e) {
             log.warn("Invalid date format: {}", dateTimeStr);
             return defaultValue;

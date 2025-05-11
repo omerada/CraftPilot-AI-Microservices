@@ -1,203 +1,42 @@
 package com.craftpilot.activitylogservice.repository;
 
 import com.craftpilot.activitylogservice.model.ActivityLog;
-import com.google.api.core.ApiFuture;
-import com.google.cloud.firestore.CollectionReference;
-import com.google.cloud.firestore.DocumentSnapshot;
-import com.google.cloud.firestore.Firestore;
-import com.google.cloud.firestore.Query;
-import com.google.cloud.firestore.QuerySnapshot;
-import com.google.cloud.firestore.WriteResult;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.Query;
+import org.springframework.data.mongodb.repository.ReactiveMongoRepository;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.Date;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 @Repository
-@Slf4j
-public class ActivityLogRepository {
-
-    private static final String COLLECTION_NAME = "activity_logs";
-    private final Firestore firestore;
-
-    public ActivityLogRepository(Firestore firestore) {
-        this.firestore = firestore;
-    }
+public interface ActivityLogRepository extends ReactiveMongoRepository<ActivityLog, String> {
     
-    public CollectionReference getCollection() {
-        return firestore.collection(COLLECTION_NAME);
-    }
-
-    public Mono<ActivityLog> save(ActivityLog activityLog) {
-        log.info("Saving activity log: userId={}, actionType={}, id={}",
-                activityLog.getUserId(), activityLog.getActionType(), activityLog.getId());
-        
-        // ID yoksa oluştur
-        if (activityLog.getId() == null || activityLog.getId().trim().isEmpty()) {
-            activityLog.setId(UUID.randomUUID().toString());
-        }
-        
-        ApiFuture<WriteResult> future = getCollection()
-                .document(activityLog.getId())
-                .set(activityLog);
-        
-        return Mono.fromFuture(toCompletableFuture(future))
-                .doOnSuccess(writeResult -> log.info("Successfully saved activity log with ID: {}, write time: {}", 
-                        activityLog.getId(), writeResult.getUpdateTime()))
-                .doOnError(error -> log.error("Failed to save activity log: {}", error.getMessage(), error))
-                .thenReturn(activityLog);
-    }
-
-    public Mono<ActivityLog> findById(String id) {
-        ApiFuture<DocumentSnapshot> future = getCollection()
-                .document(id)
-                .get();
-                
-        return Mono.fromFuture(toCompletableFuture(future))
-                .map(document -> document.exists() 
-                    ? document.toObject(ActivityLog.class) 
-                    : null);
-    }
-
-    public Flux<ActivityLog> findByUserId(String userId) {
-        ApiFuture<QuerySnapshot> future = getCollection()
-                .whereEqualTo("userId", userId)
-                .orderBy("timestamp", Query.Direction.DESCENDING)
-                .get();
-                
-        return Mono.fromFuture(toCompletableFuture(future))
-                .flatMapMany(querySnapshot -> Flux.fromIterable(querySnapshot.getDocuments()))
-                .map(document -> document.toObject(ActivityLog.class));
-    }
-
-    public Flux<ActivityLog> findByActionType(String actionType) {
-        ApiFuture<QuerySnapshot> future = getCollection()
-                .whereEqualTo("actionType", actionType)
-                .orderBy("timestamp", Query.Direction.DESCENDING)
-                .get();
-                
-        return Mono.fromFuture(toCompletableFuture(future))
-                .flatMapMany(querySnapshot -> Flux.fromIterable(querySnapshot.getDocuments()))
-                .map(document -> document.toObject(ActivityLog.class));
-    }
-
-    public Flux<ActivityLog> findByTimeRange(LocalDateTime start, LocalDateTime end) {
-        Query query = getCollection().orderBy("timestamp", Query.Direction.DESCENDING);
-        
-        if (start != null) {
-            query = query.whereGreaterThanOrEqualTo("timestamp", start);
-        }
-        
-        if (end != null) {
-            query = query.whereLessThanOrEqualTo("timestamp", end);
-        }
-        
-        ApiFuture<QuerySnapshot> future = query.get();
-                
-        return Mono.fromFuture(toCompletableFuture(future))
-                .flatMapMany(querySnapshot -> Flux.fromIterable(querySnapshot.getDocuments()))
-                .map(document -> document.toObject(ActivityLog.class));
-    }
+    Flux<ActivityLog> findByUserId(String userId);
     
-    public Flux<ActivityLog> findByFilters(
-            String userId, 
-            String actionType, 
-            LocalDateTime fromDate, 
-            LocalDateTime toDate, 
-            int limit, 
-            String lastDocumentId) {
-                
-        Query query = getCollection().orderBy("eventTime", Query.Direction.DESCENDING);
-        
-        if (userId != null && !userId.isEmpty()) {
-            query = query.whereEqualTo("userId", userId);
-        }
-        
-        if (actionType != null && !actionType.isEmpty()) {
-            query = query.whereEqualTo("actionType", actionType);
-        }
-        
-        if (fromDate != null) {
-            Date fromDateAsDate = Date.from(fromDate.atZone(ZoneId.systemDefault()).toInstant());
-            query = query.whereGreaterThanOrEqualTo("eventTime", fromDateAsDate);
-        }
-        
-        if (toDate != null) {
-            Date toDateAsDate = Date.from(toDate.atZone(ZoneId.systemDefault()).toInstant());
-            query = query.whereLessThanOrEqualTo("eventTime", toDateAsDate);
-        }
-        
-        if (lastDocumentId != null && !lastDocumentId.isEmpty()) {
-            // Create a final copy of query for use in the lambda
-            final Query finalQuery = query;
-            return findById(lastDocumentId)
-                    .flatMapMany(lastDocument -> {
-                        ApiFuture<QuerySnapshot> future = finalQuery
-                                .startAfter(lastDocument)
-                                .limit(limit)
-                                .get();
-                        
-                        return Mono.fromFuture(toCompletableFuture(future))
-                                .flatMapMany(querySnapshot -> Flux.fromIterable(querySnapshot.getDocuments()))
-                                .map(document -> document.toObject(ActivityLog.class));
-                    })
-                    .switchIfEmpty(Flux.empty());
-        }
-        
-        ApiFuture<QuerySnapshot> future = query
-                .limit(limit)
-                .get();
-        
-        return Mono.fromFuture(toCompletableFuture(future))
-                .flatMapMany(querySnapshot -> Flux.fromIterable(querySnapshot.getDocuments()))
-                .map(document -> document.toObject(ActivityLog.class));
-    }
+    Flux<ActivityLog> findByActionType(String actionType);
     
-    public Mono<Long> countByFilters(String userId, String actionType, LocalDateTime fromDate, LocalDateTime toDate) {
-        Query query = getCollection();
-        
-        if (userId != null && !userId.isEmpty()) {
-            query = query.whereEqualTo("userId", userId);
-        }
-        
-        if (actionType != null && !actionType.isEmpty()) {
-            query = query.whereEqualTo("actionType", actionType);
-        }
-        
-        if (fromDate != null) {
-            Date fromDateAsDate = Date.from(fromDate.atZone(ZoneId.systemDefault()).toInstant());
-            query = query.whereGreaterThanOrEqualTo("eventTime", fromDateAsDate);
-        }
-        
-        if (toDate != null) {
-            Date toDateAsDate = Date.from(toDate.atZone(ZoneId.systemDefault()).toInstant());
-            query = query.whereLessThanOrEqualTo("eventTime", toDateAsDate);
-        }
-        
-        ApiFuture<QuerySnapshot> future = query.get();
-        
-        return Mono.fromFuture(toCompletableFuture(future))
-                .map(QuerySnapshot::size)
-                .map(Integer::longValue);
-    }
-
-    private <T> CompletableFuture<T> toCompletableFuture(ApiFuture<T> apiFuture) {
-        CompletableFuture<T> completableFuture = new CompletableFuture<>();
-        
-        apiFuture.addListener(() -> {
-            try {
-                completableFuture.complete(apiFuture.get());
-            } catch (Exception e) {
-                completableFuture.completeExceptionally(e);
-            }
-        }, Runnable::run);
-        
-        return completableFuture;
-    }
+    @Query("{ 'userId': ?0, 'actionType': ?1 }")
+    Flux<ActivityLog> findByUserIdAndActionType(String userId, String actionType);
+    
+    @Query("{ 'eventTime': { $gte: ?0, $lte: ?1 } }")
+    Flux<ActivityLog> findByEventTimeBetween(Date fromDate, Date toDate);
+    
+    @Query("{ $and: [ " +
+           "{ 'userId': { $regex: ?0, $options: 'i' } }, " +
+           "{ 'actionType': { $regex: ?1, $options: 'i' } }, " +
+           "{ 'eventTime': { $gte: ?2 } }, " +
+           "{ 'eventTime': { $lte: ?3 } } " +
+           "] }")
+    Flux<ActivityLog> findByFilters(String userId, String actionType, Date fromDate, Date toDate, Pageable pageable);
+    
+    @Query(value = "{ $and: [ " +
+            "{ 'userId': { $regex: ?0, $options: 'i' } }, " +
+            "{ 'actionType': { $regex: ?1, $options: 'i' } }, " +
+            "{ 'eventTime': { $gte: ?2 } }, " +
+            "{ 'eventTime': { $lte: ?3 } } " +
+            "] }", count = true)
+    Mono<Long> countByFilters(String userId, String actionType, Date fromDate, Date toDate);
 }

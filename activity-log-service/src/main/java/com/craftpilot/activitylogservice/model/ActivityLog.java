@@ -1,9 +1,9 @@
 package com.craftpilot.activitylogservice.model;
 
-import com.google.cloud.Timestamp;
-import com.google.cloud.firestore.annotation.DocumentId;
-import com.google.cloud.firestore.annotation.Exclude;
-import com.google.cloud.firestore.annotation.ServerTimestamp;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.index.Indexed;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,22 +20,24 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Document(collection = "activity_logs")
 public class ActivityLog {
     
-    @DocumentId
+    @Id
     private String id;
     
+    @Indexed
     private String userId;
+    
+    @Indexed
     private String actionType;
     
-    @ServerTimestamp
-    private Timestamp createdAt;
+    private LocalDateTime createdAt;
     
-    // Change this field from LocalDateTime to a Firestore-compatible Date
+    @Indexed
     private Date eventTime;
     
-    // Keep the original LocalDateTime as a transient field
-    @Exclude
+    @Transient
     private transient LocalDateTime timestamp;
     
     private Map<String, Object> metadata;
@@ -46,9 +48,10 @@ public class ActivityLog {
                 .userId(event.getUserId())
                 .actionType(event.getActionType())
                 .metadata(event.getMetadata())
+                .createdAt(LocalDateTime.now())
                 .build();
                 
-        // Convert LocalDateTime to Date for Firestore
+        // Convert LocalDateTime to Date for MongoDB
         if (event.getTimestamp() != null) {
             log.setEventTime(java.util.Date.from(
                 event.getTimestamp().atZone(ZoneId.systemDefault()).toInstant()));
@@ -58,7 +61,7 @@ public class ActivityLog {
         return log;
     }
     
-    @Exclude
+    @Transient
     public ZonedDateTime getZonedTimestamp() {
         if (timestamp != null) {
             return timestamp.atZone(ZoneId.systemDefault());
@@ -69,7 +72,7 @@ public class ActivityLog {
         return null;
     }
     
-    @Exclude
+    @Transient
     public LocalDateTime getTimestamp() {
         if (timestamp != null) {
             return timestamp;
