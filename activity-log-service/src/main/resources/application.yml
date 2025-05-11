@@ -17,12 +17,10 @@ spring:
       project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
       credentials:
         location: file:${GOOGLE_APPLICATION_CREDENTIALS:/app/credentials/gcp-credentials.json}
-      firestore:
-        enabled: true
-        project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
-        emulator:
-          enabled: ${FIRESTORE_EMULATOR_ENABLED:false}
-          host: ${FIRESTORE_EMULATOR_HOST:localhost:8081}
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority}
+      database: ${MONGO_INITDB_DATABASE:craftpilot}
   jackson:
     default-property-inclusion: non_null
     serialization:

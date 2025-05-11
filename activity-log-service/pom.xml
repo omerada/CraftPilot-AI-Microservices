@@ -71,9 +71,16 @@
             <groupId>com.google.cloud</groupId>
             <artifactId>spring-cloud-gcp-starter</artifactId>
         </dependency>
-        <dependency>
+        <!-- Firestore bağımlılığını kaldır -->
+        <!-- <dependency>
             <groupId>com.google.cloud</groupId>
-            <artifactId>spring-cloud-gcp-starter-firestore</artifactId>
+            <artifactId>google-cloud-firestore</artifactId>
+        </dependency> -->
+        
+        <!-- MongoDB bağımlılıklarını ekle -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-mongodb-reactive</artifactId>
         </dependency>
         
         <!-- Project Reactor -->
