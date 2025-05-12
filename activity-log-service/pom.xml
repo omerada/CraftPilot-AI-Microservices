@@ -17,9 +17,9 @@
     <properties>
         <java.version>17</java.version>
         <spring-cloud.version>2022.0.4</spring-cloud.version>
+        <spring-cloud-gcp.version>4.7.2</spring-cloud-gcp.version>
         <lombok.version>1.18.30</lombok.version>
         <reactor-kafka.version>1.3.17</reactor-kafka.version>
-        <resilience4j.version>2.1.0</resilience4j.version>
     </properties>
     
     <dependencies>
@@ -66,10 +66,14 @@
             <version>${reactor-kafka.version}</version>
         </dependency>
         
-        <!-- MongoDB - Ana veri depolama bağımlılığı -->
+        <!-- GCP & Firestore -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-mongodb-reactive</artifactId>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>spring-cloud-gcp-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>spring-cloud-gcp-starter-firestore</artifactId>
         </dependency>
         
         <!-- Project Reactor -->
@@ -109,24 +113,6 @@
             <version>2.1.0</version>
         </dependency>
 
-        <!-- Resilience4j Dependencies -->
-        <dependency>
-            <groupId>io.github.resilience4j</groupId>
-            <artifactId>resilience4j-spring-boot3</artifactId>
-            <version>${resilience4j.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.github.resilience4j</groupId>
-            <artifactId>resilience4j-reactor</artifactId>
-            <version>${resilience4j.version}</version>
-        </dependency>
-        
-        <!-- Spring Boot Web Error Handlers -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
-
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -154,14 +140,6 @@
             <artifactId>craft-pilot-commons</artifactId>
             <version>${project.version}</version>
         </dependency>
-
-        <!-- Add MongoDB embedded for testing -->
-        <dependency>
-            <groupId>de.flapdoodle.embed</groupId>
-            <artifactId>de.flapdoodle.embed.mongo.spring30x</artifactId>
-            <version>4.11.0</version>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
     
     <dependencyManagement>
@@ -170,6 +148,13 @@
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
                 <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.google.cloud</groupId>
+                <artifactId>spring-cloud-gcp-dependencies</artifactId>
+                <version>${spring-cloud-gcp.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

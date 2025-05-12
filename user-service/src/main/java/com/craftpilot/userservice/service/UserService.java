@@ -67,7 +67,6 @@ public class UserService {
 
     @Transactional
     public Mono<UserEntity> createUser(UserEntity user) {
-        userCreationCounter.increment();
         return userRepository.save(user)
                 .doOnSuccess(savedUser -> {
                     kafkaService.sendUserCreatedEvent(savedUser);
@@ -210,7 +209,7 @@ public class UserService {
                     // Kullanıcı tercihlerini sil
                     return userPreferenceService.deleteUserPreferences(userId)
                             .then(Mono.defer(() -> {
-                                // MongoDB'den kullanıcıyı sil
+                                // Firestore'dan kullanıcıyı sil
                                 return userRepository.deleteById(userId);
                             }))
                             .then(Mono.fromRunnable(() -> {

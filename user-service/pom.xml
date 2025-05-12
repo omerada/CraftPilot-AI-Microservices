@@ -34,7 +34,6 @@
 		<firebase-admin.version>9.2.0</firebase-admin.version>
 		<spring-cloud-gcp.version>5.0.0</spring-cloud-gcp.version>
         <google-cloud-firestore.version>3.14.0</google-cloud-firestore.version>
-        <mongodb.driver.version>4.8.2</mongodb.driver.version>
 	</properties>
 
 	<dependencies>
@@ -188,19 +187,6 @@
 			<artifactId>caffeine</artifactId>
 			<version>3.1.8</version>
 		</dependency>
-
-		 <!-- MongoDB bağımlılıklarını ekleyin -->
-        <!-- Spring Boot Data MongoDB Reactive -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-mongodb-reactive</artifactId>
-        </dependency>
-        
-        <!-- MongoDB Driver -->
-        <dependency>
-            <groupId>org.mongodb</groupId>
-            <artifactId>mongodb-driver-reactivestreams</artifactId>
-        </dependency>
 
 		<!-- Test -->
 		<dependency>

@@ -84,10 +84,6 @@
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-circuitbreaker-reactor-resilience4j</artifactId>
-        </dependency>
 
         <!-- Kafka -->
         <dependency>
@@ -95,8 +91,7 @@
             <artifactId>spring-kafka</artifactId>
         </dependency>
 
-        <!-- Google Cloud bağımlılıklarını kaldır -->
-        <!--
+        <!-- Google Cloud -->
         <dependency>
             <groupId>com.google.cloud</groupId>
             <artifactId>spring-cloud-gcp-starter</artifactId>
@@ -105,21 +100,6 @@
         <dependency>
             <groupId>com.google.cloud</groupId>
             <artifactId>google-cloud-firestore</artifactId>
-        </dependency>
-        -->
-
-        <!-- MongoDB Reactive bağımlılığı ekle -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-mongodb-reactive</artifactId>
-        </dependency>
-
-        <!-- Test MongoDB için embedded MongoDB -->
-        <dependency>
-            <groupId>de.flapdoodle.embed</groupId>
-            <artifactId>de.flapdoodle.embed.mongo.spring3x</artifactId>
-            <version>4.11.0</version>
-            <scope>test</scope>
         </dependency>
 
         <!-- Analytics & Monitoring -->
@@ -188,29 +168,6 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- Bean Validation Implementation -->
-        <dependency>
-            <groupId>org.hibernate.validator</groupId>
-            <artifactId>hibernate-validator</artifactId>
-        </dependency>
-
-        <!-- Jakarta EL Implementation - Bean Validation için gerekli -->
-        <dependency>
-            <groupId>org.glassfish</groupId>
-            <artifactId>jakarta.el</artifactId>
-            <version>4.0.2</version>
-        </dependency>
-
-        <!-- Spring Retry for MongoDB connection retry -->
-        <dependency>
-            <groupId>org.springframework.retry</groupId>
-            <artifactId>spring-retry</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-aspects</artifactId>
-        </dependency>
-
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -257,6 +214,10 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
     </dependencies>
 
     <dependencyManagement>
@@ -268,9 +229,6 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-
-            <!-- Google Cloud dependencyManagement bölümünü kaldır -->
-            <!--
             <dependency>
                 <groupId>com.google.cloud</groupId>
                 <artifactId>spring-cloud-gcp-dependencies</artifactId>
@@ -278,7 +236,6 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            -->
         </dependencies>
     </dependencyManagement>
 

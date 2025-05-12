@@ -5,50 +5,56 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.annotation.TypeAlias;
+import com.google.cloud.firestore.annotation.DocumentId;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "userPreferences")
+@Builder
+@TypeAlias("userPreference")
 public class UserPreference {
-    
     @Id
-    private String id;
-    
-    @Indexed(unique = true)
+    @DocumentId
     private String userId;
+
+    // Tema modu (light, dark, system)
+    @Builder.Default
+    private String theme = "system";
+
+    // Tema şeması (default, dark, green, purple, orange)
+    @Builder.Default
+    private String themeSchema = "default";
+
+    // Kullanıcının tercih ettiği dil
+    @Builder.Default
+    private String language = "en";
+
+    // Layout tercihi (collapsibleSide, framelessSide)
+    @Builder.Default
+    private String layout = "collapsibleSide";
+
+    // Kullanıcının favori AI modelleri
+    @Builder.Default
+    private List<String> aiModelFavorites = new ArrayList<>();
+
+    // Bildirim tercihleri
+    @Builder.Default
+    private Map<String, Boolean> notifications = new HashMap<>();
     
-    private String language;
-    private String theme;
-    private String themeSchema;
-    private String layout;
-    private Map<String, Boolean> notifications;
-    private Boolean pushEnabled;
-    private List<String> aiModelFavorites;
-    private String lastSelectedModelId;
+    @Builder.Default
+    private Boolean pushEnabled = false;
     
+    // Son seçilen AI modeli ID'si
+    @Builder.Default
+    private String lastSelectedModelId = "google/gemini-2.0-flash-lite-001";
+
+    // Zaman damgaları
     private Long createdAt;
     private Long updatedAt;
-    
-    public void setCreatedAt(Long createdAt) {
-        this.createdAt = createdAt;
-    }
-    
-    public void setUpdatedAt(Long updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-    
-    public Long getCreatedAt() {
-        return this.createdAt;
-    }
-    
-    public Long getUpdatedAt() {
-        return this.updatedAt;
-    }
 }

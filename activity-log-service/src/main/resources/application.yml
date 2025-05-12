@@ -12,30 +12,30 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:prod}
     include: kafka-base
-  data:
-    mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/activitylog}
-      database: ${MONGODB_DATABASE:activitylog}
-      connection-timeout: 30000
-      socket-timeout: 60000
-      max-connection-idle-time: 300000
-      retry-writes: true
-      retry-reads: true
-      auto-index-creation: true
+  cloud:
+    gcp:
+      project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
+      credentials:
+        location: file:${GOOGLE_APPLICATION_CREDENTIALS:/app/credentials/gcp-credentials.json}
+      firestore:
+        enabled: true
+        project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
+        emulator:
+          enabled: ${FIRESTORE_EMULATOR_ENABLED:false}
+          host: ${FIRESTORE_EMULATOR_HOST:localhost:8081}
   jackson:
     default-property-inclusion: non_null
     serialization:
       write-dates-as-timestamps: false
     date-format: com.fasterxml.jackson.databind.util.ISO8601DateFormat
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    bootstrap-servers: kafka:9092
     consumer:
       group-id: activity-log-service
       auto-offset-reset: latest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "*"
+        spring.json.trusted.packages: com.craftpilot.commons.activity.model,com.craftpilot.activitylogservice.model
         spring.json.value.default.type: com.craftpilot.commons.activity.model.ActivityEvent
         spring.json.use.type.headers: false
 
@@ -74,7 +74,8 @@ logging:
     com.craftpilot: DEBUG
     org.springframework.web: INFO
     org.springframework.kafka: INFO
-    com.craftpilot.activitylogservice: DEBUG
+    com.google.cloud.firestore: INFO
+    com.craftpilot.activitylogservice: INFO
     org.apache.kafka: WARN
 
 kafka:
@@ -113,16 +114,7 @@ eureka:
 activity:
   kafka:
     consumer:
-      topic: ${kafka.topics.user-activity}
+      topic: user-activity
     retry:
       max-attempts: 3
       initial-backoff: 1000
-
-# MongoDB bağlantı yeniden deneme yapılandırması
-mongodb:
-  connection:
-    retry:
-      max-attempts: 10
-      initial-interval: 1000
-      max-interval: 30000
-      multiplier: 2.0

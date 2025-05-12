@@ -3,11 +3,8 @@ package com.craftpilot.userservice.service;
 import com.craftpilot.redis.service.ReactiveCacheService;
 import com.craftpilot.userservice.model.UserPreference;
 import com.craftpilot.userservice.model.user.entity.UserEntity;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
@@ -24,12 +21,8 @@ import java.util.HashMap;
 public class RedisCacheService {
     
     private final ReactiveCacheService cacheService;
-    private final ReactiveRedisTemplate<String, String> redisTemplate;
-    private final ObjectMapper objectMapper;
-    
     private static final String USER_KEY_PREFIX = "user:";
     private static final String PREFERENCE_KEY_PREFIX = "preference:";
-    private static final Duration DEFAULT_TTL = Duration.ofHours(1);
 
     // UserEntity için önbellekleme işlemleri
     public Mono<UserEntity> getUser(String userId) {
@@ -121,54 +114,5 @@ public class RedisCacheService {
     public <T> Mono<Boolean> setGeneric(String key, T value) {
         log.debug("Redis'e doğrudan değer kaydediliyor: key={}", key);
         return cacheService.cache(key, value);
-    }
-
-    public <T> Mono<String> set(String key, T value) {
-        return set(key, value, DEFAULT_TTL);
-    }
-    
-    public <T> Mono<String> set(String key, T value, Duration ttl) {
-        try {
-            String json = objectMapper.writeValueAsString(value);
-            String cacheKey = USER_KEY_PREFIX + key;
-            
-            return redisTemplate.opsForValue().set(cacheKey, json, ttl)
-                    .flatMap(success -> {
-                        if (Boolean.TRUE.equals(success)) {
-                            log.debug("Cache hit: {}", cacheKey);
-                            return Mono.just(json);
-                        } else {
-                            log.warn("Failed to set cache key: {}", cacheKey);
-                            return Mono.empty();
-                        }
-                    })
-                    .onErrorResume(e -> {
-                        log.error("Error setting cache: {}", e.getMessage());
-                        return Mono.empty();
-                    });
-        } catch (JsonProcessingException e) {
-            log.error("Error serializing object to JSON: {}", e.getMessage());
-            return Mono.empty();
-        }
-    }
-    
-    // Duplicate get method removed
-
-    public Mono<Boolean> delete(String key) {
-        String cacheKey = USER_KEY_PREFIX + key;
-        
-        return redisTemplate.delete(cacheKey)
-                .map(count -> count > 0)
-                .doOnNext(deleted -> {
-                    if (deleted) {
-                        log.debug("Deleted cache key: {}", cacheKey);
-                    } else {
-                        log.debug("Cache key not found for deletion: {}", cacheKey);
-                    }
-                })
-                .onErrorResume(e -> {
-                    log.error("Error deleting from cache: {}", e.getMessage());
-                    return Mono.just(false);
-                });
     }
 }

@@ -11,56 +11,18 @@ spring:
     name: analytics-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:prod}
-    include: ${KAFKA_ENABLED:true} ? kafka-base
+    include: kafka-base
   cloud:
     discovery:
       enabled: true
   main:
     web-application-type: reactive
-    fail-fast: false
-  data:
-    mongodb:
-      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/analytics?authSource=admin&retryWrites=true&w=majority}
-      auto-index-creation: true
-      connection-timeout: 30000
-      socket-timeout: 60000
-      max-connection-idle-time: 300000
-      retry-writes: true
-      retry-reads: true
-      server-selection-timeout: 20000
-      max-wait-time: 15000
-      connection-pool:
-        max-size: 20
-        min-size: 5
-        max-wait-time: 15000
-        max-connection-lifetime: 30000
 
 # Kafka topic yapılandırması
 kafka:
   topics:
     analytics-events: analytics-events
     metrics-events: metrics-events
-  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
-  enabled: ${KAFKA_ENABLED:true}
-  admin:
-    fail-fast: false
-    auto-create: true
-    bootstrap-timeout: 10000
-    operations-timeout: 10000
-    close-timeout: 5000
-
-# MongoDB resilience configuration
-mongodb:
-  connection:
-    retry:
-      max-attempts: 10
-      initial-interval: 1000
-      max-interval: 30000
-      multiplier: 2.0
-  indexes:
-    creation:
-      enabled: ${MONGODB_INDEX_CREATION_ENABLED:true}
-      startup-fail-fast: false
 
 management:
   endpoints:
@@ -70,13 +32,6 @@ management:
   endpoint:
     health:
       show-details: always
-      probes:
-        enabled: true
-      group:
-        readiness:
-          include: mongo,redis,diskSpace
-        liveness:
-          include: ping
   metrics:
     tags:
       application: ${spring.application.name}
@@ -90,13 +45,9 @@ eureka:
       defaultZone: ${EUREKA_SERVER_URL:http://craftpilot:13579ada@eureka-server:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
-    registry-fetch-interval-seconds: 5
   instance:
     prefer-ip-address: true
     hostname: ${HOSTNAME:analytics-service}
-    instance-id: ${spring.application.name}:${spring.cloud.client.hostname}:${server.port}
-    lease-renewal-interval-in-seconds: 10
-    health-check-url-path: /actuator/health
 
 springdoc:
   swagger-ui:
@@ -122,22 +73,9 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
         permittedNumberOfCallsInHalfOpenState: 3
-  retry:
-    instances:
-      mongoRetry:
-        maxAttempts: 5
-        waitDuration: 1s
-        retryExceptions:
-          - org.springframework.dao.DataAccessResourceFailureException
-          - org.springframework.data.mongodb.UncategorizedMongoDbException
-          - com.mongodb.MongoSocketOpenException
-          - com.mongodb.MongoTimeoutException
 
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] [%X{userId}] %-5level %logger{36} - %msg%n"
   level:
     com.craftpilot.analyticsservice: ${LOG_LEVEL:INFO}
-    org.springframework.data.mongodb: INFO
-    org.springframework.data.redis: INFO
-    org.springframework.boot: INFO

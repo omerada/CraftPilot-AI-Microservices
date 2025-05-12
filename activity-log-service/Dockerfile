@@ -25,6 +25,7 @@ COPY --from=build /build/target/*.jar app.jar
 
 # JVM settings
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom"
+ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
 
 # Install curl for healthcheck
 RUN apt-get update && \

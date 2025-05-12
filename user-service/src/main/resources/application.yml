@@ -2,8 +2,8 @@ spring:
   application:
     name: user-service
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:prod}
-    include: ${KAFKA_ENABLED:true} ? kafka-base
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+    include: kafka-base
   autoconfigure:
     # Spring Boot'un kendi Redis ve Redisson yapılandırmalarını devre dışı bırakıyoruz
     exclude:
@@ -18,41 +18,25 @@ spring:
     redis:
       repositories:
         enabled: false
-    mongodb:
-      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/userservice?authSource=admin&retryWrites=true}
-      database: ${MONGODB_DATABASE:userservice}
-      auto-index-creation: true
-      connection-timeout: 30000
-      socket-timeout: 60000
-      max-connection-idle-time: 300000
-      connection-pool-max-size: 20
-      uuid-representation: standard
-  cloud:
-    discovery:
-      enabled: true
   firebase:
     config:
       path: ${FIREBASE_CONFIG_PATH:/etc/gcp/credentials/gcp-credentials.json}
   kafka:
-    enabled: ${KAFKA_ENABLED:true}
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    enabled: true
+    bootstrap-servers: ${KAFKA_BROKERS:kafka:9092}
     producer:
-      retries: 2
+      retries: 3
       acks: 1
       batch-size: 16384
       buffer-memory: 33554432
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
-        request.timeout.ms: 3000
+        request.timeout.ms: 5000
         retry.backoff.ms: 1000
-        max.block.ms: 3000
+        max.block.ms: 5000
         # Bağlantı sorunlarında daha hızlı hata vermesi için
-        delivery.timeout.ms: 5000
-    admin:
-      fail-fast: false
-      operations-timeout: 5000
-      close-timeout: 3000
+        delivery.timeout.ms: 10000
 
 eureka:
   instance:
@@ -63,12 +47,11 @@ eureka:
     metadata-map:
       user.name: ${eureka.client.security.user.name:craftpilot}
       user.password: ${eureka.client.security.user.password:13579ada}
-    hostname: ${HOSTNAME:user-service}
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_SERVER_URL:http://craftpilot:13579ada@eureka-server:8761/eureka/}
-    register-with-eureka: true
-    fetch-registry: true
+      defaultZone: http://${eureka.client.security.user.name:craftpilot}:${eureka.client.security.user.password:13579ada}@${EUREKA_HOST:eureka-server}:${EUREKA_PORT:8761}/eureka/
+    register-with-eureka: ${EUREKA_REGISTER:true}
+    fetch-registry: ${EUREKA_FETCH:true}
     enabled: ${EUREKA_ENABLED:true}
     healthcheck:
       enabled: true
@@ -82,9 +65,7 @@ eureka:
         password: ${EUREKA_PASSWORD:13579ada}
 
 server:
-  port: ${PORT:8081}
-  compression:
-    enabled: true
+  port: ${SERVER_PORT:8080}
 
 management:
   endpoints:
@@ -206,13 +187,12 @@ logging:
   level:
     root: INFO
     com.craftpilot: DEBUG
-    com.craftpilot.userservice: ${LOG_LEVEL:INFO}
+    com.craftpilot.userservice: DEBUG
     com.craftpilot.redis: INFO # DEBUG yerine INFO seviyesi
     org.springframework.data.redis: DEBUG
     org.springframework.boot.actuate: DEBUG
     org.springframework.web: INFO
     io.lettuce: INFO # DEBUG yerine INFO seviyesi
-    org.springframework.data.mongodb: INFO
 
 craftpilot:
   redis:
@@ -236,19 +216,6 @@ craftpilot:
     max-retry-attempts: 2
     retry-wait-duration: 250ms # 500ms'den 250ms'e düşürüldü
     health-indicator-enabled: true
-
-# MongoDB bağlantı yeniden deneme yapılandırması
-mongodb:
-  connection:
-    retry:
-      max-attempts: 5
-      initial-interval: 1000
-      max-interval: 10000
-      multiplier: 2.0
-  indexes:
-    creation:
-      enabled: true
-      startup-fail-fast: false
 
 # Kullanıcı tercihleri operasyon timeout değeri
 user-preference:

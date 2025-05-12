@@ -48,8 +48,6 @@ public class ActivityEventListener {
                         signal.failure().getMessage()));
         
         receiver.receive()
-                .doOnNext(record -> log.debug("Received activity event: key={}, topic={}, actionType={}", 
-                        record.key(), record.topic(), record.value().getActionType()))
                 .flatMap(this::processRecord)
                 .doOnError(error -> {
                     if (error instanceof InaccessibleObjectException) {
@@ -82,8 +80,7 @@ public class ActivityEventListener {
             return Mono.fromRunnable(record::receiverOffset).then();
         }
         
-        log.info("Processing activity event: userId={}, actionType={}, timestamp={}", 
-                commonsEvent.getUserId(), commonsEvent.getActionType(), commonsEvent.getTimestamp());
+        log.debug("Processing activity event: {}", commonsEvent);
         
         // Convert from commons ActivityEvent to service ActivityEvent
         com.craftpilot.activitylogservice.model.ActivityEvent serviceEvent = 
@@ -92,7 +89,7 @@ public class ActivityEventListener {
         return activityLogService.processEvent(serviceEvent)
                 .doOnSuccess(v -> {
                     record.receiverOffset().acknowledge();
-                    log.info("Successfully processed and acknowledged activity event: {}", commonsEvent.getActionType());
+                    log.debug("Successfully processed and acknowledged activity event");
                 })
                 .doOnError(e -> log.error("Failed to process activity event: {}", e.getMessage(), e))
                 .then();

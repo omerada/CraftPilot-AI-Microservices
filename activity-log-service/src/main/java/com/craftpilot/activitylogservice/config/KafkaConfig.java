@@ -32,24 +32,21 @@ public class KafkaConfig {
 
     @Bean
     public KafkaReceiver<String, ActivityEvent> activityEventReceiver() {
-        log.info("Configuring Kafka receiver for topic: {} with bootstrap servers: {}", topic, bootstrapServers);
-        
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.craftpilot.commons.activity.model,com.craftpilot.activitylogservice.model");
         props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "com.craftpilot.commons.activity.model.ActivityEvent");
         props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
         
         ReceiverOptions<String, ActivityEvent> receiverOptions = ReceiverOptions.<String, ActivityEvent>create(props)
                 .subscription(Collections.singleton(topic))
-                .addAssignListener(partitions -> log.info("Assigned partitions: {}", partitions))
-                .addRevokeListener(partitions -> log.info("Revoked partitions: {}", partitions));
+                .addAssignListener(partitions -> log.info("Assigned: {}", partitions))
+                .addRevokeListener(partitions -> log.info("Revoked: {}", partitions));
                 
-        log.info("Kafka receiver successfully configured for topic: {}", topic);
         return KafkaReceiver.create(receiverOptions);
     }
 }

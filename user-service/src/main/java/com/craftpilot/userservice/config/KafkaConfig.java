@@ -67,15 +67,7 @@ public class KafkaConfig {
         configs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         // Admin istemcisi için timeout süresini azalt
         configs.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 5000);
-        configs.put(AdminClientConfig.RETRIES_CONFIG, 1); // Retry sayısını azalt
-        configs.put(AdminClientConfig.RETRY_BACKOFF_MS_CONFIG, 1000);
-        
-        KafkaAdmin admin = new KafkaAdmin(configs);
-        // Başlatma hatalarında daha esnek davranmasını sağla
-        admin.setFatalIfBrokerNotAvailable(false);
-        admin.setAutoCreate(true);
-        
-        return admin;
+        return new KafkaAdmin(configs);
     }
 
     private Map<String, Object> getBaseProducerConfigs() {
