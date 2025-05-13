@@ -23,6 +23,10 @@ spring:
       max-connection-idle-time: 300000
       connection-pool-max-size: 20
       auto-index-creation: true
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
   jackson:
     default-property-inclusion: non_null
     serialization:
@@ -41,16 +45,16 @@ spring:
 
 # Redis yapılandırması
 spring.data.redis:
-  host: ${REDIS_HOST:redis}
+  host: ${REDIS_HOST:localhost}
   port: ${REDIS_PORT:6379}
-  password: ${REDIS_PASSWORD:13579ada}
+  password: ${REDIS_PASSWORD:}
   timeout: 5000
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: always
@@ -58,7 +62,8 @@ management:
         enabled: true
       group:
         readiness:
-          include: mongo,redis,diskSpace
+          include: mongo
+          show-details: always
         liveness:
           include: ping
     metrics:
@@ -67,6 +72,8 @@ management:
       enabled: true
   health:
     mongodb:
+      enabled: true
+    redis:
       enabled: true
     livenessState:
       enabled: true
