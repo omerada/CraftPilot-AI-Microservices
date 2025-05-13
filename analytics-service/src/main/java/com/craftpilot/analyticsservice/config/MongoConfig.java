@@ -12,12 +12,16 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.config.AbstractReactiveMongoConfiguration;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.repository.config.EnableReactiveMongoRepositories;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.EnableRetry;
+import org.springframework.retry.annotation.Retryable;
 
 import java.util.concurrent.TimeUnit;
 
 @Configuration
 @EnableReactiveMongoRepositories(basePackages = "com.craftpilot.analyticsservice.repository")
 @Slf4j
+@EnableRetry
 public class MongoConfig extends AbstractReactiveMongoConfiguration {
 
     @Value("${spring.data.mongodb.uri}")
@@ -26,11 +30,14 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
     @Value("${spring.data.mongodb.database}")
     private String database;
 
-    @Value("${mongodb.username:#{null}}")
+    @Value("${spring.data.mongodb.username:craftpilotadmin}")
     private String username;
 
-    @Value("${mongodb.password:#{null}}")
+    @Value("${spring.data.mongodb.password:}")
     private String password;
+
+    @Value("${spring.data.mongodb.authentication-database:admin}")
+    private String authenticationDatabase;
 
     @Value("${spring.data.mongodb.connection-timeout:30000}")
     private int connectionTimeout;
@@ -41,8 +48,11 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
     @Value("${spring.data.mongodb.max-connection-idle-time:300000}")
     private int maxConnectionIdleTime;
 
-    @Value("${mongodb.connection.retry.max-attempts:10}")
-    private int maxRetryAttempts;
+    @Value("${spring.data.mongodb.connection-pool-max-size:50}")
+    private int connectionPoolMaxSize;
+
+    @Value("${spring.data.mongodb.connection-pool-min-size:5}")
+    private int connectionPoolMinSize;
 
     @Override
     protected String getDatabaseName() {
@@ -51,6 +61,7 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
 
     @Override
     @Bean
+    @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
     public MongoClient reactiveMongoClient() {
         log.info("Initializing MongoDB client with database: {}", database);
         
@@ -61,34 +72,49 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
         try {
             ConnectionString connectionString = new ConnectionString(mongoUri);
             
-            // MongoDB URI'den bilgileri çıkar
-            String host = connectionString.getHosts().get(0);
-            log.info("MongoDB host: {}", host);
-            
-            MongoClientSettings settings = MongoClientSettings.builder()
+            MongoClientSettings.Builder settingsBuilder = MongoClientSettings.builder()
                     .applyConnectionString(connectionString)
                     .applyToConnectionPoolSettings(builder -> 
-                        builder.maxSize(50)
-                               .minSize(5)
+                        builder.maxSize(connectionPoolMaxSize)
+                               .minSize(connectionPoolMinSize)
                                .maxConnectionIdleTime(maxConnectionIdleTime, TimeUnit.MILLISECONDS)
-                               .maxWaitTime(10000, TimeUnit.MILLISECONDS))
+                               .maxWaitTime(30000, TimeUnit.MILLISECONDS))
                     .applyToSocketSettings(builder -> 
                         builder.connectTimeout(connectionTimeout, TimeUnit.MILLISECONDS)
                                .readTimeout(socketTimeout, TimeUnit.MILLISECONDS))
                     .applyToServerSettings(builder ->
-                        builder.heartbeatFrequency(20000, TimeUnit.MILLISECONDS))
-                    .build();
+                        builder.heartbeatFrequency(10000, TimeUnit.MILLISECONDS));
             
+            // Eğer URI'de kimlik bilgileri yoksa ve ayrıca tanımlanmışsa, ekle
+            if (!mongoUri.contains("@") && username != null && !username.isEmpty() && password != null && !password.isEmpty()) {
+                log.info("Adding credential from properties for user: {} on database: {}", username, authenticationDatabase);
+                MongoCredential credential = MongoCredential.createCredential(
+                    username, 
+                    authenticationDatabase, 
+                    password.toCharArray());
+                settingsBuilder.credential(credential);
+            }
+            
+            MongoClientSettings settings = settingsBuilder.build();
             log.info("MongoDB connection configured successfully");
             return MongoClients.create(settings);
         } catch (Exception e) {
             log.error("Failed to initialize MongoDB client: {}", e.getMessage(), e);
-            throw e;
+            // Hata durumunda da client oluşturalım, uygulama ayağa kalksın
+            // Diğer servisler çalışmaya devam edebilir
+            return MongoClients.create(MongoClientSettings.builder()
+                    .applyConnectionString(new ConnectionString(mongoUri))
+                    .build());
         }
     }
 
     @Bean
     public ReactiveMongoTemplate reactiveMongoTemplate() {
-        return new ReactiveMongoTemplate(reactiveMongoClient(), getDatabaseName());
+        try {
+            return new ReactiveMongoTemplate(reactiveMongoClient(), getDatabaseName());
+        } catch (Exception e) {
+            log.error("Failed to create ReactiveMongoTemplate: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 }
