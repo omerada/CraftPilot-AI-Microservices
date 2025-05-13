@@ -1,28 +1,51 @@
-# Build stage - sadece ARM64
+# Build stage - ARM64 specific
 FROM --platform=linux/arm64 maven:3.9.6-eclipse-temurin-21 AS build
 
 WORKDIR /build
 COPY pom.xml .
 COPY src ./src
 
-# Maven build için platform ayarı
-ARG TARGETARCH=arm64
-RUN echo "Building for ARM64 architecture"
+# Maven build for ARM64
 RUN mvn clean package -DskipTests
 
-# Run stage - sadece ARM64
-FROM --platform=linux/arm64 eclipse-temurin:21-jdk
+# Run stage - ARM64 specific
+FROM --platform=linux/arm64 eclipse-temurin:21-jre
 
 WORKDIR /app
+
+# Install necessary packages
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    curl \
+    netcat-openbsd \
+    tzdata \
+    libc6 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create necessary directories
+RUN mkdir -p /tmp/netty /tmp/image-service
+
+# Copy application
 COPY --from=build /build/target/*.jar app.jar
 
-# JVM ayarları
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
-ENV SERVER_PORT=8056
+# Set environment variables
+ENV SPRING_PROFILES_ACTIVE=prod \
+    JAVA_TOOL_OPTIONS="\
+    -XX:+UseContainerSupport \
+    -XX:MaxRAMPercentage=75.0 \
+    -XX:+UseG1GC \
+    -Dio.netty.tryReflectionSetAccessible=true \
+    -Djava.security.egd=file:/dev/./urandom \
+    -Djava.awt.headless=true \
+    -Dfile.encoding=UTF-8"
 
-EXPOSE ${SERVER_PORT}
+# Create healthcheck script
+RUN echo '#!/bin/sh\ncurl -f http://localhost:8056/actuator/health || exit 1' > /healthcheck.sh && \
+    chmod +x /healthcheck.sh
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
-  CMD curl -f http://localhost:${SERVER_PORT}/actuator/health || exit 1
+# Health check configuration
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD /healthcheck.sh
 
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${SERVER_PORT} -Dspring.profiles.active=prod -jar app.jar"]
+EXPOSE 8056
+ENTRYPOINT ["java", "-jar", "app.jar"]
