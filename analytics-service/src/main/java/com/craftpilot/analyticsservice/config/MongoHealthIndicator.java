@@ -17,9 +17,13 @@ import java.util.Map;
 public class MongoHealthIndicator implements ReactiveHealthIndicator {
 
     private final ReactiveMongoTemplate mongoTemplate;
+    private final String databaseName;
 
     public MongoHealthIndicator(ReactiveMongoTemplate mongoTemplate) {
         this.mongoTemplate = mongoTemplate;
+        this.databaseName = mongoTemplate.getMongoDatabase()
+                .map(db -> db.getName())
+                .block(); // Safe to block during initialization
     }
 
     @Override
@@ -43,7 +47,7 @@ public class MongoHealthIndicator implements ReactiveHealthIndicator {
                         log.debug("MongoDB sağlık kontrolü başarılı");
                         Map<String, Object> details = new HashMap<>();
                         details.put("ping", "ok");
-                        details.put("database", mongoTemplate.getMongoDatabase().getName());
+                        details.put("database", databaseName);
                         return Health.up().withDetails(details).build();
                     } else {
                         log.warn("MongoDB ping komutu başarısız");

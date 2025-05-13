@@ -74,8 +74,7 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
                         .maxConnectionLifeTime(maxConnectionLifeTime, TimeUnit.MILLISECONDS))
                 .applyToSocketSettings(builder -> builder.connectTimeout(connectTimeout, TimeUnit.MILLISECONDS)
                         .readTimeout(socketTimeout, TimeUnit.MILLISECONDS))
-                .applyToServerSettings(builder -> builder
-                        .heartbeatFrequency(10000, TimeUnit.MILLISECONDS)
+                .applyToClusterSettings(builder -> builder
                         .serverSelectionTimeout(serverSelectionTimeout, TimeUnit.MILLISECONDS))
                 .build();
 
