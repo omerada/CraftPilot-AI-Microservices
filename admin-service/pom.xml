@@ -80,6 +80,11 @@
             <groupId>org.mongodb</groupId>
             <artifactId>mongodb-driver-reactivestreams</artifactId>
         </dependency>
+        <!-- MongoDB Health Indicator -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
 
         <!-- Spring Cloud -->
         <dependency>

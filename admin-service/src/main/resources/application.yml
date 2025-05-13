@@ -32,11 +32,12 @@ spring:
           max-wait: 1000ms
         shutdown-timeout: 200ms
     mongodb:
-      uri: ${MONGODB_URI:mongodb://admin:password@localhost:27017/admindb}
+      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=5000}
       database: ${MONGODB_DATABASE:admindb}
-      connection-timeout: 5000
+      connection-timeout: 10000
+      socket-timeout: 15000
       max-connection-idle-time: 60000
-      connection-pool-max-size: 20
+      connection-pool-max-size: 50
       auto-index-creation: true
 
 eureka:
@@ -96,3 +97,4 @@ logging:
     org.springframework.data.redis: INFO
     org.springframework.data.mongodb: INFO
     org.springframework.cloud: INFO
+    com.mongodb: WARN

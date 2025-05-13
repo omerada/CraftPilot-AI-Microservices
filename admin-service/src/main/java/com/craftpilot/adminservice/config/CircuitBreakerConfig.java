@@ -23,33 +23,17 @@ public class CircuitBreakerConfig {
     public Customizer<ReactiveResilience4JCircuitBreakerFactory> adminServiceCustomizer() {
         return factory -> {
             factory.configure(builder -> builder
-                .circuitBreakerConfig(io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
-                    .slidingWindowType(SlidingWindowType.COUNT_BASED)
-                    .slidingWindowSize(20)
-                    .failureRateThreshold(40)
-                    .waitDurationInOpenState(Duration.ofSeconds(30))
-                    .permittedNumberOfCallsInHalfOpenState(5)
-                    .build())
-                .timeLimiterConfig(TimeLimiterConfig.custom()
-                    .timeoutDuration(Duration.ofSeconds(5))
-                    .build()), "adminService");
-        };
-    }
-
-    @Bean
-    public Customizer<ReactiveResilience4JCircuitBreakerFactory> firestoreServiceCustomizer() {
-        return factory -> {
-            factory.configure(builder -> builder
-                .circuitBreakerConfig(io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
-                    .slidingWindowType(SlidingWindowType.COUNT_BASED)
-                    .slidingWindowSize(10)
-                    .failureRateThreshold(50)
-                    .waitDurationInOpenState(Duration.ofSeconds(5))
-                    .permittedNumberOfCallsInHalfOpenState(2)
-                    .build())
-                .timeLimiterConfig(TimeLimiterConfig.custom()
-                    .timeoutDuration(Duration.ofSeconds(3))
-                    .build()), "firestoreService");
+                    .circuitBreakerConfig(io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
+                            .slidingWindowType(SlidingWindowType.COUNT_BASED)
+                            .slidingWindowSize(20)
+                            .failureRateThreshold(40)
+                            .waitDurationInOpenState(Duration.ofSeconds(30))
+                            .permittedNumberOfCallsInHalfOpenState(5)
+                            .build())
+                    .timeLimiterConfig(TimeLimiterConfig.custom()
+                            .timeoutDuration(Duration.ofSeconds(5))
+                            .build()),
+                    "adminService");
         };
     }
 
@@ -57,16 +41,24 @@ public class CircuitBreakerConfig {
     public Customizer<ReactiveResilience4JCircuitBreakerFactory> mongoServiceCustomizer() {
         return factory -> {
             factory.configure(builder -> builder
-                .circuitBreakerConfig(io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
-                    .slidingWindowType(SlidingWindowType.COUNT_BASED)
-                    .slidingWindowSize(10)
-                    .failureRateThreshold(50)
-                    .waitDurationInOpenState(Duration.ofSeconds(5))
-                    .permittedNumberOfCallsInHalfOpenState(2)
-                    .build())
-                .timeLimiterConfig(TimeLimiterConfig.custom()
-                    .timeoutDuration(Duration.ofSeconds(3))
-                    .build()), "mongoService");
+                    .circuitBreakerConfig(io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
+                            .slidingWindowType(SlidingWindowType.COUNT_BASED)
+                            .slidingWindowSize(15)
+                            .failureRateThreshold(40)
+                            .waitDurationInOpenState(Duration.ofSeconds(10))
+                            .permittedNumberOfCallsInHalfOpenState(3)
+                            .automaticTransitionFromOpenToHalfOpenEnabled(true)
+                            .recordExceptions(
+                                    com.mongodb.MongoTimeoutException.class,
+                                    com.mongodb.MongoSocketException.class,
+                                    com.mongodb.MongoExecutionTimeoutException.class,
+                                    com.mongodb.MongoQueryException.class,
+                                    com.mongodb.MongoWriteException.class)
+                            .build())
+                    .timeLimiterConfig(TimeLimiterConfig.custom()
+                            .timeoutDuration(Duration.ofSeconds(3))
+                            .build()),
+                    "mongoService");
         };
     }
 
@@ -74,16 +66,17 @@ public class CircuitBreakerConfig {
     public Customizer<ReactiveResilience4JCircuitBreakerFactory> redisServiceCustomizer() {
         return factory -> {
             factory.configure(builder -> builder
-                .circuitBreakerConfig(io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
-                    .slidingWindowType(SlidingWindowType.COUNT_BASED)
-                    .slidingWindowSize(15)
-                    .failureRateThreshold(45)
-                    .waitDurationInOpenState(Duration.ofSeconds(15))
-                    .permittedNumberOfCallsInHalfOpenState(3)
-                    .build())
-                .timeLimiterConfig(TimeLimiterConfig.custom()
-                    .timeoutDuration(Duration.ofSeconds(2))
-                    .build()), "redisService");
+                    .circuitBreakerConfig(io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
+                            .slidingWindowType(SlidingWindowType.COUNT_BASED)
+                            .slidingWindowSize(15)
+                            .failureRateThreshold(45)
+                            .waitDurationInOpenState(Duration.ofSeconds(15))
+                            .permittedNumberOfCallsInHalfOpenState(3)
+                            .build())
+                    .timeLimiterConfig(TimeLimiterConfig.custom()
+                            .timeoutDuration(Duration.ofSeconds(2))
+                            .build()),
+                    "redisService");
         };
     }
 
@@ -91,17 +84,17 @@ public class CircuitBreakerConfig {
     public Customizer<ReactiveResilience4JCircuitBreakerFactory> defaultCustomizer() {
         return factory -> {
             factory.configureDefault(id -> new Resilience4JConfigBuilder(id)
-                .circuitBreakerConfig(io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
-                    .slidingWindowType(SlidingWindowType.COUNT_BASED)
-                    .slidingWindowSize(10)
-                    .failureRateThreshold(50)
-                    .waitDurationInOpenState(Duration.ofSeconds(10))
-                    .permittedNumberOfCallsInHalfOpenState(3)
-                    .build())
-                .timeLimiterConfig(TimeLimiterConfig.custom()
-                    .timeoutDuration(Duration.ofSeconds(3))
-                    .build())
-                .build());
+                    .circuitBreakerConfig(io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
+                            .slidingWindowType(SlidingWindowType.COUNT_BASED)
+                            .slidingWindowSize(10)
+                            .failureRateThreshold(50)
+                            .waitDurationInOpenState(Duration.ofSeconds(10))
+                            .permittedNumberOfCallsInHalfOpenState(3)
+                            .build())
+                    .timeLimiterConfig(TimeLimiterConfig.custom()
+                            .timeoutDuration(Duration.ofSeconds(3))
+                            .build())
+                    .build());
         };
     }
 }

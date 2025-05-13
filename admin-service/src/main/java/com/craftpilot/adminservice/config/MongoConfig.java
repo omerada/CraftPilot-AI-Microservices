@@ -43,21 +43,24 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
     @Override
     @Bean
     public MongoClient reactiveMongoClient() {
-        logger.info("MongoDB yapılandırması başlatılıyor. URI: {}, Database: {}", 
-                mongoUri.replaceAll("mongodb\\+srv://.*:.*@", "mongodb+srv://***:***@"), databaseName);
-        
+        logger.info("Initializing MongoDB configuration. Database: {}", databaseName);
+
         ConnectionString connectionString = new ConnectionString(mongoUri);
-        
+
         MongoClientSettings settings = MongoClientSettings.builder()
                 .applyConnectionString(connectionString)
-                .applyToConnectionPoolSettings(builder -> 
-                        builder.maxSize(connectionPoolMaxSize)
-                               .maxConnectionIdleTime(maxConnectionIdleTime, TimeUnit.MILLISECONDS))
-                .applyToSocketSettings(builder -> 
-                        builder.connectTimeout(connectionTimeout, TimeUnit.MILLISECONDS))
+                .applyToConnectionPoolSettings(builder -> builder.maxSize(connectionPoolMaxSize)
+                        .minSize(5)
+                        .maxConnectionIdleTime(maxConnectionIdleTime, TimeUnit.MILLISECONDS)
+                        .maxWaitTime(15000, TimeUnit.MILLISECONDS))
+                .applyToSocketSettings(builder -> builder.connectTimeout(connectionTimeout, TimeUnit.MILLISECONDS)
+                        .readTimeout(30000, TimeUnit.MILLISECONDS))
+                .applyToServerSettings(builder -> builder.heartbeatFrequency(20000, TimeUnit.MILLISECONDS))
+                .retryWrites(true)
+                .retryReads(true)
                 .build();
-        
-        logger.info("MongoDB başarıyla yapılandırıldı");
+
+        logger.info("MongoDB configuration successfully initialized");
         return MongoClients.create(settings);
     }
 
