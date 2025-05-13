@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.TopicBuilder;
 import lombok.extern.slf4j.Slf4j;
@@ -33,5 +34,14 @@ public class KafkaConfig extends KafkaBaseConfig {
                     .replicas(1)
                     .build();
         }
+    }
+    
+    // Kafka bağlantısı başarısız olduğunda uygulamanın çökmemesi için fallback mekanizması
+    @Bean
+    @Primary
+    @ConditionalOnProperty(name = "spring.kafka.enabled", havingValue = "false")
+    public org.springframework.kafka.core.KafkaTemplate<?, ?> noopKafkaTemplate() {
+        log.info("Creating no-op KafkaTemplate since Kafka is disabled");
+        return null;
     }
 }

@@ -86,8 +86,14 @@ jobs:
 
             # Variables from GitHub secrets - will be replaced with actual values
             DOCKERHUB_USERNAME="DOCKERHUB_USERNAME_PLACEHOLDER"
-            MONGODB_URI="MONGODB_URI_PLACEHOLDER"
+            MONGO_ROOT_USERNAME="MONGO_ROOT_USERNAME_PLACEHOLDER"
+            MONGO_ROOT_PASSWORD="MONGO_ROOT_PASSWORD_PLACEHOLDER"
+            MONGO_INITDB_DATABASE="MONGO_INITDB_DATABASE_PLACEHOLDER"
             OPENAI_API_KEY="OPENAI_API_KEY_PLACEHOLDER"
+
+            # MongoDB connection - use actual container name from docker ps output
+            MONGODB_URI="mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@craftpilot-mongodb:27017/${MONGO_INITDB_DATABASE}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"
+            echo "Using MongoDB URI: $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
 
             # Run the container
             echo "=== Starting container ==="
@@ -105,7 +111,7 @@ jobs:
               -e SPRING_SECURITY_USER_NAME=craftpilot \
               -e SPRING_SECURITY_USER_PASSWORD=13579ada \
               -e SPRING_DATA_MONGODB_URI="${MONGODB_URI}" \
-              -e SPRING_DATA_MONGODB_DATABASE=image-service \
+              -e SPRING_DATA_MONGODB_DATABASE="${MONGO_INITDB_DATABASE}" \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
@@ -119,7 +125,9 @@ jobs:
 
             # Replace placeholders with actual values
             sed -i "s|DOCKERHUB_USERNAME_PLACEHOLDER|${{ secrets.DOCKERHUB_USERNAME }}|g" /tmp/deploy-image-service.sh
-            sed -i "s|MONGODB_URI_PLACEHOLDER|${{ secrets.MONGODB_URI }}|g" /tmp/deploy-image-service.sh
+            sed -i "s|MONGO_ROOT_USERNAME_PLACEHOLDER|${{ secrets.MONGO_ROOT_USERNAME }}|g" /tmp/deploy-image-service.sh
+            sed -i "s|MONGO_ROOT_PASSWORD_PLACEHOLDER|${{ secrets.MONGO_ROOT_PASSWORD }}|g" /tmp/deploy-image-service.sh
+            sed -i "s|MONGO_INITDB_DATABASE_PLACEHOLDER|${{ secrets.MONGO_INITDB_DATABASE }}|g" /tmp/deploy-image-service.sh
             sed -i "s|OPENAI_API_KEY_PLACEHOLDER|${{ secrets.OPENAI_API_KEY }}|g" /tmp/deploy-image-service.sh
 
             # Make script executable
@@ -127,6 +135,24 @@ jobs:
 
             # Run the deploy script
             /tmp/deploy-image-service.sh
+
+            # Verify MongoDB connection from container
+            echo "=== Verifying MongoDB connection ==="
+            sleep 10
+            if docker exec image-service nc -z -w5 craftpilot-mongodb 27017; then
+              echo "✅ MongoDB connection successful"
+            else
+              echo "⚠️ MongoDB connection check failed"
+              echo "Testing connection from host machine..."
+              nc -z -w5 localhost 27017 && echo "Host can connect to MongoDB" || echo "Host cannot connect to MongoDB"
+              
+              # Check MongoDB container is running
+              docker ps | grep craftpilot-mongodb || echo "MongoDB container not found!"
+              
+              # Print MongoDB container network details
+              docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' craftpilot-mongodb
+              docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' image-service
+            fi
 
             # Verify container is running
             echo "=== Verifying container started ==="
@@ -174,6 +200,8 @@ jobs:
                 echo "=== Mid-point debug information ==="
                 echo "Container Status:"
                 docker ps | grep image-service || echo "Container not found"
+                echo "MongoDB Status:"
+                docker ps | grep craftpilot-mongodb || echo "MongoDB container not found"
                 echo "Recent Logs:"
                 docker logs image-service --tail 100 || echo "No logs available"
               fi
@@ -186,6 +214,8 @@ jobs:
             echo "=== Health check failed - Debug information ==="
             echo "Final Container Status:"
             docker ps | grep image-service || echo "Container not found in running containers"
+            echo "MongoDB Container Status:"
+            docker ps | grep craftpilot-mongodb || echo "MongoDB container not found"
             echo "Container Logs:"
             docker logs image-service --tail 100 || echo "No logs available"
             exit 1
