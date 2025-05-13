@@ -1,22 +1,31 @@
-# Build stage
-FROM maven:3.9.6-eclipse-temurin-21 AS build
-
-WORKDIR /build
-COPY pom.xml .
-COPY src ./src
-
-# Maven build
-RUN mvn clean package -DskipTests
-
-# Run stage
-FROM eclipse-temurin:21-jdk
+FROM openjdk:21-slim as builder
 
 WORKDIR /app
-COPY --from=build /build/target/*.jar app.jar
 
-# JVM ayarları
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
-ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
+COPY .mvn/ .mvn/
+COPY mvnw pom.xml ./
+RUN ./mvnw dependency:go-offline
+
+COPY src ./src/
+RUN ./mvnw clean package -DskipTests
+
+FROM openjdk:21-slim
+
+WORKDIR /app
+
+COPY --from=builder /app/target/*.jar app.jar
+
+# MongoDB connection
+ENV MONGODB_URI=mongodb://craftpilot:secure_password@mongodb:27017/analytics?authSource=admin&retryWrites=true&w=majority
+ENV MONGODB_DATABASE=analytics
+
+# Eureka configuration
+ENV EUREKA_SERVER_URL=http://craftpilot:13579ada@eureka-server:8761/eureka/
+
+# Spring and application configs
+ENV SPRING_PROFILES_ACTIVE=prod
+ENV SERVER_PORT=8064
 
 EXPOSE 8064
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]
+
+CMD ["java", "-Xms512m", "-Xmx1g", "-jar", "app.jar"]

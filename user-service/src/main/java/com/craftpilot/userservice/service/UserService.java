@@ -206,10 +206,9 @@ public class UserService {
     public Mono<Void> deleteUser(String userId) {
         return userRepository.findById(userId)
                 .flatMap(user -> {
-                    // Kullanıcı tercihlerini sil
                     return userPreferenceService.deleteUserPreferences(userId)
                             .then(Mono.defer(() -> {
-                                // Firestore'dan kullanıcıyı sil
+                                // MongoDB'den kullanıcıyı sil
                                 return userRepository.deleteById(userId);
                             }))
                             .then(Mono.fromRunnable(() -> {

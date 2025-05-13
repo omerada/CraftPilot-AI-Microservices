@@ -11,18 +11,34 @@ spring:
     name: analytics-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:prod}
-    include: kafka-base
+    include: ${KAFKA_ENABLED:true} ? kafka-base
   cloud:
     discovery:
       enabled: true
   main:
     web-application-type: reactive
+    fail-fast: false
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=5000}
+      database: ${MONGODB_DATABASE:analytics}
+      auto-index-creation: true
+      connection-timeout: 30000
+      socket-timeout: 60000
+      max-connection-idle-time: 300000
+      retry-writes: true
+      retry-reads: true
 
 # Kafka topic yapılandırması
 kafka:
   topics:
     analytics-events: analytics-events
     metrics-events: metrics-events
+  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+  enabled: ${KAFKA_ENABLED:true}
+  admin:
+    fail-fast: false
+    auto-create: true
 
 management:
   endpoints:
@@ -79,3 +95,16 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] [%X{userId}] %-5level %logger{36} - %msg%n"
   level:
     com.craftpilot.analyticsservice: ${LOG_LEVEL:INFO}
+
+# MongoDB resilience configuration
+mongodb:
+  connection:
+    retry:
+      max-attempts: 10
+      initial-interval: 1000
+      max-interval: 30000
+      multiplier: 2.0
+  indexes:
+    creation:
+      enabled: ${MONGODB_INDEX_CREATION_ENABLED:true}
+      startup-fail-fast: false

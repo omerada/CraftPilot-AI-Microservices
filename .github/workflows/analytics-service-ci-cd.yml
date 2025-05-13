@@ -93,19 +93,21 @@ jobs:
               --network craftpilot-network \
               --restart unless-stopped \
               -p 8064:8064 \
-              -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
-              -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/gcp-credentials.json \
+              -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
+              -e MONGODB_DATABASE=analytics \
+              -e MONGODB_HOST=craftpilot-mongodb \
+              -e MONGODB_PORT=27017 \
+              -e MONGODB_USERNAME=${{ secrets.MONGO_ROOT_USERNAME }} \
+              -e MONGODB_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }} \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
-              -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e KAFKA_ENABLED=true \
               --health-cmd="curl -f http://localhost:8064/actuator/health || exit 1" \
