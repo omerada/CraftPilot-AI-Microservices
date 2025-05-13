@@ -39,27 +39,39 @@ echo "Java version: $(java -version 2>&1 | head -n 1)"
 echo "Environment checks:"
 
 # MongoDB host ve kimlik bilgilerini belirle
-# SPRING_DATA_MONGODB_URI'dan host çıkarma veya varsayılan kullanma
-if [ -n "\$SPRING_DATA_MONGODB_URI" ]; then
-  MONGODB_HOST=\$(echo \$SPRING_DATA_MONGODB_URI | sed -n 's/.*@\\([^:]*\\).*/\\1/p')
-  if [ -z "\$MONGODB_HOST" ]; then
-    echo "Warning: Could not extract MongoDB host from URI"
-    MONGODB_HOST="craftpilot-mongodb"  # Varsayılan değeri kullan
-  fi
+# SPRING_DATA_MONGODB_URI'dan host ve kimlik bilgilerini çıkarma (geliştirilmiş regex)
+if [[ -n "\$SPRING_DATA_MONGODB_URI" && "\$SPRING_DATA_MONGODB_URI" =~ mongodb://([^:]*):([^@]*)@([^:/]+) ]]; then
+  MONGODB_USERNAME="\${BASH_REMATCH[1]}"
+  MONGODB_PASSWORD="\${BASH_REMATCH[2]}"
+  MONGODB_HOST="\${BASH_REMATCH[3]}"
+  echo "📊 MongoDB URI'dan kimlik bilgileri çıkarıldı - Kullanıcı: \$MONGODB_USERNAME, Host: \$MONGODB_HOST"
 else
   # Değişkenler tanımlı değilse varsayılan değerleri kullan
-  MONGODB_HOST="craftpilot-mongodb"
+  MONGODB_USERNAME="\${MONGO_ROOT_USERNAME:-craftpilot}"
+  MONGODB_PASSWORD="\${MONGO_ROOT_PASSWORD:-secure_password}"
+  MONGODB_HOST="\${MONGODB_HOST:-craftpilot-mongodb}"
+  echo "⚠️ Varsayılan MongoDB bilgileri kullanılıyor - Kullanıcı: \$MONGODB_USERNAME, Host: \$MONGODB_HOST"
 fi
 
 echo "Testing connection to MongoDB at \$MONGODB_HOST..."
 for i in {1..30}; do
   if nc -z -w 2 \$MONGODB_HOST 27017; then
-    echo "✅ Successfully connected to MongoDB at \$MONGODB_HOST:27017"
+    echo "✅ MongoDB'ye başarıyla bağlanıldı: \$MONGODB_HOST:27017"
+    
+    # Kimlik doğrulama kontrolü (eğer mongosh varsa)
+    if command -v mongosh >/dev/null 2>&1; then
+      echo "MongoDB kimlik doğrulama testi yapılıyor..."
+      if mongosh --quiet --eval "db.runCommand({ping:1}).ok" admin --host \$MONGODB_HOST --port 27017 -u \$MONGODB_USERNAME -p \$MONGODB_PASSWORD --authenticationDatabase admin | grep -q "1"; then
+        echo "✅ MongoDB kimlik doğrulama başarılı"
+      else
+        echo "⚠️ MongoDB kimlik doğrulama başarısız, ancak bağlantı mevcut"
+      fi
+    fi
     break
   fi
-  echo "⏳ Waiting for MongoDB to be available... (\$i/30)"
+  echo "⏳ MongoDB'nin hazır olması bekleniyor... (\$i/30)"
   if [ \$i -eq 30 ]; then
-    echo "⚠️ Could not connect to MongoDB within timeout, but will continue startup"
+    echo "⚠️ MongoDB bağlantı zaman aşımı, servis başlatılacak ancak MongoDB bağlantısı olmayabilir!"
   fi
   sleep 2
 done
