@@ -45,10 +45,17 @@ on:
           - notification-service
           - analytics-service
           - admin-service
+          - activity-log-service
+          - user-memory-service
+          - lighthouse-service
+          - lighthouse-worker
+          - eureka-server
+          - credit-service
           - api-gateway
           - redis
           - mongodb
           - kafka
+          - zookeeper
         default: "all"
         required: false
 

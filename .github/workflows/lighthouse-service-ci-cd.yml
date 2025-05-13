@@ -17,6 +17,15 @@ on:
         options:
           - prod
           - debug
+      service_component:
+        description: "Service component to deploy"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - lighthouse-service
+          - lighthouse-worker
 
 jobs:
   build-and-test-service:

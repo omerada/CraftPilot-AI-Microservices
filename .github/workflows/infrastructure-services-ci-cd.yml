@@ -29,7 +29,22 @@ on:
           - kafka
           - zookeeper
           - redis
+          - mongodb
           - kafka-cli
+          - user-service
+          - llm-service
+          - subscription-service
+          - image-service
+          - notification-service
+          - analytics-service
+          - admin-service
+          - activity-log-service
+          - user-memory-service
+          - lighthouse-service
+          - lighthouse-worker
+          - eureka-server
+          - credit-service
+          - api-gateway
         default: "all"
       clean_data:
         type: boolean
