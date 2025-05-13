@@ -73,6 +73,30 @@ kafka:
   topics:
     credit-events: credit-events
     payment-events: payment-events
+  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+  enabled: ${KAFKA_ENABLED:true}
+  admin:
+    fail-fast: false
+    auto-create: ${KAFKA_ADMIN_AUTO_CREATE:false}
+    
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    properties:
+      reconnect.backoff.ms: 1000
+      reconnect.backoff.max.ms: 5000
+      retry.backoff.ms: 1000
+    producer:
+      retries: 3
+      acks: 1
+      properties:
+        max.block.ms: 5000
+        request.timeout.ms: 3000
+    admin:
+      fail-fast: false
+      modify-topic-configs: false
+      operations-timeout: 10
+      close-timeout: 10
 
 management:
   endpoints:

@@ -38,6 +38,9 @@ public class CreditService {
     @Value("${initial.advanced.credit.amount:0}")  // Varsayılan değer: 0
     private String initialAdvancedCreditAmount;
 
+    @Value("${kafka.enabled:true}")
+    private boolean kafkaEnabled;
+
     public Mono<Credit> getUserCredits(String userId) {
         return creditRepository.findByUserId(userId)
                 .switchIfEmpty(createInitialCredit(userId));
@@ -225,6 +228,11 @@ public class CreditService {
 
     // Kredi olayını yayınlama ve metrik kayıt fonksiyonlarını güncelle
     private void publishCreditEvent(String userId, BigDecimal amount, String type, String creditType) {
+        if (!kafkaEnabled) {
+            log.debug("Kafka messaging is disabled, skipping event for user ID: {}", userId);
+            return;
+        }
+        
         CreditEvent event = CreditEvent.builder()
                 .userId(userId)
                 .amount(amount)
@@ -233,7 +241,21 @@ public class CreditService {
                 .timestamp(System.currentTimeMillis())
                 .build();
         
-        kafkaTemplate.send("credit-events", event);
+        try {
+            kafkaTemplate.send("credit-events", event)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("Failed to send credit event for user: {}, error: {}", 
+                               userId, ex.getMessage());
+                    } else {
+                        log.debug("Credit event sent successfully for user: {}", userId);
+                    }
+                });
+        } catch (Exception e) {
+            log.error("Error attempting to send Kafka message for user: {}, error: {}", 
+                     userId, e.getMessage());
+            // Hata durumunda servisin çalışmasını engellememek için exception'ı yutuyoruz
+        }
     }
 
     private void recordCreditMetrics(String userId, BigDecimal amount, String type, String creditType) {
