@@ -32,7 +32,7 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
     @Value("${spring.data.mongodb.max-connection-idle-time:60000}")
     private int maxConnectionIdleTime;
 
-    @Value("${spring.data.mongodb.connection-pool-max-size:100}")
+    @Value("${spring.data.mongodb.connection-pool-max-size:50}")
     private int connectionPoolMaxSize;
 
     @Override
@@ -43,25 +43,32 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
     @Override
     @Bean
     public MongoClient reactiveMongoClient() {
-        logger.info("Initializing MongoDB configuration. Database: {}", databaseName);
+        // Hassas bilgileri gizleyerek URI'yi loglama
+        String safeUri = mongoUri.replaceAll("mongodb://[^:]*:[^@]*@", "mongodb://***:***@");
+        logger.info("Initializing MongoDB configuration. Database: {}, URI: {}", databaseName, safeUri);
 
-        ConnectionString connectionString = new ConnectionString(mongoUri);
+        try {
+            ConnectionString connectionString = new ConnectionString(mongoUri);
 
-        MongoClientSettings settings = MongoClientSettings.builder()
-                .applyConnectionString(connectionString)
-                .applyToConnectionPoolSettings(builder -> builder.maxSize(connectionPoolMaxSize)
-                        .minSize(5)
-                        .maxConnectionIdleTime(maxConnectionIdleTime, TimeUnit.MILLISECONDS)
-                        .maxWaitTime(15000, TimeUnit.MILLISECONDS))
-                .applyToSocketSettings(builder -> builder.connectTimeout(connectionTimeout, TimeUnit.MILLISECONDS)
-                        .readTimeout(30000, TimeUnit.MILLISECONDS))
-                .applyToServerSettings(builder -> builder.heartbeatFrequency(20000, TimeUnit.MILLISECONDS))
-                .retryWrites(true)
-                .retryReads(true)
-                .build();
+            MongoClientSettings settings = MongoClientSettings.builder()
+                    .applyConnectionString(connectionString)
+                    .applyToConnectionPoolSettings(builder -> builder.maxSize(connectionPoolMaxSize)
+                            .minSize(5)
+                            .maxConnectionIdleTime(maxConnectionIdleTime, TimeUnit.MILLISECONDS)
+                            .maxWaitTime(15000, TimeUnit.MILLISECONDS))
+                    .applyToSocketSettings(builder -> builder.connectTimeout(connectionTimeout, TimeUnit.MILLISECONDS)
+                            .readTimeout(30000, TimeUnit.MILLISECONDS))
+                    .applyToServerSettings(builder -> builder.heartbeatFrequency(20000, TimeUnit.MILLISECONDS))
+                    .retryWrites(true)
+                    .retryReads(true)
+                    .build();
 
-        logger.info("MongoDB configuration successfully initialized");
-        return MongoClients.create(settings);
+            logger.info("MongoDB configuration successfully initialized");
+            return MongoClients.create(settings);
+        } catch (Exception e) {
+            logger.error("MongoDB connection configuration failed", e);
+            throw e;
+        }
     }
 
     @Bean

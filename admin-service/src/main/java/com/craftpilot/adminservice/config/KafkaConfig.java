@@ -8,6 +8,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.kafka.config.TopicBuilder;
+import javax.annotation.PostConstruct;
 
 @Configuration
 @EnableKafka
@@ -30,33 +32,55 @@ public class KafkaConfig extends KafkaBaseConfig {
     @Value("${kafka.topics.activity-events:activity-events}")
     private String userActivityTopic;
 
+    @PostConstruct
+    public void init() {
+        log.info(
+                "Kafka configuration initialized with topics: admin-events={}, system-metrics={}, system-alerts={}, audit-logs={}, activity-events={}",
+                adminEventsTopic, systemMetricsTopic, systemAlertsTopic, auditLogsTopic, userActivityTopic);
+    }
+
     @Bean
     public NewTopic adminEventsTopic() {
         log.info("Creating Kafka topic: {}", adminEventsTopic);
-        return createTopic(adminEventsTopic);
+        return TopicBuilder.name(adminEventsTopic)
+                .partitions(3)
+                .replicas(1)
+                .build();
     }
 
     @Bean
     public NewTopic systemMetricsTopic() {
         log.info("Creating Kafka topic: {}", systemMetricsTopic);
-        return createTopic(systemMetricsTopic);
+        return TopicBuilder.name(systemMetricsTopic)
+                .partitions(3)
+                .replicas(1)
+                .build();
     }
 
     @Bean
     public NewTopic systemAlertsTopic() {
         log.info("Creating Kafka topic: {}", systemAlertsTopic);
-        return createTopic(systemAlertsTopic);
+        return TopicBuilder.name(systemAlertsTopic)
+                .partitions(3)
+                .replicas(1)
+                .build();
     }
 
     @Bean
     public NewTopic auditLogsTopic() {
         log.info("Creating Kafka topic: {}", auditLogsTopic);
-        return createTopic(auditLogsTopic);
+        return TopicBuilder.name(auditLogsTopic)
+                .partitions(3)
+                .replicas(1)
+                .build();
     }
 
     @Bean
     public NewTopic userActivityTopic() {
         log.info("Creating Kafka topic: {}", userActivityTopic);
-        return createTopic(userActivityTopic);
+        return TopicBuilder.name(userActivityTopic)
+                .partitions(3)
+                .replicas(1)
+                .build();
     }
 }

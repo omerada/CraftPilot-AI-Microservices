@@ -32,8 +32,8 @@ spring:
           max-wait: 1000ms
         shutdown-timeout: 200ms
     mongodb:
-      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@craftpilot-mongodb:27017/admindb?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=5000}
-      database: ${MONGODB_DATABASE:admindb}
+      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=5000}
+      database: ${MONGODB_DATABASE:craftpilot}
       connection-timeout: 10000
       socket-timeout: 15000
       max-connection-idle-time: 60000
