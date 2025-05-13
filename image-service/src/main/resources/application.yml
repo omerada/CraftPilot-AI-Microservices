@@ -47,9 +47,21 @@ spring:
   cloud:
     gcp:
       enabled: false
+      credentials:
+        enabled: false
+      core:
+        enabled: false
       firestore:
         enabled: false
       storage:
+        enabled: false
+      pubsub:
+        enabled: false
+      secretmanager:
+        enabled: false
+      vision:
+        enabled: false
+      trace:
         enabled: false
     kubernetes:
       config:

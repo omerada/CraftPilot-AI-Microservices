@@ -26,7 +26,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Create necessary directories
-RUN mkdir -p /tmp/netty /tmp/image-service /gcp-credentials /data/db
+RUN mkdir -p /tmp/netty /tmp/image-service /data/db
 
 # Copy application
 COPY --from=build /build/target/*.jar app.jar
