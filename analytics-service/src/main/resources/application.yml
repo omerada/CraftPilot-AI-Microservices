@@ -34,8 +34,6 @@ spring:
       max-connection-pool-size: 20
       min-connection-pool-size: 5
       server-selection-timeout: 60000
-      maintenance-frequency: 20000
-      maintenance-initial-delay: 5000
     redis:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
@@ -49,10 +47,10 @@ kafka:
     analytics-events: analytics-events
     metrics-events: metrics-events
   bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
-  enabled: ${KAFKA_ENABLED:false}
+  enabled: ${KAFKA_ENABLED:true}
   admin:
     fail-fast: false
-    auto-create: false
+    auto-create: true
 
 management:
   endpoints:

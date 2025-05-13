@@ -29,28 +29,6 @@ RUN apt-get update && \
     jq && \
     rm -rf /var/lib/apt/lists/*
 
-# MongoDB connection - GitHub Secrets değerlerini kullanacak şekilde güncellendi
-ENV MONGODB_URI=
-ENV MONGODB_DATABASE=craftpilot
-ENV MONGODB_USERNAME=
-ENV MONGODB_PASSWORD=
-ENV MONGODB_HOST=craftpilot-mongodb
-ENV MONGODB_PORT=27017
-
-# Kafka configuration - Fail-fast olmadan yapılandırma
-ENV KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-ENV KAFKA_ENABLED=false
-ENV KAFKA_ADMIN_AUTO_CREATE=false
-
-# Eureka configuration
-ENV EUREKA_SERVER_URL=http://craftpilot:13579ada@eureka-server:8761/eureka/
-
-# Spring and application configs
-ENV SPRING_PROFILES_ACTIVE=prod
-ENV SERVER_PORT=8064
-ENV MONGODB_AUTO_INDEX_CREATION=false
-ENV SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=false
-
 # Create startup script for better initialization
 COPY <<EOF /app/startup.sh
 #!/bin/bash
@@ -62,17 +40,15 @@ echo "Environment checks:"
 
 # MongoDB host ve kimlik bilgilerini belirle
 # SPRING_DATA_MONGODB_URI'dan host çıkarma veya varsayılan kullanma
-if [ -n "$SPRING_DATA_MONGODB_URI" ]; then
+if [ -n "\$SPRING_DATA_MONGODB_URI" ]; then
   MONGODB_HOST=\$(echo \$SPRING_DATA_MONGODB_URI | sed -n 's/.*@\\([^:]*\\).*/\\1/p')
   if [ -z "\$MONGODB_HOST" ]; then
     echo "Warning: Could not extract MongoDB host from URI"
-    MONGODB_HOST="\$MONGODB_HOST"  # Önceki değerle devam et
+    MONGODB_HOST="craftpilot-mongodb"  # Varsayılan değeri kullan
   fi
 else
   # Değişkenler tanımlı değilse varsayılan değerleri kullan
-  if [ -z "\$MONGODB_HOST" ]; then
-    MONGODB_HOST="craftpilot-mongodb"
-  fi
+  MONGODB_HOST="craftpilot-mongodb"
 fi
 
 echo "Testing connection to MongoDB at \$MONGODB_HOST..."
@@ -135,15 +111,18 @@ COPY <<EOF /app/healthcheck.sh
 set -e
 
 # Basic health check
-HEALTH_ENDPOINT="http://localhost:${SERVER_PORT:-8064}/actuator/health"
-echo "Checking health at: $HEALTH_ENDPOINT"
+HEALTH_ENDPOINT="http://localhost:\${SERVER_PORT:-8064}/actuator/health"
+echo "Checking health at: \$HEALTH_ENDPOINT"
 
 # Try with curl
-if curl -f $HEALTH_ENDPOINT > /dev/null 2>&1; then
+if curl -f \$HEALTH_ENDPOINT > /dev/null 2>&1; then
   echo "Health check passed"
   exit 0
 else
   echo "Health check failed"
+  # More diagnostic information
+  echo "Service logs:"
+  tail -n 20 /tmp/analytics-service.log 2>/dev/null || echo "No logs available"
   exit 1
 fi
 EOF

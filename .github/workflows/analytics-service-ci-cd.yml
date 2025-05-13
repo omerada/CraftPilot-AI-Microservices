@@ -66,55 +66,62 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Infrastructure containers
-            docker network create craftpilot-network || true
+            set -e # Hata durumunda script'i durdur
 
-            # MongoDB container check - simplified approach
+            echo "=== Analytics Service Deployment Starting ==="
+
+            # Infrastructure containers - ağ kontrolü
+            docker network create craftpilot-network 2>/dev/null || echo "Network already exists"
+
+            # MongoDB container'ını kontrol et - basitleştirilmiş yaklaşım
             MONGODB_CONTAINER="craftpilot-mongodb"
             if ! docker ps | grep -q "$MONGODB_CONTAINER"; then
-              MONGODB_CONTAINER="mongodb"
-              if ! docker ps | grep -q "$MONGODB_CONTAINER"; then
-                echo "WARNING: Default MongoDB containers not found, checking for any mongodb container..."
-                MONGODB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'mongo|mongodb' | head -n 1)
-                if [ -z "$MONGODB_CONTAINER" ]; then
-                  echo "ERROR: No MongoDB container found!"
-                  MONGODB_CONTAINER="craftpilot-mongodb" # Fallback to default
-                else
-                  echo "Found MongoDB container: $MONGODB_CONTAINER"
-                fi
+              echo "WARNING: Default MongoDB container 'craftpilot-mongodb' not found"
+              MONGODB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'mongo|mongodb' | head -n 1)
+              
+              if [ -z "$MONGODB_CONTAINER" ]; then
+                echo "ERROR: No MongoDB container found, using default name"
+                MONGODB_CONTAINER="craftpilot-mongodb"
+              else
+                echo "Found MongoDB container: $MONGODB_CONTAINER"
               fi
             fi
             echo "Using MongoDB container: $MONGODB_CONTAINER"
 
-            # MongoDB URI configuration - using GitHub Secrets
+            # MongoDB URI konfigürasyonu - GitHub Secrets kullanarak
             if [ -n "${{ secrets.MONGODB_URI }}" ]; then
-              # Eğer MONGODB_URI doğrudan tanımlanmışsa, onu kullan
+              # Eğer MONGODB_URI doğrudan secrets'ta tanımlıysa, onu kullan
               MONGODB_URI="${{ secrets.MONGODB_URI }}"
-              echo "Using predefined MongoDB URI from secrets"
+              echo "Using pre-configured MongoDB URI from secrets"
             else
               # Değilse, bileşenlerden URI oluştur
               MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE || 'analytics' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
-              echo "Generated MongoDB URI using individual credentials"
+              echo "Built MongoDB URI from credential components"
             fi
             echo "MongoDB URI: $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
 
-            # GCP kimlik bilgilerini kontrol et
+            # GCP kimlik bilgilerini kontrol et ve oluştur
             if [ ! -d "/craftpilot" ]; then
               sudo mkdir -p /craftpilot
+              sudo chown $USER:$USER /craftpilot
             fi
 
-            # GCP kimlik bilgilerini oluştur ve doğrula
-            echo '${{ secrets.GCP_SA_KEY }}' | sudo tee /craftpilot/gcp-credentials.json > /dev/null
-            sudo chmod 640 /craftpilot/gcp-credentials.json
+            # GCP kimlik bilgilerini yetkilerle birlikte oluştur (eğer varsa)
+            if [ -n "${{ secrets.GCP_SA_KEY }}" ]; then
+              echo '${{ secrets.GCP_SA_KEY }}' > /craftpilot/gcp-credentials.json
+              chmod 600 /craftpilot/gcp-credentials.json
+            fi
 
             # Önceki konteynerı durdur ve kaldır
-            docker stop analytics-service || true
-            docker rm analytics-service || true
-
-            echo "Starting analytics-service container with environment: ${{ github.event.inputs.environment || 'prod' }}"
+            echo "Stopping previous Analytics Service container if exists"
+            docker stop analytics-service 2>/dev/null || true
+            docker rm analytics-service 2>/dev/null || true
 
             # Environment tipine göre konteynerı başlat
-            if [ "${{ github.event.inputs.environment }}" = "debug" ]; then
+            ENV="${{ github.event.inputs.environment || 'prod' }}"
+            echo "Starting Analytics Service container in $ENV mode"
+
+            if [ "$ENV" = "debug" ]; then
               # Debug modu için remote debugging özelliği
               docker run -d \
                 --name analytics-service \
@@ -128,32 +135,25 @@ jobs:
                 -e EUREKA_SERVER_URL=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
                 -e SPRING_DATA_MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE || 'analytics' }}" \
-                -e SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=false \
-                -e MONGODB_AUTO_INDEX_CREATION=false \
-                -e SPRING_DATA_MONGODB_CONNECT_TIMEOUT=60000 \
-                -e SPRING_DATA_MONGODB_SOCKET_TIMEOUT=60000 \
-                -e SPRING_DATA_MONGODB_MAX_WAIT_TIME=120000 \
-                -e SPRING_DATA_MONGODB_SERVER_SELECTION_TIMEOUT=60000 \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
-                -e KAFKA_ENABLED=false \
+                -e KAFKA_ENABLED=true \
                 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-                -e KAFKA_ADMIN_AUTO_CREATE=false \
+                -e KAFKA_ADMIN_FAIL_FAST=false \
                 -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
-                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus,loggers,env \
                 -e MANAGEMENT_HEALTH_MONGODB_ENABLED=true \
-                -e MANAGEMENT_HEALTH_REDIS_ENABLED=true \
-                -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
                 -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
-                -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
                 -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
                 -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB=DEBUG \
-                -e JAVA_TOOL_OPTIONS="-agentlib:jdwp=transport=dt_socket,address=*:5005,server=y,suspend=n -Xms512m -Xmx1g" \
+                -e JAVA_TOOL_OPTIONS="-agentlib:jdwp=transport=dt_socket,address=*:5005,server=y,suspend=n -Xms512m -Xmx1g -XX:+UseContainerSupport" \
                 ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
             else
-              # Prod modu
+              # Prod modu - yüksek güvenilirlik ve performans odaklı
               docker run -d \
                 --name analytics-service \
                 --network craftpilot-network \
@@ -165,61 +165,90 @@ jobs:
                 -e EUREKA_SERVER_URL=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
                 -e SPRING_DATA_MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE || 'analytics' }}" \
-                -e MONGODB_AUTO_INDEX_CREATION=false \
-                -e SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=false \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
-                -e KAFKA_ENABLED=false \
+                -e KAFKA_ENABLED=true \
                 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-                -e KAFKA_ADMIN_AUTO_CREATE=false \
+                -e KAFKA_ADMIN_FAIL_FAST=false \
                 -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
                 -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-                -e JAVA_OPTS="-Xms512m -Xmx1g -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Djava.security.egd=file:/dev/./urandom" \
+                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e JAVA_OPTS="-Xms512m -Xmx1g -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Dfile.encoding=UTF-8 -Djava.security.egd=file:/dev/./urandom" \
                 ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
             fi
 
-            # Waiting for container to start and checking health
+            # Container başlatma ve sağlık kontrolü
             echo "Waiting for container to initialize..."
             sleep 10
 
+            # Container çalışıyor mu kontrol et
+            if ! docker ps | grep -q analytics-service; then
+              echo "ERROR: Container failed to start!"
+              docker logs analytics-service
+              exit 1
+            fi
+
             echo "Performing health check..."
-            for i in {1..30}; do
-              if docker logs analytics-service 2>&1 | grep -q "Started AnalyticsServiceApplication"; then
-                echo "Service started successfully!"
-                
-                # Try health endpoint
-                echo "Testing health endpoint..."
-                if curl -s http://localhost:8064/actuator/health | grep -q "UP"; then
-                  echo "Service is healthy!"
-                  docker logs analytics-service --tail 20
-                  exit 0
-                else
-                  echo "Service started but health check not passing yet. Waiting..."
-                fi
+            MAX_ATTEMPTS=30
+            ATTEMPT=1
+
+            while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+              echo "Health check attempt $ATTEMPT/$MAX_ATTEMPTS"
+              
+              # Container hala çalışıyor mu kontrol et
+              if ! docker ps | grep -q analytics-service; then
+                echo "ERROR: Container stopped unexpectedly!"
+                docker logs analytics-service
+                exit 1
               fi
               
-              # Check for specific MongoDB connection errors
-              if docker logs analytics-service 2>&1 | grep -q "MongoSecurityException"; then
-                echo "⚠️ MongoDB authentication issue detected!"
-                echo "Checking MongoDB credentials and connectivity..."
-                
-                # Test network connectivity
-                docker exec analytics-service nc -zv $MONGODB_CONTAINER 27017 || echo "Cannot connect to MongoDB"
-                
-                # Try simple authentication with mongo command if mongo client is available
-                if docker exec analytics-service which mongo &>/dev/null; then
-                  echo "Testing MongoDB credentials..."
-                  docker exec analytics-service mongo --host $MONGODB_CONTAINER:27017 -u craftpilot -p secure_password --authenticationDatabase admin --eval "db.adminCommand('ping')" || echo "MongoDB authentication failed with mongo command"
-                fi
+              # Sağlık endpoint'ini kontrol et
+              HEALTH_STATUS=$(curl -s http://localhost:8064/actuator/health || echo '{"status":"UNKNOWN"}')
+              
+              if echo $HEALTH_STATUS | grep -q '"status":"UP"'; then
+                echo "✅ Service is healthy! Deployment successful."
+                break
               fi
               
-              echo "Health check attempt $i/30 - service not ready yet"
+              # MongoDB bağlantı sorunlarını kontrol et
+              if docker logs analytics-service 2>&1 | grep -q "com.mongodb.MongoSocketReadException\|com.mongodb.MongoTimeoutException\|com.mongodb.MongoSocketOpenException"; then
+                echo "⚠️ MongoDB connection issues detected!"
+                
+                # MongoDB durumunu kontrol et
+                echo "Checking MongoDB container status:"
+                docker ps | grep $MONGODB_CONTAINER
+                
+                # MongoDB container'ına doğrudan erişim testi yap
+                echo "Testing direct connection to MongoDB:"
+                docker exec -it analytics-service nc -zv $MONGODB_CONTAINER 27017 || echo "Connection failed"
+                
+                # MongoDB container ağ bilgilerini kontrol et
+                echo "MongoDB container network details:"
+                docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $MONGODB_CONTAINER
+                echo "Analytics service container network details:"
+                docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' analytics-service
+              fi
+              
+              # Kritik noktalarda daha detaylı bilgi
+              if [ $ATTEMPT -eq 5 ] || [ $ATTEMPT -eq 15 ] || [ $ATTEMPT -eq 25 ]; then
+                echo "Detailed logs at attempt $ATTEMPT:"
+                docker logs analytics-service --tail 30
+              fi
+              
+              echo "Service not ready yet, waiting..."
               sleep 10
+              ATTEMPT=$((ATTEMPT + 1))
             done
 
-            echo "❌ Service failed to become healthy within timeout period."
-            echo "Final container logs:"
-            docker logs analytics-service --tail 50
-            echo "Container will continue running for debugging purposes."
+            if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
+              echo "❌ Service failed to become healthy within timeout period."
+              echo "Final container logs:"
+              docker logs analytics-service --tail 50
+              echo "Deployment completed with warnings - service may not be fully functional"
+            else
+              echo "=== Analytics Service Deployment Completed Successfully ==="
+            fi
