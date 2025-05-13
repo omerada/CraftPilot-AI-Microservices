@@ -32,8 +32,8 @@ spring:
           max-wait: 1000ms
         shutdown-timeout: 200ms
     mongodb:
-      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=5000}
-      database: ${MONGODB_DATABASE:craftpilot}
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://craftpilot:secure_password@mongodb-server:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=5000}
+      database: ${SPRING_DATA_MONGODB_DATABASE:craftpilot}
       connection-timeout: 10000
       socket-timeout: 15000
       max-connection-idle-time: 60000
@@ -61,7 +61,7 @@ kafka:
 eureka:
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_SERVER_URL:http://craftpilot:13579ada@eureka-server:8761/eureka/}
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8761/eureka/}
     register-with-eureka: true
     fetch-registry: true
     healthcheck:
@@ -74,14 +74,15 @@ eureka:
     health-check-url-path: /actuator/health
     metadata-map:
       startup: ${random.int}
-      user.name: ${spring.security.user.name}
-      user.password: ${spring.security.user.password}
+      user.name: ${spring.security.user.name:craftpilot}
+      user.password: ${spring.security.user.password:13579ada}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+      base-path: /actuator
   endpoint:
     health:
       show-details: always

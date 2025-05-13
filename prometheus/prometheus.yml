@@ -36,7 +36,7 @@ scrape_configs:
   - job_name: "admin-service"
     metrics_path: "/actuator/prometheus"
     static_configs:
-      - targets: ["admin-service:1116"]
+      - targets: ["admin-service:8063"]
 
   - job_name: "redis"
     static_configs:
@@ -61,7 +61,7 @@ scrape_configs:
             "auth-service:1112",
             "user-service:1113",
             "notification-service:1115",
-            "admin-service:1116",
+            "admin-service:8063",
           ]
 
 # Alerting rules
@@ -89,7 +89,7 @@ scrape_configurations:
             "auth-service:1112",
             "user-service:1113",
             "notification-service:1115",
-            "admin-service:1116",
+            "admin-service:8063",
           ]
     metrics_relabel_configs:
       - source_labels: [__name__]
