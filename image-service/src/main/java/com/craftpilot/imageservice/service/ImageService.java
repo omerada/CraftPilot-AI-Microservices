@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDateTime;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -23,6 +25,11 @@ public class ImageService {
     private String imageEventsTopic;
 
     public Mono<Image> generateImage(Image image) {
+        if (image.getCreatedAt() == null) {
+            image.setCreatedAt(LocalDateTime.now());
+        }
+        image.setUpdatedAt(LocalDateTime.now());
+        
         return openAIService.generateImage(image.getPrompt())
                 .map(imageUrl -> {
                     image.setImageUrl(imageUrl);

@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 
@@ -11,7 +13,9 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Document(collection = "images")
 public class Image {
+    @Id
     private String id;
     private String userId;
     private String prompt;
@@ -23,4 +27,4 @@ public class Image {
     private String description;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-} 
+}

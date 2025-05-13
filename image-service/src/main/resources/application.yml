@@ -44,8 +44,13 @@ spring:
       connection-timeout: 30000
       socket-timeout: 60000
       max-connection-idle-time: 300000
-  # Removing GCP configuration since MongoDB is used
   cloud:
+    gcp:
+      enabled: false
+      firestore:
+        enabled: false
+      storage:
+        enabled: false
     kubernetes:
       config:
         enabled: true

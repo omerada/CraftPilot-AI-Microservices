@@ -112,6 +112,7 @@ jobs:
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+              -e SPRING_CLOUD_GCP_ENABLED=false \
               -e OPENAI_API_KEY="${OPENAI_API_KEY}" \
               ${DOCKERHUB_USERNAME}/image-service:latest-arm64
             EOL

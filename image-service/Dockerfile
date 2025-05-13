@@ -1,15 +1,15 @@
-# Build stage - ARM64 specific
-FROM --platform=linux/arm64 maven:3.9.6-eclipse-temurin-21 AS build
+# Build stage
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 
 WORKDIR /build
 COPY pom.xml .
 COPY src ./src
 
-# Maven build for ARM64
+# Maven build
 RUN mvn clean package -DskipTests
 
-# Run stage - ARM64 specific
-FROM --platform=linux/arm64 eclipse-temurin:21-jre
+# Run stage
+FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
