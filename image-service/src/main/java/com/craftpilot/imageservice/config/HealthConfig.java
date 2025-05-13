@@ -8,7 +8,6 @@ import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
-import org.springframework.boot.actuate.kafka.KafkaHealthIndicator;
 import org.springframework.kafka.core.KafkaAdmin;
 
 @Configuration
@@ -37,15 +36,17 @@ public class HealthConfig {
     public HealthIndicator customKafkaHealthIndicator(KafkaAdmin kafkaAdmin) {
         return () -> {
             try {
-                // The KafkaAdmin's isAutoStartup method will return if Kafka was configured
-                if (kafkaAdmin.isAutoStartup()) {
+                // Check if bootstrap servers are configured
+                Object bootstrapServers = kafkaAdmin.getConfigurationProperties()
+                    .get("bootstrap.servers");
+                
+                if (bootstrapServers != null && !String.valueOf(bootstrapServers).isEmpty()) {
                     return Health.up()
-                        .withDetail("bootstrapServers", kafkaAdmin.getConfigurationProperties()
-                            .get("bootstrap.servers"))
+                        .withDetail("bootstrapServers", bootstrapServers)
                         .build();
                 } else {
-                    return Health.unknown()
-                        .withDetail("message", "Kafka admin not started")
+                    return Health.down()
+                        .withDetail("message", "Kafka bootstrap servers not configured")
                         .build();
                 }
             } catch (Exception e) {
