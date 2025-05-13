@@ -24,9 +24,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # MongoDB connection - Default olarak güvenli varsayılan değerler
-ENV MONGODB_URI=mongodb://adminuser:secure_password@mongodb:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000
+ENV MONGODB_URI=mongodb://craftpilot:secure_password@mongodb:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000
 ENV MONGODB_DATABASE=analytics
-ENV MONGODB_USERNAME=adminuser
+ENV MONGODB_USERNAME=craftpilot
 ENV MONGODB_PASSWORD=secure_password
 ENV MONGODB_HOST=mongodb
 ENV MONGODB_PORT=27017

@@ -21,8 +21,8 @@ spring:
     allow-bean-definition-overriding: true
   data:
     mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://adminuser:secure_password@craftpilot-mongodb:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000}
-      database: ${SPRING_DATA_MONGODB_DATABASE:analytics}
+      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000}
+      database: ${MONGODB_DATABASE:analytics}
       auto-index-creation: ${MONGODB_AUTO_INDEX_CREATION:true}
       connect-timeout: 60000
       socket-timeout: 60000

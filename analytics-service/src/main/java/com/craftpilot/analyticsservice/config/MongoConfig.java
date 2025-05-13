@@ -54,6 +54,9 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
     @Value("${spring.data.mongodb.connection-pool-min-size:5}")
     private int connectionPoolMinSize;
 
+    @Value("${mongodb.connection.retry.max-attempts:5}")
+    private int maxRetryAttempts;
+
     @Override
     protected String getDatabaseName() {
         return database;
@@ -61,16 +64,23 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
 
     @Override
     @Bean
-    @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
+    @Retryable(
+        maxAttemptsExpression = "${mongodb.connection.retry.max-attempts:5}",
+        backoff = @Backoff(delayExpression = "${mongodb.connection.retry.initial-interval:1000}", 
+                          multiplierExpression = "${mongodb.connection.retry.multiplier:2.0}", 
+                          maxDelayExpression = "${mongodb.connection.retry.max-interval:30000}")
+    )
     public MongoClient reactiveMongoClient() {
         log.info("Initializing MongoDB client with database: {}", database);
         
-        // URL'yi maskele (hassas bilgileri gizle)
+        // Mask sensitive connection info for logging
         String maskedUri = mongoUri.replaceAll("mongodb://[^:]*:[^@]*@", "mongodb://***:***@");
         log.info("MongoDB URI (masked): {}", maskedUri);
         
         try {
             ConnectionString connectionString = new ConnectionString(mongoUri);
+            String host = connectionString.getHosts().isEmpty() ? "unknown" : connectionString.getHosts().get(0);
+            log.info("MongoDB host: {}", host);
             
             MongoClientSettings.Builder settingsBuilder = MongoClientSettings.builder()
                     .applyConnectionString(connectionString)
@@ -100,11 +110,7 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
             return MongoClients.create(settings);
         } catch (Exception e) {
             log.error("Failed to initialize MongoDB client: {}", e.getMessage(), e);
-            // Hata durumunda da client oluşturalım, uygulama ayağa kalksın
-            // Diğer servisler çalışmaya devam edebilir
-            return MongoClients.create(MongoClientSettings.builder()
-                    .applyConnectionString(new ConnectionString(mongoUri))
-                    .build());
+            throw e; // Rethrow to trigger retry mechanism
         }
     }
 
