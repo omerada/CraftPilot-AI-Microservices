@@ -61,22 +61,22 @@ jobs:
             docker network create craftpilot-network || true
 
             # GCP kimlik bilgilerini kontrol et ve oluştur
-            if [ ! -d "/opt/craftpilot" ]; then
-              sudo mkdir -p /opt/craftpilot
+            if [ ! -d "/craftpilot" ]; then
+              sudo mkdir -p /craftpilot
             fi
 
             # GCP kimlik bilgilerini oluştur ve doğrula
-            echo '${{ secrets.GCP_SA_KEY }}' | sudo tee /opt/craftpilot/gcp-credentials.json > /dev/null
-            sudo chmod 640 /opt/craftpilot/gcp-credentials.json
+            echo '${{ secrets.GCP_SA_KEY }}' | sudo tee /craftpilot/gcp-credentials.json > /dev/null
+            sudo chmod 640 /craftpilot/gcp-credentials.json
 
             # JSON formatını doğrula
-            if ! jq empty /opt/craftpilot/gcp-credentials.json 2>/dev/null; then
+            if ! jq empty /craftpilot/gcp-credentials.json 2>/dev/null; then
               echo "GCP kimlik bilgileri geçerli JSON formatında değil!"
               exit 1
             fi
 
             # Dosya içeriğini kontrol et
-            if [ ! -s /opt/craftpilot/gcp-credentials.json ]; then
+            if [ ! -s /craftpilot/gcp-credentials.json ]; then
               echo "GCP kimlik bilgileri dosyası boş!"
               exit 1
             fi
@@ -91,7 +91,7 @@ jobs:
               --network craftpilot-network \
               --restart unless-stopped \
               -p 8063:8063 \
-              -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
+              -v /craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8063 \
               -e EUREKA_INSTANCE_NONSECUREPORT=8063 \

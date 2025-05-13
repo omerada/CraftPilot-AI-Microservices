@@ -2,31 +2,54 @@ package com.craftpilot.adminservice.config;
 
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.TopicBuilder;
-import java.util.Map;
-import java.util.HashMap;
+import lombok.extern.slf4j.Slf4j;
 
-public abstract class KafkaBaseConfig {
-    
-    @Value("${kafka.topic.partitions:3}")
-    private int partitions;
-    
-    @Value("${kafka.topic.replicas:1}")
-    private int replicas;
-    
+@Configuration
+@Slf4j
+public class KafkaBaseConfig {
+
+    @Value("${spring.kafka.bootstrap-servers:kafka:9092}")
+    private String bootstrapServers;
+
+    @Value("${kafka.topic.num-partitions:3}")
+    private int numPartitions;
+
+    @Value("${kafka.topic.replication-factor:1}")
+    private short replicationFactor;
+
+    /**
+     * Creates a Kafka topic with default settings
+     * 
+     * @param name the name of the topic to create
+     * @return a new topic configuration
+     */
     protected NewTopic createTopic(String name) {
+        log.debug("Creating Kafka topic: {} with {} partitions and replication factor {}",
+                name, numPartitions, replicationFactor);
+
         return TopicBuilder.name(name)
-                          .partitions(partitions)
-                          .replicas(replicas)
-                          .configs(getTopicConfig())
-                          .build();
+                .partitions(numPartitions)
+                .replicas(replicationFactor)
+                .build();
     }
-    
-    private Map<String, String> getTopicConfig() {
-        Map<String, String> configs = new HashMap<>();
-        configs.put("cleanup.policy", "delete");
-        configs.put("retention.ms", "604800000"); // 7 days
-        return configs;
+
+    /**
+     * Creates a Kafka topic with custom partitions and replication factor
+     * 
+     * @param name       the name of the topic to create
+     * @param partitions number of partitions
+     * @param replicas   replication factor
+     * @return a new topic configuration
+     */
+    protected NewTopic createTopic(String name, int partitions, short replicas) {
+        log.debug("Creating Kafka topic: {} with {} partitions and replication factor {}",
+                name, partitions, replicas);
+
+        return TopicBuilder.name(name)
+                .partitions(partitions)
+                .replicas(replicas)
+                .build();
     }
 }

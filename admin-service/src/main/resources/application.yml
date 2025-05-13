@@ -32,13 +32,31 @@ spring:
           max-wait: 1000ms
         shutdown-timeout: 200ms
     mongodb:
-      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=5000}
+      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@craftpilot-mongodb:27017/admindb?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=5000}
       database: ${MONGODB_DATABASE:admindb}
       connection-timeout: 10000
       socket-timeout: 15000
       max-connection-idle-time: 60000
       connection-pool-max-size: 50
       auto-index-creation: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    consumer:
+      group-id: admin-service
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.craftpilot.adminservice.model,com.craftpilot.adminservice.event
+
+kafka:
+  enabled: true
+  topics:
+    admin-events: admin-events
+    system-metrics: system-metrics
+    system-alerts: system-alerts
+    audit-logs: audit-logs
+    activity-events: activity-events
 
 eureka:
   client:
