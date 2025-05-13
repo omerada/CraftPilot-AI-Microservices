@@ -53,13 +53,11 @@ class SystemMetricsRepositoryTest {
 
         // Then
         StepVerifier.create(savedMetrics)
-                .expectNextMatches(saved -> 
-                    saved.getServiceId().equals("service-1") &&
-                    saved.getServiceType() == SystemMetrics.ServiceType.API_GATEWAY &&
-                    saved.getStatus() == SystemMetrics.ServiceStatus.HEALTHY &&
-                    saved.getResourceUsage().get("cpu").equals(45.5) &&
-                    saved.getId() != null
-                )
+                .expectNextMatches(saved -> saved.getServiceId().equals("service-1") &&
+                        saved.getServiceType() == SystemMetrics.ServiceType.API_GATEWAY &&
+                        saved.getStatus() == SystemMetrics.ServiceStatus.HEALTHY &&
+                        saved.getResourceUsage().get("cpu").equals(45.5) &&
+                        saved.getId() != null)
                 .verifyComplete();
     }
 
@@ -80,10 +78,8 @@ class SystemMetricsRepositoryTest {
 
         // Then
         StepVerifier.create(findResult)
-                .expectNextMatches(found -> 
-                    found.getServiceId().equals(serviceId) &&
-                    found.getServiceType() == SystemMetrics.ServiceType.USER_SERVICE
-                )
+                .expectNextMatches(found -> found.getServiceId().equals(serviceId) &&
+                        found.getServiceType() == SystemMetrics.ServiceType.USER_SERVICE)
                 .verifyComplete();
     }
 
@@ -102,10 +98,8 @@ class SystemMetricsRepositoryTest {
 
         // Then
         StepVerifier.create(saveResult.then(repository.findByStatus(SystemMetrics.ServiceStatus.DOWN).next()))
-                .expectNextMatches(found -> 
-                    found.getServiceId().equals("service-down") &&
-                    found.getStatus() == SystemMetrics.ServiceStatus.DOWN
-                )
+                .expectNextMatches(found -> found.getServiceId().equals("service-down") &&
+                        found.getStatus() == SystemMetrics.ServiceStatus.DOWN)
                 .verifyComplete();
     }
 
@@ -122,9 +116,8 @@ class SystemMetricsRepositoryTest {
         // When & Then
         StepVerifier.create(
                 repository.save(metrics)
-                .flatMap(saved -> repository.deleteById(saved.getId())
-                        .then(repository.findById(saved.getId())))
-        )
-        .verifyComplete(); // findById should return empty after deletion
+                        .flatMap(saved -> repository.deleteById(saved.getId())
+                                .then(repository.findById(saved.getId()))))
+                .verifyComplete(); // findById should return empty after deletion
     }
 }

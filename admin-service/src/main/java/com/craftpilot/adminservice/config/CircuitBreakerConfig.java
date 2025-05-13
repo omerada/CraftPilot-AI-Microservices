@@ -49,11 +49,11 @@ public class CircuitBreakerConfig {
                             .permittedNumberOfCallsInHalfOpenState(3)
                             .automaticTransitionFromOpenToHalfOpenEnabled(true)
                             .recordExceptions(
-                                    com.mongodb.MongoTimeoutException.class,
-                                    com.mongodb.MongoSocketException.class,
-                                    com.mongodb.MongoExecutionTimeoutException.class,
-                                    com.mongodb.MongoQueryException.class,
-                                    com.mongodb.MongoWriteException.class)
+    com.mongodb.MongoTimeoutException.class,
+    com.mongodb.MongoSocketException.class,
+    com.mongodb.MongoExecutionTimeoutException.class,
+    com.mongodb.MongoQueryException.class,
+    com.mongodb.MongoWriteException.class)
                             .build())
                     .timeLimiterConfig(TimeLimiterConfig.custom()
                             .timeoutDuration(Duration.ofSeconds(3))
