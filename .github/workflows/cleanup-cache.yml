@@ -1,0 +1,287 @@
+name: Sistem Temizliği ve Önbellek Yönetimi
+
+on:
+  workflow_dispatch:
+    inputs:
+      cleanup_level:
+        type: choice
+        description: "Temizlik seviyesi"
+        options:
+          - light
+          - moderate
+          - full
+          - nuclear
+        default: "moderate"
+        required: true
+      clean_docker_images:
+        type: boolean
+        description: "Kullanılmayan Docker imajlarını temizle"
+        default: true
+      clean_docker_containers:
+        type: boolean
+        description: "Durmuş Docker container'larını temizle"
+        default: true
+      clean_build_cache:
+        type: boolean
+        description: "Maven/Gradle/NPM cache'lerini temizle"
+        default: false
+      clean_docker_volumes:
+        type: boolean
+        description: "⚠️ TEHLİKE: Docker volume'larını temizle (veri kaybı olabilir!)"
+        default: false
+      restart_services:
+        type: boolean
+        description: "Temizlik sonrası hizmetleri yeniden başlat"
+        default: false
+      target_service:
+        type: choice
+        description: "Hedef servis (sadece belirli bir servisi temizlemek için)"
+        options:
+          - all
+          - user-service
+          - llm-service
+          - subscription-service
+          - image-service
+          - notification-service
+          - analytics-service
+          - admin-service
+          - api-gateway
+          - redis
+          - mongodb
+          - kafka
+        default: "all"
+        required: false
+
+jobs:
+  cleanup:
+    runs-on: self-hosted
+    steps:
+      - name: Temizlik İşlemi Başlatılıyor
+        run: |
+          echo "=== Temizlik İşlemi Başlatılıyor ==="
+          echo "Seviye: ${{ github.event.inputs.cleanup_level }}"
+          echo "Hedef Servis: ${{ github.event.inputs.target_service }}"
+          echo "Tarih: $(date)"
+          echo "Temizlik öncesi sistem durumu:"
+          echo "Disk alanı:"
+          df -h
+          echo "Docker durumu:"
+          docker info
+          docker system df
+
+      - name: Sistem Hafızası Durumu
+        run: |
+          echo "=== Sistem Hafıza Durumu ==="
+          free -h
+          echo "=== Docker Konteyner Durumu ==="
+          docker ps -a
+          echo "=== Docker İmaj Durumu ==="
+          docker images
+
+      - name: Docker Container Temizliği
+        if: ${{ github.event.inputs.clean_docker_containers == 'true' }}
+        run: |
+          echo "=== Docker Container Temizliği ==="
+
+          if [ "${{ github.event.inputs.target_service }}" != "all" ]; then
+            echo "Sadece ${{ github.event.inputs.target_service }} için temizlik yapılıyor..."
+            docker ps -a | grep "${{ github.event.inputs.target_service }}" | grep "Exited" | awk '{print $1}' | xargs -r docker rm -f
+            echo "Temizlik tamamlandı."
+          else
+            echo "Tüm durmuş containerlar temizleniyor..."
+            docker container prune -f
+            echo "Temizlik tamamlandı."
+          fi
+
+      - name: Docker Image Temizliği
+        if: ${{ github.event.inputs.clean_docker_images == 'true' }}
+        run: |
+          echo "=== Docker Image Temizliği ==="
+
+          if [ "${{ github.event.inputs.cleanup_level }}" == "light" ]; then
+            echo "Hafif temizlik: Sadece dangling (etiketlenmemiş) imajlar temizleniyor..."
+            docker image prune -f
+          elif [ "${{ github.event.inputs.cleanup_level }}" == "moderate" ]; then
+            echo "Orta seviye temizlik: Kullanılmayan tüm imajlar temizleniyor..."
+            docker image prune -a -f --filter "until=24h"
+          elif [ "${{ github.event.inputs.cleanup_level }}" == "full" ]; then
+            echo "Tam temizlik: Tüm kullanılmayan imajlar temizleniyor..."
+            docker image prune -a -f
+          elif [ "${{ github.event.inputs.cleanup_level }}" == "nuclear" ] && [ "${{ github.event.inputs.target_service }}" == "all" ]; then
+            echo "⚠️ Nuclear temizlik: Tüm imajlar temizleniyor (kullanılanlar dahil)..."
+            docker rmi -f $(docker images -q) || true
+          elif [ "${{ github.event.inputs.cleanup_level }}" == "nuclear" ] && [ "${{ github.event.inputs.target_service }}" != "all" ]; then
+            echo "⚠️ Nuclear temizlik: ${{ github.event.inputs.target_service }} imajları temizleniyor..."
+            docker images | grep "${{ github.event.inputs.target_service }}" | awk '{print $3}' | xargs -r docker rmi -f
+          fi
+
+          echo "Image temizliği tamamlandı."
+
+      - name: Docker Build Cache Temizliği
+        if: ${{ github.event.inputs.cleanup_level == 'full' || github.event.inputs.cleanup_level == 'nuclear' }}
+        run: |
+          echo "=== Docker Build Cache Temizliği ==="
+          docker builder prune -f -a
+          echo "Build cache temizliği tamamlandı."
+
+      - name: Docker Network Temizliği
+        if: ${{ github.event.inputs.cleanup_level != 'light' }}
+        run: |
+          echo "=== Docker Network Temizliği ==="
+          docker network prune -f
+          echo "Network temizliği tamamlandı."
+
+      - name: Docker Volume Temizliği
+        if: ${{ github.event.inputs.clean_docker_volumes == 'true' }}
+        run: |
+          echo "=== Docker Volume Temizliği ==="
+
+          if [ "${{ github.event.inputs.target_service }}" != "all" ]; then
+            echo "⚠️⚠️⚠️ DİKKAT: ${{ github.event.inputs.target_service }} ile ilgili tüm volume'lar temizlenecek! ⚠️⚠️⚠️"
+            docker volume ls | grep "${{ github.event.inputs.target_service }}" | awk '{print $2}' | xargs -r docker volume rm
+          else
+            if [ "${{ github.event.inputs.cleanup_level }}" == "nuclear" ]; then
+              echo "⚠️⚠️⚠️ UYARI: TÜM DOCKER VOLUME'LAR KALDIRILACAK! VERİ KAYBI OLACAK! ⚠️⚠️⚠️"
+              docker volume prune -f
+            else
+              echo "⚠️ UYARI: Kullanılmayan Docker volume'ları temizleniyor..."
+              docker volume prune -f
+            fi
+          fi
+
+          echo "Volume temizliği tamamlandı."
+
+      - name: Maven/Gradle Cache Temizliği
+        if: ${{ github.event.inputs.clean_build_cache == 'true' }}
+        run: |
+          echo "=== Build Cache Temizliği ==="
+
+          # Maven cache temizliği
+          if [ -d ~/.m2/repository ]; then
+            echo "Maven cache temizleniyor..."
+            
+            if [ "${{ github.event.inputs.cleanup_level }}" == "nuclear" ]; then
+              rm -rf ~/.m2/repository/*
+              echo "Tüm Maven cache temizlendi."
+            elif [ "${{ github.event.inputs.cleanup_level }}" == "full" ]; then
+              # Maven cache'ini temizle ama local repo'yu bırak
+              find ~/.m2/repository -type d -name "*SNAPSHOT" | xargs -r rm -rf
+              echo "Maven SNAPSHOT cache temizlendi."
+            else
+              # Sadece temp/lastUpdated dosyalarını temizle
+              find ~/.m2 -name "*.lastUpdated" -type f -delete
+              find ~/.m2 -name "*.repositories" -type f -delete
+              find ~/.m2 -name "*_remote.repositories" -type f -delete
+              find ~/.m2 -name "resolver-status.properties" -type f -delete
+              echo "Maven geçici dosyaları temizlendi."
+            fi
+          else
+            echo "Maven cache bulunamadı."
+          fi
+
+          # Gradle cache temizliği
+          if [ -d ~/.gradle/caches ]; then
+            echo "Gradle cache temizleniyor..."
+            
+            if [ "${{ github.event.inputs.cleanup_level }}" == "nuclear" ]; then
+              rm -rf ~/.gradle/caches/*
+              echo "Tüm Gradle cache temizlendi."
+            else
+              rm -rf ~/.gradle/caches/modules-2/files-2.1/*
+              rm -rf ~/.gradle/caches/transforms-*
+              rm -rf ~/.gradle/caches/*/plugin-resolution/*
+              echo "Gradle cache temizlendi."
+            fi
+          else
+            echo "Gradle cache bulunamadı."
+          fi
+
+          # NPM cache temizliği
+          if [ -d ~/.npm ]; then
+            echo "NPM cache temizleniyor..."
+            npm cache clean --force
+            echo "NPM cache temizlendi."
+          else
+            echo "NPM cache bulunamadı."
+          fi
+
+          echo "Build cache temizliği tamamlandı."
+
+      - name: Sistem Dosya Temizliği
+        if: ${{ github.event.inputs.cleanup_level == 'full' || github.event.inputs.cleanup_level == 'nuclear' }}
+        run: |
+          echo "=== Sistem Dosya Temizliği ==="
+
+          # /tmp klasöründeki eski dosyaları temizle (7 günden eski)
+          echo "Geçici dosyalar temizleniyor..."
+          find /tmp -type f -atime +7 -delete 2>/dev/null || true
+
+          # /var/log/ içindeki compress edilmiş eski log dosyalarını temizle
+          echo "Eski log dosyaları temizleniyor..."
+          find /var/log -type f -name "*.gz" -delete 2>/dev/null || true
+
+          # Docker log temizliği
+          echo "Docker log dosyaları temizleniyor..."
+          truncate -s 0 /var/lib/docker/containers/*/*-json.log 2>/dev/null || true
+
+          echo "Sistem dosya temizliği tamamlandı."
+
+      - name: Docker Sistem Temizliği
+        run: |
+          echo "=== Docker Sistem Temizliği ==="
+          docker system prune -f
+
+          if [ "${{ github.event.inputs.cleanup_level }}" == "full" ] || [ "${{ github.event.inputs.cleanup_level }}" == "nuclear" ]; then
+            echo "Kapsamlı Docker sistem temizliği yapılıyor..."
+            docker system prune -a -f --volumes
+          fi
+
+          echo "Docker sistem temizliği tamamlandı."
+
+      - name: Servisleri Yeniden Başlat
+        if: ${{ github.event.inputs.restart_services == 'true' }}
+        run: |
+          echo "=== Servisleri Yeniden Başlatma ==="
+
+          if [ "${{ github.event.inputs.target_service }}" != "all" ]; then
+            echo "${{ github.event.inputs.target_service }} servisini yeniden başlatıyorum..."
+            docker restart ${{ github.event.inputs.target_service }} || true
+          else
+            echo "Temel servisleri önce başlatıyorum..."
+            docker restart redis zookeeper kafka mongodb eureka-server || true
+            
+            echo "Diğer servisleri başlatıyorum..."
+            sleep 15
+            docker ps -a --format "{{.Names}}" | grep -v "redis\|zookeeper\|kafka\|mongodb\|eureka-server" | xargs -r docker restart
+          fi
+
+          echo "Servisler başlatıldı. Servis durumları kontrol ediliyor..."
+          docker ps
+
+      - name: Temizlik Sonrası Durum Raporu
+        run: |
+          echo "=== Temizlik Sonrası Durum Raporu ==="
+          echo "Tarih: $(date)"
+          echo ""
+
+          echo "Disk Alanı Durumu:"
+          df -h
+
+          echo ""
+          echo "Docker Sistemi Durumu:"
+          docker system df
+
+          echo ""
+          echo "Docker Konteyner Durumu:"
+          docker ps -a
+
+          echo ""
+          echo "Docker Image Durumu:"
+          docker images
+
+          echo ""
+          echo "Ram Durumu:"
+          free -h
+
+          echo ""
+          echo "=== Temizlik İşlemi Tamamlandı ==="
