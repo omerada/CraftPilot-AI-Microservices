@@ -12,77 +12,30 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:prod}
     include: kafka-base
-  cloud:
-    discovery:
-      enabled: true
-    loadbalancer:
-      ribbon:
-        enabled: false
   data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@craftpilot-mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000}
+      database: ${SPRING_DATA_MONGODB_DATABASE:craftpilot}
+      auto-index-creation: true
+      connect-timeout: 60000
+      socket-timeout: 60000
+      max-wait-time: 120000
+      max-connection-idle-time: 300000
+      max-connection-life-time: 600000
     redis:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:13579ada}
-      timeout: 5000
-      lettuce:
-        pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 2
-          max-wait: 1000ms
-        shutdown-timeout: 200ms
-    mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://craftpilot:secure_password@mongodb-server:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=5000}
-      database: ${SPRING_DATA_MONGODB_DATABASE:craftpilot}
-      connection-timeout: 10000
-      socket-timeout: 15000
-      max-connection-idle-time: 60000
-      connection-pool-max-size: 50
-      auto-index-creation: true
+      timeout: 10000
+      connect-timeout: 10000
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
-    consumer:
-      group-id: admin-service
-      auto-offset-reset: latest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: com.craftpilot.adminservice.model,com.craftpilot.adminservice.event
-
-kafka:
-  enabled: true
-  topics:
-    admin-events: admin-events
-    system-metrics: system-metrics
-    system-alerts: system-alerts
-    audit-logs: audit-logs
-    activity-events: activity-events
-
-eureka:
-  client:
-    serviceUrl:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8761/eureka/}
-    register-with-eureka: true
-    fetch-registry: true
-    healthcheck:
-      enabled: true
-  instance:
-    prefer-ip-address: true
-    hostname: ${HOSTNAME:admin-service}
-    instance-id: ${spring.application.name}:${spring.cloud.client.hostname}:${server.port}
-    lease-renewal-interval-in-seconds: 10
-    health-check-url-path: /actuator/health
-    metadata-map:
-      startup: ${random.int}
-      user.name: ${spring.security.user.name:craftpilot}
-      user.password: ${spring.security.user.password:13579ada}
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info,metrics,prometheus
-      base-path: /actuator
   endpoint:
     health:
       show-details: always
@@ -94,26 +47,9 @@ management:
         liveness:
           include: ping
   health:
-    redis:
-      enabled: true
     mongodb:
       enabled: true
-    circuitbreakers:
+    livenessState:
       enabled: true
-    livenessstate:
+    readinessState:
       enabled: true
-    readinessstate:
-      enabled: true
-    validate-group-membership: false
-
-logging:
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
-  level:
-    root: INFO
-    com.craftpilot: DEBUG
-    org.springframework.web: INFO
-    org.springframework.data.redis: INFO
-    org.springframework.data.mongodb: INFO
-    org.springframework.cloud: INFO
-    com.mongodb: WARN
