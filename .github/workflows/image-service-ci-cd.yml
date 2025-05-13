@@ -87,7 +87,6 @@ jobs:
               -e SPRING_PROFILES_ACTIVE=prod \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_SECURITY_USER_NAME=craftpilot \
               -e SPRING_SECURITY_USER_PASSWORD=13579ada \
               -e SPRING_DATA_REDIS_HOST=redis \
@@ -97,6 +96,8 @@ jobs:
               -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
               -e IMAGE_STORAGE_BUCKET_NAME=${{ secrets.GCP_STORAGE_BUCKET }} \
               -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
+              -e SPRING_DATA_MONGODB_URI=${{ secrets.MONGODB_URI }} \
+              -e SPRING_DATA_MONGODB_DATABASE=image-service \
               ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
 
             # Install curl in the container for health checks
