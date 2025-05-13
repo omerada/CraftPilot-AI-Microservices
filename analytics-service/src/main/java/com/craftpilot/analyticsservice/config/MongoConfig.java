@@ -2,6 +2,7 @@ package com.craftpilot.analyticsservice.config;
 
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
+import com.mongodb.MongoCredential;
 import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoClients;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,12 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
 
     @Value("${spring.data.mongodb.database}")
     private String database;
+
+    @Value("${mongodb.username:#{null}}")
+    private String username;
+
+    @Value("${mongodb.password:#{null}}")
+    private String password;
 
     @Value("${spring.data.mongodb.connection-timeout:30000}")
     private int connectionTimeout;

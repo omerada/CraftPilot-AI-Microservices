@@ -103,8 +103,8 @@ jobs:
             docker stop analytics-service || true
             docker rm analytics-service || true
 
-            # MongoDB URI configuration
-            MONGODB_URI="mongodb://craftpilot:secure_password@${MONGODB_CONTAINER}:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+            # MongoDB URI configuration - Kullanıcı adı ve şifre düzeltmesi
+            MONGODB_URI="mongodb://${MONGO_ROOT_USERNAME:-adminuser}:${MONGO_ROOT_PASSWORD:-secure_password}@${MONGODB_CONTAINER}:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
             echo "MongoDB URI: $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
 
             echo "=== Starting New Container ==="
@@ -120,17 +120,17 @@ jobs:
               -e REDIS_PASSWORD=13579ada \
               -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
               -e SPRING_DATA_MONGODB_DATABASE=analytics \
-              -e MONGODB_HOST=craftpilot-mongodb \
+              -e MONGODB_HOST=${MONGODB_CONTAINER} \
               -e MONGODB_PORT=27017 \
-              -e MONGODB_USERNAME=${{ secrets.MONGO_ROOT_USERNAME }} \
-              -e MONGODB_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }} \
+              -e MONGODB_USERNAME=${MONGO_ROOT_USERNAME:-adminuser} \
+              -e MONGODB_PASSWORD=${MONGO_ROOT_PASSWORD:-secure_password} \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-              -e KAFKA_ENABLED=true \
-              -e SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=false \
+              -e KAFKA_ENABLED=false \
+              -e SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=true \
               ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="

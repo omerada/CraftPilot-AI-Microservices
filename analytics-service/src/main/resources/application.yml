@@ -11,18 +11,19 @@ spring:
     name: analytics-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:prod}
-    include: kafka-base
+    include: ${KAFKA_ENABLED:false} ? kafka-base
   cloud:
     discovery:
       enabled: true
   main:
     web-application-type: reactive
     fail-fast: false
+    allow-bean-definition-overriding: true
   data:
     mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://craftpilot:secure_password@craftpilot-mongodb:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000}
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://adminuser:secure_password@craftpilot-mongodb:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000}
       database: ${SPRING_DATA_MONGODB_DATABASE:analytics}
-      auto-index-creation: true
+      auto-index-creation: ${MONGODB_AUTO_INDEX_CREATION:true}
       connect-timeout: 60000
       socket-timeout: 60000
       max-wait-time: 120000
@@ -47,10 +48,10 @@ kafka:
     analytics-events: analytics-events
     metrics-events: metrics-events
   bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
-  enabled: ${KAFKA_ENABLED:true}
+  enabled: ${KAFKA_ENABLED:false}
   admin:
     fail-fast: false
-    auto-create: true
+    auto-create: false
 
 management:
   endpoints:
