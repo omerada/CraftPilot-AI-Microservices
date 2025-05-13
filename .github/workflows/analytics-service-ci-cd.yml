@@ -86,6 +86,18 @@ jobs:
             fi
             echo "Using MongoDB container: $MONGODB_CONTAINER"
 
+            # MongoDB URI configuration - using GitHub Secrets
+            if [ -n "${{ secrets.MONGODB_URI }}" ]; then
+              # Eğer MONGODB_URI doğrudan tanımlanmışsa, onu kullan
+              MONGODB_URI="${{ secrets.MONGODB_URI }}"
+              echo "Using predefined MongoDB URI from secrets"
+            else
+              # Değilse, bileşenlerden URI oluştur
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE || 'analytics' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+              echo "Generated MongoDB URI using individual credentials"
+            fi
+            echo "MongoDB URI: $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
+
             # GCP kimlik bilgilerini kontrol et
             if [ ! -d "/craftpilot" ]; then
               sudo mkdir -p /craftpilot
@@ -98,10 +110,6 @@ jobs:
             # Önceki konteynerı durdur ve kaldır
             docker stop analytics-service || true
             docker rm analytics-service || true
-
-            # MongoDB URI configuration - using container variable
-            MONGODB_URI="mongodb://craftpilot:secure_password@${MONGODB_CONTAINER}:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
-            echo "MongoDB URI: $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
 
             echo "Starting analytics-service container with environment: ${{ github.event.inputs.environment || 'prod' }}"
 
@@ -119,7 +127,7 @@ jobs:
                 -e SERVER_PORT=8064 \
                 -e EUREKA_SERVER_URL=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
-                -e SPRING_DATA_MONGODB_DATABASE=analytics \
+                -e SPRING_DATA_MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE || 'analytics' }}" \
                 -e SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=false \
                 -e MONGODB_AUTO_INDEX_CREATION=false \
                 -e SPRING_DATA_MONGODB_CONNECT_TIMEOUT=60000 \
@@ -156,7 +164,7 @@ jobs:
                 -e SERVER_PORT=8064 \
                 -e EUREKA_SERVER_URL=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
-                -e SPRING_DATA_MONGODB_DATABASE=analytics \
+                -e SPRING_DATA_MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE || 'analytics' }}" \
                 -e MONGODB_AUTO_INDEX_CREATION=false \
                 -e SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=false \
                 -e REDIS_HOST=redis \

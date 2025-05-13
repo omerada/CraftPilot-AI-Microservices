@@ -29,12 +29,12 @@ RUN apt-get update && \
     jq && \
     rm -rf /var/lib/apt/lists/*
 
-# MongoDB connection - Default olarak güvenli varsayılan değerler
-ENV MONGODB_URI=mongodb://craftpilot:secure_password@mongodb:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000
-ENV MONGODB_DATABASE=analytics
-ENV MONGODB_USERNAME=craftpilot
-ENV MONGODB_PASSWORD=secure_password
-ENV MONGODB_HOST=mongodb
+# MongoDB connection - GitHub Secrets değerlerini kullanacak şekilde güncellendi
+ENV MONGODB_URI=
+ENV MONGODB_DATABASE=craftpilot
+ENV MONGODB_USERNAME=
+ENV MONGODB_PASSWORD=
+ENV MONGODB_HOST=craftpilot-mongodb
 ENV MONGODB_PORT=27017
 
 # Kafka configuration - Fail-fast olmadan yapılandırma
@@ -60,11 +60,19 @@ echo "Starting Analytics Service..."
 echo "Java version: $(java -version 2>&1 | head -n 1)"
 echo "Environment checks:"
 
-# Check MongoDB connection
-MONGODB_HOST=\$(echo \$SPRING_DATA_MONGODB_URI | sed -n 's/.*@\\([^:]*\\).*/\\1/p')
-if [ -z "\$MONGODB_HOST" ]; then
-  echo "Warning: Could not extract MongoDB host from URI"
-  MONGODB_HOST="craftpilot-mongodb"
+# MongoDB host ve kimlik bilgilerini belirle
+# SPRING_DATA_MONGODB_URI'dan host çıkarma veya varsayılan kullanma
+if [ -n "$SPRING_DATA_MONGODB_URI" ]; then
+  MONGODB_HOST=\$(echo \$SPRING_DATA_MONGODB_URI | sed -n 's/.*@\\([^:]*\\).*/\\1/p')
+  if [ -z "\$MONGODB_HOST" ]; then
+    echo "Warning: Could not extract MongoDB host from URI"
+    MONGODB_HOST="\$MONGODB_HOST"  # Önceki değerle devam et
+  fi
+else
+  # Değişkenler tanımlı değilse varsayılan değerleri kullan
+  if [ -z "\$MONGODB_HOST" ]; then
+    MONGODB_HOST="craftpilot-mongodb"
+  fi
 fi
 
 echo "Testing connection to MongoDB at \$MONGODB_HOST..."
