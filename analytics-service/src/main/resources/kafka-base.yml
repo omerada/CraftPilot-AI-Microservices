@@ -30,3 +30,7 @@ kafka:
   topic:
     partitions: 3
     replicas: 1
+    analytics-events: analytics-events
+    usage-metrics: usage-metrics
+    performance-metrics: performance-metrics
+    analytics-reports: analytics-reports
