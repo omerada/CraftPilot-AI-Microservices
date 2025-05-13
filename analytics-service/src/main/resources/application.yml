@@ -64,16 +64,19 @@ management:
         enabled: true
       group:
         readiness:
-          include: mongo,redis,diskSpace
+          include: mongo,diskSpace
         liveness:
           include: ping
   health:
     mongodb:
       enabled: true
+    redis:
+      enabled: false
     livenessState:
       enabled: true
     readinessState:
       enabled: true
+    validate-group-membership: false
   metrics:
     tags:
       application: ${spring.application.name}

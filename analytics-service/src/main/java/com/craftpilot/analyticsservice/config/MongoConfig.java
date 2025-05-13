@@ -47,8 +47,16 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
     public MongoClient reactiveMongoClient() {
         log.info("Initializing MongoDB client with database: {}", database);
         
+        // URL'yi maskele (hassas bilgileri gizle)
+        String maskedUri = mongoUri.replaceAll("mongodb://[^:]*:[^@]*@", "mongodb://***:***@");
+        log.info("MongoDB URI (masked): {}", maskedUri);
+        
         try {
             ConnectionString connectionString = new ConnectionString(mongoUri);
+            
+            // MongoDB URI'den bilgileri çıkar
+            String host = connectionString.getHosts().get(0);
+            log.info("MongoDB host: {}", host);
             
             MongoClientSettings settings = MongoClientSettings.builder()
                     .applyConnectionString(connectionString)
