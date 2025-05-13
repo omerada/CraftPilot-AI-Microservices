@@ -21,8 +21,11 @@ spring:
     allow-bean-definition-overriding: true
   data:
     mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${SPRING_DATA_MONGODB_DATABASE:analytics}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000}
-      database: ${SPRING_DATA_MONGODB_DATABASE:analytics}
+      # MongoDB URI: Güvenlik için credentials bilgileri environment variables üzerinden sağlanmalıdır
+      # CI/CD pipeline veya Kubernetes secrets kullanarak MONGODB_URI tanımlanabilir
+      uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:analytics}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000}
+      database: ${MONGODB_DATABASE:analytics}
+      # MongoDB bağlantı optimizasyonları
       auto-index-creation: ${MONGODB_AUTO_INDEX_CREATION:false}
       connect-timeout: 60000
       socket-timeout: 60000

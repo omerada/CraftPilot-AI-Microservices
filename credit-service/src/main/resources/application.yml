@@ -60,8 +60,10 @@ spring:
     web-application-type: reactive
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGO_INITDB_DATABASE:craftpilot}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000}
+      # MongoDB güvenli yapılandırma
+      uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:craftpilot}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000}
       database: ${MONGODB_DATABASE:craftpilot}
+      # Bağlantı parametreleri
       connection-timeout: 30000
       socket-timeout: 60000
       max-connection-idle-time: 300000

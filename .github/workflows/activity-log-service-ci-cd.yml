@@ -116,6 +116,39 @@ jobs:
               fi
             done
 
+            # MongoDB container kontrolü - sabit container ismi ile güvenilir sistem
+            MONGODB_CONTAINER="craftpilot-mongodb"
+            if ! docker ps | grep -q "$MONGODB_CONTAINER"; then
+              echo "WARNING: MongoDB container '$MONGODB_CONTAINER' not running or missing!"
+              echo "Current MongoDB containers (if any):"
+              docker ps | grep -i mongo || echo "No MongoDB containers found!"
+              echo "Using the default container name anyway: $MONGODB_CONTAINER"
+            else
+              echo "✅ MongoDB container '$MONGODB_CONTAINER' is running: $(docker inspect --format='{{.State.Health.Status}}' $MONGODB_CONTAINER 2>/dev/null || echo 'health status unavailable')"
+            fi
+
+            # MongoDB URI yapılandırması - kredensiyalleri güvenli şekilde kullan
+            if [ -n "${{ secrets.MONGODB_URI }}" ]; then
+              # Secrets'tan gelen URI'da container ismi güncellemesi
+              MONGODB_URI=$(echo "${{ secrets.MONGODB_URI }}" | sed "s/mongodb:27017/$MONGODB_CONTAINER:27017/g" | sed "s/@mongodb:/@$MONGODB_CONTAINER:/g")
+              echo "Using MongoDB URI from secrets (adjusted hostname): $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
+            else
+              # Komponentlerden URI oluşturma
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"
+              echo "Built MongoDB URI from components: $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
+            fi
+
+            # MongoDB bağlantısını deployment öncesi test et
+            echo "Testing MongoDB connection before deployment..."
+            if docker run --rm --network craftpilot-network mongo:6.0 mongosh --quiet --eval "db.runCommand({ping:1}).ok" admin --host $MONGODB_CONTAINER --port 27017 -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }} --authenticationDatabase admin | grep -q "1"; then
+              echo "✅ MongoDB connection test successful!"
+            else
+              echo "⚠️ MongoDB connection test failed! This may cause issues with the service."
+              echo "Checking MongoDB container status:"
+              docker ps | grep -i $MONGODB_CONTAINER || echo "Container not found!"
+              # Devam etmeyi seçiyoruz, bazı durumlarda geçici ağ sorunları olabilir
+            fi
+
             # Pull the latest Docker image
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
 
@@ -127,7 +160,6 @@ jobs:
             # Setup environment variables
             ENVIRONMENT="${{ github.event.inputs.environment }}"
             DOCKER_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
-            MONGODB_URI="${{ secrets.MONGODB_URI }}"
 
             # Deployment with proper conditional statement
             echo "Deploying Activity Log Service in ${ENVIRONMENT:-prod} mode..."
@@ -149,14 +181,24 @@ jobs:
                 -e SPRING_SECURITY_USER_NAME=craftpilot \
                 -e SPRING_SECURITY_USER_PASSWORD=13579ada \
                 -e MONGODB_URI="${MONGODB_URI}" \
-                -e MONGODB_DATABASE=activitylog \
+                -e MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE }}" \
+                -e MONGO_INITDB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE }}" \
+                -e MONGO_ROOT_USERNAME="${{ secrets.MONGO_ROOT_USERNAME }}" \
+                -e MONGO_ROOT_PASSWORD="${{ secrets.MONGO_ROOT_PASSWORD }}" \
+                -e MONGODB_HOST="${MONGODB_CONTAINER}" \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
                 -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
-                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus,loggers,env \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e MANAGEMENT_HEALTH_MONGODB_ENABLED=true \
+                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
                 -e SERVER_PORT=8095 \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB=DEBUG \
+                -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
                 -e JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5010" \
                 "${DOCKER_USERNAME}/activity-log-service:latest-arm64"
             else
@@ -175,31 +217,27 @@ jobs:
                 -e SPRING_SECURITY_USER_NAME=craftpilot \
                 -e SPRING_SECURITY_USER_PASSWORD=13579ada \
                 -e MONGODB_URI="${MONGODB_URI}" \
-                -e MONGODB_DATABASE=activitylog \
+                -e MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE }}" \
+                -e MONGO_INITDB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE }}" \
+                -e MONGO_ROOT_USERNAME="${{ secrets.MONGO_ROOT_USERNAME }}" \
+                -e MONGO_ROOT_PASSWORD="${{ secrets.MONGO_ROOT_PASSWORD }}" \
+                -e MONGODB_HOST="${MONGODB_CONTAINER}" \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
                 -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
-                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e MANAGEMENT_HEALTH_MONGODB_ENABLED=true \
+                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
                 -e SERVER_PORT=8095 \
                 -e JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom" \
                 "${DOCKER_USERNAME}/activity-log-service:latest-arm64"
             fi
 
-            # Check container logs immediately
-            echo "Initial container logs:"
-            sleep 5
-            docker logs activity-log-service --tail 20
-
-            # Verify container is running
-            if ! docker ps | grep -q activity-log-service; then
-              echo "Container failed to start! Checking logs..."
-              docker logs activity-log-service
-              exit 1
-            fi
-
-            # Health check with improved logging
+            # Geliştirilmiş sağlık kontrolü
             echo "Waiting for service to start..."
             max_attempts=20
             attempt=1
@@ -207,44 +245,64 @@ jobs:
             while [ $attempt -le $max_attempts ]; do
               echo "Health check attempt $attempt/$max_attempts..."
               
-              # Check if container is still running
+              # Container çalışıyor mu kontrolü
               if ! docker ps | grep -q activity-log-service; then
                 echo "Container stopped unexpectedly! Checking logs..."
                 docker logs activity-log-service
                 exit 1
               fi
               
-              # Try health check with container IP to avoid host networking issues
-              CONTAINER_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' activity-log-service)
-              echo "Container IP: $CONTAINER_IP"
+              # MongoDB bağlantı durumunu kontrol et
+              if [ $attempt -eq 3 ] || [ $attempt -eq 10 ]; then
+                echo "Checking MongoDB connection from inside container..."
+                docker exec activity-log-service nc -zv $MONGODB_CONTAINER 27017 || echo "MongoDB connection failed from container"
+                
+                echo "Database environment variables:"
+                docker exec activity-log-service env | grep -E 'MONGO|mongodb' || echo "No MongoDB env vars found"
+                
+                # Özel sağlık kontrolü
+                echo "MongoDB component health check:"
+                docker exec activity-log-service curl -s http://localhost:8095/actuator/health/mongo || echo "MongoDB health component unavailable"
+              fi
               
-              # Try both localhost and container IP
-              HEALTH_RESPONSE_LOCAL=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8095/actuator/health || echo "000")
-              HEALTH_RESPONSE_CONTAINER=$(docker exec activity-log-service curl -s -o /dev/null -w "%{http_code}" http://localhost:8095/actuator/health 2>/dev/null || echo "000")
+              # Health endpoint kontrolü
+              HEALTH_CHECK=$(curl -s -m 5 http://localhost:8095/actuator/health || echo '{"status":"UNKNOWN"}')
               
-              echo "Health check response (localhost): $HEALTH_RESPONSE_LOCAL"
-              echo "Health check response (container): $HEALTH_RESPONSE_CONTAINER"
-              
-              if [ "$HEALTH_RESPONSE_LOCAL" = "200" ] || [ "$HEALTH_RESPONSE_CONTAINER" = "200" ]; then
-                echo "Service is healthy! Deployment successful."
-                docker logs activity-log-service --tail 20
-                exit 0
+              if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
+                echo "✅ Service is healthy!"
+                
+                # MongoDB bileşeni kontrolü
+                if echo "$HEALTH_CHECK" | grep -q '"mongo":{"status":"UP"' || docker exec activity-log-service curl -s http://localhost:8095/actuator/health/mongo | grep -q '"status":"UP"'; then
+                  echo "✅ MongoDB connection verified! Deployment successful."
+                  docker logs activity-log-service --tail 20
+                  exit 0
+                else
+                  echo "Service is up but MongoDB component status unclear. Checking again..."
+                  
+                  # 15. denemeden sonra servisi genel olarak UP durumundaysa kabul et
+                  if [ $attempt -gt 15 ]; then
+                    echo "Service is reporting as healthy, accepting deployment despite unclear MongoDB status"
+                    docker logs activity-log-service --tail 20
+                    exit 0
+                  fi
+                fi
               else
-                echo "Health checks failed. Checking application logs..."
-                docker logs activity-log-service --tail 10
+                echo "Service not yet healthy: $(echo "$HEALTH_CHECK" | grep -o '"status":"[^"]*"' || echo 'no status')"
+                docker logs activity-log-service --tail 5
               fi
               
               sleep 10
               attempt=$((attempt + 1))
             done
 
-            echo "Service failed to become healthy within timeout"
+            echo "⚠️ Service failed to become fully healthy within timeout"
+            echo "Final health status: $(curl -s http://localhost:8095/actuator/health || echo 'unavailable')"
             echo "CONTAINER LOGS:"
-            docker logs activity-log-service
-            echo "CONTAINER NETWORK INFO:"
-            docker inspect activity-log-service | grep -A 20 "Networks"
-            echo "EUREKA STATUS:"
-            curl -s http://craftpilot:13579ada@localhost:8761/eureka/apps/ || echo "Could not connect to Eureka"
+            docker logs activity-log-service --tail 50
 
-            # Don't fail the deployment, let's keep the container running for investigation
-            echo "Deployment completed with warnings - service may not be fully functional"
+            # MongoDB bağlantı sorunları için son kontrol
+            echo "FINAL MONGODB CONNECTION CHECK:"
+            docker exec activity-log-service nc -zv $MONGODB_CONTAINER 27017 || echo "Failed to connect to MongoDB"
+            docker exec activity-log-service curl -s http://localhost:8095/actuator/health/mongo || echo "MongoDB health component unavailable"
+
+            echo "Container will continue running for troubleshooting"
