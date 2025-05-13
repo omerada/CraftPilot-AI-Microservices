@@ -104,7 +104,7 @@ jobs:
             docker rm analytics-service || true
 
             # MongoDB URI configuration - Kullanıcı adı ve şifre düzeltmesi
-            MONGODB_URI="mongodb://${MONGO_ROOT_USERNAME:-adminuser}:${MONGO_ROOT_PASSWORD:-secure_password}@${MONGODB_CONTAINER}:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+            MONGODB_URI="mongodb://craftpilot:secure_password@${MONGODB_CONTAINER}:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
             echo "MongoDB URI: $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
 
             echo "=== Starting New Container ==="
@@ -122,8 +122,8 @@ jobs:
               -e SPRING_DATA_MONGODB_DATABASE=analytics \
               -e MONGODB_HOST=${MONGODB_CONTAINER} \
               -e MONGODB_PORT=27017 \
-              -e MONGODB_USERNAME=${MONGO_ROOT_USERNAME:-adminuser} \
-              -e MONGODB_PASSWORD=${MONGO_ROOT_PASSWORD:-secure_password} \
+              -e MONGODB_USERNAME=craftpilot \
+              -e MONGODB_PASSWORD=secure_password \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \

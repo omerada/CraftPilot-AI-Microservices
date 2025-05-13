@@ -82,6 +82,15 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
             String host = connectionString.getHosts().isEmpty() ? "unknown" : connectionString.getHosts().get(0);
             log.info("MongoDB host: {}", host);
             
+            // Add more explicit logging for auth details (without exposing password)
+            if (connectionString.getCredential() != null) {
+                log.info("Auth source: {}, Username: {}", 
+                    connectionString.getCredential().getSource(), 
+                    connectionString.getCredential().getUserName());
+            } else {
+                log.warn("No credentials found in connection string!");
+            }
+            
             MongoClientSettings.Builder settingsBuilder = MongoClientSettings.builder()
                     .applyConnectionString(connectionString)
                     .applyToConnectionPoolSettings(builder -> 
