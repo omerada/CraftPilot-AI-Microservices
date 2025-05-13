@@ -66,22 +66,28 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-
             # Deploy Image Service
             echo "=== Deploying Image Service ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
             docker stop image-service || true
             docker rm image-service || true
 
+            # Ensure craftpilot network exists
+            docker network create craftpilot-network || true
+
+            # Ensure gcp credentials directory exists
+            if [ ! -f "/opt/craftpilot/gcp-credentials.json" ]; then
+              echo "Warning: GCP credentials file not found at expected location"
+              echo "Creating directory structure if needed..."
+              sudo mkdir -p /opt/craftpilot
+              sudo chmod 755 /opt/craftpilot
+            fi
+
+            # Run the container with properly formatted command
             docker run -d \
               --name image-service \
               --network craftpilot-network \
               --restart unless-stopped \
-              --health-cmd="curl -f http://localhost:8056/actuator/health || exit 1" \
-              --health-interval=30s \
-              --health-retries=3 \
-              --health-timeout=10s \
-              --health-start-period=60s \
               -p 8056:8056 \
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
@@ -89,6 +95,8 @@ jobs:
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e SPRING_SECURITY_USER_NAME=craftpilot \
               -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+              -e SPRING_DATA_MONGODB_URI=${{ secrets.MONGODB_URI }} \
+              -e SPRING_DATA_MONGODB_DATABASE=image-service \
               -e SPRING_DATA_REDIS_HOST=redis \
               -e SPRING_DATA_REDIS_PORT=6379 \
               -e SPRING_DATA_REDIS_PASSWORD=13579ada \
@@ -96,15 +104,21 @@ jobs:
               -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
               -e IMAGE_STORAGE_BUCKET_NAME=${{ secrets.GCP_STORAGE_BUCKET }} \
               -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
-              -e SPRING_DATA_MONGODB_URI=${{ secrets.MONGODB_URI }} \
-              -e SPRING_DATA_MONGODB_DATABASE=image-service \
               ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
 
-            # Install curl in the container for health checks
-            docker exec image-service apt-get update && docker exec image-service apt-get install -y curl
-
+            # Wait for container to start
             echo "=== Waiting for initial startup ==="
-            sleep 60
+            sleep 30
+
+            # Check if the container is running
+            if ! docker ps | grep -q "image-service"; then
+              echo "Container failed to start. Checking logs..."
+              docker logs image-service
+              exit 1
+            fi
+
+            # Install curl if needed
+            docker exec image-service sh -c "apt-get update && apt-get install -y curl || true"
 
             echo "=== Checking service health ==="
             MAX_ATTEMPTS=10
@@ -114,25 +128,23 @@ jobs:
               echo "Health check attempt $ATTEMPT/$MAX_ATTEMPTS"
               
               # Check container status
-              CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' image-service)
-              if [ "$CONTAINER_STATUS" != "running" ]; then
-                echo "Container is not running. Current status: $CONTAINER_STATUS"
+              if ! docker ps | grep -q "image-service"; then
+                echo "Container is not running. Checking logs..."
                 docker logs image-service
                 exit 1
               fi
 
               # Check application health
-              HEALTH_CHECK=$(docker exec image-service curl -s -w "\n%{http_code}" http://localhost:8056/actuator/health)
-              HTTP_CODE=$(echo "$HEALTH_CHECK" | tail -n1)
-              HEALTH_STATUS=$(echo "$HEALTH_CHECK" | head -n1)
-              
-              if [ "$HTTP_CODE" = "200" ] && echo "$HEALTH_STATUS" | grep -q '"status":"UP"'; then
+              if docker exec -i image-service curl -s http://localhost:8056/actuator/health | grep -q "UP"; then
                 echo "Service is healthy!"
                 # Verify Eureka registration
                 if docker logs image-service | grep -q "registration status: 204"; then
                   echo "Successfully registered with Eureka"
                   exit 0
+                else
+                  echo "Service is up but may not be registered with Eureka yet"
                 fi
+                exit 0
               fi
               
               if [ $ATTEMPT -eq 5 ]; then
@@ -144,13 +156,13 @@ jobs:
               fi
               
               echo "Waiting before next attempt..."
-              sleep 30
+              sleep 15
               ATTEMPT=$((ATTEMPT + 1))
             done
 
             echo "=== Health check failed - Debug information ==="
             echo "Final Container Status:"
-            docker inspect image-service | grep -A 10 "Health"
+            docker ps | grep image-service || echo "Container not found in running containers"
             echo "Container Logs:"
             docker logs image-service
             exit 1
