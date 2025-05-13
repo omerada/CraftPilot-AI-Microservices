@@ -67,19 +67,7 @@ spring:
       max-connection-idle-time: 300000
       connection-pool-max-size: 20
       auto-index-creation: true
-
-# Kafka özel yapılandırmaları
-kafka:
-  topics:
-    credit-events: credit-events
-    payment-events: payment-events
-  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
-  enabled: ${KAFKA_ENABLED:true}
-  admin:
-    fail-fast: false
-    auto-create: ${KAFKA_ADMIN_AUTO_CREATE:false}
-    
-spring:
+  # Kafka yapılandırması ana spring bloğuna taşındı
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     properties:
@@ -97,6 +85,17 @@ spring:
       modify-topic-configs: false
       operations-timeout: 10
       close-timeout: 10
+
+# Kafka özel yapılandırmaları
+kafka:
+  topics:
+    credit-events: credit-events
+    payment-events: payment-events
+  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+  enabled: ${KAFKA_ENABLED:true}
+  admin:
+    fail-fast: false
+    auto-create: ${KAFKA_ADMIN_AUTO_CREATE:false}
 
 management:
   endpoints:
