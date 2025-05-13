@@ -69,13 +69,22 @@ jobs:
             # Infrastructure containers
             docker network create craftpilot-network || true
 
-            # MongoDB container name kontrolü
-            MONGODB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'mongodb|mongo')
-            if [ -z "$MONGODB_CONTAINER" ]; then
-              echo "UYARI: MongoDB container bulunamadı!"
-            else
-              echo "MongoDB container bulundu: $MONGODB_CONTAINER"
+            # MongoDB container check - simplified approach
+            MONGODB_CONTAINER="craftpilot-mongodb"
+            if ! docker ps | grep -q "$MONGODB_CONTAINER"; then
+              MONGODB_CONTAINER="mongodb"
+              if ! docker ps | grep -q "$MONGODB_CONTAINER"; then
+                echo "WARNING: Default MongoDB containers not found, checking for any mongodb container..."
+                MONGODB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'mongo|mongodb' | head -n 1)
+                if [ -z "$MONGODB_CONTAINER" ]; then
+                  echo "ERROR: No MongoDB container found!"
+                  MONGODB_CONTAINER="craftpilot-mongodb" # Fallback to default
+                else
+                  echo "Found MongoDB container: $MONGODB_CONTAINER"
+                fi
+              fi
             fi
+            echo "Using MongoDB container: $MONGODB_CONTAINER"
 
             # GCP kimlik bilgilerini kontrol et
             if [ ! -d "/craftpilot" ]; then
@@ -90,18 +99,9 @@ jobs:
             docker stop admin-service || true
             docker rm admin-service || true
 
-            # MONGODB_URI bilgisini al ve kontrol et
-            MONGODB_URI="${{ secrets.MONGODB_URI }}"
-            if [ -z "$MONGODB_URI" ]; then
-              # MongoDB container name'e göre URI oluştur
-              if [ ! -z "$MONGODB_CONTAINER" ]; then
-                MONGODB_URI="mongodb://craftpilot:secure_password@$MONGODB_CONTAINER:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
-              else
-                # Varsayılan URI
-                MONGODB_URI="mongodb://craftpilot:secure_password@craftpilot-mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
-              fi
-            fi
-            echo "MongoDB URI: $MONGODB_URI" | sed 's/:[^:]*@/:\*\*\*@/g'
+            # MongoDB URI configuration - using container variable
+            MONGODB_URI="mongodb://craftpilot:secure_password@${MONGODB_CONTAINER}:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+            echo "MongoDB URI: $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
 
             echo "Starting admin-service container with environment: ${{ github.event.inputs.environment || 'prod' }}"
 
@@ -118,7 +118,7 @@ jobs:
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=8063 \
                 -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-                -e SPRING_DATA_MONGODB_URI=$MONGODB_URI \
+                -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
                 -e SPRING_DATA_MONGODB_DATABASE=craftpilot \
                 -e SPRING_DATA_MONGODB_CONNECT_TIMEOUT=60000 \
                 -e SPRING_DATA_MONGODB_SOCKET_TIMEOUT=60000 \
@@ -139,13 +139,9 @@ jobs:
                 -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
                 -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB=DEBUG \
                 -e JAVA_TOOL_OPTIONS="-agentlib:jdwp=transport=dt_socket,address=*:5005,server=y,suspend=n" \
-                --health-interval=30s \
-                --health-timeout=10s \
-                --health-retries=10 \
-                --health-start-period=120s \
                 ${{ secrets.DOCKERHUB_USERNAME }}/admin-service:latest-arm64
             else
-              # Prod modu
+              # Prod modu - simplified, like the credit-service
               docker run -d \
                 --name admin-service \
                 --network craftpilot-network \
@@ -155,83 +151,48 @@ jobs:
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=8063 \
                 -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-                -e SPRING_DATA_MONGODB_URI=$MONGODB_URI \
+                -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
                 -e SPRING_DATA_MONGODB_DATABASE=craftpilot \
-                -e SPRING_DATA_MONGODB_CONNECT_TIMEOUT=60000 \
-                -e SPRING_DATA_MONGODB_SOCKET_TIMEOUT=60000 \
-                -e SPRING_DATA_MONGODB_MAX_WAIT_TIME=120000 \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
-                -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
                 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
                 -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
                 -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
-                -e MANAGEMENT_HEALTH_MONGODB_ENABLED=true \
-                -e MANAGEMENT_HEALTH_REDIS_ENABLED=true \
-                -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
-                -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
-                --health-interval=30s \
-                --health-timeout=10s \
-                --health-retries=10 \
-                --health-start-period=120s \
                 ${{ secrets.DOCKERHUB_USERNAME }}/admin-service:latest-arm64
             fi
 
-            # Konteyner loglarını kontrol et
-            echo "Container logs (after initial start):"
-            sleep 5
-            docker logs admin-service
+            # Waiting for container to start
+            echo "Waiting for container to initialize..."
+            sleep 10
 
-            # Docker network üzerindeki MongoDB'yi kontrol et
-            echo "MongoDB container adresini kontrol ediyorum..."
-            docker exec admin-service ping -c 2 craftpilot-mongodb || echo "craftpilot-mongodb host'una erişilemiyor"
-
-            if [ ! -z "$MONGODB_CONTAINER" ]; then
-              docker exec admin-service ping -c 2 $MONGODB_CONTAINER || echo "$MONGODB_CONTAINER host'una erişilemiyor"
-            fi
-
-            # Gelişmiş sağlık kontrolü
+            # More reliable health check approach - similar to credit-service
             echo "Performing health check..."
-            max_attempts=20
-            for i in $(seq 1 $max_attempts); do
-              echo "Health check attempt $i/$max_attempts..."
-              
-              # Konteyner hala çalışıyor mu kontrol et
-              if ! docker ps | grep -q admin-service; then
-                echo "Container stopped unexpectedly! Checking logs..."
-                docker logs admin-service
-                exit 1
-              fi
-              
-              # Sağlık kontrolü - hem localhost hem de konteyner içinden dene
-              status_code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8063/actuator/health || echo "000")
-              container_status=$(docker exec admin-service curl -s -o /dev/null -w "%{http_code}" http://localhost:8063/actuator/health 2>/dev/null || echo "000")
-              
-              echo "Health check response (host): $status_code"
-              echo "Health check response (container): $container_status"
-              
-              if [ "$status_code" = "200" ] || [ "$container_status" = "200" ]; then
-                echo "✅ Service is healthy! Deployment successful."
+            for i in {1..30}; do
+              if curl -s http://localhost:8063/actuator/health | grep -q "UP"; then
+                echo "Service is healthy!"
                 docker logs admin-service --tail 20
                 exit 0
-              else
-                echo "⏳ Service not ready yet, checking logs..."
-                docker logs admin-service --tail 10
+              fi
+              echo "Health check attempt $i/30 - service not ready yet"
+              
+              # Check for MongoDB connection errors
+              if docker logs admin-service 2>&1 | grep -q "UnknownHostException"; then
+                echo "MongoDB connection issue detected. Checking container networking..."
+                echo "Container IP addresses:"
+                docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' admin-service
+                echo "MongoDB container IP:"
+                docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $MONGODB_CONTAINER
+                
+                # Test network connectivity
+                docker exec admin-service nc -zv $MONGODB_CONTAINER 27017 || echo "Cannot connect to MongoDB"
               fi
               
-              sleep 15
+              sleep 10
             done
 
             echo "❌ Service failed to become healthy within timeout period."
-            echo "==== CONTAINER LOGS ===="
-            docker logs admin-service
-            echo "==== CONTAINER INFO ===="
-            docker inspect admin-service | grep -A 20 "NetworkSettings"
-            echo "==== NETWORK BAĞLANTILARI ===="
-            docker network inspect craftpilot-network | grep -A 30 "Containers"
-
-            # Servisin çalışmaya devam etmesine izin ver - inceleme için
-            echo "⚠️ Service may not be fully functional but container remains running for debugging."
+            echo "Final container logs:"
+            docker logs admin-service --tail 50
+            echo "Container is still running for debugging purposes."

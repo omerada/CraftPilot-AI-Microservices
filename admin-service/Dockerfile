@@ -3,11 +3,12 @@ FROM maven:3.9.6-eclipse-temurin-21 AS build
 
 WORKDIR /build
 
-# Proje dosyalarını kopyala
+# Cache Maven dependencies
 COPY pom.xml ./
-COPY src ./src/
+RUN mvn dependency:go-offline
 
-# Maven ile build
+# Build the application
+COPY src ./src/
 RUN mvn clean package -DskipTests
 
 # Run stage
@@ -15,68 +16,76 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-# Uygulamayı kopyala
+# Copy application JAR
 COPY --from=build /build/target/*.jar app.jar
 
-# Gerekli araçları kur
+# Install essential tools for troubleshooting
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl procps net-tools jq && \
+    apt-get install -y --no-install-recommends \
+    curl \
+    netcat-openbsd \
+    iputils-ping \
+    dnsutils \
+    procps \
+    jq && \
     rm -rf /var/lib/apt/lists/*
 
-# Sağlık kontrolü
-HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8063/actuator/health || exit 1
-
-# Port aç
-EXPOSE 8063
-# Debug portu - isteğe bağlı
-EXPOSE 5005
-
-# Başlatma scriptini kopyala
+# Create startup script
 COPY <<EOF /app/startup.sh
 #!/bin/bash
+set -e
+
 echo "Starting Admin Service..."
-echo "Java version:"
-java -version
-echo "Environment:"
-env | grep -E 'SPRING|KAFKA|MONGO|REDIS|EUREKA'
-echo "Starting application with options: \$JAVA_OPTS"
+echo "Java version: $(java -version 2>&1 | head -n 1)"
+echo "Environment checks:"
 
-# Bağımlı servislerin hazır olmasını bekle
-echo "Checking dependencies before starting..."
-
-# MongoDB bağlantısını kontrol et
-if [[ "\$SPRING_DATA_MONGODB_URI" == *"@"* ]]; then
-  MONGODB_HOST=\$(echo \$SPRING_DATA_MONGODB_URI | sed -n 's/.*@\\([^:]*\\).*/\\1/p')
-else
-  MONGODB_HOST=\$(echo \$SPRING_DATA_MONGODB_URI | sed -n 's/.*\\/\\/\\([^:]*\\).*/\\1/p')
+# Check MongoDB connection
+MONGODB_HOST=\$(echo \$SPRING_DATA_MONGODB_URI | sed -n 's/.*@\\([^:]*\\).*/\\1/p')
+if [ -z "\$MONGODB_HOST" ]; then
+  echo "Warning: Could not extract MongoDB host from URI"
+  MONGODB_HOST="craftpilot-mongodb"
 fi
 
-echo "Waiting for MongoDB at \$MONGODB_HOST..."
+echo "Testing connection to MongoDB at \$MONGODB_HOST..."
 for i in {1..30}; do
-  if ping -c 1 \$MONGODB_HOST &> /dev/null; then
-    echo "MongoDB server reachable"
+  if nc -z -w 2 \$MONGODB_HOST 27017; then
+    echo "✅ Successfully connected to MongoDB at \$MONGODB_HOST:27017"
     break
   fi
-  echo "Waiting for MongoDB to be reachable (\$i/30)..."
+  echo "⏳ Waiting for MongoDB to be available... (\$i/30)"
+  if [ \$i -eq 30 ]; then
+    echo "⚠️ Could not connect to MongoDB within timeout, but will continue startup"
+  fi
   sleep 2
 done
 
-# Redis bağlantısını kontrol et
-echo "Waiting for Redis at \$REDIS_HOST..."
-for i in {1..15}; do
-  if ping -c 1 \$REDIS_HOST &> /dev/null; then
-    echo "Redis server reachable"
-    break
-  fi
-  echo "Waiting for Redis to be reachable (\$i/15)..."
-  sleep 2
-done
+# Check Redis connection
+if [ ! -z "\$REDIS_HOST" ]; then
+  echo "Testing connection to Redis at \$REDIS_HOST..."
+  for i in {1..15}; do
+    if nc -z -w 2 \$REDIS_HOST 6379; then
+      echo "✅ Successfully connected to Redis at \$REDIS_HOST:6379"
+      break
+    fi
+    echo "⏳ Waiting for Redis to be available... (\$i/15)"
+    if [ \$i -eq 15 ]; then
+      echo "⚠️ Could not connect to Redis within timeout, but will continue startup"
+    fi
+    sleep 2
+  done
+fi
 
-echo "Dependency checks completed, starting application..."
+echo "Starting application with options: \$JAVA_OPTS"
 exec java \$JAVA_OPTS -jar app.jar
 EOF
 
 RUN chmod +x /app/startup.sh
+
+# Configure health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+  CMD curl -f http://localhost:8063/actuator/health || exit 1
+
+EXPOSE 8063
+EXPOSE 5005
 
 ENTRYPOINT ["/app/startup.sh"]

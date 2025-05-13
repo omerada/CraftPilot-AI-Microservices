@@ -14,7 +14,7 @@ spring:
     include: kafka-base
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@craftpilot-mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000}
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://craftpilot:secure_password@craftpilot-mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000}
       database: ${SPRING_DATA_MONGODB_DATABASE:craftpilot}
       auto-index-creation: true
       connect-timeout: 60000
@@ -22,6 +22,14 @@ spring:
       max-wait-time: 120000
       max-connection-idle-time: 300000
       max-connection-life-time: 600000
+      # MongoDB health ve bağlantı dayanıklılığı ayarları
+      retry-writes: true
+      max-connection-pool-size: 20
+      min-connection-pool-size: 5
+      max-connection-life-time: 30000
+      server-selection-timeout: 60000
+      maintenance-frequency: 20000
+      maintenance-initial-delay: 5000
     redis:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}

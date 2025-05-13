@@ -54,10 +54,16 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
         String safeUri = mongoUri.replaceAll("mongodb://[^:]*:[^@]*@", "mongodb://***:***@");
         log.info("MongoDB URI (masked): {}", safeUri);
 
-        ConnectionString connectionString = new ConnectionString(mongoUri);
+        try {
+            ConnectionString connectionString = new ConnectionString(mongoUri);
+            String host = connectionString.getHosts().get(0);
+            log.info("MongoDB host: {}", host);
+        } catch (Exception e) {
+            log.warn("MongoDB URI parsing error: {}", e.getMessage());
+        }
 
         MongoClientSettings settings = MongoClientSettings.builder()
-                .applyConnectionString(connectionString)
+                .applyConnectionString(new ConnectionString(mongoUri))
                 .applyToConnectionPoolSettings(builder -> builder.maxSize(20)
                         .minSize(5)
                         .maxWaitTime(maxWaitTime, TimeUnit.MILLISECONDS)
@@ -65,7 +71,8 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
                         .maxConnectionLifeTime(maxConnectionLifeTime, TimeUnit.MILLISECONDS))
                 .applyToSocketSettings(builder -> builder.connectTimeout(connectTimeout, TimeUnit.MILLISECONDS)
                         .readTimeout(socketTimeout, TimeUnit.MILLISECONDS))
-                .applyToServerSettings(builder -> builder.heartbeatFrequency(20000, TimeUnit.MILLISECONDS))
+                .applyToServerSettings(builder -> builder.heartbeatFrequency(10000, TimeUnit.MILLISECONDS))
+                .applyToClusterSettings(builder -> builder.serverSelectionTimeout(60000, TimeUnit.MILLISECONDS))
                 .build();
 
         log.info(

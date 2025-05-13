@@ -5,6 +5,10 @@ import com.mongodb.MongoSocketException;
 import com.mongodb.MongoExecutionTimeoutException;
 import com.mongodb.MongoQueryException;
 import com.mongodb.MongoWriteException;
+import com.mongodb.MongoCommandException;
+import com.mongodb.MongoException;
+import com.mongodb.MongoInterruptedException;
+import com.mongodb.MongoServerUnavailableException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -15,6 +19,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import reactor.core.publisher.Mono;
 
+import java.net.ConnectException;
+import java.net.UnknownHostException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -27,7 +33,10 @@ public class GlobalExceptionHandler {
                         MongoTimeoutException.class,
                         MongoSocketException.class,
                         MongoExecutionTimeoutException.class,
-                        DataAccessResourceFailureException.class
+                        DataAccessResourceFailureException.class,
+                        MongoServerUnavailableException.class,
+                        UnknownHostException.class,
+                        ConnectException.class
         })
         @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
         public Mono<ResponseEntity<ErrorResponse>> handleMongoConnectionException(Exception ex) {
@@ -35,8 +44,8 @@ public class GlobalExceptionHandler {
 
                 ErrorResponse errorResponse = ErrorResponse.builder()
                                 .status(HttpStatus.SERVICE_UNAVAILABLE.value())
-                                .error("MongoDB Connection Error")
-                                .message("Database connection failed or timed out")
+                                .error("Database Connection Error")
+                                .message("Database connection failed: " + ex.getMessage())
                                 .timestamp(LocalDateTime.now())
                                 .path(null) // Path could be added via request context if needed
                                 .build();
@@ -44,7 +53,8 @@ public class GlobalExceptionHandler {
                 return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse));
         }
 
-        @ExceptionHandler({ MongoQueryException.class, MongoWriteException.class })
+        @ExceptionHandler({ MongoQueryException.class, MongoWriteException.class, MongoCommandException.class,
+                        MongoException.class })
         @ResponseStatus(HttpStatus.BAD_REQUEST)
         public Mono<ResponseEntity<ErrorResponse>> handleMongoOperationException(Exception ex) {
                 log.error("MongoDB operation error: {}", ex.getMessage(), ex);
@@ -52,7 +62,7 @@ public class GlobalExceptionHandler {
                 ErrorResponse errorResponse = ErrorResponse.builder()
                                 .status(HttpStatus.BAD_REQUEST.value())
                                 .error("Database Operation Error")
-                                .message("Failed to perform database operation")
+                                .message("Failed to perform database operation: " + ex.getMessage())
                                 .timestamp(LocalDateTime.now())
                                 .path(null)
                                 .build();
