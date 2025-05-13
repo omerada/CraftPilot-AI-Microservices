@@ -9,6 +9,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 import org.springframework.kafka.core.KafkaAdmin;
+import java.time.Duration;
 
 @Configuration
 @Slf4j
@@ -18,12 +19,27 @@ public class HealthConfig {
     public HealthIndicator mongoHealthIndicator(ReactiveMongoTemplate mongoTemplate) {
         return () -> {
             try {
-                // Just ping the database to check connectivity
-                mongoTemplate.executeCommand("{ ping: 1 }")
-                    .block();
-                return Health.up().withDetail("database", "MongoDB").build();
+                // Kısa bir zaman aşımı ile MongoDB'ye ping gönder
+                Boolean isAvailable = mongoTemplate.executeCommand("{ ping: 1 }")
+                    .map(document -> true) // Komut başarılı olursa true döndür
+                    .timeout(Duration.ofSeconds(5))
+                    .onErrorResume(e -> {
+                        log.warn("MongoDB sağlık kontrolü başarısız: {}", e.getMessage());
+                        return Mono.just(false);
+                    })
+                    .blockOptional(Duration.ofSeconds(6))
+                    .orElse(false);
+                
+                if (isAvailable) {
+                    return Health.up().withDetail("database", "MongoDB").build();
+                } else {
+                    return Health.down()
+                        .withDetail("database", "MongoDB")
+                        .withDetail("message", "MongoDB bağlantısı kurulamadı")
+                        .build();
+                }
             } catch (Exception e) {
-                log.warn("MongoDB health check failed: {}", e.getMessage());
+                log.warn("MongoDB sağlık kontrolü başarısız: {}", e.getMessage());
                 return Health.down()
                     .withDetail("database", "MongoDB")
                     .withDetail("error", e.getMessage())
@@ -36,7 +52,7 @@ public class HealthConfig {
     public HealthIndicator customKafkaHealthIndicator(KafkaAdmin kafkaAdmin) {
         return () -> {
             try {
-                // Check if bootstrap servers are configured
+                // Kafka bootstrap sunucularının yapılandırıldığını kontrol et
                 Object bootstrapServers = kafkaAdmin.getConfigurationProperties()
                     .get("bootstrap.servers");
                 
@@ -46,11 +62,11 @@ public class HealthConfig {
                         .build();
                 } else {
                     return Health.down()
-                        .withDetail("message", "Kafka bootstrap servers not configured")
+                        .withDetail("message", "Kafka bootstrap sunucuları yapılandırılmamış")
                         .build();
                 }
             } catch (Exception e) {
-                log.warn("Kafka health check failed: {}", e.getMessage());
+                log.warn("Kafka sağlık kontrolü başarısız: {}", e.getMessage());
                 return Health.down()
                     .withDetail("error", e.getMessage())
                     .build();

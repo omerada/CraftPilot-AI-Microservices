@@ -38,11 +38,11 @@ spring:
     max-in-memory-size: 32MB
   data:
     mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/image-service?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=5000}
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/image-service?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=10000&connectTimeoutMS=10000&socketTimeoutMS=20000}
       database: ${SPRING_DATA_MONGODB_DATABASE:image-service}
-      auto-index-creation: true
-      connection-timeout: 30000
-      socket-timeout: 60000
+      auto-index-creation: false # İndeksleri kendimiz yönetiyoruz
+      connection-timeout: 10000
+      socket-timeout: 20000
       max-connection-idle-time: 300000
   cloud:
     gcp:

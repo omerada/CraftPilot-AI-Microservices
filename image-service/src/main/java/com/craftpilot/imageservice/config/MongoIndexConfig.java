@@ -8,6 +8,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
 
 @Component
 @Slf4j
@@ -20,23 +21,37 @@ public class MongoIndexConfig {
     public void initIndexes() {
         log.info("MongoDB indeksleri başlatılıyor");
         
-        // Image koleksiyonu için indeksler
-        mongoTemplate.indexOps("images")
-                .ensureIndex(new Index().on("userId", Sort.Direction.ASC))
-                .subscribe(result -> log.info("Image userId indeksi oluşturuldu: {}", result));
+        try {
+            // Image koleksiyonu için indeksler
+            createIndex("images", "userId", Sort.Direction.ASC, false);
+            createIndex("images", "createdAt", Sort.Direction.DESC, false);
+            createIndex("images", "status", Sort.Direction.ASC, false);
+            createIndex("images", "tags", Sort.Direction.ASC, false);
+            
+            log.info("MongoDB indeks başlatma işlemi tamamlandı");
+        } catch (Exception e) {
+            // Uygulama başlangıcının indeks sorunlarından dolayı başarısız olmasını engelle
+            log.error("MongoDB indeksleri oluşturulurken bir hata oluştu, ancak uygulama çalışmaya devam edecek: {}", e.getMessage());
+        }
+    }
+    
+    private void createIndex(String collection, String field, Sort.Direction direction, boolean unique) {
+        Index index = new Index().on(field, direction);
         
-        mongoTemplate.indexOps("images")
-                .ensureIndex(new Index().on("createdAt", Sort.Direction.DESC))
-                .subscribe(result -> log.info("Image createdAt indeksi oluşturuldu: {}", result));
+        // Eğer index benzersiz olacaksa unique() metodunu parametresiz çağır
+        if (unique) {
+            index = index.unique();
+        }
         
-        mongoTemplate.indexOps("images")
-                .ensureIndex(new Index().on("status", Sort.Direction.ASC))
-                .subscribe(result -> log.info("Image status indeksi oluşturuldu: {}", result));
-        
-        mongoTemplate.indexOps("images")
-                .ensureIndex(new Index().on("tags", Sort.Direction.ASC))
-                .subscribe(result -> log.info("Image tags indeksi oluşturuldu: {}", result));
-        
-        log.info("MongoDB indeks başlatma işlemi tamamlandı");
+        mongoTemplate.indexOps(collection)
+                .ensureIndex(index)
+                .onErrorResume(e -> {
+                    log.warn("{} koleksiyonunda {} alanı için indeks oluşturulamadı: {}", 
+                            collection, field, e.getMessage());
+                    return Mono.empty();
+                })
+                .subscribe(result -> 
+                        log.info("{} koleksiyonunda {} indeksi oluşturuldu: {}", 
+                                collection, field, result));
     }
 }
