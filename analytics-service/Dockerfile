@@ -3,11 +3,12 @@ FROM maven:3.9.6-eclipse-temurin-21 AS build
 
 WORKDIR /app
 
-# Cache Maven dependencies
-COPY pom.xml ./
-RUN mvn dependency:go-offline
+# Sadece pom.xml dosyasını kopyala ve bağımlılıkları indir
+COPY pom.xml .
+# Maven bağımlılık indirme hatası olsa bile devam et
+RUN mvn dependency:go-offline || echo "Dependencies may not be completely downloaded"
 
-# Build the application
+# Kaynak kodları kopyala ve paketi oluştur
 COPY src ./src/
 RUN mvn clean package -DskipTests
 
@@ -85,7 +86,7 @@ if [ ! -z "\$REDIS_HOST" ]; then
       break
     fi
     echo "⏳ Waiting for Redis to be available... (\$i/15)"
-    if [ \$i -eq 15 ]; then
+    if [ \$i -eq 15]; then
       echo "⚠️ Could not connect to Redis within timeout, but will continue startup"
     fi
     sleep 2
@@ -104,7 +105,7 @@ if [ "\$KAFKA_ENABLED" = "true" ] && [ ! -z "\$KAFKA_BOOTSTRAP_SERVERS" ]; then
       break
     fi
     echo "⏳ Waiting for Kafka to be available... (\$i/10)"
-    if [ \$i -eq 10 ]; then
+    if [ \$i -eq 10]; then
       echo "⚠️ Could not connect to Kafka within timeout, but will continue startup"
     fi
     sleep 2
