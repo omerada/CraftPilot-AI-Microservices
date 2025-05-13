@@ -36,18 +36,13 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
-          
+
       - name: Build commons library (if needed)
         run: |
           if [ -d "craft-pilot-commons" ]; then
             cd craft-pilot-commons
             mvn clean install -DskipTests
           fi
-
-      - name: Clean activity-log-service project
-        run: |
-          cd activity-log-service
-          mvn clean
 
       - name: Build with Maven
         run: |
@@ -73,17 +68,6 @@ jobs:
           # Create a temporary directory for build context
           mkdir -p /tmp/docker-build-context
 
-          # Check source directories and files
-          echo "Current directory: $(pwd)"
-          echo "Checking activity-log-service directory:"
-          ls -la activity-log-service/
-
-          # Ensure activity-log-service directory exists
-          if [ ! -d "activity-log-service" ]; then
-            echo "ERROR: activity-log-service directory not found"
-            exit 1
-          fi
-
           # Copy directories to build context
           cp -r activity-log-service /tmp/docker-build-context/
 
@@ -91,12 +75,6 @@ jobs:
           if [ -d "craft-pilot-commons" ]; then
             cp -r craft-pilot-commons /tmp/docker-build-context/
           fi
-
-          # Verify build context contents
-          echo "Checking build context:"
-          ls -la /tmp/docker-build-context/
-          echo "Checking activity-log-service directory in build context:"
-          ls -la /tmp/docker-build-context/activity-log-service/
 
       - name: Build and Push Docker image
         id: docker_build
@@ -116,17 +94,15 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true
-          command_timeout: "10m"
           script: |
             echo "Starting deployment of Activity Log Service..."
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
             docker stop activity-log-service || true
             docker rm activity-log-service || true
 
-            # Debug ve prod modları için farklı container yapılandırması
-            if [[ "${{ github.event.inputs.environment }}" == "debug" ]]; then
-              # Debug modu container yapılandırması
+            # Basitleştirilmiş deploy - Credit Service modeline benzer yapı
+            if [ "${{ github.event.inputs.environment }}" = "debug" ]; then
+              # Debug modu
               docker run -d \
                 --name activity-log-service \
                 --network craftpilot-network \
@@ -145,17 +121,12 @@ jobs:
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
                 -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
-                -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*" \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-                -e "JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5010" \
-                --health-cmd="curl -f http://localhost:8095/actuator/health || exit 1" \
-                --health-interval=30s \
-                --health-timeout=10s \
-                --health-retries=3 \
-                --health-start-period=60s \
+                -e JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5010" \
                 ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
             else
-              # Prod modu container yapılandırması
+              # Prod modu
               docker run -d \
                 --name activity-log-service \
                 --network craftpilot-network \
@@ -173,68 +144,23 @@ jobs:
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
                 -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
-                -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*" \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-                -e "JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom" \
-                --health-cmd="curl -f http://localhost:8095/actuator/health || exit 1" \
-                --health-interval=30s \
-                --health-timeout=10s \
-                --health-retries=3 \
-                --health-start-period=60s \
+                -e JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom" \
                 ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
             fi
 
-            # MongoDB'nin hazır olduğunu kontrol et
-            echo "=== MongoDB'nin hazır olduğunu kontrol ediliyor ==="
-            mongo_ready=false
-            for i in {1..10}; do
-              if docker exec -t activity-log-service wget -q --spider --timeout=2 http://mongodb:27017 > /dev/null 2>&1 || docker exec -t activity-log-service nc -z -w2 mongodb 27017 > /dev/null 2>&1; then
-                echo "✓ MongoDB erişilebilir durumdadır"
-                mongo_ready=true
-                break
-              else
-                echo "Deneme $i: MongoDB henüz hazır değil, 10 saniye bekleniyor..."
-                sleep 10
-              fi
-            done
-
-            if [ "$mongo_ready" = false ]; then
-              echo "× MongoDB'ye erişilemiyor! MongoDB ve ağ durumunu kontrol ediniz."
-              docker logs craftpilot-mongodb || echo "MongoDB container'ı bulunamadı"
-              echo "Şu andaki ağ durumu:"
-              docker network inspect craftpilot-network
-            fi
-
-            echo "=== Waiting for service startup ==="
-            max_attempts=20
-            counter=0
-
-            while [ $counter -lt $max_attempts ]; do
-              echo "Health check attempt $((counter + 1))/$max_attempts"
-              
-              # Container durumu kontrolü
-              if ! docker ps --filter "name=activity-log-service" --format '{{.Status}}' | grep -q "Up"; then
-                echo "Container is not running. Checking logs..."
-                docker logs activity-log-service
-                exit 1
-              fi
-              
-              # Health check kontrolü (basitleştirilmiş)
-              HEALTH_CHECK=$(curl -s http://localhost:8095/actuator/health || echo "FAILED")
-              if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
-                echo "✓ Service is healthy"
-                echo "=== Deployment completed successfully ==="
+            # MongoDB'nin hazır olduğunu kontrol etmek yerine direkt servisi bekleyelim
+            echo "Waiting for service to start..."
+            for i in {1..12}; do
+              if curl -s http://localhost:8095/actuator/health | grep -q "UP"; then
+                echo "Service is healthy"
                 exit 0
               fi
-              
-              echo "Waiting for service to start... ($((counter + 1))/$max_attempts)"
-              sleep 15  # Bekleme süresini artırdım
-              counter=$((counter + 1))
+              echo "Attempt $i: Service not ready yet..."
+              sleep 10
             done
 
-            echo "=== Service failed to start - Debug Information ==="
-            echo "Docker Status:"
-            docker ps -a | grep activity-log-service
-            echo "Container Logs (last 100 lines):"
-            docker logs activity-log-service --tail 100
+            echo "Service failed to become healthy within timeout"
+            docker logs activity-log-service
             exit 1
