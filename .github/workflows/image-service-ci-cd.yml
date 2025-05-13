@@ -68,28 +68,24 @@ jobs:
           script: |
             # Deploy Image Service
             echo "=== Deploying Image Service ==="
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64 || { echo "Failed to pull image"; exit 1; }
             docker stop image-service || true
             docker rm image-service || true
 
             # Ensure craftpilot network exists
-            docker network create craftpilot-network || true
-
-            # Ensure gcp credentials directory exists
-            if [ ! -f "/opt/craftpilot/gcp-credentials.json" ]; then
-              echo "Warning: GCP credentials file not found at expected location"
-              echo "Creating directory structure if needed..."
-              sudo mkdir -p /opt/craftpilot
-              sudo chmod 755 /opt/craftpilot
+            echo "=== Creating or verifying network ==="
+            docker network create craftpilot-network 2>/dev/null || true
+            if ! docker network inspect craftpilot-network >/dev/null 2>&1; then
+              echo "Failed to create or verify network"; exit 1;
             fi
 
             # Run the container with properly formatted command
+            echo "=== Starting container ==="
             docker run -d \
               --name image-service \
               --network craftpilot-network \
               --restart unless-stopped \
               -p 8056:8056 \
-              -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
@@ -101,23 +97,19 @@ jobs:
               -e SPRING_DATA_REDIS_PORT=6379 \
               -e SPRING_DATA_REDIS_PASSWORD=13579ada \
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
-              -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
-              -e IMAGE_STORAGE_BUCKET_NAME=${{ secrets.GCP_STORAGE_BUCKET }} \
               -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
               ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
 
-            # Wait for container to start
-            echo "=== Waiting for initial startup ==="
-            sleep 30
-
-            # Check if the container is running
+            # Verify container is running
+            echo "=== Verifying container started ==="
             if ! docker ps | grep -q "image-service"; then
               echo "Container failed to start. Checking logs..."
-              docker logs image-service
+              docker logs image-service || echo "No logs available"
               exit 1
             fi
 
             # Install curl if needed
+            echo "=== Installing curl if needed ==="
             docker exec image-service sh -c "apt-get update && apt-get install -y curl || true"
 
             echo "=== Checking service health ==="
@@ -130,7 +122,7 @@ jobs:
               # Check container status
               if ! docker ps | grep -q "image-service"; then
                 echo "Container is not running. Checking logs..."
-                docker logs image-service
+                docker logs image-service || echo "No logs available"
                 exit 1
               fi
 
@@ -150,9 +142,9 @@ jobs:
               if [ $ATTEMPT -eq 5 ]; then
                 echo "=== Mid-point debug information ==="
                 echo "Container Status:"
-                docker ps | grep image-service
+                docker ps | grep image-service || echo "Container not found"
                 echo "Recent Logs:"
-                docker logs image-service --tail 100
+                docker logs image-service --tail 100 || echo "No logs available"
               fi
               
               echo "Waiting before next attempt..."
@@ -164,5 +156,5 @@ jobs:
             echo "Final Container Status:"
             docker ps | grep image-service || echo "Container not found in running containers"
             echo "Container Logs:"
-            docker logs image-service
+            docker logs image-service || echo "No logs available"
             exit 1

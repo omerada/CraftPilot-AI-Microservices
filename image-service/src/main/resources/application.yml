@@ -44,15 +44,8 @@ spring:
       connection-timeout: 30000
       socket-timeout: 60000
       max-connection-idle-time: 300000
+  # Removing GCP configuration since MongoDB is used
   cloud:
-    gcp:
-      project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
-      credentials:
-        location: file:/gcp-credentials.json
-      firestore:
-        enabled: true
-      storage:
-        enabled: true
     kubernetes:
       config:
         enabled: true

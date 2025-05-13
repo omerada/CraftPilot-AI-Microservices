@@ -14,12 +14,50 @@ spec:
       labels:
         app: image-service
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - image-service
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: image-service
           image: ${DOCKERHUB_USERNAME}/image-service:latest-arm64
           ports:
             - containerPort: 8056
+              name: http
           env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: redis-host
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: redis-port
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: kafka-config
+                  key: bootstrap-servers
+            - name: EUREKA_SERVER_URL
+              value: "http://eureka-server:8761"
+            - name: SPRING_CLOUD_CONFIG_URI
+              value: "http://config-server:8888"
+            - name: SERVER_PORT
+              value: "8056"
+            - name: SPRING_CLOUD_KUBERNETES_ENABLED
+              value: "true"
             - name: EUREKA_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -30,32 +68,26 @@ spec:
                 secretKeyRef:
                   name: eureka-credentials
                   key: password
-            - name: EUREKA_HOST
-              value: "eureka-server"
-            - name: EUREKA_PORT
-              value: "8761"
-            - name: SPRING_PROFILES_ACTIVE
-              value: "prod"
-            - name: REDIS_HOST
-              value: "redis"
-            - name: REDIS_PORT
-              value: "6379"
-            - name: REDIS_PASSWORD
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              value: "http://eureka-server:8761/eureka/"
+            - name: SPRING_APPLICATION_NAME
+              value: "image-service"
+            - name: MANAGEMENT_SERVER_PORT
+              value: "8056"
+            - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+              value: "*"
+            - name: SPRING_DATA_MONGODB_URI
               valueFrom:
                 secretKeyRef:
-                  name: redis-credentials
-                  key: password
+                  name: mongodb-credentials
+                  key: uri
+            - name: SPRING_DATA_MONGODB_DATABASE
+              value: "image-service"
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: openai-credentials
                   key: api-key
-            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
-              value: "http://eureka-server:8761/eureka/"
-          volumeMounts:
-            - name: gcp-credentials
-              mountPath: "/gcp-credentials"
-              readOnly: true
           resources:
             requests:
               memory: "512Mi"
@@ -82,7 +114,4 @@ spec:
               port: 8056
             initialDelaySeconds: 40
             periodSeconds: 15
-      volumes:
-        - name: gcp-credentials
-          secret:
-            secretName: gcp-credentials
+      terminationGracePeriodSeconds: 60
