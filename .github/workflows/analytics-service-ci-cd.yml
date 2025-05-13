@@ -110,6 +110,7 @@ jobs:
               -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e KAFKA_ENABLED=true \
+              -e SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=false \
               --health-cmd="curl -f http://localhost:8064/actuator/health || exit 1" \
               --health-interval=30s \
               --health-timeout=10s \

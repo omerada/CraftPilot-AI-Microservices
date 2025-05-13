@@ -20,9 +20,9 @@ spring:
     fail-fast: false
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=5000}
+      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/analytics?authSource=admin&retryWrites=true&w=majority}
       database: ${MONGODB_DATABASE:analytics}
-      auto-index-creation: true
+      auto-index-creation: false # We'll handle this manually to avoid duplicate index creation
       connection-timeout: 30000
       socket-timeout: 60000
       max-connection-idle-time: 300000
