@@ -69,19 +69,17 @@ jobs:
             # Infrastructure containers
             docker network create craftpilot-network || true
 
-            # MongoDB container check - simplified approach
+            # MongoDB container check - use fixed container name from status info
             MONGODB_CONTAINER="craftpilot-mongodb"
             if ! docker ps | grep -q "$MONGODB_CONTAINER"; then
-              MONGODB_CONTAINER="mongodb"
-              if ! docker ps | grep -q "$MONGODB_CONTAINER"; then
-                echo "WARNING: Default MongoDB containers not found, checking for any mongodb container..."
-                MONGODB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'mongo|mongodb' | head -n 1)
-                if [ -z "$MONGODB_CONTAINER" ]; then
-                  echo "ERROR: No MongoDB container found!"
-                  MONGODB_CONTAINER="craftpilot-mongodb" # Fallback to default
-                else
-                  echo "Found MongoDB container: $MONGODB_CONTAINER"
-                fi
+              echo "WARNING: Default MongoDB container not found ($MONGODB_CONTAINER)"
+              # Still try to detect any MongoDB container as fallback
+              MONGODB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'mongo|mongodb' | head -n 1)
+              if [ -z "$MONGODB_CONTAINER" ]; then
+                echo "ERROR: No MongoDB container found! Using default name, but connection may fail."
+                MONGODB_CONTAINER="craftpilot-mongodb" # Fallback to default
+              else
+                echo "Found alternative MongoDB container: $MONGODB_CONTAINER"
               fi
             fi
             echo "Using MongoDB container: $MONGODB_CONTAINER"
@@ -99,17 +97,33 @@ jobs:
             docker stop admin-service || true
             docker rm admin-service || true
 
-            # MongoDB URI configuration - using GitHub Secrets
+            # MongoDB URI configuration - improved to handle container name properly
             if [ -n "${{ secrets.MONGODB_URI }}" ]; then
-              # Use the URI directly from secrets if available
-              MONGODB_URI="${{ secrets.MONGODB_URI }}"
-              echo "Using pre-configured MongoDB URI from secrets"
+              # Parse the URI and replace the hostname with our container name
+              # Extract parts before and after hostname
+              URI_PREFIX=$(echo "${{ secrets.MONGODB_URI }}" | grep -oP 'mongodb://[^@]+@')
+              URI_SUFFIX=$(echo "${{ secrets.MONGODB_URI }}" | grep -oP '(?<=@)[^/]+/.*')
+              URI_HOST=$(echo "$URI_SUFFIX" | grep -oP '^[^:/]+')
+              URI_REMAINDER=$(echo "$URI_SUFFIX" | grep -oP '(?<='"$URI_HOST"')[:/].*')
+              
+              # Build URI with the correct container name
+              MONGODB_URI="${URI_PREFIX}${MONGODB_CONTAINER}${URI_REMAINDER}"
+              echo "Modified MongoDB URI with correct container name: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
             else
-              # Otherwise, build the URI from components
+              # Build URI from components
               MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
-              echo "Built MongoDB URI from credential components"
+              echo "Built MongoDB URI from credential components: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
             fi
-            echo "MongoDB URI: $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
+
+            # Test MongoDB connection before deployment
+            echo "Testing MongoDB connection..."
+            if docker run --rm --network craftpilot-network mongo:6.0 mongosh --quiet --eval "db.runCommand({ping:1}).ok" admin --host $MONGODB_CONTAINER --port 27017 -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }} --authenticationDatabase admin | grep -q "1"; then
+              echo "✅ MongoDB connection test successful!"
+            else
+              echo "⚠️ MongoDB connection test failed! Deployment will continue but may have issues."
+              echo "Checking MongoDB container status:"
+              docker ps | grep -i $MONGODB_CONTAINER || echo "Container not found!"
+            fi
 
             echo "Starting admin-service container with environment: ${{ github.event.inputs.environment || 'prod' }}"
 
@@ -175,26 +189,47 @@ jobs:
             echo "Waiting for container to initialize..."
             sleep 10
 
-            # More reliable health check approach - similar to credit-service
-            echo "Performing health check..."
+            # More reliable health check approach with MongoDB connection verification
+            echo "Performing health check with MongoDB connection verification..."
             for i in {1..30}; do
-              if curl -s http://localhost:8063/actuator/health | grep -q "UP"; then
-                echo "Service is healthy!"
-                docker logs admin-service --tail 20
-                exit 0
+              if ! docker ps | grep -q "admin-service"; then
+                echo "❌ Container stopped unexpectedly!"
+                docker logs admin-service || echo "No logs available"
+                exit 1
               fi
+              
+              # Try health check
+              HEALTH_CHECK=$(curl -s http://localhost:8063/actuator/health || echo "{}")
+              if echo "$HEALTH_CHECK" | grep -q "UP"; then
+                echo "✅ Service is healthy!"
+                
+                # Verify MongoDB component specifically
+                if echo "$HEALTH_CHECK" | grep -q '"mongo":{"status":"UP"}'; then
+                  echo "✅ MongoDB component is healthy!"
+                  docker logs admin-service --tail 20
+                  exit 0
+                else
+                  echo "⚠️ Service is up but MongoDB component might have issues"
+                  echo "$HEALTH_CHECK" | grep -A 10 mongo || echo "No MongoDB component info found"
+                fi
+              fi
+              
               echo "Health check attempt $i/30 - service not ready yet"
               
-              # Check for MongoDB connection errors
-              if docker logs admin-service 2>&1 | grep -q "UnknownHostException"; then
-                echo "MongoDB connection issue detected. Checking container networking..."
-                echo "Container IP addresses:"
-                docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' admin-service
-                echo "MongoDB container IP:"
-                docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $MONGODB_CONTAINER
+              # Enhanced MongoDB connection diagnostics
+              if [ $i -eq 5 ] || [ $i -eq 15 ] || [ $i -eq 25 ]; then
+                echo "--- MongoDB Connection Diagnostics ---"
+                echo "MongoDB container status:"
+                docker ps | grep $MONGODB_CONTAINER || echo "MongoDB container not running!"
                 
-                # Test network connectivity
+                echo "Testing network connectivity from admin-service to MongoDB:"
                 docker exec admin-service nc -zv $MONGODB_CONTAINER 27017 || echo "Cannot connect to MongoDB"
+                
+                echo "Container environment variables:"
+                docker exec admin-service env | grep -E 'MONGO|DB_|mongodb' || echo "No MongoDB env vars found"
+                
+                echo "Network details:"
+                docker network inspect craftpilot-network | grep -A 5 -E "$MONGODB_CONTAINER|admin-service" || echo "Network inspection failed"
               fi
               
               sleep 10

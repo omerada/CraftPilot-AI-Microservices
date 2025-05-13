@@ -40,43 +40,43 @@ echo "Java version: $(java -version 2>&1 | head -n 1)"
 echo "Environment checks:"
 
 # Check MongoDB connection
-MONGODB_HOST=\$(echo \$SPRING_DATA_MONGODB_URI | sed -n 's/.*@\\([^:]*\\).*/\\1/p')
-if [ -z "\$MONGODB_HOST" ]; then
-  echo "Warning: Could not extract MongoDB host from URI"
+MONGODB_HOST=$(echo $SPRING_DATA_MONGODB_URI | grep -oP '(?<=@)[^:/]+(?=[:/?]|$)' || echo "craftpilot-mongodb")
+if [ -z "$MONGODB_HOST" ]; then
+  echo "MongoDB host URI'den alınamadı, varsayılan değer kullanılıyor"
   MONGODB_HOST="craftpilot-mongodb"
 fi
 
-echo "Testing connection to MongoDB at \$MONGODB_HOST..."
+echo "Testing connection to MongoDB at $MONGODB_HOST..."
 for i in {1..30}; do
-  if nc -z -w 2 \$MONGODB_HOST 27017; then
-    echo "✅ Successfully connected to MongoDB at \$MONGODB_HOST:27017"
+  if nc -z -w 2 $MONGODB_HOST 27017; then
+    echo "✅ Successfully connected to MongoDB at $MONGODB_HOST:27017"
     break
   fi
-  echo "⏳ Waiting for MongoDB to be available... (\$i/30)"
-  if [ \$i -eq 30 ]; then
+  echo "⏳ Waiting for MongoDB to be available... ($i/30)"
+  if [ $i -eq 30 ]; then
     echo "⚠️ Could not connect to MongoDB within timeout, but will continue startup"
   fi
   sleep 2
 done
 
 # Check Redis connection
-if [ ! -z "\$REDIS_HOST" ]; then
-  echo "Testing connection to Redis at \$REDIS_HOST..."
+if [ ! -z "$REDIS_HOST" ]; then
+  echo "Testing connection to Redis at $REDIS_HOST..."
   for i in {1..15}; do
-    if nc -z -w 2 \$REDIS_HOST 6379; then
-      echo "✅ Successfully connected to Redis at \$REDIS_HOST:6379"
+    if nc -z -w 2 $REDIS_HOST 6379; then
+      echo "✅ Successfully connected to Redis at $REDIS_HOST:6379"
       break
     fi
-    echo "⏳ Waiting for Redis to be available... (\$i/15)"
-    if [ \$i -eq 15 ]; then
+    echo "⏳ Waiting for Redis to be available... ($i/15)"
+    if [ $i -eq 15 ]; then
       echo "⚠️ Could not connect to Redis within timeout, but will continue startup"
     fi
     sleep 2
   done
 fi
 
-echo "Starting application with options: \$JAVA_OPTS"
-exec java \$JAVA_OPTS -jar app.jar
+echo "Starting application with options: $JAVA_OPTS"
+exec java $JAVA_OPTS -jar app.jar
 EOF
 
 RUN chmod +x /app/startup.sh
