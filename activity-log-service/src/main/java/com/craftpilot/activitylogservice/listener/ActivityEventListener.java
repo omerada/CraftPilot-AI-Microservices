@@ -30,7 +30,7 @@ public class ActivityEventListener {
     @Value("${activity.kafka.retry.initial-backoff:1000}")
     private long initialBackoffMillis;
     
-    @Value("${activity.kafka.consumer.topic:user-activity}")
+    @Value("${activity.kafka.consumer.topic:activity-events}")
     private String activityTopic;
     
     public ActivityEventListener(KafkaReceiver<String, ActivityEvent> receiver, ActivityLogService activityLogService) {

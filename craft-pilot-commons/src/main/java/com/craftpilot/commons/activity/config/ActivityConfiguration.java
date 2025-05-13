@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class ActivityConfiguration {
     
     private boolean enabled = true;
-    private String topic = "user-activity";
+    private String topic = "activity-events";
     private String errorHandling = "log-only";
     private String serviceNamePrefix = "";
     

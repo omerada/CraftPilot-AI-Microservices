@@ -27,7 +27,7 @@ public class KafkaConfig {
     @Value("${spring.kafka.consumer.group-id:activity-log-service}")
     private String groupId;
 
-    @Value("${activity.kafka.consumer.topic:user-activity}")
+    @Value("${activity.kafka.consumer.topic:activity-events}")
     private String topic;
 
     @Bean
@@ -41,6 +41,8 @@ public class KafkaConfig {
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.craftpilot.commons.activity.model,com.craftpilot.activitylogservice.model");
         props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "com.craftpilot.commons.activity.model.ActivityEvent");
         props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+        
+        log.info("Configuring Kafka receiver with topic: {}, bootstrap servers: {}", topic, bootstrapServers);
         
         ReceiverOptions<String, ActivityEvent> receiverOptions = ReceiverOptions.<String, ActivityEvent>create(props)
                 .subscription(Collections.singleton(topic))

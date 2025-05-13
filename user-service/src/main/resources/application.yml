@@ -179,7 +179,7 @@ kafka:
   topics:
     user-preferences: user-preferences
     user-events: user-events
-    user-activity: user-activity
+    activity-events: activity-events
   topic:
     user-preferences: user-preferences
 

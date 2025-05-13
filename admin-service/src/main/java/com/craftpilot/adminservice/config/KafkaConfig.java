@@ -1,5 +1,5 @@
 package com.craftpilot.adminservice.config;
- 
+
 import com.craftpilot.adminservice.config.KafkaBaseConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,20 +10,20 @@ import org.springframework.kafka.annotation.EnableKafka;
 @Configuration
 @EnableKafka
 public class KafkaConfig extends KafkaBaseConfig {
-    
+
     @Value("${kafka.topics.admin-events}")
     private String adminEventsTopic;
-    
+
     @Value("${kafka.topics.system-metrics}")
     private String systemMetricsTopic;
-    
+
     @Value("${kafka.topics.system-alerts}")
     private String systemAlertsTopic;
-    
+
     @Value("${kafka.topics.audit-logs}")
     private String auditLogsTopic;
-    
-    @Value("${kafka.topics.user-activity}")
+
+    @Value("${kafka.topics.activity-events}")
     private String userActivityTopic;
 
     @Bean

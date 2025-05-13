@@ -96,7 +96,7 @@ user-memory:
 # Activity logging yapılandırması
 activity:
   service-name-prefix: LLM
-  kafka-topic: user-activity
+  kafka-topic: activity-events
 
 # Eureka ayarları
 eureka:

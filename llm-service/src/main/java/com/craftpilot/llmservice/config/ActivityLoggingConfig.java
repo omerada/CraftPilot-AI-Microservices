@@ -24,9 +24,9 @@ public class ActivityLoggingConfig {
     @Value("${activity.service-name-prefix:LLM}")
     private String serviceNamePrefix;
 
-    @Value("${activity.kafka-topic:user-activity}")
+    @Value("${activity.kafka-topic:activity-events}")
     private String kafkaTopic;
-    
+
     @Value("${spring.kafka.bootstrap-servers:#{null}}")
     private String bootstrapServers;
 
@@ -49,13 +49,15 @@ public class ActivityLoggingConfig {
     @Bean
     @ConditionalOnMissingBean(ActivityProducer.class)
     public ActivityProducer loggingActivityProducer() {
-        log.warn("Kafka bootstrap servers not configured, falling back to logging activity producer. Kafka connection: {}", 
-              bootstrapServers != null ? bootstrapServers : "not configured");
+        log.warn(
+                "Kafka bootstrap servers not configured, falling back to logging activity producer. Kafka connection: {}",
+                bootstrapServers != null ? bootstrapServers : "not configured");
         return new LoggingActivityProducer();
     }
 
     @Bean
-    public ActivityLogger activityLogger(ActivityProducer activityProducer, ActivityConfiguration activityConfiguration) {
+    public ActivityLogger activityLogger(ActivityProducer activityProducer,
+            ActivityConfiguration activityConfiguration) {
         return new ActivityLogger(activityProducer, activityConfiguration);
     }
 
