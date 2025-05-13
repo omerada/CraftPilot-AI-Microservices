@@ -54,8 +54,8 @@ public class MongoInitializerConfig {
                             log.info("Creating collection: {}", collectionName);
                             return createCollection(database, collectionName)
                                 .doOnError(e -> log.warn("Could not create collection {}: {}", collectionName, e.getMessage()))
-                                .onErrorResume(e -> Mono.just(false))
-                                .thenReturn(true);
+                                .onErrorResume(e -> Mono.empty())
+                                .then(Mono.just(true));  
                         }
                         return Mono.just(false);
                     })
