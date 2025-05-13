@@ -25,14 +25,9 @@ spring:
     admin:
       auto-create: ${KAFKA_ADMIN_AUTO_CREATE:false}
       fail-fast: false
-      operation-timeout: 20000
-      close-timeout: 10000
 
 kafka:
+  enabled: ${KAFKA_ENABLED:false}
   topic:
     partitions: 3
     replicas: 1
-    analytics-events: analytics-events
-    usage-metrics: usage-metrics
-    performance-metrics: performance-metrics
-    analytics-reports: analytics-reports

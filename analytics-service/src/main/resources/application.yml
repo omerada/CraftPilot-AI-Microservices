@@ -11,7 +11,7 @@ spring:
     name: analytics-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:prod}
-    include: ${KAFKA_ENABLED:false} ? kafka-base
+    include: kafka-base
   cloud:
     discovery:
       enabled: true
@@ -21,14 +21,15 @@ spring:
     allow-bean-definition-overriding: true
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000}
-      database: ${MONGODB_DATABASE:analytics}
-      auto-index-creation: ${MONGODB_AUTO_INDEX_CREATION:true}
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://craftpilot:secure_password@craftpilot-mongodb:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000}
+      database: ${SPRING_DATA_MONGODB_DATABASE:analytics}
+      auto-index-creation: ${MONGODB_AUTO_INDEX_CREATION:false}
       connect-timeout: 60000
       socket-timeout: 60000
       max-wait-time: 120000
       max-connection-idle-time: 300000
       max-connection-life-time: 600000
+      # MongoDB health ve bağlantı dayanıklılığı ayarları
       retry-writes: true
       max-connection-pool-size: 20
       min-connection-pool-size: 5
@@ -65,7 +66,7 @@ management:
         enabled: true
       group:
         readiness:
-          include: mongo,diskSpace
+          include: mongo,redis,diskSpace
         liveness:
           include: ping
   health:
@@ -88,12 +89,13 @@ management:
 eureka:
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8761/eureka/}
+      defaultZone: ${EUREKA_SERVER_URL:http://craftpilot:13579ada@eureka-server:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
   instance:
     prefer-ip-address: true
     instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
+    lease-renewal-interval-in-seconds: 30
 
 springdoc:
   swagger-ui:

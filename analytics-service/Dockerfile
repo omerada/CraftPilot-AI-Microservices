@@ -12,15 +12,21 @@ COPY src ./src/
 RUN mvn clean package -DskipTests
 
 # Run stage
-FROM openjdk:21-slim
+FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
 COPY --from=build /app/target/*.jar app.jar
 
-# Install curl for healthcheck and diagnostics
+# Install essential tools for troubleshooting
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl netcat-openbsd jq && \
+    apt-get install -y --no-install-recommends \
+    curl \
+    netcat-openbsd \
+    iputils-ping \
+    dnsutils \
+    procps \
+    jq && \
     rm -rf /var/lib/apt/lists/*
 
 # MongoDB connection - Default olarak güvenli varsayılan değerler
@@ -45,6 +51,76 @@ ENV SERVER_PORT=8064
 ENV MONGODB_AUTO_INDEX_CREATION=false
 ENV SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=false
 
+# Create startup script for better initialization
+COPY <<EOF /app/startup.sh
+#!/bin/bash
+set -e
+
+echo "Starting Analytics Service..."
+echo "Java version: $(java -version 2>&1 | head -n 1)"
+echo "Environment checks:"
+
+# Check MongoDB connection
+MONGODB_HOST=\$(echo \$SPRING_DATA_MONGODB_URI | sed -n 's/.*@\\([^:]*\\).*/\\1/p')
+if [ -z "\$MONGODB_HOST" ]; then
+  echo "Warning: Could not extract MongoDB host from URI"
+  MONGODB_HOST="craftpilot-mongodb"
+fi
+
+echo "Testing connection to MongoDB at \$MONGODB_HOST..."
+for i in {1..30}; do
+  if nc -z -w 2 \$MONGODB_HOST 27017; then
+    echo "✅ Successfully connected to MongoDB at \$MONGODB_HOST:27017"
+    break
+  fi
+  echo "⏳ Waiting for MongoDB to be available... (\$i/30)"
+  if [ \$i -eq 30 ]; then
+    echo "⚠️ Could not connect to MongoDB within timeout, but will continue startup"
+  fi
+  sleep 2
+done
+
+# Check Redis connection if configured
+if [ ! -z "\$REDIS_HOST" ]; then
+  echo "Testing connection to Redis at \$REDIS_HOST..."
+  for i in {1..15}; do
+    if nc -z -w 2 \$REDIS_HOST 6379; then
+      echo "✅ Successfully connected to Redis at \$REDIS_HOST:6379"
+      break
+    fi
+    echo "⏳ Waiting for Redis to be available... (\$i/15)"
+    if [ \$i -eq 15 ]; then
+      echo "⚠️ Could not connect to Redis within timeout, but will continue startup"
+    fi
+    sleep 2
+  done
+fi
+
+# Check Kafka connection if enabled
+if [ "\$KAFKA_ENABLED" = "true" ] && [ ! -z "\$KAFKA_BOOTSTRAP_SERVERS" ]; then
+  KAFKA_HOST=\$(echo \$KAFKA_BOOTSTRAP_SERVERS | cut -d':' -f1)
+  KAFKA_PORT=\$(echo \$KAFKA_BOOTSTRAP_SERVERS | cut -d':' -f2)
+  
+  echo "Testing connection to Kafka at \$KAFKA_HOST:\$KAFKA_PORT..."
+  for i in {1..10}; do
+    if nc -z -w 2 \$KAFKA_HOST \$KAFKA_PORT; then
+      echo "✅ Successfully connected to Kafka at \$KAFKA_HOST:\$KAFKA_PORT"
+      break
+    fi
+    echo "⏳ Waiting for Kafka to be available... (\$i/10)"
+    if [ \$i -eq 10 ]; then
+      echo "⚠️ Could not connect to Kafka within timeout, but will continue startup"
+    fi
+    sleep 2
+  done
+fi
+
+echo "Starting application with options: \$JAVA_OPTS"
+exec java \$JAVA_OPTS -jar app.jar
+EOF
+
+RUN chmod +x /app/startup.sh
+
 # Create healthcheck script
 COPY <<EOF /app/healthcheck.sh
 #!/bin/bash
@@ -66,13 +142,11 @@ EOF
 
 RUN chmod +x /app/healthcheck.sh
 
-# Healthcheck for container orchestration using the script
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
+# Configure health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
   CMD /app/healthcheck.sh
 
 EXPOSE 8064
+EXPOSE 5005
 
-ENTRYPOINT ["java", "-Xms512m", "-Xmx1g", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", \
-  "-Dfile.encoding=UTF-8", "-Djava.security.egd=file:/dev/./urandom", \
-  "-Dspring.data.mongodb.auto-index-creation=false", \
-  "-jar", "app.jar"]
+ENTRYPOINT ["/app/startup.sh"]

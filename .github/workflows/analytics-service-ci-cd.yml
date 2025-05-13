@@ -7,6 +7,15 @@ on:
       - "analytics-service/**"
       - ".github/workflows/analytics-service-ci-cd.yml"
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy to"
+        required: true
+        default: "prod"
+        type: choice
+        options:
+          - prod
+          - debug
 
 jobs:
   build-and-deploy:
@@ -50,36 +59,17 @@ jobs:
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:buildcache-arm64
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:buildcache-arm64,mode=max
 
-      # Google Cloud kimlik doğrulaması
-      - id: "auth"
-        name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v1"
-        with:
-          credentials_json: "${{ secrets.GCP_SA_KEY }}"
-
-      # Google Cloud CLI kurulumu
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
-
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true
-          debug: true
-          command_timeout: "20m"
           script: |
-            echo "=== Testing Docker ==="
-            docker version
-            docker info
-            docker ps
-
-            # Infrastructure containers kontrol
+            # Infrastructure containers
             docker network create craftpilot-network || true
 
-            # MongoDB container check
+            # MongoDB container check - simplified approach
             MONGODB_CONTAINER="craftpilot-mongodb"
             if ! docker ps | grep -q "$MONGODB_CONTAINER"; then
               MONGODB_CONTAINER="mongodb"
@@ -96,79 +86,132 @@ jobs:
             fi
             echo "Using MongoDB container: $MONGODB_CONTAINER"
 
-            echo "=== Pulling ARM64 Image ==="
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
+            # GCP kimlik bilgilerini kontrol et
+            if [ ! -d "/craftpilot" ]; then
+              sudo mkdir -p /craftpilot
+            fi
 
-            echo "=== Stopping Old Container ==="
+            # GCP kimlik bilgilerini oluştur ve doğrula
+            echo '${{ secrets.GCP_SA_KEY }}' | sudo tee /craftpilot/gcp-credentials.json > /dev/null
+            sudo chmod 640 /craftpilot/gcp-credentials.json
+
+            # Önceki konteynerı durdur ve kaldır
             docker stop analytics-service || true
             docker rm analytics-service || true
 
-            # MongoDB URI configuration - Kullanıcı adı ve şifre düzeltmesi
+            # MongoDB URI configuration - using container variable
             MONGODB_URI="mongodb://craftpilot:secure_password@${MONGODB_CONTAINER}:27017/analytics?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
             echo "MongoDB URI: $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
 
-            echo "=== Starting New Container ==="
-            docker run -d \
-              --name analytics-service \
-              --network craftpilot-network \
-              --restart unless-stopped \
-              -p 8064:8064 \
-              -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
-              -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
-              -e SPRING_DATA_MONGODB_DATABASE=analytics \
-              -e MONGODB_HOST=${MONGODB_CONTAINER} \
-              -e MONGODB_PORT=27017 \
-              -e MONGODB_USERNAME=craftpilot \
-              -e MONGODB_PASSWORD=secure_password \
-              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
-              -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
-              -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
-              -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
-              -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-              -e KAFKA_ENABLED=false \
-              -e SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=true \
-              ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
+            echo "Starting analytics-service container with environment: ${{ github.event.inputs.environment || 'prod' }}"
 
-            echo "=== Waiting for Container to Start ==="
-            sleep 60
+            # Environment tipine göre konteynerı başlat
+            if [ "${{ github.event.inputs.environment }}" = "debug" ]; then
+              # Debug modu için remote debugging özelliği
+              docker run -d \
+                --name analytics-service \
+                --network craftpilot-network \
+                --restart unless-stopped \
+                -p 8064:8064 \
+                -p 5005:5005 \
+                -v /craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e SERVER_PORT=8064 \
+                -e EUREKA_SERVER_URL=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
+                -e SPRING_DATA_MONGODB_DATABASE=analytics \
+                -e SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=false \
+                -e MONGODB_AUTO_INDEX_CREATION=false \
+                -e SPRING_DATA_MONGODB_CONNECT_TIMEOUT=60000 \
+                -e SPRING_DATA_MONGODB_SOCKET_TIMEOUT=60000 \
+                -e SPRING_DATA_MONGODB_MAX_WAIT_TIME=120000 \
+                -e SPRING_DATA_MONGODB_SERVER_SELECTION_TIMEOUT=60000 \
+                -e REDIS_HOST=redis \
+                -e REDIS_PORT=6379 \
+                -e REDIS_PASSWORD=13579ada \
+                -e KAFKA_ENABLED=false \
+                -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+                -e KAFKA_ADMIN_AUTO_CREATE=false \
+                -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
+                -e MANAGEMENT_HEALTH_MONGODB_ENABLED=true \
+                -e MANAGEMENT_HEALTH_REDIS_ENABLED=true \
+                -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+                -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+                -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB=DEBUG \
+                -e JAVA_TOOL_OPTIONS="-agentlib:jdwp=transport=dt_socket,address=*:5005,server=y,suspend=n -Xms512m -Xmx1g" \
+                ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
+            else
+              # Prod modu
+              docker run -d \
+                --name analytics-service \
+                --network craftpilot-network \
+                --restart unless-stopped \
+                -p 8064:8064 \
+                -v /craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
+                -e SPRING_PROFILES_ACTIVE=prod \
+                -e SERVER_PORT=8064 \
+                -e EUREKA_SERVER_URL=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
+                -e SPRING_DATA_MONGODB_DATABASE=analytics \
+                -e MONGODB_AUTO_INDEX_CREATION=false \
+                -e SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=false \
+                -e REDIS_HOST=redis \
+                -e REDIS_PORT=6379 \
+                -e REDIS_PASSWORD=13579ada \
+                -e KAFKA_ENABLED=false \
+                -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+                -e KAFKA_ADMIN_AUTO_CREATE=false \
+                -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e JAVA_OPTS="-Xms512m -Xmx1g -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Djava.security.egd=file:/dev/./urandom" \
+                ${{ secrets.DOCKERHUB_USERNAME }}/analytics-service:latest-arm64
+            fi
 
-            echo "=== Container Logs ==="
-            docker logs analytics-service
+            # Waiting for container to start and checking health
+            echo "Waiting for container to initialize..."
+            sleep 10
 
-            echo "=== Health Check ==="
-            max_attempts=12
-            counter=0
-
-            while [ $counter -lt $max_attempts ]; do
-              echo "Health check attempt $((counter + 1))/$max_attempts"
-              
-              # Container durumu kontrolü
-              if ! docker ps --filter "name=analytics-service" --format '{{.Status}}' | grep -q "Up"; then
-                echo "Container is not running anymore. Checking logs..."
-                docker logs analytics-service --tail 100
-                exit 1
+            echo "Performing health check..."
+            for i in {1..30}; do
+              if docker logs analytics-service 2>&1 | grep -q "Started AnalyticsServiceApplication"; then
+                echo "Service started successfully!"
+                
+                # Try health endpoint
+                echo "Testing health endpoint..."
+                if curl -s http://localhost:8064/actuator/health | grep -q "UP"; then
+                  echo "Service is healthy!"
+                  docker logs analytics-service --tail 20
+                  exit 0
+                else
+                  echo "Service started but health check not passing yet. Waiting..."
+                fi
               fi
               
-              # Health check
-              if curl -f http://localhost:8064/actuator/health; then
-                echo "Service is healthy!"
-                exit 0
+              # Check for specific MongoDB connection errors
+              if docker logs analytics-service 2>&1 | grep -q "MongoSecurityException"; then
+                echo "⚠️ MongoDB authentication issue detected!"
+                echo "Checking MongoDB credentials and connectivity..."
+                
+                # Test network connectivity
+                docker exec analytics-service nc -zv $MONGODB_CONTAINER 27017 || echo "Cannot connect to MongoDB"
+                
+                # Try simple authentication with mongo command if mongo client is available
+                if docker exec analytics-service which mongo &>/dev/null; then
+                  echo "Testing MongoDB credentials..."
+                  docker exec analytics-service mongo --host $MONGODB_CONTAINER:27017 -u craftpilot -p secure_password --authenticationDatabase admin --eval "db.adminCommand('ping')" || echo "MongoDB authentication failed with mongo command"
+                fi
               fi
               
-              echo "Waiting for service to start... Attempt $((counter + 1))/$max_attempts"
-              sleep 20
-              counter=$((counter + 1))
+              echo "Health check attempt $i/30 - service not ready yet"
+              sleep 10
             done
 
-            echo "Service failed health check"
-            echo "=== Detailed Container Logs ==="
-            docker logs analytics-service
-            echo "=== Container Status ==="
-            docker inspect analytics-service --format='{{.State.Status}}'
-            echo "=== Health Check Status ==="
-            docker inspect analytics-service --format='{{.State.Health.Status}}'
-            exit 1
+            echo "❌ Service failed to become healthy within timeout period."
+            echo "Final container logs:"
+            docker logs analytics-service --tail 50
+            echo "Container will continue running for debugging purposes."
