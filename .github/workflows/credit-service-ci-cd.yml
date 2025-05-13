@@ -88,9 +88,9 @@ jobs:
 
             # Configure MongoDB URI
             if [ -n "${{ secrets.MONGODB_URI }}" ]; then
-              # Use the URI directly from secrets if available
-              MONGODB_URI="${{ secrets.MONGODB_URI }}"
-              echo "Using pre-configured MongoDB URI from secrets"
+              # Use the URI directly from secrets but replace hostname if needed
+              MONGODB_URI=$(echo "${{ secrets.MONGODB_URI }}" | sed "s/mongodb:27017/$MONGODB_CONTAINER:27017/g" | sed "s/@mongodb:/@$MONGODB_CONTAINER:/g")
+              echo "Using MongoDB URI from secrets (with adjusted hostname if needed)"
             else
               # Otherwise, build the URI from components
               MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"

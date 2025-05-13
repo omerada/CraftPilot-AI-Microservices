@@ -73,42 +73,40 @@ jobs:
             # Infrastructure containers - ağ kontrolü
             docker network create craftpilot-network 2>/dev/null || echo "Network already exists"
 
-            # MongoDB konteyner adını doğrula - daha güvenilir yöntem
+            # MongoDB konteyner adını sabit olarak craftpilot-mongodb olarak belirle
             MONGODB_CONTAINER="craftpilot-mongodb"
-            if ! docker ps --filter "name=$MONGODB_CONTAINER" --filter "health=healthy" --format '{{.Names}}' | grep -q "$MONGODB_CONTAINER"; then
-              echo "UYARI: Sağlıklı 'craftpilot-mongodb' containeri bulunamadı. Alternatif kontrol yapılıyor..."
-              MONGODB_CONTAINER=$(docker ps --filter "ancestor=mongo" --format '{{.Names}}' | head -n 1)
-              
-              if [ -z "$MONGODB_CONTAINER" ]; then
-                echo "HATA: Hiçbir MongoDB containeri bulunamadı!"
-                echo "craftpilot-mongodb containeri çalışmıyor olabilir. Lütfen kontrol edin."
-                exit 1
-              else
-                echo "Alternatif MongoDB containeri bulundu: $MONGODB_CONTAINER"
-              fi
-            fi
-            echo "MongoDB containeri kullanılıyor: $MONGODB_CONTAINER (status: $(docker inspect --format='{{.State.Health.Status}}' $MONGODB_CONTAINER || echo 'health status unavailable'))"
 
-            # MongoDB URI ayarı - Daha güvenilir yapılandırma
-            # GitHub Secrets yapısını image-service'e benzer şekilde kullan
-            if [ -n "${{ secrets.MONGODB_URI }}" ]; then
-              # Doğrudan URI kullanımı
-              MONGODB_URI="${{ secrets.MONGODB_URI }}"
-              echo "Secrets'tan direkt MongoDB URI kullanılıyor (maskelenmiş)"
+            # MongoDB container'ının sağlık durumunu kontrol et
+            if ! docker ps --filter "name=$MONGODB_CONTAINER" --format '{{.Names}}' | grep -q "$MONGODB_CONTAINER"; then
+              echo "UYARI: '$MONGODB_CONTAINER' container'ı bulunamadı veya çalışmıyor!"
+              docker ps | grep -i mongo || echo "Hiçbir MongoDB container'ı bulunamadı!"
             else
-              # Bileşenlerden URI oluşturuluyor
+              echo "MongoDB container'ı çalışıyor: $MONGODB_CONTAINER (status: $(docker inspect --format='{{.State.Health.Status}}' $MONGODB_CONTAINER 2>/dev/null || echo 'health status unavailable'))"
+            fi
+
+            # MongoDB URI konfigürasyonu - image-service ile uyumlu
+            # Doğrudan secrets'tan URI kullan veya bileşenlerden oluştur
+            if [ -n "${{ secrets.MONGODB_URI }}" ]; then
+              # URI içindeki host adını craftpilot-mongodb olarak değiştir
+              MONGODB_URI=$(echo "${{ secrets.MONGODB_URI }}" | sed 's/mongodb:27017/craftpilot-mongodb:27017/g' | sed 's/@mongodb:/@craftpilot-mongodb:/g')
+              echo "Secrets'tan alınan MongoDB URI düzeltildi"
+            else
+              # Bileşenlerden URI oluşturma - craftpilot-mongodb host adıyla
               MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@$MONGODB_CONTAINER:27017/${{ secrets.MONGO_INITDB_DATABASE || 'analytics' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"
-              echo "Bileşenlerden MongoDB URI oluşturuldu (maskelenmiş)"
+              echo "Bileşenlerden MongoDB URI oluşturuldu"
             fi
             # Log çıktılarında parolayı maskele
             echo "MongoDB URI (maskelenmiş): $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
 
             # MongoDB bağlantısını test et
             echo "MongoDB bağlantısı test ediliyor..."
-            if ! docker run --rm --network craftpilot-network mongo:6.0 mongosh --quiet --eval "db.runCommand({ping:1}).ok" admin --host $MONGODB_CONTAINER --port 27017 -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }} --authenticationDatabase admin | grep -q "1"; then
-              echo "UYARI: MongoDB bağlantı testi başarısız oldu! Deployment devam edecek ancak servis başlangıçta hata verebilir."
-            else
+            if docker run --rm --network craftpilot-network mongo:6.0 mongosh --quiet --eval "db.runCommand({ping:1}).ok" admin --host $MONGODB_CONTAINER --port 27017 -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }} --authenticationDatabase admin | grep -q "1"; then
               echo "✅ MongoDB bağlantı testi başarılı!"
+            else
+              echo "⚠️ MongoDB bağlantı testi başarısız! Deployment devam edecek ancak servis başlangıçta hata verebilir."
+              echo "MongoDB container'ının durumunu kontrol edin:"
+              docker ps | grep -i mongo
+              docker logs $MONGODB_CONTAINER --tail 20
             fi
 
             # GCP kimlik bilgilerini kontrol et ve oluştur (gerekirse)
@@ -224,15 +222,19 @@ jobs:
                 exit 1
               fi
               
-              # MongoDB bağlantısı test et
+              # MongoDB bağlantısını test et (özel deneme)
               if [ $ATTEMPT -eq 5 ]; then
-                echo "MongoDB bağlantısı test ediliyor..."
+                echo "MongoDB bağlantısı kontrol ediliyor..."
+                docker exec analytics-service env | grep MONGODB || echo "MongoDB değişkenleri bulunamadı"
+                docker exec analytics-service env | grep SPRING_DATA_MONGODB || echo "Spring MongoDB değişkenleri bulunamadı"
+                
                 if docker exec analytics-service nc -z -w 3 $MONGODB_CONTAINER 27017; then
                   echo "✅ MongoDB bağlantısı başarılı!"
                 else
-                  echo "⚠️ MongoDB bağlantısı başarısız! Container içinden test ediliyor..."
-                  docker exec analytics-service env | grep MONGODB
-                  docker exec analytics-service env | grep SPRING_DATA_MONGODB
+                  echo "⚠️ MongoDB bağlantısı başarısız! Network debug bilgileri:"
+                  docker exec analytics-service ping -c 2 $MONGODB_CONTAINER || echo "ping başarısız"
+                  docker network inspect craftpilot-network | grep -A 10 analytics-service
+                  docker network inspect craftpilot-network | grep -A 10 $MONGODB_CONTAINER
                 fi
               fi
               
@@ -245,11 +247,13 @@ jobs:
                 break
               fi
               
-              # MongoDB bileşenini izole et ve kontrol et
+              # Problem detaylarını göster
               if [ $ATTEMPT -eq 10 ]; then
-                echo "MongoDB bileşeni detaylı kontrol ediliyor..."
+                echo "MongoDB bileşeni kontrol ediliyor..."
                 MONGO_HEALTH=$(curl -s http://localhost:8064/actuator/health/mongo || echo "unavailable")
-                echo "MongoDB bileşen durumu: $MONGO_HEALTH"
+                echo "MongoDB sağlık durumu: $MONGO_HEALTH"
+                echo "Container içinden MongoDB URI testi:"
+                docker exec analytics-service bash -c 'nc -zv $(echo $SPRING_DATA_MONGODB_URI | sed -n "s/.*@\([^:]*\).*/\1/p") 27017'
               fi
               
               # Kritik noktalarda daha detaylı bilgi

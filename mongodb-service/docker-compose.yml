@@ -4,6 +4,7 @@ services:
   mongodb:
     container_name: craftpilot-mongodb
     image: mongo:6.0
+    hostname: craftpilot-mongodb
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-craftpilot}

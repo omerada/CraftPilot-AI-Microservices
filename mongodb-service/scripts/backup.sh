@@ -10,6 +10,7 @@ else
   MONGO_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-secure_password}
   MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-craftpilot}
   MONGO_PORT=${MONGO_PORT:-27017}
+  MONGODB_HOST=${MONGODB_HOST:-craftpilot-mongodb}
 fi
 
 # Yedekleme dizini oluştur
