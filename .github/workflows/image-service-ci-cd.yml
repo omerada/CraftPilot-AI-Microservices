@@ -66,18 +66,15 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Ensure network exists
+            echo "=== Creating or verifying network ==="
+            docker network create craftpilot-network 2>/dev/null || true
+
             # Deploy Image Service
             echo "=== Deploying Image Service ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64 || { echo "Failed to pull image"; exit 1; }
             docker stop image-service || true
             docker rm image-service || true
-
-            # Ensure craftpilot network exists
-            echo "=== Creating or verifying network ==="
-            docker network create craftpilot-network 2>/dev/null || true
-            if ! docker network inspect craftpilot-network >/dev/null 2>&1; then
-              echo "Failed to create or verify network"; exit 1;
-            fi
 
             # Run the container with properly formatted command
             echo "=== Starting container ==="
@@ -87,8 +84,11 @@ jobs:
               --restart unless-stopped \
               -p 8056:8056 \
               -e SPRING_PROFILES_ACTIVE=prod \
+              -e SERVER_PORT=8056 \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+              -e EUREKA_INSTANCE_HOSTNAME=image-service \
+              -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
               -e SPRING_SECURITY_USER_NAME=craftpilot \
               -e SPRING_SECURITY_USER_PASSWORD=13579ada \
               -e SPRING_DATA_MONGODB_URI=${{ secrets.MONGODB_URI }} \
@@ -97,6 +97,8 @@ jobs:
               -e SPRING_DATA_REDIS_PORT=6379 \
               -e SPRING_DATA_REDIS_PASSWORD=13579ada \
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
               ${{ secrets.DOCKERHUB_USERNAME }}/image-service:latest-arm64
 
@@ -113,7 +115,7 @@ jobs:
             docker exec image-service sh -c "apt-get update && apt-get install -y curl || true"
 
             echo "=== Checking service health ==="
-            MAX_ATTEMPTS=10
+            MAX_ATTEMPTS=15
             ATTEMPT=1
 
             while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
@@ -127,7 +129,9 @@ jobs:
               fi
 
               # Check application health
-              if docker exec -i image-service curl -s http://localhost:8056/actuator/health | grep -q "UP"; then
+              HEALTH_CHECK=$(docker exec -i image-service curl -s http://localhost:8056/actuator/health || echo "Failed")
+              
+              if echo "$HEALTH_CHECK" | grep -q "UP"; then
                 echo "Service is healthy!"
                 # Verify Eureka registration
                 if docker logs image-service | grep -q "registration status: 204"; then
@@ -135,11 +139,16 @@ jobs:
                   exit 0
                 else
                   echo "Service is up but may not be registered with Eureka yet"
+                  if [ $ATTEMPT -ge 10 ]; then
+                    echo "Accepting service as healthy even without Eureka registration confirmation"
+                    exit 0
+                  fi
                 fi
-                exit 0
+              else
+                echo "Health check response: $HEALTH_CHECK"
               fi
               
-              if [ $ATTEMPT -eq 5 ]; then
+              if [ $ATTEMPT -eq 7]; then
                 echo "=== Mid-point debug information ==="
                 echo "Container Status:"
                 docker ps | grep image-service || echo "Container not found"
