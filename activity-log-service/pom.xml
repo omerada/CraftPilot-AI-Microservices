@@ -17,7 +17,6 @@
     <properties>
         <java.version>17</java.version>
         <spring-cloud.version>2022.0.4</spring-cloud.version>
-        <spring-cloud-gcp.version>4.7.2</spring-cloud-gcp.version>
         <lombok.version>1.18.30</lombok.version>
         <reactor-kafka.version>1.3.17</reactor-kafka.version>
     </properties>
@@ -66,14 +65,14 @@
             <version>${reactor-kafka.version}</version>
         </dependency>
         
-        <!-- GCP & Firestore -->
+        <!-- MongoDB -->
         <dependency>
-            <groupId>com.google.cloud</groupId>
-            <artifactId>spring-cloud-gcp-starter</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-mongodb-reactive</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.google.cloud</groupId>
-            <artifactId>spring-cloud-gcp-starter-firestore</artifactId>
+            <groupId>org.mongodb</groupId>
+            <artifactId>mongodb-driver-reactivestreams</artifactId>
         </dependency>
         
         <!-- Project Reactor -->
@@ -148,13 +147,6 @@
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
                 <version>${spring-cloud.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>com.google.cloud</groupId>
-                <artifactId>spring-cloud-gcp-dependencies</artifactId>
-                <version>${spring-cloud-gcp.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

@@ -1,13 +1,13 @@
 package com.craftpilot.activitylogservice.model;
 
-import com.google.cloud.Timestamp;
-import com.google.cloud.firestore.annotation.DocumentId;
-import com.google.cloud.firestore.annotation.Exclude;
-import com.google.cloud.firestore.annotation.ServerTimestamp;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -19,18 +19,24 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Document(collection = "activity_logs")
 public class ActivityLog {
     
-    @DocumentId
+    @Id
     private String id;
     
+    @Indexed
     private String userId;
+    
+    @Indexed
     private String actionType;
     
-    @ServerTimestamp
-    private Timestamp createdAt;
+    @CreatedDate
+    private LocalDateTime createdAt;
     
+    @Indexed
     private LocalDateTime timestamp;
+    
     private Map<String, Object> metadata;
     
     public static ActivityLog fromEvent(ActivityEvent event) {
@@ -43,7 +49,6 @@ public class ActivityLog {
                 .build();
     }
     
-    @Exclude
     public ZonedDateTime getZonedTimestamp() {
         return timestamp != null 
             ? timestamp.atZone(ZoneId.systemDefault()) 

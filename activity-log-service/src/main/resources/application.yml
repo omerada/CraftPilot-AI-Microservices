@@ -12,17 +12,15 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:prod}
     include: kafka-base
-  cloud:
-    gcp:
-      project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
-      credentials:
-        location: file:${GOOGLE_APPLICATION_CREDENTIALS:/app/credentials/gcp-credentials.json}
-      firestore:
-        enabled: true
-        project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
-        emulator:
-          enabled: ${FIRESTORE_EMULATOR_ENABLED:false}
-          host: ${FIRESTORE_EMULATOR_HOST:localhost:8081}
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://craftpilot:secure_password@mongodb:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=5000}
+      database: ${MONGODB_DATABASE:craftpilot}
+      connection-timeout: 30000
+      socket-timeout: 60000
+      max-connection-idle-time: 300000
+      connection-pool-max-size: 20
+      auto-index-creation: true
   jackson:
     default-property-inclusion: non_null
     serialization:
@@ -39,7 +37,7 @@ spring:
         spring.json.value.default.type: com.craftpilot.commons.activity.model.ActivityEvent
         spring.json.use.type.headers: false
 
-# Redis yapılandırması ekleniyor
+# Redis yapılandırması
 spring.data.redis:
   host: ${REDIS_HOST:redis}
   port: ${REDIS_PORT:6379}
@@ -56,11 +54,18 @@ management:
       show-details: always
       probes:
         enabled: true
+      group:
+        readiness:
+          include: mongo,redis,diskSpace
+        liveness:
+          include: ping
     metrics:
       enabled: true
     prometheus:
       enabled: true
   health:
+    mongodb:
+      enabled: true
     livenessState:
       enabled: true
     readinessState:
@@ -74,7 +79,7 @@ logging:
     com.craftpilot: DEBUG
     org.springframework.web: INFO
     org.springframework.kafka: INFO
-    com.google.cloud.firestore: INFO
+    org.springframework.data.mongodb: INFO
     com.craftpilot.activitylogservice: INFO
     org.apache.kafka: WARN
 

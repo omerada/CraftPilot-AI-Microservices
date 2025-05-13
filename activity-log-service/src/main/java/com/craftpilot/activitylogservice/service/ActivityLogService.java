@@ -9,6 +9,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
@@ -76,7 +78,9 @@ public class ActivityLogService {
     
     private ActivityLog convertToActivityLog(ActivityEvent event) {
         ActivityLog log = ActivityLog.fromEvent(event);
-        log.setId(UUID.randomUUID().toString()); // Ensure ID is set
+        if (log.getId() == null || log.getId().trim().isEmpty()) {
+            log.setId(UUID.randomUUID().toString());
+        }
         return log;
     }
 
@@ -95,9 +99,13 @@ public class ActivityLogService {
             
             int validatedPage = page != null && page >= 0 ? page : 0;
             int validatedSize = validatePageSize(size);
-            int limit = validatedSize;
-            int skip = validatedPage * validatedSize;
-            String lastDocId = null; // We would need cursor-based pagination for efficient Firestore queries
+            
+            // MongoDB pagination set up
+            PageRequest pageRequest = PageRequest.of(
+                validatedPage, 
+                validatedSize, 
+                Sort.by(Sort.Direction.DESC, "timestamp")
+            );
             
             // Count total elements for pagination metadata
             Mono<Long> countMono = activityLogRepository.countByFilters(
@@ -105,7 +113,7 @@ public class ActivityLogService {
             
             // Get the actual page of logs
             Mono<java.util.List<ActivityLog>> logsMono = activityLogRepository
-                .findByFilters(userId, actionType, fromDateTime, toDateTime, limit, lastDocId)
+                .findByFilters(userId, actionType, fromDateTime, toDateTime, pageRequest)
                 .collectList();
             
             // Combine into a PageResponse
