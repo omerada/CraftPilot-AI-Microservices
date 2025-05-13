@@ -95,14 +95,28 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Set error handling
+            set -e
+
             echo "Starting deployment of Activity Log Service..."
+
+            # Pull the latest Docker image
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
+
+            # Stop and remove existing container if it exists
             docker stop activity-log-service || true
             docker rm activity-log-service || true
 
-            # Basitleştirilmiş deploy - Credit Service modeline benzer yapı
-            if [ "${{ github.event.inputs.environment }}" = "debug" ]; then
-              # Debug modu
+            # Setup environment variables
+            ENVIRONMENT="${{ github.event.inputs.environment }}"
+            DOCKER_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
+            MONGODB_URI="${{ secrets.MONGODB_URI }}"
+
+            # Deployment with proper conditional statement
+            echo "Deploying Activity Log Service in ${ENVIRONMENT:-prod} mode..."
+
+            if [ "${ENVIRONMENT}" = "debug" ]; then
+              echo "Starting in DEBUG mode with remote debugging enabled"
               docker run -d \
                 --name activity-log-service \
                 --network craftpilot-network \
@@ -115,7 +129,7 @@ jobs:
                 -e HOSTNAME=activity-log-service \
                 -e SPRING_SECURITY_USER_NAME=craftpilot \
                 -e SPRING_SECURITY_USER_PASSWORD=13579ada \
-                -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
+                -e MONGODB_URI="${MONGODB_URI}" \
                 -e MONGODB_DATABASE=activitylog \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
@@ -124,9 +138,9 @@ jobs:
                 -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
                 -e JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5010" \
-                ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
+                "${DOCKER_USERNAME}/activity-log-service:latest-arm64"
             else
-              # Prod modu
+              echo "Starting in PRODUCTION mode"
               docker run -d \
                 --name activity-log-service \
                 --network craftpilot-network \
@@ -138,7 +152,7 @@ jobs:
                 -e HOSTNAME=activity-log-service \
                 -e SPRING_SECURITY_USER_NAME=craftpilot \
                 -e SPRING_SECURITY_USER_PASSWORD=13579ada \
-                -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
+                -e MONGODB_URI="${MONGODB_URI}" \
                 -e MONGODB_DATABASE=activitylog \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
@@ -147,20 +161,49 @@ jobs:
                 -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
                 -e JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom" \
-                ${{ secrets.DOCKERHUB_USERNAME }}/activity-log-service:latest-arm64
+                "${DOCKER_USERNAME}/activity-log-service:latest-arm64"
             fi
 
-            # MongoDB'nin hazır olduğunu kontrol etmek yerine direkt servisi bekleyelim
+            # Verify container is running
+            if ! docker ps | grep -q activity-log-service; then
+              echo "Container failed to start! Checking logs..."
+              docker logs activity-log-service
+              exit 1
+            fi
+
+            # Health check with improved logging
             echo "Waiting for service to start..."
-            for i in {1..12}; do
-              if curl -s http://localhost:8095/actuator/health | grep -q "UP"; then
-                echo "Service is healthy"
-                exit 0
+            max_attempts=12
+            attempt=1
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Health check attempt $attempt/$max_attempts..."
+              
+              # Check if container is still running
+              if ! docker ps | grep -q activity-log-service; then
+                echo "Container stopped unexpectedly! Checking logs..."
+                docker logs activity-log-service
+                exit 1
               fi
-              echo "Attempt $i: Service not ready yet..."
+              
+              # Try health check
+              HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8095/actuator/health || echo "000")
+              
+              if [ "$HEALTH_RESPONSE" = "200" ]; then
+                echo "Service is healthy! Deployment successful."
+                docker logs activity-log-service --tail 10
+                exit 0
+              else
+                echo "Attempt $attempt: Service returned status code: $HEALTH_RESPONSE"
+              fi
+              
               sleep 10
+              attempt=$((attempt + 1))
             done
 
             echo "Service failed to become healthy within timeout"
+            echo "CONTAINER LOGS:"
             docker logs activity-log-service
+            echo "EUREKA STATUS:"
+            curl -s http://craftpilot:13579ada@localhost:8761/eureka/apps/ || echo "Could not connect to Eureka"
             exit 1
