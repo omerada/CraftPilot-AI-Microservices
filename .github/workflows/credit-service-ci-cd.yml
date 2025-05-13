@@ -66,8 +66,40 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Ensure network exists
+            echo "=== Creating or verifying network ==="
+            docker network create craftpilot-network 2>/dev/null || true
+
+            # Determine MongoDB container and connection info
+            echo "=== Checking MongoDB container ==="
+            MONGODB_CONTAINER="craftpilot-mongodb"
+            if ! docker ps | grep -q "$MONGODB_CONTAINER"; then
+              echo "WARNING: Default MongoDB container not found, trying alternative names..."
+              MONGODB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'mongo|mongodb' | head -n 1)
+              
+              if [ -z "$MONGODB_CONTAINER" ]; then
+                echo "ERROR: No MongoDB container found, using default name"
+                MONGODB_CONTAINER="craftpilot-mongodb"
+              else
+                echo "Found MongoDB container: $MONGODB_CONTAINER"
+              fi
+            fi
+            echo "Using MongoDB container: $MONGODB_CONTAINER"
+
+            # Configure MongoDB URI
+            if [ -n "${{ secrets.MONGODB_URI }}" ]; then
+              # Use the URI directly from secrets if available
+              MONGODB_URI="${{ secrets.MONGODB_URI }}"
+              echo "Using pre-configured MongoDB URI from secrets"
+            else
+              # Otherwise, build the URI from components
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"
+              echo "Built MongoDB URI from credential components"
+            fi
+            echo "MongoDB URI: $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
 
             # Deploy Credit Service
+            echo "=== Deploying Credit Service ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/credit-service:latest-arm64
             docker stop credit-service || true
             docker rm credit-service || true
@@ -84,23 +116,65 @@ jobs:
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_SECURITY_USER_NAME=craftpilot \
               -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+              -e MONGODB_URI="$MONGODB_URI" \
+              -e MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}" \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
+              -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics,prometheus" \
+              -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               ${{ secrets.DOCKERHUB_USERNAME }}/credit-service:latest-arm64
 
+            # Verify MongoDB connection
+            echo "=== Verifying MongoDB connection ==="
+            sleep 5
+            if docker exec credit-service nc -z -w5 $MONGODB_CONTAINER 27017; then
+              echo "✅ MongoDB connection successful"
+            else
+              echo "⚠️ MongoDB connection check failed"
+              echo "Testing connection from host machine..."
+              nc -z -w5 localhost 27017 && echo "Host can connect to MongoDB" || echo "Host cannot connect to MongoDB"
+              
+              # Check network details
+              echo "Container network details:"
+              docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' credit-service
+              docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $MONGODB_CONTAINER
+            fi
+
             # Enhanced health check with longer timeout
-            echo "Waiting for service to start..."
-            for i in {1..12}; do
+            echo "=== Waiting for service to start ==="
+            MAX_ATTEMPTS=12
+            ATTEMPT=1
+
+            while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+              echo "Health check attempt $ATTEMPT/$MAX_ATTEMPTS"
+              
+              # Check container status
+              if ! docker ps | grep -q "credit-service"; then
+                echo "Container stopped unexpectedly! Checking logs..."
+                docker logs credit-service
+                exit 1
+              fi
+              
+              # Check health
               if curl -s http://localhost:8058/actuator/health | grep -q "UP"; then
-                echo "Service is healthy"
+                echo "✅ Service is healthy"
                 exit 0
               fi
-              echo "Attempt $i: Service not ready yet..."
+              
+              echo "Service not ready yet... Waiting"
+              
+              # Show logs at middle of attempts
+              if [ $ATTEMPT -eq 6 ]; then
+                echo "Service logs:"
+                docker logs credit-service --tail 50
+              fi
+              
+              ATTEMPT=$((ATTEMPT + 1))
               sleep 10
             done
 
-            echo "Service failed to become healthy within timeout"
+            echo "❌ Service failed to become healthy within timeout"
             docker logs credit-service
             exit 1

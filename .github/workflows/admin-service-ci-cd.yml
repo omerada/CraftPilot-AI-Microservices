@@ -99,8 +99,16 @@ jobs:
             docker stop admin-service || true
             docker rm admin-service || true
 
-            # MongoDB URI configuration - using container variable
-            MONGODB_URI="mongodb://craftpilot:secure_password@${MONGODB_CONTAINER}:27017/craftpilot?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+            # MongoDB URI configuration - using GitHub Secrets
+            if [ -n "${{ secrets.MONGODB_URI }}" ]; then
+              # Use the URI directly from secrets if available
+              MONGODB_URI="${{ secrets.MONGODB_URI }}"
+              echo "Using pre-configured MongoDB URI from secrets"
+            else
+              # Otherwise, build the URI from components
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+              echo "Built MongoDB URI from credential components"
+            fi
             echo "MongoDB URI: $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
 
             echo "Starting admin-service container with environment: ${{ github.event.inputs.environment || 'prod' }}"
