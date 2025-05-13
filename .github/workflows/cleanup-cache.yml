@@ -105,6 +105,14 @@ jobs:
         run: |
           echo "=== Docker Image Temizliği ==="
 
+          # İmajlar temizlenmeden önce ilgili konteynerleri durdur ve kaldır
+          if [ "${{ github.event.inputs.target_service }}" != "all" ]; then
+            echo "Önce ${{ github.event.inputs.target_service }} container'larını durduruyorum..."
+            docker ps -a | grep "${{ github.event.inputs.target_service }}" | awk '{print $1}' | xargs -r docker stop
+            docker ps -a | grep "${{ github.event.inputs.target_service }}" | awk '{print $1}' | xargs -r docker rm
+            echo "${{ github.event.inputs.target_service }} container'ları durduruldu ve kaldırıldı."
+          fi
+
           if [ "${{ github.event.inputs.cleanup_level }}" == "light" ]; then
             echo "Hafif temizlik: Sadece dangling (etiketlenmemiş) imajlar temizleniyor..."
             docker image prune -f
@@ -115,11 +123,20 @@ jobs:
             echo "Tam temizlik: Tüm kullanılmayan imajlar temizleniyor..."
             docker image prune -a -f
           elif [ "${{ github.event.inputs.cleanup_level }}" == "nuclear" ] && [ "${{ github.event.inputs.target_service }}" == "all" ]; then
+            echo "⚠️ Nuclear temizlik: Tüm konteynerleri durdurma ve kaldırma işlemi yapılıyor..."
+            docker ps -a -q | xargs -r docker stop
+            docker ps -a -q | xargs -r docker rm
             echo "⚠️ Nuclear temizlik: Tüm imajlar temizleniyor (kullanılanlar dahil)..."
             docker rmi -f $(docker images -q) || true
           elif [ "${{ github.event.inputs.cleanup_level }}" == "nuclear" ] && [ "${{ github.event.inputs.target_service }}" != "all" ]; then
             echo "⚠️ Nuclear temizlik: ${{ github.event.inputs.target_service }} imajları temizleniyor..."
-            docker images | grep "${{ github.event.inputs.target_service }}" | awk '{print $3}' | xargs -r docker rmi -f
+            # Önce image ID'lerini al
+            TARGET_IMAGES=$(docker images | grep "${{ github.event.inputs.target_service }}" | awk '{print $3}')
+            if [ ! -z "$TARGET_IMAGES" ]; then
+              echo "$TARGET_IMAGES" | xargs -r docker rmi -f || true
+            else
+              echo "${{ github.event.inputs.target_service }} ile ilgili imaj bulunamadı"
+            fi
           fi
 
           echo "Image temizliği tamamlandı."
