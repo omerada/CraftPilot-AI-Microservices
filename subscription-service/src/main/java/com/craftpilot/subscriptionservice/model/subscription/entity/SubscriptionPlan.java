@@ -1,11 +1,12 @@
 package com.craftpilot.subscriptionservice.model.subscription.entity;
 
-import com.google.cloud.firestore.annotation.DocumentId;
-import com.google.cloud.firestore.annotation.PropertyName;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -15,61 +16,46 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Document(collection = "subscription_plans")
 public class SubscriptionPlan {
-    @DocumentId
+    @Id
     private String id;
-    
-    @PropertyName("name")
+
+    @Indexed
     private String name;
-    
-    @PropertyName("description")
+
     private String description;
-    
-    @PropertyName("price")
+
     private BigDecimal price;
-    
-    @PropertyName("currency")
+
     private String currency;
-    
-    @PropertyName("durationInDays")
+
     private Integer durationInDays;
-    
-    @PropertyName("requestLimit")
+
     private Integer requestLimit;
-    
-    @PropertyName("modelLimit")
+
     private Integer modelLimit;
-    
-    @PropertyName("hasAdvancedModels")
+
     private Boolean hasAdvancedModels;
-    
-    @PropertyName("hasPrioritySupport")
+
     private Boolean hasPrioritySupport;
-    
-    @PropertyName("hasTeamFeatures")
+
     private Boolean hasTeamFeatures;
-    
-    @PropertyName("hasCustomization")
+
     private Boolean hasCustomization;
-    
-    @PropertyName("maxTeamMembers")
+
     private Integer maxTeamMembers;
-    
-    @PropertyName("maxProjects")
+
     private Integer maxProjects;
-    
-    @PropertyName("isActive")
+
+    @Indexed
     private Boolean isActive;
-    
-    @PropertyName("isDeleted")
+
     private Boolean isDeleted;
-    
-    @PropertyName("features")
+
     private List<String> features;
-    
-    @PropertyName("createdAt")
+
     private LocalDateTime createdAt;
-    
-    @PropertyName("updatedAt")
+
     private LocalDateTime updatedAt;
 }

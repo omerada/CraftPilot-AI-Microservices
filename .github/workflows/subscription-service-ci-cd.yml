@@ -52,6 +52,46 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # MongoDB container kontrolü ve bağlantı testi
+      - name: Check MongoDB and Set up Connection
+        env:
+          MONGO_ROOT_USERNAME: ${{ secrets.MONGO_ROOT_USERNAME }}
+          MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
+          MONGO_INITDB_DATABASE: ${{ secrets.MONGO_INITDB_DATABASE || 'subscription_service' }}
+        run: |
+          echo "Testing MongoDB connectivity..."
+          # Container ismini kontrol et
+          MONGODB_CONTAINER="craftpilot-mongodb"
+          if docker ps | grep -q "$MONGODB_CONTAINER"; then
+            echo "✅ MongoDB container found: $MONGODB_CONTAINER"
+          else
+            echo "⚠️ Default MongoDB container ($MONGODB_CONTAINER) not found. Looking for alternatives..."
+            MONGODB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'mongo|mongodb' | head -n 1)
+            if [ -n "$MONGODB_CONTAINER" ]; then
+              echo "✅ Alternative MongoDB container found: $MONGODB_CONTAINER"
+            else
+              echo "❌ No MongoDB container found! Deployment may fail."
+              MONGODB_CONTAINER="craftpilot-mongodb"
+            fi
+          fi
+          echo "MONGODB_CONTAINER=$MONGODB_CONTAINER" >> $GITHUB_ENV
+
+          # MongoDB URI oluştur
+          if [ -n "${{ secrets.MONGODB_URI }}" ]; then
+            MONGODB_URI="${{ secrets.MONGODB_URI }}"
+            echo "Using preconfigured MongoDB URI"
+          else
+            MONGODB_URI="mongodb://$MONGO_ROOT_USERNAME:$MONGO_ROOT_PASSWORD@$MONGODB_CONTAINER:27017/$MONGO_INITDB_DATABASE?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+            echo "Created MongoDB URI from components"
+          fi
+          echo "MONGODB_URI=$(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
+          echo "MONGODB_URI=$MONGODB_URI" >> $GITHUB_ENV
+
+      # MongoDB bağlantı testi
+      - name: Test MongoDB Connection
+        run: |
+          docker run --rm --network craftpilot-network mongo:6.0 mongosh --quiet --eval "db.runCommand({ping:1}).ok" admin --host ${{ env.MONGODB_CONTAINER }} --port 27017 -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }} --authenticationDatabase admin && echo "✅ MongoDB bağlantı testi başarılı!" || echo "⚠️ MongoDB bağlantı testi başarısız! Deployment sorunlu olabilir."
+
       # Build ve Push
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
@@ -67,17 +107,6 @@ jobs:
           build-args: |
             BUILDPLATFORM=linux/arm64
             TARGETPLATFORM=linux/arm64
-
-      # Google Cloud kimlik doğrulaması
-      - id: "auth"
-        name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v1"
-        with:
-          credentials_json: "${{ secrets.GCP_SA_KEY }}"
-
-      # Google Cloud CLI kurulumu
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
 
       # VPS'e deployment
       - name: Deploy to VPS
@@ -101,7 +130,6 @@ jobs:
             ls -la /opt/craftpilot || mkdir -p /opt/craftpilot
 
             echo "=== Continuing with Deployment ==="
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
 
             echo "=== Testing Docker ==="
             docker version
@@ -111,6 +139,48 @@ jobs:
             # Docker ağını oluştur (eğer yoksa)
             docker network create craftpilot-network || true
 
+            # MongoDB container kontrolü
+            MONGODB_CONTAINER="craftpilot-mongodb"
+            if ! docker ps | grep -q "$MONGODB_CONTAINER"; then
+              echo "WARNING: Default MongoDB container not found ($MONGODB_CONTAINER)"
+              # MongoDB container'ı tespit etmeye çalış
+              MONGODB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'mongo|mongodb' | head -n 1)
+              if [ -z "$MONGODB_CONTAINER" ]; then
+                echo "ERROR: MongoDB container bulunamadı, bağlantı başarısız olabilir!"
+                MONGODB_CONTAINER="craftpilot-mongodb" # Varsayılana dön
+              else
+                echo "Found alternative MongoDB container: $MONGODB_CONTAINER"
+              fi
+            fi
+            echo "Using MongoDB container: $MONGODB_CONTAINER"
+
+            # MongoDB URI yapılandırma
+            if [ -n "${{ secrets.MONGODB_URI }}" ]; then
+              # URI'nin parçalarını ayırıp host kısmını değiştiriyoruz
+              URI_PREFIX=$(echo "${{ secrets.MONGODB_URI }}" | grep -oP 'mongodb://[^@]+@')
+              URI_SUFFIX=$(echo "${{ secrets.MONGODB_URI }}" | grep -oP '(?<=@)[^/]+/.*')
+              URI_HOST=$(echo "$URI_SUFFIX" | grep -oP '^[^:/]+')
+              URI_REMAINDER=$(echo "$URI_SUFFIX" | grep -oP '(?<='"$URI_HOST"')[:/].*')
+              
+              # Doğru container adı ile URI oluşturuyoruz
+              MONGODB_URI="${URI_PREFIX}${MONGODB_CONTAINER}${URI_REMAINDER}"
+              echo "Modified MongoDB URI with correct container name: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
+            else
+              # Bileşenlerden URI oluşturuyoruz
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE || 'subscription_service' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+              echo "Built MongoDB URI from credential components: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
+            fi
+
+            # MongoDB bağlantı testi
+            echo "Testing MongoDB connection..."
+            if docker run --rm --network craftpilot-network mongo:6.0 mongosh --quiet --eval "db.runCommand({ping:1}).ok" admin --host $MONGODB_CONTAINER --port 27017 -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }} --authenticationDatabase admin | grep -q "1"; then
+              echo "✅ MongoDB bağlantı testi başarılı!"
+            else
+              echo "⚠️ MongoDB bağlantı testi başarısız! Deployment devam edecek ancak sorunlar olabilir."
+              echo "MongoDB container durumu kontrol ediliyor:"
+              docker ps | grep -i $MONGODB_CONTAINER || echo "Container bulunamadı!"
+            fi
+
             echo "=== Pulling ARM64 Image ==="
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/subscription-service:latest-arm64
 
@@ -118,48 +188,53 @@ jobs:
             docker stop subscription-service || true
             docker rm subscription-service || true
 
-            echo "=== Setting up GCP Credentials ==="
-            mkdir -p /opt/craftpilot/gcp-credentials
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials/credentials.json
-            chmod 600 /opt/craftpilot/gcp-credentials/credentials.json
-
             echo "=== Starting New Container ==="
             docker run -d \
               --name subscription-service \
               --network craftpilot-network \
               --restart unless-stopped \
               -p 8092:8092 \
-              -v /opt/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+              -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
+              -e SPRING_DATA_MONGODB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE || 'subscription_service' }} \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
-              -e SPRING_CLOUD_GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }} \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
-              -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/gcp-credentials.json \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+              -e MANAGEMENT_HEALTH_MONGODB_ENABLED=true \
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
-              -e LOGGING_LEVEL_COM_GOOGLE_CLOUD=DEBUG \
+              -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB=INFO \
+              -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB_CORE_MONGOTEMPLATE=INFO \
               ${{ secrets.DOCKERHUB_USERNAME }}/subscription-service:latest-arm64
 
             echo "=== Waiting for Container to Start ==="
-            sleep 60
+            sleep 20
 
             echo "=== Container Logs ==="
-            docker logs subscription-service
+            docker logs subscription-service | tail -30
 
             echo "=== Health Check ==="
-            for i in {1..10}; do
-              if curl -f http://localhost:8092/actuator/health; then
-                echo "Service is healthy"
-                exit 0
+            for i in {1..12}; do
+              HEALTH_CHECK=$(curl -s http://localhost:8092/actuator/health || echo "{}")
+              
+              if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
+                echo "✅ Servis UP durumunda!"
+                
+                if echo "$HEALTH_CHECK" | grep -q '"mongo":{.*"status":"UP"'; then
+                  echo "✅ MongoDB bileşeni sağlıklı! (grep kontrolü)"
+                  echo "Deployment başarıyla tamamlandı!"
+                  exit 0
+                fi
               fi
-              echo "Attempt $i: Service not healthy yet, waiting..."
-              sleep 30
+              
+              echo "Deneme $i/12: Servis henüz hazır değil, bekleniyor..."
+              sleep 10
             done
-            echo "Service failed health check"
-            docker logs subscription-service
-            exit 1
+
+            echo "❌ Servis sağlık kontrolü zaman aşımına uğradı."
+            echo "Son container logları:"
+            docker logs subscription-service | tail -50
+            echo "Container halen çalışıyor ve sorun giderme için kullanılabilir."

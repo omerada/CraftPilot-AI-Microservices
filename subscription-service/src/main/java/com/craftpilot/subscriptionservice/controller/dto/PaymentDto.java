@@ -41,7 +41,7 @@ public class PaymentDto {
                 .subscriptionId(payment.getSubscriptionId())
                 .amount(payment.getAmount())
                 .currency(payment.getCurrency())
-                .paymentMethod(payment.getPaymentMethod().toString())
+                .paymentMethod(payment.getPaymentMethod().name())
                 .cardHolderName(payment.getCardHolderName())
                 .cardNumber(payment.getCardNumber())
                 .expireMonth(payment.getExpireMonth())
@@ -61,15 +61,15 @@ public class PaymentDto {
                 .id(this.id)
                 .userId(this.userId)
                 .subscriptionId(this.subscriptionId)
-                .amount(this.amount)
+                .amount(this.amount) // Using BigDecimal directly
                 .currency(this.currency)
-                .paymentMethod(PaymentMethod.valueOf(this.paymentMethod))
+                .paymentMethod(this.paymentMethod != null ? PaymentMethod.valueOf(this.paymentMethod) : null)
                 .cardHolderName(this.cardHolderName)
                 .cardNumber(this.cardNumber)
                 .expireMonth(this.expireMonth)
                 .expireYear(this.expireYear)
                 .cvc(this.cvc)
-                .status(PaymentStatus.valueOf(this.status))
+                .status(this.status != null ? PaymentStatus.valueOf(this.status) : null)
                 .iyzicoPaymentTransactionId(this.iyzicoPaymentTransactionId)
                 .refundTransactionId(this.refundTransactionId)
                 .errorMessage(this.errorMessage)
@@ -77,4 +77,4 @@ public class PaymentDto {
                 .updatedAt(this.updatedAt)
                 .build();
     }
-} 
+}

@@ -25,7 +25,6 @@
 
         <!-- Spring Cloud -->
         <spring-cloud.version>2023.0.2</spring-cloud.version>
-        <spring-cloud-gcp.version>5.0.0</spring-cloud-gcp.version>
 
         <!-- Payment Processing -->
         <iyzipay-java.version>2.0.121</iyzipay-java.version>
@@ -93,19 +92,14 @@
             <artifactId>spring-kafka</artifactId>
         </dependency>
 
-        <!-- Google Cloud -->
+        <!-- MongoDB -->
         <dependency>
-            <groupId>com.google.cloud</groupId>
-            <artifactId>spring-cloud-gcp-starter</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-mongodb-reactive</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.google.cloud</groupId>
-            <artifactId>google-cloud-firestore</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.google.cloud</groupId>
-            <artifactId>google-cloud-firestore-admin</artifactId>
-            <version>3.14.0</version>
+            <groupId>org.mongodb</groupId>
+            <artifactId>mongodb-driver-reactivestreams</artifactId>
         </dependency>
 
         <!-- Payment Processing -->
@@ -205,6 +199,12 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>mongodb</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.wiremock</groupId>
             <artifactId>wiremock</artifactId>
             <version>${wiremock.version}</version>
@@ -234,13 +234,6 @@
             <version>5.10.0</version>
             <scope>test</scope>
         </dependency>
-
-        <!-- Firebase -->
-        <dependency>
-            <groupId>com.google.firebase</groupId>
-            <artifactId>firebase-admin</artifactId>
-            <version>9.2.0</version>
-        </dependency>
     </dependencies>
 
     <dependencyManagement>
@@ -249,13 +242,6 @@
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
                 <version>${spring-cloud.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>com.google.cloud</groupId>
-                <artifactId>spring-cloud-gcp-dependencies</artifactId>
-                <version>${spring-cloud-gcp.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -367,4 +353,4 @@
         </profile>
     </profiles>
 
-</project> 
+</project>

@@ -11,7 +11,7 @@ import com.craftpilot.subscriptionservice.model.payment.iyzico.IyzicoPaymentResu
 import com.craftpilot.subscriptionservice.model.payment.iyzico.IyzicoRefundResult;
 import com.craftpilot.subscriptionservice.model.payment.iyzico.request.CreatePaymentRequest;
 import com.craftpilot.subscriptionservice.model.payment.iyzico.request.CreateRefundRequest;
-import com.craftpilot.subscriptionservice.repository.FirestorePaymentRepository;
+import com.craftpilot.subscriptionservice.repository.MongoPaymentRepository;
 import com.craftpilot.subscriptionservice.model.subscription.entity.Subscription;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +29,7 @@ import java.time.LocalDateTime;
 public class PaymentService {
 
     private final IyzicoService iyzicoService;
-    private final FirestorePaymentRepository paymentRepository;
+    private final MongoPaymentRepository paymentRepository;
     private final KafkaTemplate<String, PaymentEvent> kafkaTemplate;
 
     @CircuitBreaker(name = "payment-service")
@@ -39,9 +39,9 @@ public class PaymentService {
         Payment payment = Payment.builder()
                 .userId(userId)
                 .subscriptionId(paymentRequest.getSubscriptionId())
-                .amount(paymentRequest.getAmount())
+                .amount(paymentRequest.getAmount()) // Using BigDecimal directly
                 .currency(paymentRequest.getCurrency())
-                .paymentMethod(PaymentMethod.valueOf(paymentRequest.getPaymentMethod()))
+                .paymentMethod(PaymentMethod.valueOf(paymentRequest.getPaymentMethod().toUpperCase()))
                 .cardHolderName(paymentRequest.getCardHolderName())
                 .cardNumber(paymentRequest.getCardNumber())
                 .expireMonth(paymentRequest.getExpireMonth())
@@ -155,7 +155,7 @@ public class PaymentService {
                 .paymentId(payment.getId())
                 .userId(payment.getUserId())
                 .subscriptionId(payment.getSubscriptionId())
-                .amount(payment.getAmount())
+                .amount(payment.getAmount()) // Using BigDecimal directly
                 .status(payment.getStatus().toString())
                 .timestamp(System.currentTimeMillis())
                 .build();
@@ -176,7 +176,7 @@ public class PaymentService {
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .userId(subscription.getUserId())
                 .planId(subscription.getPlanId())
-                .amount(subscription.getAmount())
+                .amount(subscription.getAmount()) // Using BigDecimal directly
                 .description(subscription.getDescription())
                 .callbackUrl("http://localhost:8080/payments/callback")
                 .build();
@@ -213,4 +213,4 @@ public class PaymentService {
                     }
                 });
     }
-} 
+}

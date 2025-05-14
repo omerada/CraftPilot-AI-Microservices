@@ -2,7 +2,6 @@ package com.craftpilot.subscriptionservice.controller.dto;
 
 import com.craftpilot.subscriptionservice.model.subscription.entity.SubscriptionPlan;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.google.cloud.firestore.annotation.IgnoreExtraProperties;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,7 +20,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@IgnoreExtraProperties
 public class SubscriptionPlanDto implements Serializable {
     private static final long serialVersionUID = 1L;
 
@@ -118,4 +116,4 @@ public class SubscriptionPlanDto implements Serializable {
                 .updatedAt(this.updatedAt)
                 .build();
     }
-} 
+}

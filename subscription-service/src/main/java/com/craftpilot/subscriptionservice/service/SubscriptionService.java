@@ -2,7 +2,8 @@ package com.craftpilot.subscriptionservice.service;
 
 import com.craftpilot.subscriptionservice.event.SubscriptionEvent;
 import com.craftpilot.subscriptionservice.exception.SubscriptionNotFoundException;
-import com.craftpilot.subscriptionservice.model.subscription.entity.Subscription; 
+import com.craftpilot.subscriptionservice.model.subscription.entity.Subscription;
+import com.craftpilot.subscriptionservice.model.subscription.enums.SubscriptionStatus;
 import com.craftpilot.subscriptionservice.model.subscription.request.CreateSubscriptionRequest;
 import com.craftpilot.subscriptionservice.repository.SubscriptionPlanRepository;
 import com.craftpilot.subscriptionservice.repository.SubscriptionRepository;
@@ -57,11 +58,11 @@ public class SubscriptionService {
         subscriptionCreationCounter = Counter.builder("subscription.creation")
                 .description("Number of subscriptions created")
                 .register(meterRegistry);
-        
+
         subscriptionRenewalCounter = Counter.builder("subscription.renewal")
                 .description("Number of subscriptions renewed")
                 .register(meterRegistry);
-        
+
         subscriptionCancellationCounter = Counter.builder("subscription.cancellation")
                 .description("Number of subscriptions cancelled")
                 .register(meterRegistry);
@@ -78,20 +79,19 @@ public class SubscriptionService {
                             .description(plan.getName())
                             .startDate(LocalDateTime.now())
                             .endDate(LocalDateTime.now().plus(plan.getDurationInDays(), ChronoUnit.DAYS))
-                            .status("PENDING")
-                            .isActive(false)
-                            .isDeleted(false)
+                            .status(SubscriptionStatus.PENDING)
+                            .active(false)
+                            .deleted(false)
                             .createdAt(LocalDateTime.now())
                             .updatedAt(LocalDateTime.now())
                             .build();
 
                     return subscriptionRepository.save(subscription)
-                            .flatMap(savedSubscription ->
-                                    paymentService.createPayment(savedSubscription)
-                                            .map(paymentResponse -> {
-                                                savedSubscription.setPaymentUrl(paymentResponse.getPaymentUrl());
-                                                return savedSubscription;
-                                            }));
+                            .flatMap(savedSubscription -> paymentService.createPayment(savedSubscription)
+                                    .map(paymentResponse -> {
+                                        savedSubscription.setPaymentUrl(paymentResponse.getPaymentUrl());
+                                        return savedSubscription;
+                                    }));
                 });
     }
 
@@ -119,9 +119,9 @@ public class SubscriptionService {
         return subscriptionRepository.findById(subscriptionId)
                 .switchIfEmpty(Mono.error(new RuntimeException("Abonelik bulunamadı")))
                 .flatMap(subscription -> {
-                    subscription.setStatus("CANCELLED");
-                    subscription.setIsActive(false);
-                    subscription.setIsDeleted(true);
+                    subscription.setStatus(SubscriptionStatus.CANCELLED);
+                    subscription.setActive(false);
+                    subscription.setDeleted(true);
                     subscription.setUpdatedAt(LocalDateTime.now());
                     return subscriptionRepository.save(subscription)
                             .doOnSuccess(s -> {
@@ -137,7 +137,7 @@ public class SubscriptionService {
                 .switchIfEmpty(Mono.error(new SubscriptionNotFoundException("Subscription not found with id: " + id)))
                 .flatMap(subscription -> subscriptionPlanRepository.findById(subscription.getPlanId())
                         .flatMap(plan -> {
-                            subscription.setStatus("ACTIVE");
+                            subscription.setStatus(SubscriptionStatus.ACTIVE);
                             subscription.setStartDate(LocalDateTime.now());
                             subscription.setEndDate(LocalDateTime.now().plusDays(plan.getDurationInDays()));
 
@@ -164,8 +164,8 @@ public class SubscriptionService {
         return subscriptionRepository.findById(subscriptionId)
                 .switchIfEmpty(Mono.error(new RuntimeException("Abonelik bulunamadı")))
                 .flatMap(subscription -> {
-                    subscription.setStatus("ACTIVE");
-                    subscription.setIsActive(true);
+                    subscription.setStatus(SubscriptionStatus.ACTIVE);
+                    subscription.setActive(true);
                     subscription.setUpdatedAt(LocalDateTime.now());
                     return subscriptionRepository.save(subscription)
                             .doOnSuccess(s -> {
@@ -178,11 +178,11 @@ public class SubscriptionService {
     @Scheduled(cron = "0 0 0 * * *") // Her gün gece yarısı
     public void checkExpiringSubscriptions() {
         LocalDateTime tomorrow = LocalDateTime.now().plusDays(1);
-        
+
         subscriptionRepository.findByEndDateBeforeAndIsActiveTrue(tomorrow)
                 .flatMap(subscription -> {
-                    subscription.setStatus("EXPIRED");
-                    subscription.setIsActive(false);
+                    subscription.setStatus(SubscriptionStatus.EXPIRED);
+                    subscription.setActive(false);
                     subscription.setUpdatedAt(LocalDateTime.now());
                     return subscriptionRepository.save(subscription)
                             .doOnSuccess(savedSubscription -> {

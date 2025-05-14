@@ -1,11 +1,14 @@
 package com.craftpilot.subscriptionservice.model.subscription.entity;
 
-import com.google.cloud.firestore.annotation.DocumentId;
-import com.google.cloud.firestore.annotation.PropertyName;
+import com.craftpilot.subscriptionservice.model.subscription.enums.SubscriptionStatus;
+import com.craftpilot.subscriptionservice.model.subscription.enums.SubscriptionType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -14,43 +17,28 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Document(collection = "subscriptions")
 public class Subscription {
-    @DocumentId
+    @Id
     private String id;
-    
-    @PropertyName("userId")
+
+    @Indexed(unique = true)
     private String userId;
-    
-    @PropertyName("planId")
+
     private String planId;
-    
-    @PropertyName("status")
-    private String status;
-    
-    @PropertyName("amount")
+    private SubscriptionType type;
+    private SubscriptionStatus status;
     private BigDecimal amount;
-    
-    @PropertyName("description")
     private String description;
-    
-    @PropertyName("paymentUrl")
     private String paymentUrl;
-    
-    @PropertyName("startDate")
     private LocalDateTime startDate;
-    
-    @PropertyName("endDate")
     private LocalDateTime endDate;
-    
-    @PropertyName("isActive")
-    private Boolean isActive;
-    
-    @PropertyName("isDeleted")
-    private Boolean isDeleted;
-    
-    @PropertyName("createdAt")
+    private boolean autoRenewal;
+    private boolean active; // Changed from isActive to active for standard naming
+    private boolean deleted; // Changed from isDeleted to deleted for standard naming
+    private int creditsPerMonth;
+    private int availableCredits;
+    private LocalDateTime lastCreditRefillDate;
     private LocalDateTime createdAt;
-    
-    @PropertyName("updatedAt")
     private LocalDateTime updatedAt;
-} 
+}

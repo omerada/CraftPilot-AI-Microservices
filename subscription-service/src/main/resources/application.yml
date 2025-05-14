@@ -37,12 +37,23 @@ spring:
         processPaymentEvent-in-0:
           destination: payment-events
           group: subscription-service-group
-  gcp:
-    project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
-    credentials:
-      location: file:/gcp-credentials/credentials.json
-    firestore:
-      enabled: true
+  # MongoDB yapılandırması
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:subscription-service}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000}
+      database: ${MONGODB_DATABASE:subscription-service}
+      auto-index-creation: true
+      # Bağlantı parametreleri
+      connect-timeout: 30000
+      socket-timeout: 60000
+      max-wait-time: 120000
+      max-connection-idle-time: 300000
+      max-connection-life-time: 600000
+      # MongoDB dayanıklılık ayarları
+      retry-writes: true
+      max-connection-pool-size: 20
+      min-connection-pool-size: 5
+      server-selection-timeout: 60000
   service-registry:
     auto-registration:
       enabled: true
@@ -75,6 +86,8 @@ management:
     livenessState:
       enabled: true
     readinessState:
+      enabled: true
+    mongodb:
       enabled: true
   server:
     port: 8092
@@ -117,7 +130,7 @@ resilience4j:
         permittedNumberOfCallsInHalfOpenState: 3
         waitDurationInOpenState: 5s
         failureRateThreshold: 50
-      firestore-service:
+      mongodb-service:
         registerHealthIndicator: true
         slidingWindowSize: 10
         minimumNumberOfCalls: 5
@@ -129,6 +142,16 @@ resilience4j:
       default:
         maxAttempts: 3
         waitDuration: 1000
+      mongodb:
+        maxAttempts: 3
+        waitDuration: 500
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+      mongodb-operations:
+        maxAttempts: 5
+        waitDuration: 1000
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 1.5
   ratelimiter:
     instances:
       default:
@@ -140,6 +163,8 @@ logging:
   level:
     com.craftpilot.subscriptionservice: DEBUG
     org.springframework.data: INFO
+    org.springframework.data.mongodb: INFO
+    org.springframework.data.mongodb.core.MongoTemplate: DEBUG
     org.springframework.kafka: INFO
     org.springframework.web: INFO
 

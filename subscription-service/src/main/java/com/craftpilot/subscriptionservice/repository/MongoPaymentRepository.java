@@ -5,18 +5,16 @@ import com.craftpilot.subscriptionservice.model.payment.enums.PaymentStatus;
 import org.springframework.data.mongodb.repository.ReactiveMongoRepository;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 @Repository
-public interface PaymentRepository extends ReactiveMongoRepository<Payment, String> {
-
+public interface MongoPaymentRepository extends ReactiveMongoRepository<Payment, String> {
     Flux<Payment> findByUserId(String userId);
 
     Flux<Payment> findBySubscriptionId(String subscriptionId);
 
-    Mono<Payment> findByIyzicoPaymentTransactionId(String iyzicoPaymentId);
-
     Flux<Payment> findByStatus(PaymentStatus status);
+
+    Flux<Payment> findByStatusEquals(PaymentStatus status); // alternatif sorgu methodu
 
     default Flux<Payment> findPendingPayments() {
         return findByStatus(PaymentStatus.PENDING);
