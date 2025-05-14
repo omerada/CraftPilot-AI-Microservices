@@ -47,10 +47,9 @@ public class Notification {
     private boolean processed;
     private LocalDateTime processedTime;
      
-    // Explicit boolean field and accessors
+    @org.springframework.data.mongodb.core.mapping.Field("deleted")
     private boolean deleted;
     
-    // Spring Data MongoDB için boolean getter/setter metodları - özellikle isDeleted() metodu önemli
     public boolean isDeleted() {
         return deleted;
     }
@@ -58,16 +57,10 @@ public class Notification {
     public void setDeleted(boolean deleted) {
         this.deleted = deleted;
     }
-    
-    // Alternatif BoxedType getter - Kullanımda tutuyoruz, ancak asıl isDeleted() metodu kullanılacak
-    public Boolean getDeleted() {
-        return deleted;
-    }
 
     @Version
     private Long version;
 
-    // Yardımcı metotlar - Instant - LocalDateTime dönüşümleri için
     public Instant getScheduledAtAsInstant() {
         return scheduledAt != null ? scheduledAt.atZone(java.time.ZoneId.systemDefault()).toInstant() : null;
     }
