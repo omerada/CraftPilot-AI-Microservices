@@ -24,8 +24,8 @@ spring:
       # MongoDB yapılandırması - sadeleştirilmiş
       uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:craftpilot_analytics_db}?authSource=admin&retryWrites=true&w=majority}
       database: ${MONGODB_DATABASE:craftpilot_analytics_db}
-      # Bağlantı optimizasyonları - sadeleştirilmiş
-      auto-index-creation: ${MONGODB_AUTO_INDEX_CREATION:false}
+      # MongoDB auto-index-creation false yapıldı çünkü indeksler zaten oluşturuldu
+      auto-index-creation: false
       connect-timeout: 30000
       socket-timeout: 60000
       max-wait-time: 60000
@@ -43,10 +43,22 @@ kafka:
     analytics-events: analytics-events
     metrics-events: metrics-events
   bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
-  enabled: ${KAFKA_ENABLED:true}
+  enabled: ${KAFKA_ENABLED:false}
   admin:
     fail-fast: false
     auto-create: true
+    timeout: 10000
+
+spring:
+  kafka:
+    admin:
+      fail-fast: false
+      auto-create: true
+      operation-timeout: 10000
+      close-timeout: 10000
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    listener:
+      missing-topics-fatal: false
 
 management:
   endpoints:
@@ -118,6 +130,14 @@ logging:
     com.craftpilot: ${LOGGING_LEVEL_COM_CRAFTPILOT:INFO}
     org.springframework.data.mongodb: INFO
     org.springframework.web: INFO
+    # Kafka Admin Client hatalarını bastır
+    org.apache.kafka.clients.admin.KafkaAdminClient: WARN
+    org.apache.kafka.clients.admin.AdminClient: WARN
+    org.apache.kafka.common.utils.AppInfoParser: WARN
+    org.apache.kafka.clients.admin.internals.AdminMetadataManager: WARN
+    org.springframework.kafka.core.KafkaAdmin: WARN
+    # ConfigClusterResolver loglarını bastır
+    com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
 
 # MongoDB resilience configuration
 mongodb:
