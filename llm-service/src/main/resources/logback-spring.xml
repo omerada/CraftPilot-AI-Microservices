@@ -8,11 +8,13 @@
 
     <!-- Uygulama logları -->
     <logger name="com.craftpilot.llmservice" level="INFO"/>
+    <logger name="com.craftpilot" level="DEBUG"/>
     
     <!-- Framework logları -->
     <logger name="org.springframework" level="WARN"/>
     <logger name="reactor.netty" level="WARN"/>
     <logger name="io.netty" level="WARN"/>
+    <logger name="org.springframework.web" level="INFO"/>
     
     <!-- Cache logları -->
     <logger name="org.springframework.cache" level="INFO"/>
@@ -28,12 +30,25 @@
     
     <!-- MongoDB logları -->
     <logger name="org.mongodb.driver" level="WARN"/>
-    <logger name="org.springframework.data.mongodb" level="WARN"/>
+    <logger name="org.springframework.data.mongodb" level="INFO"/>
+    <logger name="org.springframework.data.mongodb.core.MongoTemplate" level="DEBUG"/>
+    <logger name="org.springframework.data.mongodb.repository.Query" level="DEBUG"/>
+    <logger name="org.springframework.data.mongodb.repository.query" level="DEBUG"/>
+    <logger name="org.springframework.data.mongodb.core.convert" level="INFO"/>
+    <logger name="org.mongodb.driver.connection" level="INFO"/>
+    <logger name="org.mongodb.driver.cluster" level="INFO"/>
+    <logger name="org.mongodb.driver.protocol" level="INFO"/>
     
     <!-- Eureka logları -->
     <logger name="com.netflix.discovery" level="WARN"/>
     <logger name="com.netflix.eureka" level="WARN"/>
     <logger name="org.springframework.cloud.netflix.eureka" level="WARN"/>
+    <!-- Tekrarlama yok - tek bir tanım olarak bırakıldı -->
+    <logger name="com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver" level="WARN"/>
+    <logger name="com.netflix.discovery.DiscoveryClient" level="WARN"/>
+    
+    <!-- Firebase logları -->
+    <logger name="com.google.cloud.firestore.CustomClassMapper" level="ERROR"/>
     
     <!-- Özel konfigürasyon logları -->
     <logger name="com.craftpilot.llmservice.config.MongoIndexConfig" level="WARN"/>

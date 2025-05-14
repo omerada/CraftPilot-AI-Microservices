@@ -159,7 +159,7 @@ jobs:
                 --name llm-service \
                 --network craftpilot-network \
                 --restart unless-stopped \
-                -p 8062:8062 \
+                -p 8066:8066 \
                 -p 5005:5005 \
                 -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
                 -v /opt/craftpilot/tmp/netty:/tmp/netty \
@@ -199,7 +199,7 @@ jobs:
                 --ulimit nofile=65536:65536 \
                 --cap-drop ALL \
                 --security-opt no-new-privileges \
-                --health-cmd="curl -f http://localhost:8062/actuator/health/liveness || exit 1" \
+                --health-cmd="curl -f http://localhost:8066/actuator/health/liveness || exit 1" \
                 --health-interval=30s \
                 --health-timeout=10s \
                 --health-retries=3 \
@@ -210,7 +210,7 @@ jobs:
                 --name llm-service \
                 --network craftpilot-network \
                 --restart unless-stopped \
-                -p 8062:8062 \
+                -p 8066:8066 \
                 -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
                 -v /opt/craftpilot/tmp/netty:/tmp/netty \
                 -e SPRING_PROFILES_ACTIVE=prod \
@@ -249,7 +249,7 @@ jobs:
                 --ulimit nofile=65536:65536 \
                 --cap-drop ALL \
                 --security-opt no-new-privileges \
-                --health-cmd="curl -f http://localhost:8062/actuator/health/liveness || exit 1" \
+                --health-cmd="curl -f http://localhost:8066/actuator/health/liveness || exit 1" \
                 --health-interval=30s \
                 --health-timeout=10s \
                 --health-retries=3 \
@@ -278,17 +278,17 @@ jobs:
                 docker exec llm-service nc -zv $MONGODB_CONTAINER 27017 || echo "Cannot connect to MongoDB from container"
                 
                 echo "MongoDB component health check:"
-                docker exec llm-service curl -s http://localhost:8062/actuator/health/mongo || echo "MongoDB health component unavailable"
+                docker exec llm-service curl -s http://localhost:8066/actuator/health/mongo || echo "MongoDB health component unavailable"
               fi
               
               # Health check
-              HEALTH_CHECK=$(curl -s http://localhost:8062/actuator/health || echo '{"status":"UNKNOWN"}')
+              HEALTH_CHECK=$(curl -s http://localhost:8066/actuator/health || echo '{"status":"UNKNOWN"}')
               
               if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
                 echo "✓ Service is healthy"
                 
                 # MongoDB specific health check
-                if echo "$HEALTH_CHECK" | grep -q '"mongo":{"status":"UP"' || docker exec llm-service curl -s http://localhost:8062/actuator/health/mongo | grep -q '"status":"UP"'; then
+                if echo "$HEALTH_CHECK" | grep -q '"mongo":{"status":"UP"' || docker exec llm-service curl -s http://localhost:8066/actuator/health/mongo | grep -q '"status":"UP"'; then
                   echo "✓ MongoDB connection verified"
                   echo "=== Deployment completed successfully ==="
                   exit 0
@@ -315,7 +315,7 @@ jobs:
             echo "Container Logs:"
             docker logs llm-service --tail 100
             echo "Health Check Response:"
-            curl -v http://localhost:8062/actuator/health || true
+            curl -v http://localhost:8066/actuator/health || true
             echo "MongoDB Connection Test:"
             docker exec llm-service nc -zv $MONGODB_CONTAINER 27017 || echo "MongoDB connection failed"
             exit 1
