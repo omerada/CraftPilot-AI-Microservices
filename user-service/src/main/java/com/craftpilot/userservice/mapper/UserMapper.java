@@ -4,9 +4,13 @@ import com.craftpilot.userservice.dto.UserDTO;
 import com.craftpilot.userservice.model.User;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingConstants;
 import org.mapstruct.ReportingPolicy;
 
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(
+    componentModel = MappingConstants.ComponentModel.SPRING, 
+    unmappedTargetPolicy = ReportingPolicy.IGNORE
+)
 public interface UserMapper {
     @Mapping(source = "email", target = "email")
     @Mapping(source = "name", target = "displayName")
