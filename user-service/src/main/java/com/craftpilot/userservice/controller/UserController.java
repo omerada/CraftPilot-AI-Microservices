@@ -46,8 +46,8 @@ public class UserController {
 
         return userService.findById(id)
                 .map(user -> ResponseEntity.ok().body((Object) user))
-                .doOnSuccess(response -> {
-                    if (response != null && response.getStatusCode().is2xxSuccessful()) {
+                .doOnSuccess(responseEntity -> {
+                    if (responseEntity != null && responseEntity.getStatusCode().is2xxSuccessful()) {
                         log.info("Kullanıcı başarıyla getirildi: id={}", id);
                     }
                 })
@@ -57,7 +57,7 @@ public class UserController {
                             "error", "User not found",
                             "message", "Belirtilen ID ile kullanıcı bulunamadı: " + id,
                             "status", "404");
-                    return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body((Object) errorResponse));
+                    return Mono.<ResponseEntity<Object>>just(ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse));
                 }))
                 .onErrorResume(e -> {
                     log.error("Kullanıcı getirilirken hata: id={}, error={}", id, e.getMessage());
@@ -65,7 +65,7 @@ public class UserController {
                             "error", "Internal Server Error",
                             "message", "Kullanıcı bilgisi alınırken bir hata oluştu",
                             "status", "500");
-                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object) errorResponse));
+                    return Mono.<ResponseEntity<Object>>just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse));
                 });
     }
 
@@ -76,8 +76,8 @@ public class UserController {
         return userService.findById(id)
                 .flatMap(existingUser -> userService.updateUser(id, updates)
                         .map(updatedUser -> ResponseEntity.ok().body((Object) updatedUser)))
-                .doOnSuccess(response -> {
-                    if (response.getStatusCode().is2xxSuccessful()) {
+                .doOnSuccess(responseEntity -> {
+                    if (responseEntity.getStatusCode().is2xxSuccessful()) {
                         log.info("Kullanıcı başarıyla güncellendi: id={}", id);
                     }
                 })
@@ -87,7 +87,7 @@ public class UserController {
                             "error", "User not found",
                             "message", "Belirtilen ID ile güncellenecek kullanıcı bulunamadı: " + id,
                             "status", "404");
-                    return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body((Object) errorResponse));
+                    return Mono.<ResponseEntity<Object>>just(ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse));
                 }))
                 .onErrorResume(e -> {
                     log.error("Kullanıcı güncellenirken hata: id={}, error={}", id, e.getMessage());
@@ -95,8 +95,7 @@ public class UserController {
                             "error", "Internal Server Error",
                             "message", "Kullanıcı güncellenirken bir hata oluştu: " + e.getMessage(),
                             "status", "500");
-                    return Mono
-                            .just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object) errorResponse));
+                    return Mono.<ResponseEntity<Object>>just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse));
                 });
     }
 

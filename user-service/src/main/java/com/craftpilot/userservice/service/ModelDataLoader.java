@@ -29,31 +29,44 @@ public class ModelDataLoader {
     private final AIModelRepository modelRepository;
     private final ObjectMapper objectMapper;
 
-    @Value("${app.data.models-path:classpath:data/models.json}")
-    private String modelsPath;
+    @Value("${app.models.file:newmodels.json}")
+    private String modelsFile;
+    
+    @Value("${app.load-models:false}")
+    private boolean loadModelsEnabled;
 
     /**
      * Yapılandırılabilir JSON dosya yolundan modelleri yükler ve MongoDB'ye
-     * kaydeder
-     * 
-     * @param configuredPath Yapılandırmadan gelen dosya yolu (null ise varsayılan
-     *                       kullanılır)
-     * @return Yüklenen model sayısı
+     * kaydeder - sadece app.load-models=true ise PostConstruct sırasında çalışır
      */
     @PostConstruct
     public void loadModelsOnStartup() {
-        loadModels(null)
+        if (!loadModelsEnabled) {
+            log.info("Otomatik model yükleme devre dışı bırakılmış (app.load-models=false)");
+            return;
+        }
+        
+        log.info("Başlangıçta model yükleme etkin. '{}' dosyasından modeller yükleniyor", modelsFile);
+        
+        loadModels(modelsFile)
                 .subscribe(
                         count -> log.info("{} adet model başarıyla yüklendi", count),
                         error -> log.error("Model yükleme sırasında hata oluştu: {}", error.getMessage()));
     }
 
     public Mono<Integer> loadModels(String configuredPath) {
-        String path = configuredPath != null ? configuredPath : modelsPath;
+        String path = configuredPath != null ? configuredPath : modelsFile;
         log.info("Modeller {} yolundan yükleniyor", path);
 
         try {
             Path filePath = Paths.get(path.replace("classpath:", ""));
+            
+            // Dosyanın varlığını kontrol et
+            if (!Files.exists(filePath)) {
+                log.error("Model yükleme başarısız: Dosya bulunamadı: {}", filePath.toAbsolutePath());
+                return Mono.error(new IOException("Model dosyası bulunamadı: " + filePath.toAbsolutePath()));
+            }
+            
             String jsonContent = Files.readString(filePath);
 
             List<Provider> providers = objectMapper.readValue(

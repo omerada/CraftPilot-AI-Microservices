@@ -77,21 +77,20 @@ public class UserService {
     /**
      * Kullanıcıyı güncelleme
      */
-    public Mono<User> updateUser(String userId, User userUpdates) {
-        return userRepository.findById(userId)
-                .switchIfEmpty(Mono.error(new UserNotFoundException("Kullanıcı bulunamadı, ID: " + userId)))
+    public Mono<UserEntity> updateUser(String userId, UserEntity userUpdates) {
+        return findById(userId)
                 .flatMap(existingUser -> {
                     // Mevcut kullanıcının güncellenecek alanlarını güncelle
-                    if (userUpdates.getName() != null) {
-                        existingUser.setName(userUpdates.getName());
+                    if (userUpdates.getDisplayName() != null) {
+                        existingUser.setDisplayName(userUpdates.getDisplayName());
                     }
                     if (userUpdates.getPhotoUrl() != null) {
                         existingUser.setPhotoUrl(userUpdates.getPhotoUrl());
                     }
                     // Diğer alanlar...
 
-                    existingUser.setUpdatedAt(LocalDateTime.now());
-                    return userRepository.save(existingUser);
+                    existingUser.setUpdatedAt(System.currentTimeMillis());
+                    return Mono.just(existingUser);
                 });
     }
 

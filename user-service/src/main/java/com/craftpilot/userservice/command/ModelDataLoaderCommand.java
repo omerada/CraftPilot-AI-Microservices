@@ -8,6 +8,9 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 
 @Component
@@ -28,6 +31,15 @@ public class ModelDataLoaderCommand implements CommandLineRunner {
         // Dosya yolunu belirle
         String jsonFilePath = args.length > 0 && args[0] != null && !args[0].isEmpty() ? 
                               args[0] : modelsFile;
+        
+        // Dosyanın var olup olmadığını kontrol et
+        Path path = Paths.get(jsonFilePath);
+        if (!Files.exists(path)) {
+            log.error("Model dosyası bulunamadı: {}", path.toAbsolutePath());
+            return;
+        }
+        
+        log.info("'{}' dosyasından modeller yükleniyor", jsonFilePath);
         
         modelDataLoader.loadModelsFromJson(jsonFilePath)
             .timeout(Duration.ofMinutes(5))
