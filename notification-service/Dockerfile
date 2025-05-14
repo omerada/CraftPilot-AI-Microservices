@@ -50,6 +50,10 @@ COPY --chown=1000:1000 --from=builder /build/target/*.jar app.jar
 COPY --chown=1000:1000 healthcheck.sh /healthcheck.sh
 RUN chmod +x /healthcheck.sh
 
+# Healthcheck ve entrypoint script'i 
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Switch to non-root user
 USER 1000
 
@@ -81,5 +85,5 @@ ENV JAVA_OPTS="\
 
 EXPOSE 8053
 
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+ENTRYPOINT ["/entrypoint.sh"]
 

@@ -32,7 +32,7 @@ public class FirebaseConfig {
     @Value("${firebase.credentials.path:/gcp/credentials/gcp-credentials.json}")
     private String credentialsPath;
     
-    @Value("${firebase.credentials.alternate-paths:/craftpilot/gcp-credentials.json,/app/gcp-credentials.json}")
+    @Value("${firebase.credentials.alternate-paths:/craftpilot/gcp-credentials.json,/app/gcp-credentials.json,/app/credentials/firebase-credentials.json}")
     private String alternativeCredentialsPaths;
     
     @Value("${firebase.credentials.base64:#{null}}")
@@ -81,7 +81,7 @@ public class FirebaseConfig {
     }
     
     private InputStream loadCredentials() throws IOException {
-        // 1. Önce çevre değişkeninden yüklemeye çalış
+        // 1. First try environment variable
         if (credentialsBase64 != null && !credentialsBase64.isEmpty()) {
             logger.info("Attempting to initialize Firebase with credentials from environment variable");
             try {
@@ -92,7 +92,7 @@ public class FirebaseConfig {
             }
         }
         
-        // 2. Ana dosya konumundan yüklemeye çalış
+        // 2. Try primary file location
         try {
             logger.info("Attempting to initialize Firebase with credentials from primary path: {}", credentialsPath);
             File credentialsFile = new File(credentialsPath);
@@ -103,7 +103,7 @@ public class FirebaseConfig {
             logger.warn("Could not load Firebase credentials from primary path: {}", credentialsPath);
         }
         
-        // 3. Alternatif konumlardan yüklemeye çalış
+        // 3. Try alternative locations
         List<String> paths = Arrays.asList(alternativeCredentialsPaths.split(","));
         for (String path : paths) {
             try {
@@ -117,7 +117,7 @@ public class FirebaseConfig {
             }
         }
         
-        // 4. Classpath içinden yüklemeye çalış
+        // 4. Try from classpath
         try {
             logger.info("Attempting to initialize Firebase with credentials from classpath");
             Resource resource = resourceLoader.getResource("classpath:firebase-credentials.json");

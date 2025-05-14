@@ -18,6 +18,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - id: "auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v1"
+        with:
+          credentials_json: "${{ secrets.GCP_SA_KEY }}"
+
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
@@ -119,11 +125,16 @@ jobs:
 
             echo "Setting up directories and permissions..."
             mkdir -p /opt/craftpilot/config/notification-service
+            mkdir -p /craftpilot
 
             echo "Creating Firebase credentials..."
-            echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /opt/craftpilot/config/notification-service/firebase-service-account.json
+            # Standardize credentials path to /craftpilot/gcp-credentials.json
+            echo '${{ secrets.GCP_SA_KEY }}' > /craftpilot/gcp-credentials.json
+            chmod 600 /craftpilot/gcp-credentials.json
+
+            # Also keep existing path for backward compatibility
+            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/notification-service/firebase-service-account.json
             chmod 644 /opt/craftpilot/config/notification-service/firebase-service-account.json
-            chown 65532:65532 /opt/craftpilot/config/notification-service/firebase-service-account.json
 
             echo "#!/bin/sh
             curl -f http://localhost:8053/actuator/health || exit 1" > /opt/craftpilot/config/notification-service/healthcheck.sh
@@ -165,9 +176,11 @@ jobs:
               -p 8053:8053 \
               -v /opt/craftpilot/config/notification-service:/app/config:ro \
               -v "/opt/craftpilot/config/notification-service/firebase-service-account.json:/app/credentials/firebase-credentials.json:ro" \
+              -v "/craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro" \
               -v "/opt/craftpilot/config/notification-service/grpc-netty.properties:/app/config/grpc-netty.properties:ro" \
               -v "/opt/craftpilot/config/notification-service/healthcheck.sh:/app/healthcheck.sh:ro" \
               -e FIREBASE_CONFIG=/app/credentials/firebase-credentials.json \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8053 \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \

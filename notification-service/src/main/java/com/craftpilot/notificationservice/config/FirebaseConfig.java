@@ -3,91 +3,107 @@ package com.craftpilot.notificationservice.config;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
-import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.auth.FirebaseAuth;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
-import org.springframework.util.StringUtils;
+import org.springframework.core.io.ResourceLoader;
 
+import javax.annotation.PostConstruct;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
+import java.util.List;
 
-import lombok.extern.slf4j.Slf4j;
-
-@Slf4j
 @Configuration
-@ConditionalOnProperty(name = "firebase.enabled", havingValue = "true", matchIfMissing = false)
 public class FirebaseConfig {
+    private static final Logger logger = LoggerFactory.getLogger(FirebaseConfig.class);
 
-    @Value("${firebase.credentials-file:}")
+    // Update to check multiple credential paths in priority order
+    @Value("${firebase.credentials.path:${FIREBASE_CONFIG:/app/credentials/firebase-credentials.json}}")
     private String credentialsPath;
     
-    @Value("${firebase.credentials-classpath:}")
-    private String credentialsClasspath;
+    @Value("${firebase.credentials.alternate-paths:/app/gcp-credentials.json,/craftpilot/gcp-credentials.json,/gcp-credentials.json}")
+    private String alternativeCredentialsPaths;
 
-    @Bean
-    public FirebaseMessaging firebaseMessaging() {
-        if (FirebaseApp.getApps().isEmpty()) {
-            try {
-                InputStream serviceAccount = getCredentialsInputStream();
-                if (serviceAccount == null) {
-                    log.warn("Firebase credentials not found. Firebase messaging is disabled.");
-                    return null;
-                }
-                
-                FirebaseOptions options = FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-                    .build();
-                FirebaseApp.initializeApp(options);
-                log.info("Firebase application has been initialized successfully");
-            } catch (IOException e) {
-                log.error("Failed to initialize Firebase: {}", e.getMessage());
-                log.warn("Application will continue without Firebase messaging capabilities");
-                return null;
-            } catch (Exception e) {
-                log.error("Unexpected error initializing Firebase: {}", e.getMessage());
-                log.warn("Application will continue without Firebase messaging capabilities");
-                return null;
-            }
-        }
-        
+    private final ResourceLoader resourceLoader;
+
+    public FirebaseConfig(ResourceLoader resourceLoader) {
+        this.resourceLoader = resourceLoader;
+    }
+
+    @PostConstruct
+    public void initialize() {
         try {
-            return FirebaseMessaging.getInstance();
+            if (FirebaseApp.getApps().isEmpty()) {
+                logger.info("Initializing Firebase with credentials");
+                
+                InputStream credentialsStream = loadCredentials();
+                if (credentialsStream != null) {
+                    initializeFirebase(credentialsStream);
+                } else {
+                    throw new IOException("Failed to load Firebase credentials from any source");
+                }
+            } else {
+                logger.info("Firebase already initialized, skipping initialization");
+            }
         } catch (Exception e) {
-            log.error("Could not get FirebaseMessaging instance: {}", e.getMessage());
-            return null;
+            logger.error("Failed to initialize Firebase: {}", e.getMessage(), e);
+            throw new RuntimeException("Firebase initialization failed", e);
         }
     }
     
-    private InputStream getCredentialsInputStream() {
-        // İlk olarak classpath'den okumayı dene
-        if (StringUtils.hasText(credentialsClasspath)) {
-            try {
-                Resource resource = new ClassPathResource(credentialsClasspath);
-                if (resource.exists()) {
-                    log.info("Loading Firebase credentials from classpath: {}", credentialsClasspath);
-                    return resource.getInputStream();
-                }
-            } catch (Exception e) {
-                log.warn("Could not load Firebase credentials from classpath: {}", e.getMessage());
-            }
+    private InputStream loadCredentials() throws IOException {
+        // 1. First try primary path
+        try {
+            logger.info("Attempting to load from primary path: {}", credentialsPath);
+            FileInputStream serviceAccount = new FileInputStream(credentialsPath);
+            return serviceAccount;
+        } catch (IOException e) {
+            logger.info("Could not load credentials from primary path: {}", e.getMessage());
         }
         
-        // Dosya sisteminden okumayı dene
-        if (StringUtils.hasText(credentialsPath)) {
+        // 2. Try alternate paths
+        List<String> altPaths = Arrays.asList(alternativeCredentialsPaths.split(","));
+        for (String path : altPaths) {
             try {
-                log.info("Loading Firebase credentials from file: {}", credentialsPath);
-                return new FileInputStream(credentialsPath);
+                logger.info("Attempting to load from alternate path: {}", path);
+                FileInputStream serviceAccount = new FileInputStream(path);
+                return serviceAccount;
             } catch (IOException e) {
-                log.warn("Could not load Firebase credentials from file: {}", e.getMessage());
+                logger.info("Could not load credentials from alternate path {}: {}", path, e.getMessage());
             }
         }
         
-        log.warn("No Firebase credentials configuration found");
+        // 3. Try as resource
+        try {
+            logger.info("Attempting to load credentials as resource");
+            Resource resource = resourceLoader.getResource("classpath:firebase-credentials.json");
+            if (resource.exists()) {
+                return resource.getInputStream();
+            }
+        } catch (IOException e) {
+            logger.info("Could not load credentials as resource: {}", e.getMessage());
+        }
+        
+        logger.error("Could not load Firebase credentials from any location");
         return null;
+    }
+    
+    private void initializeFirebase(InputStream credentialsStream) throws IOException {
+        FirebaseOptions options = FirebaseOptions.builder()
+                .setCredentials(GoogleCredentials.fromStream(credentialsStream))
+                .build();
+        FirebaseApp.initializeApp(options);
+        logger.info("Firebase initialization successful");
+    }
+
+    @Bean
+    public FirebaseAuth firebaseAuth() {
+        return FirebaseAuth.getInstance();
     }
 }
