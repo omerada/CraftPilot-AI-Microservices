@@ -8,43 +8,46 @@ COPY redis-client-lib ./redis-client-lib
 # Build and install the redis-client-lib to local Maven repository
 RUN cd redis-client-lib && mvn clean install -DskipTests
 
-# User Service Build stage
-FROM maven:3.9.6-eclipse-temurin-21 AS build
+# Build stage
+FROM maven:3.9.6-eclipse-temurin-21 AS builder
 
 WORKDIR /build
-COPY user-service/pom.xml .
-COPY user-service/src ./src
 
-# Copy Maven local repository from previous stage
-COPY --from=redis-lib-build /root/.m2 /root/.m2
+# Copy Redis client lib first
+COPY redis-client-lib/ /build/redis-client-lib/
 
-# Maven build
-RUN mvn clean package -DskipTests
+# Build Redis client lib
+RUN cd /build/redis-client-lib && mvn clean install -DskipTests
+
+# Copy user-service
+COPY user-service/ /build/user-service/
+
+# Build user-service
+RUN cd /build/user-service && mvn clean package -DskipTests
 
 # Run stage
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
-COPY --from=build /build/target/*.jar app.jar
 
-# Create logs directory and set permissions
-RUN mkdir -p /app/logs && \
-    chown -R 1000:1000 /app/logs && \
-    chmod 755 /app/logs
+# Copy jar file
+COPY --from=builder /build/user-service/target/*.jar app.jar
 
-# JVM settings
-ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseStringDeduplication -Xmx1G -Xms512m"
-# Güvenli bir şekilde kullanın, ENV olarak belirtildi ama güvenlik uyarısı oluşturabilir
-ENV GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json
+# MongoDB için çalışma zamanı ayarları
+ENV SPRING_PROFILES_ACTIVE=prod
+ENV SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=false
+ENV SPRING_APPLICATION_MONGODB_URI=""
+ENV SPRING_APPLICATION_MONGODB_DATABASE=user-service
+ENV GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-credentials.json
 
-# Health check tools
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Health check ekliyorum
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD wget -q --no-check-certificate -O /dev/null http://localhost:8090/actuator/health || exit 1
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8060/actuator/health/liveness || exit 1
+# Firebase için gerekli konfigürasyon dizini oluştur
+RUN mkdir -p /app/config
+VOLUME /app/config
 
-# Set non-root user
-USER 1000:1000
+EXPOSE 8090
 
-EXPOSE 8060
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

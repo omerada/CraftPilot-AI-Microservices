@@ -32,6 +32,7 @@
 		<lombok.version>1.18.30</lombok.version>
 		<mapstruct.version>1.5.5.Final</mapstruct.version>
 		<firebase-admin.version>9.2.0</firebase-admin.version>
+		<mongodb-driver.version>4.11.1</mongodb-driver.version>
 	</properties>
 
 	<dependencies>
@@ -52,6 +53,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-mongodb-reactive</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.mongodb</groupId>
+			<artifactId>mongodb-driver-reactivestreams</artifactId>
+			<version>${mongodb-driver.version}</version>
 		</dependency>
 
 		 <!-- Validation -->
@@ -118,11 +124,17 @@
 			<version>${mapstruct.version}</version>
 		</dependency>
 
-		 <!-- Firebase Admin -->
+		 <!-- Firebase Admin - Only for Authentication -->
         <dependency>
             <groupId>com.google.firebase</groupId>
             <artifactId>firebase-admin</artifactId>
             <version>${firebase-admin.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.cloud</groupId>
+                    <artifactId>google-cloud-firestore</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- Kafka -->

@@ -14,48 +14,36 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.ReactiveMongoDatabaseFactory;
 import org.springframework.data.mongodb.ReactiveMongoTransactionManager;
 import org.springframework.data.mongodb.config.AbstractReactiveMongoConfiguration;
+import org.springframework.data.mongodb.config.EnableReactiveMongoAuditing;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.core.convert.MappingMongoConverter;
-import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
 import org.springframework.data.mongodb.repository.config.EnableReactiveMongoRepositories;
+import org.springframework.transaction.ReactiveTransactionManager;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
-import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Configuration
 @EnableReactiveMongoRepositories(basePackages = "com.craftpilot.userservice.repository")
-@Slf4j
+@EnableReactiveMongoAuditing
+@EnableTransactionManagement
 public class MongoConfig extends AbstractReactiveMongoConfiguration {
 
-    @Value("${spring.data.mongodb.uri}")
+    @Value("${spring.application.mongodb.uri}")
     private String mongoUri;
 
-    @Value("${spring.data.mongodb.database}")
+    @Value("${spring.application.mongodb.database}")
     private String databaseName;
 
-    @Value("${spring.data.mongodb.connect-timeout:30000}")
+    @Value("${spring.application.mongodb.server-selection-timeout:30000}")
+    private long serverSelectionTimeout;
+
+    @Value("${spring.application.mongodb.connect-timeout:20000}")
     private int connectTimeout;
 
-    @Value("${spring.data.mongodb.socket-timeout:60000}")
+    @Value("${spring.application.mongodb.socket-timeout:60000}")
     private int socketTimeout;
-
-    @Value("${spring.data.mongodb.max-wait-time:120000}")
-    private int maxWaitTime;
-
-    @Value("${spring.data.mongodb.max-connection-idle-time:300000}")
-    private int maxConnectionIdleTime;
-
-    @Value("${spring.data.mongodb.max-connection-life-time:600000}")
-    private int maxConnectionLifeTime;
-
-    @Value("${spring.data.mongodb.max-connection-pool-size:20}")
-    private int maxConnectionPoolSize;
-
-    @Value("${spring.data.mongodb.min-connection-pool-size:5}")
-    private int minConnectionPoolSize;
-
-    @Value("${spring.data.mongodb.server-selection-timeout:30000}")
-    private int serverSelectionTimeout;
 
     @Override
     protected String getDatabaseName() {
@@ -65,64 +53,43 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
     @Override
     @Bean
     public MongoClient reactiveMongoClient() {
-        log.info("MongoDB yapılandırması başlatılıyor. Veritabanı: {}", databaseName);
-
-        // Hassas bilgileri maskele
-        String safeUri = mongoUri.replaceAll("mongodb://[^:]*:[^@]*@", "mongodb://***:***@");
-        log.info("MongoDB URI (maskelenmiş): {}", safeUri);
-
-        try {
-            ConnectionString connectionString = new ConnectionString(mongoUri);
-            String host = connectionString.getHosts().get(0);
-            log.info("MongoDB host: {}", host);
-        } catch (Exception e) {
-            log.warn("MongoDB URI ayrıştırma hatası: {}", e.getMessage());
-        }
+        ConnectionString connectionString = new ConnectionString(mongoUri);
 
         MongoClientSettings settings = MongoClientSettings.builder()
-                .applyConnectionString(new ConnectionString(mongoUri))
-                .applyToConnectionPoolSettings(builder -> builder
-                        .maxSize(maxConnectionPoolSize)
-                        .minSize(minConnectionPoolSize)
-                        .maxWaitTime(maxWaitTime, TimeUnit.MILLISECONDS)
-                        .maxConnectionIdleTime(maxConnectionIdleTime, TimeUnit.MILLISECONDS)
-                        .maxConnectionLifeTime(maxConnectionLifeTime, TimeUnit.MILLISECONDS))
-                .applyToSocketSettings(builder -> builder
-                        .connectTimeout(connectTimeout, TimeUnit.MILLISECONDS)
+                .applyConnectionString(connectionString)
+                .applyToClusterSettings(
+                        builder -> builder.serverSelectionTimeout(serverSelectionTimeout, TimeUnit.MILLISECONDS))
+                .applyToConnectionPoolSettings(builder -> builder.maxConnectionIdleTime(300000, TimeUnit.MILLISECONDS)
+                        .maxSize(20)
+                        .minSize(5))
+                .applyToSocketSettings(builder -> builder.connectTimeout(connectTimeout, TimeUnit.MILLISECONDS)
                         .readTimeout(socketTimeout, TimeUnit.MILLISECONDS))
-                .applyToServerSettings(builder -> builder
-                        .heartbeatFrequency(20000, TimeUnit.MILLISECONDS))
-                .applyToClusterSettings(builder -> builder
-                        .serverSelectionTimeout(serverSelectionTimeout, TimeUnit.MILLISECONDS))
-                .writeConcern(WriteConcern.MAJORITY.withWTimeout(5000, TimeUnit.MILLISECONDS))
-                .readConcern(ReadConcern.MAJORITY)
                 .readPreference(ReadPreference.primaryPreferred())
-                .retryWrites(true)
-                .retryReads(true)
+                .readConcern(ReadConcern.MAJORITY)
+                .writeConcern(WriteConcern.MAJORITY)
                 .build();
 
-        log.info("MongoDB yapılandırma tamamlandı. Bağlantı zaman aşımı: {}ms, soket zaman aşımı: {}ms, " +
-                "Max bağlantı havuzu: {}, Min bağlantı havuzu: {}, Sunucu seçim zaman aşımı: {}ms",
-                connectTimeout, socketTimeout, maxConnectionPoolSize, minConnectionPoolSize, serverSelectionTimeout);
-
+        log.info("Connecting to MongoDB at: {}", maskConnectionString(connectionString.getConnectionString()));
         return MongoClients.create(settings);
     }
 
     @Bean
-    public ReactiveMongoTemplate reactiveMongoTemplate(ReactiveMongoDatabaseFactory factory,
-            MappingMongoConverter converter) {
-        ReactiveMongoTemplate template = new ReactiveMongoTemplate(factory, converter);
-        log.info("MongoDB şema uyumluluk ve indeks oluşturma etkinleştirildi");
+    public ReactiveMongoTemplate reactiveMongoTemplate() throws Exception {
+        ReactiveMongoTemplate template = new ReactiveMongoTemplate(reactiveMongoClient(), getDatabaseName());
+        MappingMongoConverter converter = (MappingMongoConverter) template.getConverter();
+        converter.setMapKeyDotReplacement("_");
         return template;
     }
 
     @Bean
-    public ReactiveMongoTransactionManager transactionManager(ReactiveMongoDatabaseFactory factory) {
+    public ReactiveTransactionManager reactiveTransactionManager(ReactiveMongoDatabaseFactory factory) {
         return new ReactiveMongoTransactionManager(factory);
     }
 
-    @Bean
-    public MongoCustomConversions mongoCustomConversions() {
-        return new MongoCustomConversions(Collections.emptyList());
+    // Mask sensitive connection string parts for logging
+    private String maskConnectionString(String connectionString) {
+        if (connectionString == null)
+            return null;
+        return connectionString.replaceAll(":[^:]*@", ":***@");
     }
 }

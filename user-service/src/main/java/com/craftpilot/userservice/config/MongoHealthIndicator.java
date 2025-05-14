@@ -29,16 +29,21 @@ public class MongoHealthIndicator implements ReactiveHealthIndicator {
 
     private Mono<Health> checkMongoConnection() {
         return mongoTemplate.executeCommand("{ ping: 1 }")
-                .map(document -> Health.up()
-                        .withDetail("ping", "successful")
-                        .withDetail("version", document.get("version", "unknown"))
-                        .withDetail("timestamp", System.currentTimeMillis())
-                        .build())
+                .map(result -> {
+                    if (result.getDouble("ok") == 1.0) {
+                        return Health.up()
+                                .withDetail("database", mongoTemplate.getMongoDatabase().getName())
+                                .withDetail("status", "MongoDB bağlantısı sağlıklı")
+                                .build();
+                    } else {
+                        return Health.down()
+                                .withDetail("database", mongoTemplate.getMongoDatabase().getName())
+                                .withDetail("error", "MongoDB sunucusu ping yanıtında hata döndü")
+                                .build();
+                    }
+                })
                 .onErrorResume(e -> Mono.just(Health.down()
-                        .withDetail("ping", "failed")
-                        .withDetail("error", e.getClass().getSimpleName())
-                        .withDetail("message", e.getMessage())
-                        .withDetail("timestamp", System.currentTimeMillis())
+                        .withDetail("error", "MongoDB bağlantı hatası: " + e.getMessage())
                         .build()));
     }
 }

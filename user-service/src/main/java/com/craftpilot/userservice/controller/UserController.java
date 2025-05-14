@@ -15,7 +15,8 @@ import reactor.core.publisher.Mono;
 import java.util.Map;
 
 /**
- * REST controller for managing user-related operations using Firebase Authentication and Firestore.
+ * REST controller for managing user-related operations using Firebase
+ * Authentication and MongoDB.
  */
 @Slf4j
 @RestController
@@ -32,7 +33,8 @@ public class UserController {
     public Mono<UserEntity> createUser(@RequestHeader("Firebase-Token") String firebaseToken) {
         log.info("Yeni kullanıcı oluşturma isteği alındı");
         return userService.verifyAndCreateUser(firebaseToken)
-                .doOnSuccess(user -> log.info("Kullanıcı başarıyla oluşturuldu: id={}, username={}", user.getId(), user.getUsername()))
+                .doOnSuccess(user -> log.info("Kullanıcı başarıyla oluşturuldu: id={}, username={}", user.getId(),
+                        user.getUsername()))
                 .doOnError(e -> log.error("Kullanıcı oluşturulurken hata: {}", e.getMessage()));
     }
 
@@ -40,9 +42,9 @@ public class UserController {
     @Operation(summary = "Kullanıcı getir", description = "ID'ye göre kullanıcı bilgilerini getirir")
     public Mono<ResponseEntity<Object>> getUser(@PathVariable String id) {
         log.info("Kullanıcı bilgisi isteniyor: id={}", id);
-        
+
         return userService.findById(id)
-                .map(user -> ResponseEntity.ok().body((Object)user))
+                .map(user -> ResponseEntity.ok().body((Object) user))
                 .doOnSuccess(response -> {
                     if (response.getStatusCode().is2xxSuccessful()) {
                         log.info("Kullanıcı başarıyla getirildi: id={}", id);
@@ -53,18 +55,17 @@ public class UserController {
                     Map<String, String> errorResponse = Map.of(
                             "error", "User not found",
                             "message", "Belirtilen ID ile kullanıcı bulunamadı: " + id,
-                            "status", "404"
-                    );
-                    return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body((Object)errorResponse));
+                            "status", "404");
+                    return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body((Object) errorResponse));
                 }))
                 .onErrorResume(e -> {
                     log.error("Kullanıcı getirilirken hata: id={}, error={}", id, e.getMessage());
                     Map<String, String> errorResponse = Map.of(
                             "error", "Internal Server Error",
                             "message", "Kullanıcı bilgisi alınırken bir hata oluştu",
-                            "status", "500"
-                    );
-                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object)errorResponse));
+                            "status", "500");
+                    return Mono
+                            .just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object) errorResponse));
                 });
     }
 
@@ -74,7 +75,7 @@ public class UserController {
         log.info("Kullanıcı güncelleme isteği alındı: id={}", id);
         return userService.findById(id)
                 .flatMap(existingUser -> userService.updateUser(id, updates)
-                        .map(updatedUser -> ResponseEntity.ok().body((Object)updatedUser)))
+                        .map(updatedUser -> ResponseEntity.ok().body((Object) updatedUser)))
                 .doOnSuccess(response -> {
                     if (response.getStatusCode().is2xxSuccessful()) {
                         log.info("Kullanıcı başarıyla güncellendi: id={}", id);
@@ -85,18 +86,17 @@ public class UserController {
                     Map<String, String> errorResponse = Map.of(
                             "error", "User not found",
                             "message", "Belirtilen ID ile güncellenecek kullanıcı bulunamadı: " + id,
-                            "status", "404"
-                    );
-                    return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body((Object)errorResponse));
+                            "status", "404");
+                    return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body((Object) errorResponse));
                 }))
                 .onErrorResume(e -> {
                     log.error("Kullanıcı güncellenirken hata: id={}, error={}", id, e.getMessage());
                     Map<String, String> errorResponse = Map.of(
                             "error", "Internal Server Error",
                             "message", "Kullanıcı güncellenirken bir hata oluştu: " + e.getMessage(),
-                            "status", "500"
-                    );
-                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object)errorResponse));
+                            "status", "500");
+                    return Mono
+                            .just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object) errorResponse));
                 });
     }
 
@@ -111,20 +111,19 @@ public class UserController {
                 .switchIfEmpty(Mono.defer(() -> {
                     log.warn("Silinecek kullanıcı bulunamadı: id={}", id);
                     Map<String, String> errorResponse = Map.of(
-                            "error", "User not found", 
+                            "error", "User not found",
                             "message", "Belirtilen ID ile silinecek kullanıcı bulunamadı: " + id,
-                            "status", "404"
-                    );
-                    return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body((Object)errorResponse));
+                            "status", "404");
+                    return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body((Object) errorResponse));
                 }))
                 .onErrorResume(e -> {
                     log.error("Kullanıcı silinirken hata: id={}, error={}", id, e.getMessage());
                     Map<String, String> errorResponse = Map.of(
                             "error", "Internal Server Error",
                             "message", "Kullanıcı silinirken bir hata oluştu: " + e.getMessage(),
-                            "status", "500"
-                    );
-                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object)errorResponse));
+                            "status", "500");
+                    return Mono
+                            .just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object) errorResponse));
                 });
     }
 
@@ -150,8 +149,7 @@ public class UserController {
     }
 
     @PostMapping("/sync")
-    @Operation(summary = "Firebase kullanıcısını senkronize et", 
-              description = "Firebase Authentication'dan gelen kullanıcıyı sistemle senkronize eder")
+    @Operation(summary = "Firebase kullanıcısını senkronize et", description = "Firebase Authentication'dan gelen kullanıcıyı sistemle senkronize eder")
     public Mono<UserEntity> syncFirebaseUser(@RequestHeader("Firebase-Token") String firebaseToken) {
         log.info("Firebase kullanıcı senkronizasyon isteği alındı");
         return userService.verifyAndCreateOrUpdateUser(firebaseToken)
@@ -160,8 +158,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}/firebase-sync")
-    @Operation(summary = "Firebase güncellemelerini senkronize et", 
-              description = "Firebase'de yapılan güncellemeleri sistemle senkronize eder")
+    @Operation(summary = "Firebase güncellemelerini senkronize et", description = "Firebase'de yapılan güncellemeleri sistemle senkronize eder")
     public Mono<UserEntity> syncFirebaseUpdates(
             @PathVariable String id,
             @RequestBody UserEntity updates) {

@@ -1,41 +1,32 @@
 spring:
   application:
     name: user-service
-  profiles:
-    active: ${SPRING_PROFILES_ACTIVE:dev}
-    include: kafka-base
-  autoconfigure:
-    # Spring Boot'un kendi Redis ve Redisson yapılandırmalarını devre dışı bırakıyoruz
-    exclude:
-      - org.redisson.spring.starter.RedissonAutoConfiguration
-      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
-      - org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration
-  main:
-    allow-bean-definition-overriding: true
-    log-startup-info: true
-  # Spring Redis yapılandırmasını devre dışı bırakıyoruz - redis-client-lib kullanacağız
-  data:
     redis:
-      repositories:
-        enabled: false
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:13579ada}
     mongodb:
       uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:user-service}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000}
       database: ${MONGODB_DATABASE:user-service}
-      auto-index-creation: true
-      # Bağlantı parametreleri
-      connect-timeout: 30000
+      # Bağlantı optimizasyonları
+      server-selection-timeout: 30000
+      connect-timeout: 20000
       socket-timeout: 60000
       max-wait-time: 120000
       max-connection-idle-time: 300000
       max-connection-life-time: 600000
-      # MongoDB dayanıklılık ayarları
       retry-writes: true
+      # Bağlantı havuzu ayarları
       max-connection-pool-size: 20
       min-connection-pool-size: 5
-      server-selection-timeout: 30000
-  firebase:
-    config:
-      path: ${FIREBASE_CONFIG_PATH:/etc/gcp/credentials/gcp-credentials.json}
+  # Firestore'u devre dışı bırak
+  cloud:
+    gcp:
+      firestore:
+        enabled: false
+      core:
+        enabled: false
+
   kafka:
     enabled: true
     bootstrap-servers: ${KAFKA_BROKERS:kafka:9092}
@@ -245,3 +236,8 @@ app:
   models:
     file: ${MODELS_FILE:newmodels.json}
     version: ${MODELS_VERSION:1}
+
+# Firestore'dan MongoDB'ye geçiş yapılandırması
+migration:
+  firestore-to-mongo:
+    enabled: ${MIGRATION_ENABLED:false} # Geçiş yardımcısını etkinleştirmek için
