@@ -2,53 +2,80 @@ package com.craftpilot.activitylogservice.config;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.ReactiveHealthIndicator;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisPassword;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
-import reactor.core.publisher.Mono;
+import org.springframework.boot.actuate.health.Health;
+import org.springframework.boot.actuate.health.ReactiveHealthIndicator;
+import io.lettuce.core.ClientOptions;
+import io.lettuce.core.SocketOptions;
 
 import java.time.Duration;
+import reactor.core.publisher.Mono;
 
 @Configuration
 @Slf4j
-@ConditionalOnProperty(name = "spring.data.redis.host")
+@ConditionalOnProperty(name = "spring.data.redis.host", havingValue = "redis", matchIfMissing = false)
 public class RedisConfig {
 
-    @Value("${spring.data.redis.host:localhost}")
+    @Value("${spring.data.redis.host:redis}")
     private String redisHost;
 
     @Value("${spring.data.redis.port:6379}")
-    private String redisPort;
+    private int redisPort;
 
     @Value("${spring.data.redis.password:}")
     private String redisPassword;
 
+    @Value("${spring.data.redis.connect-timeout:2000}")
+    private long connectTimeout;
+
+    @Value("${spring.data.redis.timeout:5000}")
+    private long commandTimeout;
+
     @Bean
+    @Primary
     public ReactiveRedisConnectionFactory reactiveRedisConnectionFactory() {
         log.info("Configuring Redis connection factory with host: {}, port: {}", redisHost, redisPort);
         
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
         config.setHostName(redisHost);
-        config.setPort(Integer.parseInt(redisPort));
+        config.setPort(redisPort);
         
         if (redisPassword != null && !redisPassword.isEmpty()) {
-            config.setPassword(redisPassword);
+            config.setPassword(RedisPassword.of(redisPassword));
+            log.debug("Redis password configured successfully");
         }
         
-        return new LettuceConnectionFactory(config);
+        SocketOptions socketOptions = SocketOptions.builder()
+            .connectTimeout(Duration.ofMillis(connectTimeout))
+            .build();
+        
+        ClientOptions clientOptions = ClientOptions.builder()
+            .socketOptions(socketOptions)
+            .build();
+        
+        LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
+            .clientOptions(clientOptions)
+            .commandTimeout(Duration.ofMillis(commandTimeout))
+            .build();
+        
+        return new LettuceConnectionFactory(config, clientConfig);
     }
 
     @Bean
     public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(ReactiveRedisConnectionFactory connectionFactory) {
+        log.debug("Configuring ReactiveRedisTemplate");
         StringRedisSerializer keySerializer = new StringRedisSerializer();
         Jackson2JsonRedisSerializer<Object> valueSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
         
