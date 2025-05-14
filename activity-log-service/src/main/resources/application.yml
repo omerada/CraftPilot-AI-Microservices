@@ -22,7 +22,7 @@ spring:
       socket-timeout: 60000
       max-connection-idle-time: 300000
       connection-pool-max-size: 20
-      auto-index-creation: true
+      auto-index-creation: false
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
