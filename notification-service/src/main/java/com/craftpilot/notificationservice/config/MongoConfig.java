@@ -4,23 +4,20 @@ import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoClients;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.ReactiveMongoDatabaseFactory;
-import org.springframework.data.mongodb.ReactiveMongoTransactionManager;
 import org.springframework.data.mongodb.config.AbstractReactiveMongoConfiguration;
-import org.springframework.data.mongodb.config.EnableReactiveMongoAuditing;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.core.convert.MappingMongoConverter;
+import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
+import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import org.springframework.data.mongodb.repository.config.EnableReactiveMongoRepositories;
 
 import java.util.concurrent.TimeUnit;
 
-@Slf4j
 @Configuration
-@EnableReactiveMongoAuditing
 @EnableReactiveMongoRepositories(basePackages = "com.craftpilot.notificationservice.repository")
 public class MongoConfig extends AbstractReactiveMongoConfiguration {
 
@@ -36,23 +33,20 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
     }
 
     @Override
-    @Bean
     public MongoClient reactiveMongoClient() {
-        log.info("Configuring MongoDB connection with URI: {}",
-                mongoUri.replaceAll("mongodb://.*@", "mongodb://****:****@"));
-
         ConnectionString connectionString = new ConnectionString(mongoUri);
-
-        MongoClientSettings mongoClientSettings = MongoClientSettings.builder()
+        MongoClientSettings settings = MongoClientSettings.builder()
                 .applyConnectionString(connectionString)
-                .applyToConnectionPoolSettings(builder -> builder.maxConnectionIdleTime(30000, TimeUnit.MILLISECONDS)
-                        .maxSize(20)
-                        .minSize(5))
-                .applyToSocketSettings(builder -> builder.connectTimeout(10000, TimeUnit.MILLISECONDS)
-                        .readTimeout(15000, TimeUnit.MILLISECONDS))
+                .applyToConnectionPoolSettings(builder -> builder.maxSize(100)
+                        .minSize(5)
+                        .maxWaitTime(2, TimeUnit.MINUTES)
+                        .maxConnectionLifeTime(1, TimeUnit.HOURS)
+                        .maxConnectionIdleTime(10, TimeUnit.MINUTES))
+                .applyToSocketSettings(builder -> builder.connectTimeout(5, TimeUnit.SECONDS)
+                        .readTimeout(2, TimeUnit.MINUTES))
                 .build();
 
-        return MongoClients.create(mongoClientSettings);
+        return MongoClients.create(settings);
     }
 
     @Bean
@@ -60,14 +54,12 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
         return new ReactiveMongoTemplate(reactiveMongoClient(), getDatabaseName());
     }
 
-    @Bean
-    public ReactiveMongoTransactionManager transactionManager(ReactiveMongoDatabaseFactory dbFactory) {
-        return new ReactiveMongoTransactionManager(dbFactory);
-    }
-
     @Override
-    public MappingMongoConverter mappingMongoConverter() throws Exception {
-        MappingMongoConverter converter = super.mappingMongoConverter();
+    public MappingMongoConverter mappingMongoConverter(ReactiveMongoDatabaseFactory databaseFactory,
+            MongoCustomConversions customConversions,
+            MongoMappingContext mappingContext) {
+        MappingMongoConverter converter = super.mappingMongoConverter(databaseFactory, customConversions,
+                mappingContext);
         converter.setMapKeyDotReplacement("_");
         return converter;
     }

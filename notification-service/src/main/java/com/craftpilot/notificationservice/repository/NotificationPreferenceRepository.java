@@ -10,5 +10,7 @@ public interface NotificationPreferenceRepository extends ReactiveMongoRepositor
 
     Mono<NotificationPreference> findByUserIdAndDeletedFalse(String userId);
 
+    Mono<NotificationPreference> findByUserId(String userId);
+
     Mono<Void> deleteByUserId(String userId);
 }

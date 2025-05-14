@@ -13,9 +13,13 @@ public interface NotificationRepository extends ReactiveMongoRepository<Notifica
 
     Flux<Notification> findByUserIdAndDeletedFalse(String userId);
 
-    Flux<Notification> findByUserIdAndReadAndDeletedFalse(String userId, boolean read);
+    Flux<Notification> findByUserId(String userId);
+
+    Flux<Notification> findByUserIdAndRead(String userId, boolean read);
 
     Flux<Notification> findByScheduledAtAfterAndDeletedFalseOrderByScheduledAtAsc(Instant time);
 
-    Flux<Notification> findByScheduledAtAfterAndDeletedFalse(LocalDateTime dateTime);
+    Flux<Notification> findByScheduledAtAfter(LocalDateTime dateTime);
+
+    Flux<Notification> findByScheduledTimeAfter(LocalDateTime dateTime);
 }

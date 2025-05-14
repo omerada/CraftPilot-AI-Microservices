@@ -24,11 +24,18 @@ public class NotificationTemplate {
     @Indexed
     private String name;
 
+    private String titleTemplate;
+    private String contentTemplate;
+    private Map<String, String> requiredVariables;
+    private Map<String, Object> defaultValues;
+
+    // Eski alanlar - geriye dönük uyumluluk için tutulabilir
     private String title;
     private String body;
     private String subject;
     private Map<String, Object> templateData;
     private NotificationType type;
+
     private boolean active;
     private boolean deleted;
 

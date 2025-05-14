@@ -31,20 +31,19 @@ public class NotificationScheduler {
     @CircuitBreaker(name = "processScheduledNotifications")
     public void processScheduledNotifications() {
         LocalDateTime now = LocalDateTime.now();
-        
+
         notificationService.getScheduledNotifications()
-            .filter(notification -> notification.getScheduledTime().isBefore(now))
-            .flatMap(this::processAndUpdateNotification)
-            .subscribe();
+                .filter(notification -> notification.getScheduledAt().isBefore(now))
+                .flatMap(this::processAndUpdateNotification)
+                .subscribe();
     }
 
     private Mono<Notification> processAndUpdateNotification(Notification notification) {
         try {
             sendGridService.sendEmail(
-                notification.getRecipientEmail(),
-                notification.getTitle(),
-                notification.getBody()
-            );
+                    notification.getRecipientEmail(),
+                    notification.getTitle(),
+                    notification.getContent());
             notification.setProcessed(true);
             notification.setProcessedTime(LocalDateTime.now());
             return notificationService.saveNotification(notification);
@@ -70,14 +69,16 @@ public class NotificationScheduler {
 
     private void processEmailNotification(Notification notification) {
         EmailRequest emailRequest = EmailRequest.builder()
-            .to(notification.getRecipient())
-            .subject(notification.getSubject())
-            .content(notification.getContent())
-            .build();
-            
+                .to(notification.getRecipient())
+                .subject(notification.getSubject())
+                .content(notification.getContent())
+                .build();
+
         emailService.sendEmail(emailRequest)
-                .doOnSuccess(unused -> log.info("Scheduled email sent successfully to: {}", notification.getRecipient()))
-                .doOnError(error -> log.error("Failed to send scheduled email to: {}", notification.getRecipient(), error))
+                .doOnSuccess(
+                        unused -> log.info("Scheduled email sent successfully to: {}", notification.getRecipient()))
+                .doOnError(
+                        error -> log.error("Failed to send scheduled email to: {}", notification.getRecipient(), error))
                 .subscribe();
     }
 

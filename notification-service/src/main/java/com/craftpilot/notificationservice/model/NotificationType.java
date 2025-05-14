@@ -2,7 +2,7 @@ package com.craftpilot.notificationservice.model;
 
 public enum NotificationType {
     EMAIL,
-    PUSH,
     SMS,
+    PUSH,
     IN_APP
-} 
+}

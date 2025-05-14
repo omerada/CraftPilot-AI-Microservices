@@ -122,4 +122,4 @@ public class NotificationTemplateServiceImpl implements NotificationTemplateServ
                     log.info("Template status updated to {}: {}", active ? "active" : "inactive", id);
                 });
     }
-} 
+}
