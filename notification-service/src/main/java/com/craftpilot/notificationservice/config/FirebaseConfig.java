@@ -26,11 +26,11 @@ import java.util.Optional;
 public class FirebaseConfig {
     private static final Logger logger = LoggerFactory.getLogger(FirebaseConfig.class);
 
-    // Update to check multiple credential paths in priority order
-    @Value("${firebase.credentials.path:${FIREBASE_CONFIG:/app/credentials/firebase-credentials.json}}")
+    // Update to support both env variables with fallback path
+    @Value("${firebase.credentials.path:${FIREBASE_CONFIG:${GOOGLE_APPLICATION_CREDENTIALS:/app/credentials/firebase-credentials.json}}}")
     private String credentialsPath;
     
-    @Value("${firebase.credentials.alternate-paths:/app/gcp-credentials.json,/craftpilot/gcp-credentials.json,/gcp-credentials.json}")
+    @Value("${firebase.credentials.alternate-paths:/app/gcp-credentials.json,/craftpilot/gcp-credentials.json,/gcp-credentials.json,/app/config/firebase-credentials.json}")
     private String alternativeCredentialsPaths;
     
     @Value("${firebase.enabled:true}")

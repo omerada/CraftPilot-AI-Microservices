@@ -6,18 +6,18 @@ if [ -f "/app/credentials/firebase-credentials.json" ]; then
   echo "Firebase credentials file found at /app/credentials/firebase-credentials.json"
   export FIREBASE_CONFIG="/app/credentials/firebase-credentials.json"
   export GOOGLE_APPLICATION_CREDENTIALS="/app/credentials/firebase-credentials.json"
-  # Dosya izinlerini güvenli bir şekilde düzelt
-  if touch "/app/credentials/firebase-credentials.json" 2>/dev/null; then
+  # Check if the filesystem is writable before trying to change permissions
+  if [ -w "/app/credentials" ] && [ -w "/app/credentials/firebase-credentials.json" ]; then
     chmod 644 "/app/credentials/firebase-credentials.json"
   else
-    echo "Note: Firebase credentials file is read-only, skipping permissions change"
+    echo "Note: Credentials directory or file is read-only, skipping permissions change"
   fi
 elif [ -f "/app/gcp-credentials.json" ]; then
   echo "Firebase credentials file found at /app/gcp-credentials.json"
   export FIREBASE_CONFIG="/app/gcp-credentials.json"
   export GOOGLE_APPLICATION_CREDENTIALS="/app/gcp-credentials.json"
-  # Dosya izinlerini güvenli bir şekilde düzelt
-  if touch "/app/gcp-credentials.json" 2>/dev/null; then
+  # Check if the filesystem is writable before trying to change permissions
+  if [ -w "/app" ] && [ -w "/app/gcp-credentials.json" ]; then
     chmod 644 "/app/gcp-credentials.json"
   else
     echo "Note: GCP credentials file is read-only, skipping permissions change"
@@ -26,8 +26,8 @@ elif [ -f "/app/config/firebase-credentials.json" ]; then
   echo "Firebase credentials file found at /app/config/firebase-credentials.json"
   export FIREBASE_CONFIG="/app/config/firebase-credentials.json"
   export GOOGLE_APPLICATION_CREDENTIALS="/app/config/firebase-credentials.json"
-  # Dosya izinlerini güvenli bir şekilde düzelt
-  if touch "/app/config/firebase-credentials.json" 2>/dev/null; then
+  # Check if the filesystem is writable before trying to change permissions
+  if [ -w "/app/config" ] && [ -w "/app/config/firebase-credentials.json" ]; then
     chmod 644 "/app/config/firebase-credentials.json"
   else
     echo "Note: Config credentials file is read-only, skipping permissions change"
