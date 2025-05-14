@@ -168,13 +168,16 @@ logging:
     com.craftpilot.llmservice: DEBUG
     com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
     
-    # MongoDB log seviyesi - önceki yapılandırmayı iyileştirelim
+    # MongoDB log seviyesi - daha etkin loglama ve sorun tespiti için
     org.springframework.data.mongodb: INFO
     org.springframework.data.mongodb.core.MongoTemplate: DEBUG # MongoDB işlemlerini kapsamlı loglama
     org.springframework.data.mongodb.repository.Query: DEBUG # MongoDB sorgularını loglama
+    org.springframework.data.mongodb.repository.query: DEBUG # Repository sorgu logları
+    org.springframework.data.mongodb.core.convert: INFO # Dönüşüm logları
     org.mongodb.driver: WARN # MongoDB driver temel logları
     org.mongodb.driver.connection: INFO # Bağlantı sorunlarını daha iyi görmek için
     org.mongodb.driver.cluster: INFO # MongoDB küme loglaması
+    org.mongodb.driver.protocol: INFO # MongoDB protokol loglaması
 
 # MongoDB yapılandırması
 spring:

@@ -7,6 +7,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
+import org.springframework.data.mongodb.core.index.IndexOperations;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -23,14 +24,27 @@ public class MongoIndexConfig {
 
         try {
             // ChatHistory koleksiyonu için indeksler
-            createIndex("chat_histories", "userId", Sort.Direction.ASC, false);
-            createIndex("chat_histories", "sessionId", Sort.Direction.ASC, false);
-            createIndex("chat_histories", "timestamp", Sort.Direction.DESC, false);
+            IndexOperations chatHistoryIndexOps = mongoTemplate.indexOps("chat_histories");
+            createAndEnsureIndex(chatHistoryIndexOps, "userId", Sort.Direction.ASC, false);
+            createAndEnsureIndex(chatHistoryIndexOps, "sessionId", Sort.Direction.ASC, false);
+            createAndEnsureIndex(chatHistoryIndexOps, "createdAt", Sort.Direction.DESC, false);
+            createAndEnsureIndex(chatHistoryIndexOps, "updatedAt", Sort.Direction.DESC, false);
+            createAndEnsureIndex(chatHistoryIndexOps, "aiModel", Sort.Direction.ASC, false);
 
             // PerformanceAnalysis koleksiyonu için indeksler
-            createIndex("performance_analyses", "modelId", Sort.Direction.ASC, false);
-            createIndex("performance_analyses", "sessionId", Sort.Direction.ASC, false);
-            createIndex("performance_analyses", "timestamp", Sort.Direction.DESC, false);
+            IndexOperations perfAnalysisIndexOps = mongoTemplate.indexOps("performance_analyses");
+            createAndEnsureIndex(perfAnalysisIndexOps, "modelId", Sort.Direction.ASC, false);
+            createAndEnsureIndex(perfAnalysisIndexOps, "sessionId", Sort.Direction.ASC, false);
+            createAndEnsureIndex(perfAnalysisIndexOps, "userId", Sort.Direction.ASC, false);
+            createAndEnsureIndex(perfAnalysisIndexOps, "timestamp", Sort.Direction.DESC, false);
+
+            // PerformanceAnalysisResponse koleksiyonu için indeksler
+            IndexOperations perfAnalysisRespIndexOps = mongoTemplate.indexOps("performance_analysis_responses");
+            createAndEnsureIndex(perfAnalysisRespIndexOps, "modelId", Sort.Direction.ASC, false);
+            createAndEnsureIndex(perfAnalysisRespIndexOps, "sessionId", Sort.Direction.ASC, false);
+            createAndEnsureIndex(perfAnalysisRespIndexOps, "timestamp", Sort.Direction.DESC, false);
+            createAndEnsureIndex(perfAnalysisRespIndexOps, "url", Sort.Direction.ASC, false);
+            createAndEnsureIndex(perfAnalysisRespIndexOps, "status", Sort.Direction.ASC, false);
 
             log.info("MongoDB indeks başlatma işlemi tamamlandı");
         } catch (Exception e) {
@@ -40,22 +54,19 @@ public class MongoIndexConfig {
         }
     }
 
-    private void createIndex(String collection, String field, Sort.Direction direction, boolean unique) {
+    private void createAndEnsureIndex(IndexOperations indexOps, String field, Sort.Direction direction,
+            boolean unique) {
         Index index = new Index().on(field, direction);
 
-        // Eğer index benzersiz olacaksa unique() metodunu çağır
         if (unique) {
             index = index.unique();
         }
 
-        mongoTemplate.indexOps(collection)
-                .ensureIndex(index)
+        indexOps.ensureIndex(index)
                 .onErrorResume(e -> {
-                    log.warn("{} koleksiyonunda {} alanı için indeks oluşturulamadı: {}",
-                            collection, field, e.getMessage());
+                    log.warn("{} alanı için indeks oluşturulamadı: {}", field, e.getMessage());
                     return Mono.empty();
                 })
-                .subscribe(result -> log.info("{} koleksiyonunda {} indeksi oluşturuldu: {}",
-                        collection, field, result));
+                .subscribe(result -> log.info("{} indeksi oluşturuldu: {}", field, result));
     }
 }

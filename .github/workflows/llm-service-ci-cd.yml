@@ -185,10 +185,16 @@ jobs:
                 -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
                 -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
                 -e MANAGEMENT_HEALTH_MONGODB_ENABLED=true \
-                -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
-                -e SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL=PLAINTEXT \
+                -e MANAGEMENT_METRICS_ENABLE_MONGODB=true \
+                -e MANAGEMENT_METRICS_DISTRIBUTION_PERCENTILES_HISTOGRAM_HTTP_SERVER_REQUESTS=true \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics,prometheus" \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
                 -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
-                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB=DEBUG \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB=INFO \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB_CORE_MONGOTEMPLATE=DEBUG \
                 -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005" \
                 --ulimit nofile=65536:65536 \
                 --cap-drop ALL \
@@ -229,8 +235,16 @@ jobs:
                 -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
                 -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
                 -e MANAGEMENT_HEALTH_MONGODB_ENABLED=true \
-                -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
-                -e SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL=PLAINTEXT \
+                -e MANAGEMENT_METRICS_ENABLE_MONGODB=true \
+                -e MANAGEMENT_METRICS_DISTRIBUTION_PERCENTILES_HISTOGRAM_HTTP_SERVER_REQUESTS=true \
+                -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics,prometheus" \
+                -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+                -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB=INFO \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB_CORE_MONGOTEMPLATE=DEBUG \
                 -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty" \
                 --ulimit nofile=65536:65536 \
                 --cap-drop ALL \
