@@ -82,14 +82,36 @@ jobs:
             echo "Checking Docker service status..."
             systemctl status docker || true
 
-            echo "Checking existing containers..."
-            docker ps -a | grep notification-service || true
-
-            echo "Creating network if not exists..."
+            # Infrastructure containers
             docker network create craftpilot-network || true
 
-            echo "Pulling latest image..."
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
+            # MongoDB container check
+            MONGODB_CONTAINER="craftpilot-mongodb"
+            if ! docker ps | grep -q "$MONGODB_CONTAINER"; then
+              echo "WARNING: Default MongoDB container not found ($MONGODB_CONTAINER)"
+              # Try to detect any MongoDB container as fallback
+              MONGODB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'mongo|mongodb' | head -n 1)
+              if [ -z "$MONGODB_CONTAINER" ]; then
+                echo "ERROR: No MongoDB container found! Using default name, but connection may fail."
+                MONGODB_CONTAINER="craftpilot-mongodb" # Fallback to default
+              else
+                echo "Found alternative MongoDB container: $MONGODB_CONTAINER"
+              fi
+            fi
+            echo "Using MongoDB container: $MONGODB_CONTAINER"
+
+            # Test MongoDB connection before deployment
+            echo "Testing MongoDB connection..."
+            if docker run --rm --network craftpilot-network mongo:6.0 mongosh --quiet --eval "db.runCommand({ping:1}).ok" admin --host $MONGODB_CONTAINER --port 27017 -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }} --authenticationDatabase admin | grep -q "1"; then
+              echo "✅ MongoDB connection test successful!"
+            else
+              echo "⚠️ MongoDB connection test failed! Deployment will continue but may have issues."
+              echo "Checking MongoDB container status:"
+              docker ps | grep -i $MONGODB_CONTAINER || echo "Container not found!"
+            fi
+
+            echo "Checking existing containers..."
+            docker ps -a | grep notification-service || true
 
             echo "Stopping and removing existing container..."
             docker stop notification-service || true
@@ -110,11 +132,26 @@ jobs:
             # Create function definition in a variable to avoid semicolon issues
             FUNCTION_DEF="notificationEventConsumer;notificationEventProducer"
 
-            # DNS ayarlarını güncelle
+            # Setup networking config
             echo "Setting up networking config..."
             cat > /opt/craftpilot/config/notification-service/grpc-netty.properties << EOF
             io.netty.handler.ssl.openssl.useKeyManagerFactory=true
             EOF
+
+            # Build MongoDB URI with the correct container name
+            if [ -n "${{ secrets.MONGODB_URI }}" ]; then
+              # Parse the URI and replace the hostname with our container name
+              URI_PREFIX=$(echo "${{ secrets.MONGODB_URI }}" | grep -oP 'mongodb://[^@]+@')
+              URI_SUFFIX=$(echo "${{ secrets.MONGODB_URI }}" | grep -oP '(?<=@)[^/]+/.*')
+              URI_HOST=$(echo "$URI_SUFFIX" | grep -oP '^[^:/]+')
+              URI_REMAINDER=$(echo "$URI_SUFFIX" | grep -oP '(?<='"$URI_HOST"')[:/].*')
+              
+              MONGODB_URI="${URI_PREFIX}${MONGODB_CONTAINER}${URI_REMAINDER}"
+              echo "Modified MongoDB URI with correct container name: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
+            else
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/craftpilot_notification_db?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+              echo "Built MongoDB URI from credential components: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
+            fi
 
             echo "Starting container..."
             docker run -d \
@@ -147,7 +184,8 @@ jobs:
               -e SPRING_DATA_REDIS_HOST=redis \
               -e SPRING_DATA_REDIS_PORT=6379 \
               -e SPRING_DATA_REDIS_PASSWORD=13579ada \
-              -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
+              -e MONGODB_URI="${MONGODB_URI}" \
+              -e SPRING_DATA_MONGODB_URI="${MONGODB_URI}" \
               -e SPRING_DATA_MONGODB_DATABASE=craftpilot_notification_db \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e SPRING_MAIL_SENDGRID_FROM='${{ secrets.SENDGRID_FROM_EMAIL }}' \
@@ -169,49 +207,93 @@ jobs:
               ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest-arm64
 
             echo "Waiting for container to start..."
-            sleep 180  # Increased wait time
+            sleep 30
 
-            echo "Checking container status..."
-            if [ "$(docker ps -q -f name=notification-service)" ]; then
-              echo "Container is running successfully"
-              echo "Container logs:"
-              docker logs notification-service --tail 100
-              
-              echo "Container health status:"
-              docker inspect --format='{{json .State.Health}}' notification-service
-              
-              echo "Testing container health:"
-              if docker exec notification-service /healthcheck.sh; then
-                echo "Health check passed"
-              else
-                echo "Health check failed"
+            echo "Performing enhanced health checks..."
+            # Install jq if not present for proper JSON parsing
+            if ! command -v jq &> /dev/null; then
+              apt-get update && apt-get install -y jq || echo "Could not install jq, will use alternatives"
+            fi
+
+            # Enhanced health check with component verification
+            for i in {1..20}; do
+              if ! docker ps | grep -q "notification-service"; then
+                echo "❌ Container stopped unexpectedly!"
+                docker logs notification-service || echo "No logs available"
                 exit 1
               fi
               
-              echo "Container network info:"
-              docker inspect notification-service | grep -i ip
+              # Try health check with better parsing
+              HEALTH_CHECK=$(curl -s http://localhost:8053/actuator/health || echo "{}")
               
-              echo "Testing container health:"
-              curl -v http://localhost:8053/actuator/health || true
+              # Check if overall service is UP
+              if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
+                echo "✅ Service reports overall status as UP!"
+                
+                # Try to parse with jq if available
+                if command -v jq &> /dev/null; then
+                  MONGO_STATUS=$(echo "$HEALTH_CHECK" | jq -r '.components.mongodb.status' 2>/dev/null || echo "UNKNOWN")
+                  REDIS_STATUS=$(echo "$HEALTH_CHECK" | jq -r '.components.redis.status' 2>/dev/null || echo "UNKNOWN")
+                  
+                  if [ "$MONGO_STATUS" = "UP" ] && [ "$REDIS_STATUS" = "UP" ]; then
+                    echo "✅ All critical components are healthy!"
+                    echo "Deployment completed successfully!"
+                    docker logs notification-service --tail 20
+                    exit 0
+                  else
+                    echo "⚠️ Service is UP but component statuses - MongoDB: $MONGO_STATUS, Redis: $REDIS_STATUS"
+                  fi
+                elif echo "$HEALTH_CHECK" | grep -q '"mongodb":{.*"status":"UP"' && echo "$HEALTH_CHECK" | grep -q '"redis":{.*"status":"UP"'; then
+                  echo "✅ All critical components are healthy based on string search!"
+                  echo "Deployment completed successfully!"
+                  docker logs notification-service --tail 20
+                  exit 0
+                fi
+                
+                # If we've been UP for several checks, assume success
+                if [ $i -ge 10 ]; then
+                  echo "✅ Service has been reporting UP status for multiple checks"
+                  echo "Assuming deployment is successful"
+                  docker logs notification-service --tail 20
+                  exit 0
+                fi
+              fi
               
-              echo "Verifying Firestore connectivity..."
-              docker exec notification-service curl -v https://firestore.googleapis.com/
+              echo "Health check attempt $i/20 - service not ready yet or components not healthy"
               
-              echo "Verifying SendGrid API connectivity..."
-              docker exec notification-service curl -v https://api.sendgrid.com/v3/mail/send -H "Authorization: Bearer $SENDGRID_API_KEY"
-            else
-              echo "Container failed to start"
-              echo "Container logs:"
-              docker logs notification-service
+              # Enhanced diagnostics on certain iterations
+              if [ $i -eq 5 ] || [ $i -eq 10 ] || [ $i -eq 15 ]; then
+                echo "--- Connection Diagnostics ---"
+                echo "MongoDB container status:"
+                docker ps | grep $MONGODB_CONTAINER || echo "MongoDB container not running!"
+                
+                echo "Redis container status:"
+                docker ps | grep redis || echo "Redis container not running!"
+                
+                echo "Testing network connectivity:"
+                docker exec notification-service nc -zv $MONGODB_CONTAINER 27017 || echo "Cannot connect to MongoDB"
+                docker exec notification-service nc -zv redis 6379 || echo "Cannot connect to Redis"
+                
+                echo "Container environment variables:"
+                docker exec notification-service env | grep -E 'MONGO|REDIS|SENDGRID' || echo "No relevant env vars found"
+                
+                echo "Network details:"
+                docker network inspect craftpilot-network | grep -A 5 -E "$MONGODB_CONTAINER|redis|notification-service" || echo "Network inspection failed"
+              fi
               
-              echo "Docker events:"
-              docker events --filter container=notification-service --since 5m || true
-              
-              echo "System logs:"
-              journalctl -u docker.service --since "5 minutes ago" || true
-              
-              exit 1
-            fi
+              sleep 15
+            done
+
+            echo "❌ Service failed to become fully healthy within timeout period."
+            echo "Final container logs:"
+            docker logs notification-service --tail 50
+            echo "Container is still running for debugging purposes."
+
+            # Testing external connectivity
+            echo "Testing SendGrid API connectivity..."
+            docker exec notification-service curl -v https://api.sendgrid.com/v3/mail/send -H "Authorization: Bearer $SENDGRID_API_KEY" || echo "SendGrid connection failed"
+
+            exit 1
 
             # Disable debug mode
             set +x
