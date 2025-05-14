@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.ReactiveHealthIndicator;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 /**
@@ -11,6 +12,7 @@ import reactor.core.publisher.Mono;
  */
 @Deprecated
 @Slf4j
+@Component("legacyRedisHealthIndicator") // Bean adını değiştirdim, çakışmayı önlemek için
 @ConditionalOnProperty(name = "craftpilot.redis.legacy-health-indicator-enabled", havingValue = "true", matchIfMissing = false)
 public class RedisHealthIndicator implements ReactiveHealthIndicator {
 
