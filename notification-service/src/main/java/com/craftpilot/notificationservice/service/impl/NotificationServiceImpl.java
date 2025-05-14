@@ -137,6 +137,7 @@ public class NotificationServiceImpl implements NotificationService {
         notification.setScheduledAt(request.getScheduledAt());
         notification.setCreatedAt(LocalDateTime.now());
         notification.setRead(false);
+        notification.setDeleted(false); // Varsayılan olarak false ayarla
         return Mono.just(notification);
     }
 

@@ -46,6 +46,10 @@ public class Notification {
     private boolean read;
     private boolean processed;
     private LocalDateTime processedTime;
+    private boolean deleted; // Eklenen alan
+
+    @Version
+    private Long version;
 
     // Yardımcı metotlar - Instant - LocalDateTime dönüşümleri için
     public Instant getScheduledAtAsInstant() {
