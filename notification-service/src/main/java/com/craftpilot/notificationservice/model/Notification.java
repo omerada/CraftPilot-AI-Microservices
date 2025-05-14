@@ -47,10 +47,10 @@ public class Notification {
     private boolean processed;
     private LocalDateTime processedTime;
      
-    // Explicit getter/setter metotlarını düzgün bir şekilde tanımlıyoruz
+    // Explicit boolean field and accessors
     private boolean deleted;
     
-    // Spring Data semantiğine uygun getter
+    // Spring Data MongoDB için boolean getter/setter metodları - özellikle isDeleted() metodu önemli
     public boolean isDeleted() {
         return deleted;
     }
@@ -58,8 +58,8 @@ public class Notification {
     public void setDeleted(boolean deleted) {
         this.deleted = deleted;
     }
-
-    // Spring Data için alternatif getter (nullable tipler için)
+    
+    // Alternatif BoxedType getter - Kullanımda tutuyoruz, ancak asıl isDeleted() metodu kullanılacak
     public Boolean getDeleted() {
         return deleted;
     }

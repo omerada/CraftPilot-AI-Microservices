@@ -77,7 +77,7 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public Flux<NotificationResponse> getUserNotifications(String userId, boolean onlyUnread) {
         return (onlyUnread ? notificationRepository.findByUserIdAndRead(userId, false)
-                : notificationRepository.findByUserIdAndDeletedFalse(userId))
+                : notificationRepository.findByUserIdAndDeletedIsFalse(userId))
                 .map(NotificationResponse::fromEntity)
                 .doOnComplete(() -> log.debug("Retrieved notifications for user: {}", userId));
     }

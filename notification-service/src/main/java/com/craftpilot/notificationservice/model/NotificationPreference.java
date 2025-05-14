@@ -44,4 +44,16 @@ public class NotificationPreference {
     public boolean isDeleted() {
         return deleted;
     }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerified;
+    }
+
+    public boolean isPhoneVerified() {
+        return phoneVerified;
+    }
 }
