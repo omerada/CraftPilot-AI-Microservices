@@ -196,16 +196,3 @@ kafka:
   topics:
     subscription-events: subscription-events
     payment-events: payment-events
-
-# Kafka yapılandırması
-spring:
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
-    consumer:
-      group-id: ${spring.application.name}-group
-      auto-offset-reset: earliest
-    admin:
-      fail-fast: false
-      auto-create: ${KAFKA_ADMIN_AUTO_CREATE:false}
-      operations-timeout: 10000
-      close-timeout: 10000
