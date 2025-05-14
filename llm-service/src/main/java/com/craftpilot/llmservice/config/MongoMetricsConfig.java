@@ -52,8 +52,10 @@ public class MongoMetricsConfig {
                                 double available = connections.getInteger("available", 0);
 
                                 meterRegistry.gauge("mongodb.connections.current",
-                                        Tags.of("database", mongoTemplate.getDatabaseName()), // Changed from
-                                                                                              // getDb().getName()
+                                        Tags.of("database", mongoTemplate.getMongoDatabase().block().getName()), // getDatabaseName()
+                                                                                                                 // yerine
+                                                                                                                 // getMongoDatabase().block().getName()
+                                                                                                                 // kullanıldı
                                         connectionPoolSize,
                                         ref -> current);
 

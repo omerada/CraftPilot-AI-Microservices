@@ -108,7 +108,7 @@ public class PerformanceService {
                                 .url("")
                                 .status("TIMEOUT")
                                 .message("Analysis job timed out after 60 seconds, please try again later")
-                                .timestamp(System.currentTimeMillis())
+                                .timestamp(LocalDateTime.now())
                                 .build());
                     }
                     return Mono.error(e);
