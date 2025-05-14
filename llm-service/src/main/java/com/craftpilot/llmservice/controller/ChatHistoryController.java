@@ -2,8 +2,7 @@ package com.craftpilot.llmservice.controller;
 
 import com.craftpilot.llmservice.model.ChatHistory;
 import com.craftpilot.llmservice.model.Conversation;
-import com.craftpilot.llmservice.service.ChatHistoryService;
-import com.google.cloud.Timestamp;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -36,9 +35,11 @@ public class ChatHistoryController {
             @RequestParam(required = false) String searchQuery,
             @RequestParam(required = false, defaultValue = "updatedAt") String sortBy,
             @RequestParam(required = false, defaultValue = "desc") String sortOrder,
-            @RequestParam(required = false) Boolean showArchived) { 
-        
-        return chatHistoryService.getChatHistoriesByUserIdCategorized(userId, page, pageSize, categories, searchQuery, sortBy, sortOrder, showArchived)
+            @RequestParam(required = false) Boolean showArchived) {
+
+        return chatHistoryService
+                .getChatHistoriesByUserIdCategorized(userId, page, pageSize, categories, searchQuery, sortBy, sortOrder,
+                        showArchived)
                 .map(response -> ResponseEntity.ok(response))
                 .onErrorResume(error -> {
                     log.error("Sohbet geçmişi alınırken hata: {}", error.getMessage());
@@ -56,7 +57,7 @@ public class ChatHistoryController {
         emptyCategories.put("lastWeek", new CategoryData(List.of(), 0));
         emptyCategories.put("lastMonth", new CategoryData(List.of(), 0));
         emptyCategories.put("older", new CategoryData(List.of(), 0));
-        
+
         PaginationInfo pagination = PaginationInfo.builder()
                 .currentPage(page)
                 .totalPages(0)
@@ -64,7 +65,7 @@ public class ChatHistoryController {
                 .totalItems(0)
                 .hasMore(false)
                 .build();
-        
+
         return PaginatedChatHistoryResponse.builder()
                 .categories(emptyCategories)
                 .pagination(pagination)
@@ -72,8 +73,8 @@ public class ChatHistoryController {
     }
 
     @GetMapping("/histories/{id}")
-    public Mono<ResponseEntity<ChatHistory>> getChatHistoryById(@PathVariable String id) { 
-        
+    public Mono<ResponseEntity<ChatHistory>> getChatHistoryById(@PathVariable String id) {
+
         return chatHistoryService.getChatHistoryById(id)
                 .map(history -> ResponseEntity.ok(history))
                 .onErrorResume(error -> {
@@ -84,13 +85,13 @@ public class ChatHistoryController {
     }
 
     @PostMapping("/histories")
-    public Mono<ResponseEntity<ChatHistory>> createChatHistory(@RequestBody ChatHistory chatHistory) { 
-        
+    public Mono<ResponseEntity<ChatHistory>> createChatHistory(@RequestBody ChatHistory chatHistory) {
+
         // String veya Long olarak gelen timestamp değerlerini işle
         processTimestamps(chatHistory);
-        
+
         return chatHistoryService.createChatHistory(chatHistory)
-                .map(createdHistory -> { 
+                .map(createdHistory -> {
                     return ResponseEntity.status(HttpStatus.CREATED).body(createdHistory);
                 })
                 .onErrorResume(error -> {
@@ -100,8 +101,9 @@ public class ChatHistoryController {
     }
 
     @PutMapping("/histories/{id}")
-    public Mono<ResponseEntity<ChatHistory>> updateChatHistory(@PathVariable String id, @RequestBody ChatHistory chatHistory) { 
-        
+    public Mono<ResponseEntity<ChatHistory>> updateChatHistory(@PathVariable String id,
+            @RequestBody ChatHistory chatHistory) {
+
         chatHistory.setId(id);
         return chatHistoryService.updateChatHistory(chatHistory)
                 .map(updated -> ResponseEntity.ok(updated))
@@ -115,8 +117,8 @@ public class ChatHistoryController {
     @DeleteMapping("/histories/{id}")
     public Mono<ResponseEntity<Void>> deleteChatHistory(
             @RequestHeader("X-User-Id") String userId,
-            @PathVariable String id) { 
-        
+            @PathVariable String id) {
+
         return chatHistoryService.deleteChatHistory(userId, id)
                 .thenReturn(ResponseEntity.noContent().<Void>build())
                 .onErrorResume(error -> {
@@ -126,11 +128,12 @@ public class ChatHistoryController {
     }
 
     @PostMapping("/histories/{id}/conversations")
-    public Mono<ResponseEntity<ChatHistory>> addConversation(@PathVariable String id, @RequestBody Conversation conversation) { 
-        
+    public Mono<ResponseEntity<ChatHistory>> addConversation(@PathVariable String id,
+            @RequestBody Conversation conversation) {
+
         // Process timestamp if needed
         processConversationTimestamp(conversation);
-        
+
         return chatHistoryService.addConversation(id, conversation)
                 .map(updated -> {
                     // Mesaj ekleme başarılı oldu, tüm orderIndex'leri logla
@@ -138,10 +141,10 @@ public class ChatHistoryController {
                         StringBuilder sb = new StringBuilder("Güncel mesaj sıralaması - Chat ID: " + id + " - ");
                         for (Conversation c : updated.getConversations()) {
                             sb.append(c.getOrderIndex())
-                              .append("(").append(c.getRole()).append("), ");
-                        } 
+                                    .append("(").append(c.getRole()).append("), ");
+                        }
                     }
-                     
+
                     return ResponseEntity.ok(updated);
                 })
                 .onErrorResume(error -> {
@@ -154,11 +157,11 @@ public class ChatHistoryController {
     @PostMapping("/histories/{id}/update-title")
     public Mono<ResponseEntity<ChatHistory>> updateChatHistoryTitlePost(
             @PathVariable String id,
-            @RequestBody TitleUpdateRequest request) { 
+            @RequestBody TitleUpdateRequest request) {
         return chatHistoryService.getChatHistoryById(id)
                 .flatMap(chatHistory -> {
                     chatHistory.setTitle(request.getTitle());
-                    chatHistory.setUpdatedAt(Timestamp.now());
+                    chatHistory.setUpdatedAt(LocalDateTime.now());
                     return chatHistoryService.updateChatHistory(chatHistory);
                 })
                 .map(ResponseEntity::ok)
@@ -172,8 +175,8 @@ public class ChatHistoryController {
     @PostMapping("/histories/{id}/do-archive")
     public Mono<ResponseEntity<ChatHistory>> archiveChatHistoryPost(
             @RequestHeader("X-User-Id") String userId,
-            @PathVariable String id) { 
-        
+            @PathVariable String id) {
+
         return chatHistoryService.archiveChatHistory(userId, id)
                 .map(ResponseEntity::ok)
                 .onErrorResume(error -> {
@@ -190,8 +193,7 @@ public class ChatHistoryController {
             @RequestParam(required = false, defaultValue = "20") int limit,
             @RequestParam(required = false, defaultValue = "updated") String order,
             @RequestParam(required = false) Boolean showArchived) {
-         
-        
+
         return chatHistoryService.getFlatChatHistoriesByUserId(userId, offset, limit, order, showArchived)
                 .map(ResponseEntity::ok)
                 .onErrorResume(error -> {
@@ -219,19 +221,19 @@ public class ChatHistoryController {
     }
 
     /**
-     * Frontend'den gelen timestamp değerlerini Google Cloud Timestamp'e dönüştürür
+     * Frontend'den gelen timestamp değerlerini LocalDateTime'a dönüştürür
      */
     private void processTimestamps(ChatHistory chatHistory) {
         try {
             // createdAt ve updatedAt alanları null ise şu anki zamanı kullan
-            if (chatHistory.getCreatedAt() == null) { 
-                chatHistory.setCreatedAt(Timestamp.now());
+            if (chatHistory.getCreatedAt() == null) {
+                chatHistory.setCreatedAt(LocalDateTime.now());
             }
-            
-            if (chatHistory.getUpdatedAt() == null) { 
-                chatHistory.setUpdatedAt(Timestamp.now());
+
+            if (chatHistory.getUpdatedAt() == null) {
+                chatHistory.setUpdatedAt(LocalDateTime.now());
             }
-            
+
             // Eğer conversations listesi varsa içindeki timestamp değerlerini de işle
             if (chatHistory.getConversations() != null) {
                 chatHistory.getConversations().forEach(this::processConversationTimestamp);
@@ -239,8 +241,8 @@ public class ChatHistoryController {
         } catch (Exception e) {
             log.error("Timestamp işlenirken hata: {}", e.getMessage());
             // Hata durumunda yeni timestamp'ler oluştur
-            chatHistory.setCreatedAt(Timestamp.now());
-            chatHistory.setUpdatedAt(Timestamp.now());
+            chatHistory.setCreatedAt(LocalDateTime.now());
+            chatHistory.setUpdatedAt(LocalDateTime.now());
         }
     }
 
@@ -249,20 +251,20 @@ public class ChatHistoryController {
      */
     private void processConversationTimestamp(Conversation conversation) {
         try {
-            if (conversation.getTimestamp() == null) { 
-                conversation.setTimestamp(Timestamp.now());
+            if (conversation.getTimestamp() == null) {
+                conversation.setTimestamp(LocalDateTime.now());
             }
         } catch (Exception e) {
             log.error("Conversation timestamp işlenirken hata: {}", e.getMessage());
-            conversation.setTimestamp(Timestamp.now());
+            conversation.setTimestamp(LocalDateTime.now());
         }
     }
 
     @PostMapping("/histories/{id}/do-unarchive")
     public Mono<ResponseEntity<ChatHistory>> unarchiveChatHistoryPost(
             @RequestHeader("X-User-Id") String userId,
-            @PathVariable String id) { 
-        
+            @PathVariable String id) {
+
         return chatHistoryService.unarchiveChatHistory(userId, id)
                 .map(ResponseEntity::ok)
                 .onErrorResume(error -> {
@@ -280,8 +282,7 @@ public class ChatHistoryController {
             @RequestParam(required = false) String searchQuery,
             @RequestParam(required = false, defaultValue = "updatedAt") String sortBy,
             @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
-         
-        
+
         return chatHistoryService.getArchivedChatHistories(userId, page, pageSize, searchQuery, sortBy, sortOrder)
                 .map(ResponseEntity::ok)
                 .onErrorResume(error -> {

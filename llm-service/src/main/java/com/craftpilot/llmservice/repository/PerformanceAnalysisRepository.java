@@ -1,7 +1,6 @@
 package com.craftpilot.llmservice.repository;
 
 import com.craftpilot.llmservice.model.performance.PerformanceAnalysisResponse;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.Aggregation;
 import org.springframework.data.mongodb.repository.Query;
@@ -13,7 +12,6 @@ import reactor.core.publisher.Mono;
 import java.time.LocalDateTime;
 
 @Repository
-@Slf4j
 public interface PerformanceAnalysisRepository extends ReactiveMongoRepository<PerformanceAnalysisResponse, String> {
 
     Flux<PerformanceAnalysisResponse> findByUrl(String url);
