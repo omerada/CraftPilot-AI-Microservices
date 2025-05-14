@@ -236,3 +236,12 @@ app:
   models:
     file: ${MODELS_FILE:newmodels.json}
     version: ${MODELS_VERSION:1}
+
+# Firebase Yapılandırması
+firebase:
+  enabled: true
+  required: false
+  credentials:
+    path: /gcp/credentials/gcp-credentials.json
+    alternate-paths: /craftpilot/gcp-credentials.json,/app/gcp-credentials.json
+    # base64 değişkeni ortam değişkeninden alınacak şekilde boş bırakılmıştır

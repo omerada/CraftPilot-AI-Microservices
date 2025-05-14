@@ -9,6 +9,7 @@ import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
 import com.craftpilot.userservice.exception.UserNotFoundException;
 import com.craftpilot.userservice.exception.AuthenticationException;
+import com.craftpilot.userservice.config.FirebaseConfig;
 
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,22 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final FirebaseAuth firebaseAuth;
+    private final boolean firebaseEnabled;
+
+    @Autowired
+    public UserService(
+            UserRepository userRepository,
+            FirebaseAuth firebaseAuth) {
+        this.userRepository = userRepository;
+        this.firebaseAuth = firebaseAuth;
+        this.firebaseEnabled = firebaseAuth != null;
+
+        if (!firebaseEnabled) {
+            log.warn("Firebase authentication is disabled - some authentication features may not work");
+        } else {
+            log.info("Firebase authentication is enabled");
+        }
+    }
 
     /**
      * Token doğrulama ve kullanıcı getirme işlemini MongoDB kullanarak yapar
@@ -35,6 +52,11 @@ public class UserService {
      * @return User objesi
      */
     public Mono<User> verifyTokenAndGetUser(String token) {
+        if (!firebaseEnabled) {
+            log.warn("Firebase authentication is disabled - token validation will be skipped");
+            return Mono.error(new AuthenticationException("Firebase authentication is disabled"));
+        }
+
         return Mono.fromCallable(() -> {
             try {
                 FirebaseToken decodedToken = firebaseAuth.verifyIdToken(token);

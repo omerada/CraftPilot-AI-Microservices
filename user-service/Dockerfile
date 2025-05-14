@@ -46,8 +46,16 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 # Firebase için gerekli konfigürasyon dizini oluştur
 RUN mkdir -p /app/config
+
+# Kimlik bilgileri için dizinleri oluştur
+RUN mkdir -p /gcp/credentials /craftpilot /app/config
+
 VOLUME /app/config
+
+# Kimlik bilgilerini ortam değişkenlerinden aktarma için entrypoint script'i
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 EXPOSE 8090
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["/entrypoint.sh"]
