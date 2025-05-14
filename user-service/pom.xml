@@ -31,7 +31,7 @@
 		<resilience4j.version>2.1.0</resilience4j.version>
 		<lombok.version>1.18.30</lombok.version>
 		<mapstruct.version>1.5.5.Final</mapstruct.version>
-		<firebase-admin.version>9.2.0</firebase-admin.version>
+		<!-- Firebase bağımlılığı kaldırıldı -->
 		<mongodb-driver.version>4.11.1</mongodb-driver.version>
 	</properties>
 
@@ -123,19 +123,6 @@
 			<artifactId>mapstruct</artifactId>
 			<version>${mapstruct.version}</version>
 		</dependency>
-
-		 <!-- Firebase Admin - Only for Authentication -->
-        <dependency>
-            <groupId>com.google.firebase</groupId>
-            <artifactId>firebase-admin</artifactId>
-            <version>${firebase-admin.version}</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>com.google.cloud</groupId>
-                    <artifactId>google-cloud-firestore</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
 
         <!-- Kafka -->
         <dependency>

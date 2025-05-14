@@ -33,29 +33,21 @@ WORKDIR /app
 # Copy jar file
 COPY --from=builder /build/user-service/target/*.jar app.jar
 
-# MongoDB için çalışma zamanı ayarları
+# Çalışma zamanı ayarları
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=false
 ENV SPRING_APPLICATION_MONGODB_URI=""
 ENV SPRING_APPLICATION_MONGODB_DATABASE=user-service
-ENV GOOGLE_APPLICATION_CREDENTIALS=/app/config/firebase-credentials.json
 
 # Health check ekliyorum
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD wget -q --no-check-certificate -O /dev/null http://localhost:8090/actuator/health || exit 1
+    CMD wget -q --no-check-certificate -O /dev/null http://localhost:8080/actuator/health || exit 1
 
-# Firebase için gerekli konfigürasyon dizini oluştur
+# App config dizini oluştur
 RUN mkdir -p /app/config
 
-# Kimlik bilgileri için dizinleri oluştur
-RUN mkdir -p /gcp/credentials /craftpilot /app/config
+# Expose port
+EXPOSE 8080
 
-VOLUME /app/config
-
-# Kimlik bilgilerini ortam değişkenlerinden aktarma için entrypoint script'i
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-EXPOSE 8090
-
-ENTRYPOINT ["/entrypoint.sh"]
+# Basitleştirilmiş entrypoint - Firebase kaldırıldığından entrypoint.sh yerine doğrudan JAR'ı çalıştırıyoruz
+CMD ["java", "-jar", "/app/app.jar"]

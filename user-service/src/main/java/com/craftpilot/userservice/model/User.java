@@ -24,7 +24,7 @@ public class User {
     private String id;
 
     @Indexed(unique = true)
-    private String uid; // Firebase Auth UID
+    private String externalId; // Firebase UID yerine daha genel bir tanımlayıcı
 
     private String name;
 
@@ -43,11 +43,30 @@ public class User {
 
     @LastModifiedDate
     private LocalDateTime updatedAt;
+    
+    // UserService sınıfında kullanılacak ek alanlar ve metotlar
+    private LocalDateTime lastLoginAt;
+    
+    public void setLastLoginAt(LocalDateTime lastLoginAt) {
+        this.lastLoginAt = lastLoginAt;
+    }
+    
+    public String getDisplayName() {
+        return this.name;
+    }
+    
+    public void setDisplayName(String name) {
+        this.name = name;
+    }
+    
+    public void setLastUpdatedAt(LocalDateTime lastUpdatedAt) {
+        this.updatedAt = lastUpdatedAt;
+    }
 
-    // Firestore'dan geçiş yardımcı yöntemi
-    public static User fromMap(Map<String, Object> data, String uid) {
+    // Veri dönüştürme yardımcı yöntemi
+    public static User fromMap(Map<String, Object> data, String externalId) {
         User user = new User();
-        user.setUid(uid);
+        user.setExternalId(externalId);
 
         if (data.containsKey("name")) {
             user.setName((String) data.get("name"));

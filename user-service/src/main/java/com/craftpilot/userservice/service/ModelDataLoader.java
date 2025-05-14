@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -71,7 +71,8 @@ public class ModelDataLoader {
                                     if (models != null) {
                                         return Flux.fromIterable(models)
                                                 .map(model -> {
-                                                    model.setProviderId(savedProvider.getId());
+                                                    // AIModel.provider alanını kullanarak providerId'yi tanımlama
+                                                    model.setProvider(savedProvider.getName());
                                                     return model;
                                                 })
                                                 .flatMap(modelRepository::save);
@@ -86,5 +87,21 @@ public class ModelDataLoader {
             log.error("JSON model verisi yüklenirken hata: {}", e.getMessage());
             return Mono.error(e);
         }
+    }
+    
+    /**
+     * Belirtilen JSON dosyasından modelleri yükler.
+     * ModelDataLoaderCommand için gereklidir.
+     * 
+     * @param jsonFilePath JSON dosya yolu
+     * @return Yüklenen model sayısı
+     */
+    public Mono<Integer> loadModelsFromJson(String jsonFilePath) {
+        if (jsonFilePath == null || jsonFilePath.isEmpty()) {
+            return Mono.error(new IllegalArgumentException("JSON dosya yolu belirtilmemiş"));
+        }
+        
+        log.info("Modeller {} dosyasından yükleniyor", jsonFilePath);
+        return loadModels(jsonFilePath);
     }
 }

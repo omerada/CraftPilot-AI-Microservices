@@ -1,6 +1,7 @@
 package com.craftpilot.userservice.controller;
 
 import com.craftpilot.userservice.model.user.entity.UserEntity;
+import com.craftpilot.userservice.model.user.User;
 import com.craftpilot.userservice.model.user.enums.UserStatus;
 import com.craftpilot.userservice.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,7 +16,7 @@ import reactor.core.publisher.Mono;
 import java.util.Map;
 
 /**
- * REST controller for managing user-related operations using Firebase
+ * REST controller for managing user-related operations using JWT/OAuth
  * Authentication and MongoDB.
  */
 @Slf4j
@@ -29,10 +30,10 @@ public class UserController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Yeni kullanıcı oluştur", description = "Firebase token kullanarak yeni bir kullanıcı oluşturur ve benzersiz bir kullanıcı adı atar")
-    public Mono<UserEntity> createUser(@RequestHeader("Firebase-Token") String firebaseToken) {
+    @Operation(summary = "Yeni kullanıcı oluştur", description = "Token kullanarak yeni bir kullanıcı oluşturur ve benzersiz bir kullanıcı adı atar")
+    public Mono<UserEntity> createUser(@RequestHeader("Authorization") String authToken) {
         log.info("Yeni kullanıcı oluşturma isteği alındı");
-        return userService.verifyAndCreateUser(firebaseToken)
+        return userService.verifyAndCreateUser(authToken)
                 .doOnSuccess(user -> log.info("Kullanıcı başarıyla oluşturuldu: id={}, username={}", user.getId(),
                         user.getUsername()))
                 .doOnError(e -> log.error("Kullanıcı oluşturulurken hata: {}", e.getMessage()));
@@ -46,7 +47,7 @@ public class UserController {
         return userService.findById(id)
                 .map(user -> ResponseEntity.ok().body((Object) user))
                 .doOnSuccess(response -> {
-                    if (response.getStatusCode().is2xxSuccessful()) {
+                    if (response != null && response.getStatusCode().is2xxSuccessful()) {
                         log.info("Kullanıcı başarıyla getirildi: id={}", id);
                     }
                 })
@@ -64,8 +65,7 @@ public class UserController {
                             "error", "Internal Server Error",
                             "message", "Kullanıcı bilgisi alınırken bir hata oluştu",
                             "status", "500");
-                    return Mono
-                            .just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object) errorResponse));
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object) errorResponse));
                 });
     }
 
@@ -149,10 +149,10 @@ public class UserController {
     }
 
     @PostMapping("/sync")
-    @Operation(summary = "Firebase kullanıcısını senkronize et", description = "Firebase Authentication'dan gelen kullanıcıyı sistemle senkronize eder")
-    public Mono<UserEntity> syncFirebaseUser(@RequestHeader("Firebase-Token") String firebaseToken) {
-        log.info("Firebase kullanıcı senkronizasyon isteği alındı");
-        return userService.verifyAndCreateOrUpdateUser(firebaseToken)
+    @Operation(summary = "Kullanıcıyı senkronize et", description = "Authentication'dan gelen kullanıcıyı sistemle senkronize eder")
+    public Mono<UserEntity> syncUser(@RequestHeader("Authorization") String authToken) {
+        log.info("Kullanıcı senkronizasyon isteği alındı");
+        return userService.verifyAndCreateOrUpdateUser(authToken)
                 .doOnSuccess(user -> log.info("Kullanıcı başarıyla senkronize edildi: id={}", user.getId()))
                 .doOnError(e -> log.error("Kullanıcı senkronizasyonunda hata: {}", e.getMessage()));
     }

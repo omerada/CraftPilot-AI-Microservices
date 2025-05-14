@@ -18,7 +18,7 @@ import org.springframework.data.mongodb.core.index.ReactiveIndexOperations;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
