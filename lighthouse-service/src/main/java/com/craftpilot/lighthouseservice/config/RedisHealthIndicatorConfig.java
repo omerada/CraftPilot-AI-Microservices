@@ -19,7 +19,7 @@ public class RedisHealthIndicatorConfig {
     @Value("${lighthouse.redis.connection.retry-delay-ms:3000}")
     private long retryDelayMs;
 
-    @Bean
+    @Bean(name = "lighthouseRedisHealthIndicator") // Bean adını benzersiz hale getirdik
     public ReactiveHealthIndicator redisHealthIndicator(ReactiveRedisConnectionFactory connectionFactory) {
         return () -> checkRedisConnection(connectionFactory)
                     .timeout(Duration.ofMillis(2000))

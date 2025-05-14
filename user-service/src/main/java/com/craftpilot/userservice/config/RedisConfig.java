@@ -16,6 +16,9 @@ import org.springframework.context.annotation.Import;
  * Not: Bu sınıf redis-client-lib kütüphanesinin otomatik yapılandırmasını import eder
  * ve sadece özel ayarları içerir. Tüm temel Redis bağlantısı ve yapılandırması
  * RedisClientAutoConfiguration tarafından sağlanmaktadır.
+ * 
+ * HealthIndicator için de redis-client-lib tarafından sağlanan RedisHealthIndicator kullanılmaktadır.
+ * Bu nedenle burada özel bir HealthIndicator tanımı bulunmamaktadır.
  */
 @Configuration
 @Import(RedisClientAutoConfiguration.class)
