@@ -19,6 +19,8 @@ public interface NotificationRepository extends ReactiveMongoRepository<Notifica
 
     Flux<Notification> findByUserIdAndRead(String userId, boolean read);
 
+    // Replace the problematic method with a custom MongoDB query
+    @Query("{ 'scheduledAt': { $gt: ?0 }, 'deleted': false }")
     Flux<Notification> findByScheduledAtAfterAndDeletedFalseOrderByScheduledAtAsc(Instant time);
 
     Flux<Notification> findByScheduledAtAfter(LocalDateTime dateTime);

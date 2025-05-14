@@ -46,10 +46,9 @@ public class Notification {
     private boolean read;
     private boolean processed;
     private LocalDateTime processedTime;
-     
-    @org.springframework.data.mongodb.core.mapping.Field("deleted")
+      
     private boolean deleted;
-    
+     
     public boolean isDeleted() {
         return deleted;
     }
