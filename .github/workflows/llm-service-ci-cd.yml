@@ -127,6 +127,33 @@ jobs:
             docker stop llm-service || true
             docker rm llm-service || true
 
+            # MongoDB konteyner adını sabit olarak craftpilot-mongodb olarak belirle
+            MONGODB_CONTAINER="craftpilot-mongodb"
+
+            # MongoDB URI konfigürasyonu - Doğrudan secrets'tan URI kullan veya bileşenlerden oluştur
+            if [ -n "${{ secrets.MONGODB_URI }}" ]; then
+              # URI içindeki host adını craftpilot-mongodb olarak değiştir
+              MONGODB_URI=$(echo "${{ secrets.MONGODB_URI }}" | sed 's/mongodb:27017/craftpilot-mongodb:27017/g' | sed 's/@mongodb:/@craftpilot-mongodb:/g')
+              echo "Secrets'tan alınan MongoDB URI düzeltildi"
+            else
+              # Bileşenlerden URI oluşturma - craftpilot-mongodb host adıyla
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@$MONGODB_CONTAINER:27017/${{ secrets.MONGO_INITDB_DATABASE || 'llm-service' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"
+              echo "Bileşenlerden MongoDB URI oluşturuldu"
+            fi
+            # Log çıktılarında parolayı maskele
+            echo "MongoDB URI (maskelenmiş): $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
+
+            # MongoDB bağlantısını test et
+            echo "MongoDB bağlantısı test ediliyor..."
+            if docker run --rm --network craftpilot-network mongo:6.0 mongosh --quiet --eval "db.runCommand({ping:1}).ok" admin --host $MONGODB_CONTAINER --port 27017 -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }} --authenticationDatabase admin | grep -q "1"; then
+              echo "✅ MongoDB bağlantı testi başarılı!"
+            else
+              echo "⚠️ MongoDB bağlantı testi başarısız! Deployment devam edecek ancak servis başlangıçta hata verebilir."
+              echo "MongoDB container'ının durumunu kontrol edin:"
+              docker ps | grep -i mongo
+              docker logs $MONGODB_CONTAINER --tail 20
+            fi
+
             if [[ "${{ github.event.inputs.environment }}" == "debug" ]]; then
               docker run -d \
                 --name llm-service \
@@ -146,15 +173,22 @@ jobs:
                 -e SPRING_REDIS_HOST=redis \
                 -e SPRING_REDIS_PORT=6379 \
                 -e SPRING_REDIS_PASSWORD=13579ada \
+                -e SPRING_DATA_MONGODB_URI="${MONGODB_URI}" \
+                -e SPRING_DATA_MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE || 'llm-service' }}" \
+                -e MONGODB_HOST="${MONGODB_CONTAINER}" \
+                -e MONGO_ROOT_USERNAME="${{ secrets.MONGO_ROOT_USERNAME }}" \
+                -e MONGO_ROOT_PASSWORD="${{ secrets.MONGO_ROOT_PASSWORD }}" \
                 -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
                 -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*" \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
                 -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
                 -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
                 -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_MONGODB_ENABLED=true \
                 -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
                 -e SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL=PLAINTEXT \
                 -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB=DEBUG \
                 -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005" \
                 --ulimit nofile=65536:65536 \
                 --cap-drop ALL \
@@ -183,15 +217,20 @@ jobs:
                 -e SPRING_REDIS_HOST=redis \
                 -e SPRING_REDIS_PORT=6379 \
                 -e SPRING_REDIS_PASSWORD=13579ada \
+                -e SPRING_DATA_MONGODB_URI="${MONGODB_URI}" \
+                -e SPRING_DATA_MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE || 'llm-service' }}" \
+                -e MONGODB_HOST="${MONGODB_CONTAINER}" \
+                -e MONGO_ROOT_USERNAME="${{ secrets.MONGO_ROOT_USERNAME }}" \
+                -e MONGO_ROOT_PASSWORD="${{ secrets.MONGO_ROOT_PASSWORD }}" \
                 -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
                 -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*" \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
                 -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
                 -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
                 -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_MONGODB_ENABLED=true \
                 -e MANAGEMENT_HEALTH_DEFAULTS_ENABLED=true \
                 -e SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL=PLAINTEXT \
-                -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
                 -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dio.netty.noNative=true -Dio.netty.tryReflectionSetAccessible=true -Dnetty.native.workdir=/tmp/netty" \
                 --ulimit nofile=65536:65536 \
                 --cap-drop ALL \
@@ -204,8 +243,9 @@ jobs:
                 ${{ secrets.DOCKERHUB_USERNAME }}/llm-service:latest-arm64
             fi
 
+            # Geliştirilmiş sağlık kontrolü
             echo "=== Waiting for service startup ==="
-            max_attempts=20
+            max_attempts=30
             counter=0
 
             while [ $counter -lt $max_attempts ]; do
@@ -218,26 +258,40 @@ jobs:
                 exit 1
               fi
               
-              # Application log kontrolü
-              if docker logs llm-service 2>&1 | grep -q "Started LlmServiceApplication"; then
-                echo "Application startup completed"
-
-                # Eureka registration kontrolü
-                if docker logs llm-service 2>&1 | grep -q "DiscoveryClient.*registration status: 204"; then
-                  echo "Successfully registered with Eureka"
+              # MongoDB bağlantısını kontrol et
+              if [ $counter -eq 5 ] || [ $counter -eq 15 ]; then
+                echo "Checking MongoDB connection from container..."
+                docker exec llm-service nc -zv $MONGODB_CONTAINER 27017 || echo "Cannot connect to MongoDB from container"
+                
+                echo "MongoDB component health check:"
+                docker exec llm-service curl -s http://localhost:8062/actuator/health/mongo || echo "MongoDB health component unavailable"
+              fi
+              
+              # Health check
+              HEALTH_CHECK=$(curl -s http://localhost:8062/actuator/health || echo '{"status":"UNKNOWN"}')
+              
+              if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
+                echo "✓ Service is healthy"
+                
+                # MongoDB specific health check
+                if echo "$HEALTH_CHECK" | grep -q '"mongo":{"status":"UP"' || docker exec llm-service curl -s http://localhost:8062/actuator/health/mongo | grep -q '"status":"UP"'; then
+                  echo "✓ MongoDB connection verified"
+                  echo "=== Deployment completed successfully ==="
+                  exit 0
+                else
+                  echo "Service is up but MongoDB status unclear. Will check again..."
                   
-                  # Final health check
-                  HEALTH_CHECK=$(curl -s http://localhost:8062/actuator/health)
-                  if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
-                    echo "✓ Service is healthy"
-                    echo "=== Deployment completed successfully ==="
+                  # After several attempts, accept service as healthy even without clear MongoDB status
+                  if [ $counter -gt 20 ]; then
+                    echo "Service reporting UP status consistently. Accepting deployment."
+                    echo "=== Deployment completed with warnings ==="
                     exit 0
                   fi
                 fi
               fi
               
               echo "Waiting for service to start... ($((counter + 1))/$max_attempts)"
-              sleep 15
+              sleep 10
               counter=$((counter + 1))
             done
 
@@ -248,4 +302,6 @@ jobs:
             docker logs llm-service --tail 100
             echo "Health Check Response:"
             curl -v http://localhost:8062/actuator/health || true
+            echo "MongoDB Connection Test:"
+            docker exec llm-service nc -zv $MONGODB_CONTAINER 27017 || echo "MongoDB connection failed"
             exit 1

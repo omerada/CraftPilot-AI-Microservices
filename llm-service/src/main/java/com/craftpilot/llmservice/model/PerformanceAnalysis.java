@@ -1,4 +1,5 @@
-package com.craftpilot.llmservice.model.performance;
+// Model sınıfını MongoDB için güncelleyelim
+package com.craftpilot.llmservice.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,33 +16,30 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "performance_analysis_responses")
-public class PerformanceAnalysisResponse {
-
+@Document(collection = "performance_analyses")
+public class PerformanceAnalysis {
     @Id
     private String id;
 
     @Indexed
     private String sessionId;
 
-    private String url;
+    @Indexed
+    private String userId;
 
     @Indexed
     private String modelId;
 
+    private String requestId;
+
     @Indexed
     private LocalDateTime timestamp;
 
-    private Long processingTimeMs;
-    private Integer inputTokens;
-    private Integer outputTokens;
+    private Long responseTimeMs;
+    private Integer promptTokens;
+    private Integer completionTokens;
     private Integer totalTokens;
 
-    private Double responseQualityScore;
-    private Map<String, Object> metrics;
     private Map<String, Object> metadata;
-
-    private String requestType;
-    private String status;
-    private String errorMessage;
+    private Map<String, Object> metrics;
 }
