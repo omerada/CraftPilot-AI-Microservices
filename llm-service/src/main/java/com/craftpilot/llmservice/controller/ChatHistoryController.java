@@ -2,6 +2,7 @@ package com.craftpilot.llmservice.controller;
 
 import com.craftpilot.llmservice.model.ChatHistory;
 import com.craftpilot.llmservice.model.Conversation;
+import com.craftpilot.llmservice.service.ChatHistoryService;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
