@@ -17,13 +17,6 @@ COPY --from=build /build/target/*.jar app.jar
 # Sağlık kontrolü için curl ekle
 RUN apt-get update && apt-get install -y curl jq
 
-# GCP credential dosyaları için dizini oluştur
-RUN mkdir -p /etc/gcp/credentials /secrets
-
-# Firestore/GCP credential dosyası için beklenen ortam değişkenlerini ayarla
-ENV GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json
-ENV SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/etc/gcp/credentials/gcp-credentials.json
-
 # JVM ayarları
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 ENV SERVER_PORT=8067

@@ -72,11 +72,10 @@
             <version>2.0.2</version>
         </dependency>
         
-        <!-- Google Cloud Firestore -->
+        <!-- MongoDB -->
         <dependency>
-            <groupId>com.google.cloud</groupId>
-            <artifactId>google-cloud-firestore</artifactId>
-            <version>3.7.10</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-mongodb-reactive</artifactId>
         </dependency>
         
         <!-- Spring Security WebFlux -->

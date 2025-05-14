@@ -24,6 +24,7 @@ public class ResponsePreferenceService {
             .flatMap(preference -> {
                 preference.setUserId(userId);
                 preference.setLanguage(request.getLanguage());
+                preference.setTone(request.getCommunicationStyle()); // Fix: set tone or create a mapping to communicationStyle
                 preference.setCommunicationStyle(request.getCommunicationStyle());
                 preference.setAdditionalPreferences(request.getAdditionalPreferences());
                 preference.setLastUpdated(LocalDateTime.now());

@@ -69,11 +69,24 @@ public class UserContextService {
             HashMap<String, List<Map<String, Object>>> groupedEntries = new HashMap<>();
             
             for (var entry : memory.getEntries()) {
-                String context = entry.containsKey("context") ? (String) entry.get("context") : "general";
+                // Fix: Use getContext() method instead of treating entry as a Map
+                String context = entry.getContext() != null ? entry.getContext() : "general";
                 if (!groupedEntries.containsKey(context)) {
                     groupedEntries.put(context, new ArrayList<>());
                 }
-                groupedEntries.get(context).add(entry);
+                
+                // Convert MemoryItem to Map for storage in groupedEntries
+                Map<String, Object> entryMap = new HashMap<>();
+                entryMap.put("content", entry.getContent());
+                entryMap.put("source", entry.getSource());
+                entryMap.put("context", entry.getContext());
+                entryMap.put("timestamp", entry.getTimestamp());
+                entryMap.put("importance", entry.getImportance());
+                if (entry.getMetadata() != null) {
+                    entryMap.put("metadata", entry.getMetadata());
+                }
+                
+                groupedEntries.get(context).add(entryMap);
             }
             
             response.setExtractedMemories(groupedEntries);
@@ -108,7 +121,9 @@ public class UserContextService {
             ResponsePreference pref = response.getResponsePreferences();
             context.append("KULLANICI TERCİHLERİ:\n");
             context.append("- Dil: ").append(pref.getLanguage()).append("\n");
-            context.append("- İletişim stili: ").append(pref.getCommunicationStyle()).append("\n\n");
+            // Fix: Use appropriate style field based on what's available
+            context.append("- İletişim stili: ").append(pref.getTone() != null ? pref.getTone() : 
+                          (pref.getCommunicationStyle() != null ? pref.getCommunicationStyle() : "Standard")).append("\n\n");
         }
         
         // Özel talimatları ekle

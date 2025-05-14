@@ -73,7 +73,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 
 **Olası Hatalar**:
 
-- 403 Forbidden: Firebase yetkilendirme hatası
+- 403 Forbidden: Yetkilendirme hatası
 - 500 Internal Server Error: Bellek işleme hatası
 
 #### Kullanıcı Belleğini Getirme
@@ -124,7 +124,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 
 **Olası Hatalar**:
 
-- 403 Forbidden: Firebase yetkilendirme hatası
+- 403 Forbidden: Yetkilendirme hatası
 - 500 Internal Server Error: Bellek alma hatası
 
 #### Bellek Girdisi Silme
@@ -151,7 +151,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 **Olası Hatalar**:
 
 - 400 Bad Request: Geçersiz indeks değeri
-- 403 Forbidden: Firebase yetkilendirme hatası
+- 403 Forbidden: Yetkilendirme hatası
 - 500 Internal Server Error: Bellek silme hatası
 
 #### Tüm Bellek Girdilerini Silme
@@ -176,7 +176,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 
 **Olası Hatalar**:
 
-- 403 Forbidden: Firebase yetkilendirme hatası
+- 403 Forbidden: Yetkilendirme hatası
 - 500 Internal Server Error: Bellek silme hatası
 
 ### Kullanıcı Talimatları
@@ -227,7 +227,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 
 **Olası Hatalar**:
 
-- 403 Forbidden: Firebase yetkilendirme hatası
+- 403 Forbidden: Yetkilendirme hatası
 - 500 Internal Server Error: Talimat alma hatası
 
 #### Talimat Ekleme
@@ -270,7 +270,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 **Olası Hatalar**:
 
 - 400 Bad Request: Geçersiz istek verisi
-- 403 Forbidden: Firebase yetkilendirme hatası
+- 403 Forbidden: Yetkilendirme hatası
 - 500 Internal Server Error: Talimat ekleme hatası
 
 #### Talimat Güncelleme
@@ -314,7 +314,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 **Olası Hatalar**:
 
 - 400 Bad Request: Geçersiz istek verisi
-- 403 Forbidden: Firebase yetkilendirme hatası
+- 403 Forbidden: Yetkilendirme hatası
 - 404 Not Found: Belirtilen talimat bulunamadı
 - 500 Internal Server Error: Talimat güncelleme hatası
 
@@ -341,7 +341,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 
 **Olası Hatalar**:
 
-- 403 Forbidden: Firebase yetkilendirme hatası
+- 403 Forbidden: Yetkilendirme hatası
 - 404 Not Found: Belirtilen talimat bulunamadı
 - 500 Internal Server Error: Talimat silme hatası
 
@@ -367,7 +367,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 
 **Olası Hatalar**:
 
-- 403 Forbidden: Firebase yetkilendirme hatası
+- 403 Forbidden: Yetkilendirme hatası
 - 500 Internal Server Error: Talimat silme hatası
 
 ### Kullanıcı Bağlamı
@@ -403,7 +403,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 
 **Olası Hatalar**:
 
-- 403 Forbidden: Firebase yetkilendirme hatası
+- 403 Forbidden: Yetkilendirme hatası
 - 404 Not Found: Kullanıcı bağlamı bulunamadı
 - 500 Internal Server Error: Bağlam alma hatası
 
@@ -437,7 +437,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 
 **Olası Hatalar**:
 
-- 403 Forbidden: Firebase yetkilendirme hatası
+- 403 Forbidden: Yetkilendirme hatası
 - 404 Not Found: Kullanıcı dil stili tercihleri bulunamadı
 - 500 Internal Server Error: Tercih alma hatası
 
@@ -482,7 +482,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 **Olası Hatalar**:
 
 - 400 Bad Request: Geçersiz istek verisi
-- 403 Forbidden: Firebase yetkilendirme hatası
+- 403 Forbidden: Yetkilendirme hatası
 - 500 Internal Server Error: Tercih güncelleme hatası
 
 #### Dil Stili Tercihlerini Silme
@@ -507,7 +507,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 
 **Olası Hatalar**:
 
-- 403 Forbidden: Firebase yetkilendirme hatası
+- 403 Forbidden: Yetkilendirme hatası
 - 500 Internal Server Error: Tercih silme hatası
 
 ## Veri Modelleri
@@ -529,7 +529,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 
 ```java
 {
-  "id": String,           // Kullanıcı ID'si (Firestore doküman ID'si olarak kullanılır)
+  "id": String,           // MongoDB doküman ID'si
   "userId": String,       // Kullanıcı ID'si
   "created": LocalDateTime, // Bellek oluşturulma zamanı
   "lastUpdated": LocalDateTime, // Son güncelleme zamanı
@@ -601,7 +601,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 
 | Kod                     | Açıklama                                                                       |
 | ----------------------- | ------------------------------------------------------------------------------ |
-| firebase_auth_error     | Firebase yetkilendirme hatası. Servis hesabı izinleri kontrol edilmelidir.     |
+| auth_error              | Yetkilendirme hatası. Servis hesabı izinleri kontrol edilmelidir.              |
 | memory_processing_error | Bellek işleme hatası. Genellikle servis tarafında bir sorun olduğunu gösterir. |
 | memory_retrieval_error  | Kullanıcı belleği alınırken hata oluştu.                                       |
 | index_out_of_bounds     | Belirtilen indeks geçerli değil.                                               |
@@ -609,6 +609,7 @@ User Memory Service, kullanıcıların anlamlı bilgilerini saklamak, yönetmek 
 | instruction_error       | Talimat işleme sırasında bir hata oluştu.                                      |
 | context_error           | Bağlam bilgisi işleme sırasında bir hata oluştu.                               |
 | preference_error        | Tercih işleme sırasında bir hata oluştu.                                       |
+| mongodb_error           | MongoDB ile ilgili bir hata oluştu.                                            |
 
 ## Örnek İstek ve Yanıtlar
 
@@ -680,7 +681,7 @@ Content-Type: application/json
 }
 ```
 
-### Firebase Yetkilendirme Hatası Örneği
+### Yetkilendirme Hatası Örneği
 
 **İstek:**
 
@@ -695,8 +696,8 @@ HTTP/1.1 403 Forbidden
 Content-Type: application/json
 
 {
-  "code": "firebase_auth_error",
-  "message": "Firebase yetkilendirme hatası. Servis hesabı izinlerini kontrol edin.",
+  "code": "auth_error",
+  "message": "Yetkilendirme hatası. Servis hesabı izinlerini kontrol edin.",
   "status": 403
 }
 ```

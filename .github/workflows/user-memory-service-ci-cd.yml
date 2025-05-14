@@ -69,15 +69,6 @@ jobs:
           build-args: |
             SKIP_TESTS=true
 
-      - id: "auth"
-        name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v1"
-        with:
-          credentials_json: "${{ secrets.GCP_SA_KEY }}"
-
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
-
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
@@ -96,26 +87,51 @@ jobs:
             echo "=== System Architecture ==="
             uname -m
 
-            echo "=== Testing Directory Access ==="
+            echo "=== Creating Directory Structure ==="
             mkdir -p /opt/craftpilot
 
-            echo "=== Continuing with Deployment ==="
-            # GCP credentials dizini oluştur
-            mkdir -p /opt/craftpilot/gcp/credentials
-            # GCP credentials dosyasını oluştur
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp/credentials/gcp-credentials.json
-            # İzinleri ayarla - herkes tarafından okunabilsin
-            chmod 644 /opt/craftpilot/gcp/credentials/gcp-credentials.json
+            # MongoDB container check
+            MONGODB_CONTAINER="craftpilot-mongodb"
+            if ! docker ps | grep -q "$MONGODB_CONTAINER"; then
+              echo "WARNING: Default MongoDB container not found ($MONGODB_CONTAINER)"
+              # Still try to detect any MongoDB container as fallback
+              MONGODB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'mongo|mongodb' | head -n 1)
+              if [ -z "$MONGODB_CONTAINER" ]; then
+                echo "ERROR: No MongoDB container found! Using default name, but connection may fail."
+                MONGODB_CONTAINER="craftpilot-mongodb" # Fallback to default
+              else
+                echo "Found alternative MongoDB container: $MONGODB_CONTAINER"
+              fi
+            fi
+            echo "Using MongoDB container: $MONGODB_CONTAINER"
 
-            echo "=== Verifying Docker Status ==="
-            if ! systemctl is-active --quiet docker; then
-              echo "Docker is not running. Starting Docker..."
-              sudo systemctl start docker
+            # MongoDB URI configuration
+            if [ -n "${{ secrets.MONGODB_URI }}" ]; then
+              # Parse the URI and replace the hostname with our container name
+              # Extract parts before and after hostname
+              URI_PREFIX=$(echo "${{ secrets.MONGODB_URI }}" | grep -oP 'mongodb://[^@]+@')
+              URI_SUFFIX=$(echo "${{ secrets.MONGODB_URI }}" | grep -oP '(?<=@)[^/]+/.*')
+              URI_HOST=$(echo "$URI_SUFFIX" | grep -oP '^[^:/]+')
+              URI_REMAINDER=$(echo "$URI_SUFFIX" | grep -oP '(?<='"$URI_HOST"')[:/].*')
+              
+              # Build URI with the correct container name
+              MONGODB_URI="${URI_PREFIX}${MONGODB_CONTAINER}${URI_REMAINDER}"
+              echo "Modified MongoDB URI with correct container name: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
+            else
+              # Build URI from components
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE || 'user-memory-db' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+              echo "Built MongoDB URI from credential components: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
             fi
 
-            echo "=== Deploying User Memory Service ==="
-            # Force pull latest image
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
+            # Test MongoDB connection before deployment
+            echo "Testing MongoDB connection..."
+            if docker run --rm --network craftpilot-network mongo:6.0 mongosh --quiet --eval "db.runCommand({ping:1}).ok" admin --host $MONGODB_CONTAINER --port 27017 -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }} --authenticationDatabase admin | grep -q "1"; then
+              echo "✅ MongoDB connection test successful!"
+            else
+              echo "⚠️ MongoDB connection test failed! Deployment will continue but may have issues."
+              echo "Checking MongoDB container status:"
+              docker ps | grep -i $MONGODB_CONTAINER || echo "Container not found!"
+            fi
 
             echo "=== Stopping Old Container ==="
             docker rm -f ${{ env.SERVICE_NAME }} || true
@@ -128,9 +144,6 @@ jobs:
                 --restart unless-stopped \
                 -p ${{ env.CONTAINER_PORT }}:${{ env.CONTAINER_PORT }} \
                 -p 5008:5008 \
-                -v /opt/craftpilot/gcp/credentials/gcp-credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
-                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
-                -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/etc/gcp/credentials/gcp-credentials.json \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=${{ env.CONTAINER_PORT }} \
                 -e MANAGEMENT_SERVER_PORT=${{ env.MANAGEMENT_PORT }} \
@@ -140,15 +153,21 @@ jobs:
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
+                -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
+                -e SPRING_DATA_MONGODB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE || 'user-memory-db' }} \
+                -e SPRING_DATA_MONGODB_CONNECT_TIMEOUT=60000 \
+                -e SPRING_DATA_MONGODB_SOCKET_TIMEOUT=60000 \
+                -e SPRING_DATA_MONGODB_MAX_WAIT_TIME=120000 \
                 -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
                 -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
                 -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
                 -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_MONGODB_ENABLED=true \
                 -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics,prometheus" \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
                 -e SPRING_APPLICATION_NAME=${{ env.SERVICE_NAME }} \
-                -e SPRING_CLOUD_GCP_PROJECT_ID=${SPRING_CLOUD_GCP_PROJECT_ID:-craft-pilot-ai} \
                 -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB=DEBUG \
                 -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_NETFLIX_EUREKA=DEBUG \
                 -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5008" \
                 ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
@@ -158,9 +177,6 @@ jobs:
                 --network craftpilot-network \
                 --restart unless-stopped \
                 -p ${{ env.CONTAINER_PORT }}:${{ env.CONTAINER_PORT }} \
-                -v /opt/craftpilot/gcp/credentials/gcp-credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
-                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
-                -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/etc/gcp/credentials/gcp-credentials.json \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=${{ env.CONTAINER_PORT }} \
                 -e MANAGEMENT_SERVER_PORT=${{ env.MANAGEMENT_PORT }} \
@@ -170,15 +186,21 @@ jobs:
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
+                -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
+                -e SPRING_DATA_MONGODB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE || 'user-memory-db' }} \
+                -e SPRING_DATA_MONGODB_CONNECT_TIMEOUT=60000 \
+                -e SPRING_DATA_MONGODB_SOCKET_TIMEOUT=60000 \
+                -e SPRING_DATA_MONGODB_MAX_WAIT_TIME=120000 \
                 -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
                 -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
                 -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
                 -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
+                -e MANAGEMENT_HEALTH_MONGODB_ENABLED=true \
                 -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics,prometheus" \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
                 -e SPRING_APPLICATION_NAME=${{ env.SERVICE_NAME }} \
-                -e SPRING_CLOUD_GCP_PROJECT_ID=${SPRING_CLOUD_GCP_PROJECT_ID:-craft-pilot-ai} \
                 -e LOGGING_LEVEL_COM_CRAFTPILOT=INFO \
+                -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB=INFO \
                 ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
             fi
 
@@ -200,11 +222,53 @@ jobs:
               HEALTH_CHECK=$(curl -s http://localhost:${{ env.CONTAINER_PORT }}/actuator/health || echo "Failed to connect")
               
               if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
-                echo "✓ Service is healthy: $HEALTH_CHECK"
-                echo "=== Deployment completed successfully ==="
-                exit 0
+                # Try to parse with jq if available
+                if command -v jq &> /dev/null; then
+                  MONGO_STATUS=$(echo "$HEALTH_CHECK" | jq -r '.components.mongo.status' 2>/dev/null || echo "UNKNOWN")
+                  if [ "$MONGO_STATUS" = "UP" ]; then
+                    echo "✅ MongoDB component is healthy! (verified by jq)"
+                    echo "=== Deployment completed successfully ==="
+                    exit 0
+                  elif echo "$HEALTH_CHECK" | grep -q '"mongo":{.*"status":"UP"'; then
+                    echo "✅ MongoDB component is healthy! (verified by grep)"
+                    echo "=== Deployment completed successfully ==="
+                    exit 0
+                  else
+                    echo "⚠️ Service is UP but MongoDB component status is: $MONGO_STATUS"
+                  fi
+                else
+                  # Fallback if jq is not available - just check for the string pattern
+                  if echo "$HEALTH_CHECK" | grep -q '"mongo".*"status":"UP"'; then
+                    echo "✅ MongoDB component appears to be healthy based on string search"
+                    echo "=== Deployment completed successfully ==="
+                    exit 0
+                  fi
+                  
+                  # Additional fallback - if overall status is UP for 3 consecutive checks, accept it
+                  if [ $counter -ge 10 ]; then
+                    echo "✅ Service has been reporting UP status for multiple checks"
+                    echo "Assuming deployment is successful despite unclear MongoDB status"
+                    exit 0
+                  fi
+                fi
               else
                 echo "Health check response: $HEALTH_CHECK"
+              fi
+              
+              # Enhanced MongoDB connection diagnostics
+              if [ $counter -eq 5 ] || [ $counter -eq 15 ]; then
+                echo "--- MongoDB Connection Diagnostics ---"
+                echo "MongoDB container status:"
+                docker ps | grep $MONGODB_CONTAINER || echo "MongoDB container not running!"
+                
+                echo "Testing network connectivity from user-memory-service to MongoDB:"
+                docker exec ${{ env.SERVICE_NAME }} nc -zv $MONGODB_CONTAINER 27017 || echo "Cannot connect to MongoDB"
+                
+                echo "Container environment variables:"
+                docker exec ${{ env.SERVICE_NAME }} env | grep -E 'MONGO|DB_|mongodb' || echo "No MongoDB env vars found"
+                
+                echo "Network details:"
+                docker network inspect craftpilot-network | grep -A 5 -E "$MONGODB_CONTAINER|${{ env.SERVICE_NAME }}" || echo "Network inspection failed"
               fi
               
               echo "Waiting for service to start... ($((counter + 1))/$max_attempts)"

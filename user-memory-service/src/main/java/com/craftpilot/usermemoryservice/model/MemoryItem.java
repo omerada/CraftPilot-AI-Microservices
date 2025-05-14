@@ -4,26 +4,25 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.mongodb.core.mapping.Document;
+
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class MemoryItem {
-    private String id;
+    
     private String content;
     private String source;
-    private double importance;
+    private String context;
     
     @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private Map<String, Object> metadata = new HashMap<>();
     
-    @Builder.Default
-    private boolean active = true;
-    
-    @Builder.Default
-    private int usageCount = 0;
-    
-    private String category;
+    private LocalDateTime timestamp;
+    private Double importance;
 }

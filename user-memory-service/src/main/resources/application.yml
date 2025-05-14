@@ -11,13 +11,15 @@ spring:
     name: user-memory-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:prod}
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/craft-pilot}
+      database: ${MONGO_INITDB_DATABASE:user-memory-db}
+      auto-index-creation: true
+      connect-timeout: 60000
+      socket-timeout: 60000
+      max-wait-time: 120000
   cloud:
-    gcp:
-      project-id: craft-pilot-ai
-      credentials:
-        location: file:/etc/gcp/credentials/gcp-credentials.json
-      firestore:
-        enabled: true
     kubernetes:
       config:
         enabled: true
@@ -62,7 +64,7 @@ management:
       show-details: always
       group:
         readiness:
-          include: readinessState,diskSpace,ping
+          include: readinessState,diskSpace,ping,mongo
         liveness:
           include: livenessState
   health:
@@ -71,6 +73,8 @@ management:
     readinessstate:
       enabled: true
     defaults:
+      enabled: true
+    mongodb:
       enabled: true
 
 # Mevcut yapılandırmayı koruyalım
@@ -95,16 +99,12 @@ user-memory:
 llm-service:
   url: ${LLM_SERVICE_URL:http://localhost:8062}
 
-firebase:
-  database-url: ${FIREBASE_DATABASE_URL:https://craftpilot-dev.firebaseio.com}
-  storage-bucket: ${FIREBASE_STORAGE_BUCKET:craftpilot-dev.appspot.com}
-  credentials-path: ${FIREBASE_CREDENTIALS_PATH:/secrets/firebase-credentials.json}
-
 logging:
   level:
     root: ${LOGGING_LEVEL_ROOT:INFO}
     com.craftpilot: ${LOGGING_LEVEL_COM_CRAFTPILOT:INFO}
     org.springframework.cloud.netflix.eureka: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_NETFLIX_EUREKA:INFO}
+    org.springframework.data.mongodb: ${LOGGING_LEVEL_MONGODB:INFO}
 
 resilience4j:
   circuitbreaker:
@@ -129,8 +129,9 @@ resilience4j:
         timeoutDuration: 5s
         cancelRunningFuture: true
 
-# Adding Firestore configurations
-firestore:
-  project-id: ${FIRESTORE_PROJECT_ID:craft-pilot}
+# MongoDB koleksiyon isimlendirme konfigürasyonu
+mongodb:
   collection:
-    user-memory: userMemory
+    user-memory: user_memories
+    user-instruction: user_instructions
+    response-preference: response_preferences
