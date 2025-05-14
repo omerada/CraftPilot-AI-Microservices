@@ -25,29 +25,37 @@ public class MongoIndexConfig {
 
     @Value("${spring.data.mongodb.auto-index-creation:false}")
     private boolean autoIndexCreation;
+    
+    @Value("${admin.mongodb.manual-index-creation:false}")
+    private boolean manualIndexCreation;
 
     @PostConstruct
     public void initializeDatabase() {
-        log.info("MongoDB index configuration initialized with auto-index-creation: {}", autoIndexCreation);
+        if (manualIndexCreation) {
+            log.info("MongoDB manual index creation is enabled");
+        } else {
+            log.debug("MongoDB manual index creation is disabled. Set admin.mongodb.manual-index-creation=true to enable");
+        }
     }
 
     @EventListener(ContextRefreshedEvent.class)
     public void initIndices() {
-        log.info("Checking MongoDB index creation...");
-
-        if (autoIndexCreation) {
-            log.info("Auto index creation is enabled. Creating indexes manually.");
-            createUserActivityIndexes()
-                    .then(createSystemMetricsIndexes())
-                    .then(createSystemAlertIndexes())
-                    .then(createAuditLogIndexes())
-                    .then(createAdminActionIndexes())
-                    .doOnSuccess(v -> log.info("All MongoDB indexes successfully created"))
-                    .doOnError(e -> log.error("Error creating MongoDB indexes: {}", e.getMessage()))
-                    .subscribe();
-        } else {
-            log.info("Auto index creation is disabled. Spring Data MongoDB will handle index creation.");
+        if (!manualIndexCreation) {
+            // Skip index creation entirely when disabled
+            log.debug("Skipping MongoDB index creation as it is disabled");
+            return;
         }
+
+        log.info("Initializing MongoDB indexes for admin-service collections");
+
+        createUserActivityIndexes()
+                .then(createSystemMetricsIndexes())
+                .then(createSystemAlertIndexes())
+                .then(createAuditLogIndexes())
+                .then(createAdminActionIndexes())
+                .doOnSuccess(v -> log.info("MongoDB indexes initialization completed"))
+                .doOnError(e -> log.error("Error creating MongoDB indexes: {}", e.getMessage()))
+                .subscribe();
     }
 
     private Mono<Void> createUserActivityIndexes() {
