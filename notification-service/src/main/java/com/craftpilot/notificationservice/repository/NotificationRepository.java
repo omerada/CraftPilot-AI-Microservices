@@ -12,6 +12,9 @@ import java.time.LocalDateTime;
 public interface NotificationRepository extends ReactiveMongoRepository<Notification, String> {
  
     Flux<Notification> findByUserIdAndDeletedIsFalse(String userId);
+    
+    // Eklenen yeni metot - Spring Data semantiğine uygun olarak
+    Flux<Notification> findByUserIdAndDeletedFalse(String userId);
 
     Flux<Notification> findByUserId(String userId);
 

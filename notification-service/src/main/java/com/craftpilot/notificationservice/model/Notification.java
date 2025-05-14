@@ -47,14 +47,21 @@ public class Notification {
     private boolean processed;
     private LocalDateTime processedTime;
      
+    // Explicit getter/setter metotlarını düzgün bir şekilde tanımlıyoruz
     private boolean deleted;
     
+    // Spring Data semantiğine uygun getter
     public boolean isDeleted() {
         return deleted;
     }
     
     public void setDeleted(boolean deleted) {
         this.deleted = deleted;
+    }
+
+    // Spring Data için alternatif getter (nullable tipler için)
+    public Boolean getDeleted() {
+        return deleted;
     }
 
     @Version
