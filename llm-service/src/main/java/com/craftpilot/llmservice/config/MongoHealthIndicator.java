@@ -21,7 +21,7 @@ public class MongoHealthIndicator implements ReactiveHealthIndicator {
                 .map(status -> status ? Health.up().build() : Health.down().build())
                 .onErrorResume(exception -> {
                     log.error("MongoDB sağlık kontrolü başarısız: {}", exception.getMessage());
-                    return Mono.just(Health.down(exception).build());
+                    return Mono.just(Health.down().withDetail("error", exception.getMessage()).build());
                 });
     }
 

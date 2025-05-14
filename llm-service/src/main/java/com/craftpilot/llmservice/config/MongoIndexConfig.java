@@ -24,27 +24,24 @@ public class MongoIndexConfig {
 
         try {
             // ChatHistory koleksiyonu için indeksler
-            IndexOperations chatHistoryIndexOps = mongoTemplate.indexOps("chat_histories");
-            createAndEnsureIndex(chatHistoryIndexOps, "userId", Sort.Direction.ASC, false);
-            createAndEnsureIndex(chatHistoryIndexOps, "sessionId", Sort.Direction.ASC, false);
-            createAndEnsureIndex(chatHistoryIndexOps, "createdAt", Sort.Direction.DESC, false);
-            createAndEnsureIndex(chatHistoryIndexOps, "updatedAt", Sort.Direction.DESC, false);
-            createAndEnsureIndex(chatHistoryIndexOps, "aiModel", Sort.Direction.ASC, false);
+            createReactiveIndex("chat_histories", "userId", Sort.Direction.ASC, false);
+            createReactiveIndex("chat_histories", "sessionId", Sort.Direction.ASC, false);
+            createReactiveIndex("chat_histories", "createdAt", Sort.Direction.DESC, false);
+            createReactiveIndex("chat_histories", "updatedAt", Sort.Direction.DESC, false);
+            createReactiveIndex("chat_histories", "aiModel", Sort.Direction.ASC, false);
 
             // PerformanceAnalysis koleksiyonu için indeksler
-            IndexOperations perfAnalysisIndexOps = mongoTemplate.indexOps("performance_analyses");
-            createAndEnsureIndex(perfAnalysisIndexOps, "modelId", Sort.Direction.ASC, false);
-            createAndEnsureIndex(perfAnalysisIndexOps, "sessionId", Sort.Direction.ASC, false);
-            createAndEnsureIndex(perfAnalysisIndexOps, "userId", Sort.Direction.ASC, false);
-            createAndEnsureIndex(perfAnalysisIndexOps, "timestamp", Sort.Direction.DESC, false);
+            createReactiveIndex("performance_analyses", "modelId", Sort.Direction.ASC, false);
+            createReactiveIndex("performance_analyses", "sessionId", Sort.Direction.ASC, false);
+            createReactiveIndex("performance_analyses", "userId", Sort.Direction.ASC, false);
+            createReactiveIndex("performance_analyses", "timestamp", Sort.Direction.DESC, false);
 
             // PerformanceAnalysisResponse koleksiyonu için indeksler
-            IndexOperations perfAnalysisRespIndexOps = mongoTemplate.indexOps("performance_analysis_responses");
-            createAndEnsureIndex(perfAnalysisRespIndexOps, "modelId", Sort.Direction.ASC, false);
-            createAndEnsureIndex(perfAnalysisRespIndexOps, "sessionId", Sort.Direction.ASC, false);
-            createAndEnsureIndex(perfAnalysisRespIndexOps, "timestamp", Sort.Direction.DESC, false);
-            createAndEnsureIndex(perfAnalysisRespIndexOps, "url", Sort.Direction.ASC, false);
-            createAndEnsureIndex(perfAnalysisRespIndexOps, "status", Sort.Direction.ASC, false);
+            createReactiveIndex("performance_analysis_responses", "modelId", Sort.Direction.ASC, false);
+            createReactiveIndex("performance_analysis_responses", "sessionId", Sort.Direction.ASC, false);
+            createReactiveIndex("performance_analysis_responses", "timestamp", Sort.Direction.DESC, false);
+            createReactiveIndex("performance_analysis_responses", "url", Sort.Direction.ASC, false);
+            createReactiveIndex("performance_analysis_responses", "status", Sort.Direction.ASC, false);
 
             log.info("MongoDB indeks başlatma işlemi tamamlandı");
         } catch (Exception e) {
@@ -54,19 +51,18 @@ public class MongoIndexConfig {
         }
     }
 
-    private void createAndEnsureIndex(IndexOperations indexOps, String field, Sort.Direction direction,
-            boolean unique) {
+    private void createReactiveIndex(String collection, String field, Sort.Direction direction, boolean unique) {
         Index index = new Index().on(field, direction);
 
         if (unique) {
             index = index.unique();
         }
 
-        indexOps.ensureIndex(index)
-                .onErrorResume(e -> {
-                    log.warn("{} alanı için indeks oluşturulamadı: {}", field, e.getMessage());
-                    return Mono.empty();
-                })
-                .subscribe(result -> log.info("{} indeksi oluşturuldu: {}", field, result));
+        mongoTemplate.indexOps(collection)
+                .ensureIndex(index)
+                .doOnSuccess(result -> log.info("{} koleksiyonunda {} indeksi oluşturuldu: {}",
+                        collection, field, result))
+                .doOnError(e -> log.warn("{} alanı için indeks oluşturulamadı: {}", field, e.getMessage()))
+                .subscribe();
     }
 }
