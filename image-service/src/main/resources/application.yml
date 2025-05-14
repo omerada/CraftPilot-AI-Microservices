@@ -113,6 +113,7 @@ logging:
     com.google.cloud: INFO
     org.springframework.web: INFO
     org.springframework.data: INFO
+    com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
 
 eureka:
   instance:
