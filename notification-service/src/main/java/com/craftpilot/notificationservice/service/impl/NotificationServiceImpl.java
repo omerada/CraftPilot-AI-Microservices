@@ -37,7 +37,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final SendGridService sendGridService;
     private final EmailService emailService;
     private final KafkaTemplate<String, NotificationEvent> kafkaTemplate;
-    
+
     @Value("${kafka.topics.notification-events}")
     private String notificationEventsTopic;
 
@@ -48,7 +48,7 @@ public class NotificationServiceImpl implements NotificationService {
         return templateService.getTemplate(request.getTemplateId())
                 .flatMap(template -> createNotificationFromTemplate(request, template))
                 .flatMap(notification -> {
-                    if (notification.getScheduledAt() != null && 
+                    if (notification.getScheduledAt() != null &&
                             notification.getScheduledAt().isAfter(LocalDateTime.now())) {
                         return saveNotification(notification)
                                 .map(NotificationResponse::fromEntity);
@@ -76,9 +76,8 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public Flux<NotificationResponse> getUserNotifications(String userId, boolean onlyUnread) {
-        return (onlyUnread ? 
-                notificationRepository.findByUserIdAndRead(userId, false) :
-                notificationRepository.findByUserId(userId))
+        return (onlyUnread ? notificationRepository.findByUserIdAndRead(userId, false)
+                : notificationRepository.findByUserId(userId))
                 .map(NotificationResponse::fromEntity)
                 .doOnComplete(() -> log.debug("Retrieved notifications for user: {}", userId));
     }
@@ -126,7 +125,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .doOnSuccess(unused -> log.debug("Marked notification as sent: {}", id));
     }
 
-    private Mono<Notification> createNotificationFromTemplate(NotificationRequest request, 
+    private Mono<Notification> createNotificationFromTemplate(NotificationRequest request,
             NotificationTemplate template) {
         Notification notification = new Notification();
         notification.setUserId(request.getUserId());
@@ -145,7 +144,7 @@ public class NotificationServiceImpl implements NotificationService {
         String result = template;
         if (variables != null) {
             for (java.util.Map.Entry<String, Object> entry : variables.entrySet()) {
-                result = result.replace("${" + entry.getKey() + "}", 
+                result = result.replace("${" + entry.getKey() + "}",
                         String.valueOf(entry.getValue()));
             }
         }
@@ -172,11 +171,11 @@ public class NotificationServiceImpl implements NotificationService {
 
     private Mono<Void> sendEmail(Notification notification) {
         EmailRequest emailRequest = EmailRequest.builder()
-            .to(notification.getRecipient())
-            .subject(notification.getSubject())
-            .content(notification.getContent())
-            .build();
-            
+                .to(notification.getRecipient())
+                .subject(notification.getSubject())
+                .content(notification.getContent())
+                .build();
+
         return emailService.sendEmail(emailRequest)
                 .doOnSuccess(v -> log.info("Email sent successfully to: {}", notification.getRecipient()))
                 .doOnError(e -> log.error("Failed to send email to: {}", notification.getRecipient(), e));
@@ -185,10 +184,9 @@ public class NotificationServiceImpl implements NotificationService {
     private void sendEmailNotification(Notification notification) {
         try {
             sendGridService.sendEmail(
-                notification.getRecipientEmail(),
-                notification.getTitle(),
-                notification.getBody()
-            );
+                    notification.getRecipientEmail(),
+                    notification.getTitle(),
+                    notification.getContent());
             notification.setProcessed(true);
             notification.setProcessedTime(LocalDateTime.now());
             notificationRepository.save(notification).subscribe();
@@ -199,14 +197,14 @@ public class NotificationServiceImpl implements NotificationService {
 
     private void sendNotificationEvent(Notification notification, String eventType) {
         NotificationEvent event = NotificationEvent.fromNotification(eventType, notification);
-        
+
         kafkaTemplate.send(notificationEventsTopic, notification.getId(), event)
-            .whenComplete((result, ex) -> {
-                if (ex != null) {
-                    log.error("Failed to send notification event for ID: {}", notification.getId(), ex);
-                } else {
-                    log.debug("Notification event sent successfully for ID: {}", notification.getId());
-                }
-            });
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("Failed to send notification event for ID: {}", notification.getId(), ex);
+                    } else {
+                        log.debug("Notification event sent successfully for ID: {}", notification.getId());
+                    }
+                });
     }
 }
