@@ -1,7 +1,5 @@
 package com.craftpilot.lighthouseservice.controller;
 
-import com.craftpilot.commons.activity.logger.ActivityLogger;
-import com.craftpilot.commons.activity.model.ActivityEventTypes;
 import com.craftpilot.lighthouseservice.model.AnalysisRequest;
 import com.craftpilot.lighthouseservice.model.JobStatusResponse;
 import com.craftpilot.lighthouseservice.service.LighthouseQueueService;
@@ -32,7 +30,6 @@ public class LighthouseController {
     
     private final LighthouseQueueService lighthouseQueueService;
     private final LighthouseWorkerService lighthouseWorkerService;
-    private final ActivityLogger activityLogger;
 
     @PostMapping("/analyze")
     @Operation(
@@ -116,20 +113,12 @@ public class LighthouseController {
                         response.put("deviceType", deviceType);
                         response.put("queuePosition", queueLength + 1);
                         
-                        // Aktivite logunu oluştur
-                        Map<String, Object> metadata = new HashMap<>();
-                        metadata.put("jobId", jobId);
-                        metadata.put("url", request.getUrl());
-                        metadata.put("analysisType", analysisType);
-                        metadata.put("deviceType", deviceType);
-                        metadata.put("queuePosition", queueLength + 1);
-                        
-                        // Kullanıcı kimliği eksikse anonim olarak işaretle
+                        // Kullanıcı aktivitesini loglama - ActivityLogger yerine normal logger kullanıyoruz
                         String effectiveUserId = (userId != null && !userId.isEmpty()) ? userId : "anonymous";
-                        
-                        // Aktiviteyi logla ve sonra yanıtı döndür
-                        return activityLogger.log(effectiveUserId, "PERFORMANCE_ANALYSIS_START", metadata)
-                            .thenReturn(ResponseEntity.accepted().body(response));
+                        logger.info("Performance analysis started: jobId={}, userId={}, url={}, analysisType={}, deviceType={}", 
+                            jobId, effectiveUserId, request.getUrl(), analysisType, deviceType);
+                            
+                        return Mono.just(ResponseEntity.accepted().body(response));
                     });
             });
     }
