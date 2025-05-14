@@ -66,7 +66,7 @@ public class FirebasePushNotificationService implements PushNotificationService 
                 
                 // Firebase service unavailable - log and continue
                 if (firebaseMessaging == null) {
-                    log.info("Firebase messaging disabled. Would have sent notification to device: {}, title: {}, content: {}",
+                    log.info("Firebase messaging disabled or unavailable. Would have sent notification to device: {}, title: {}, content: {}",
                             deviceToken, notification.getTitle(), notification.getContent());
                     return Mono.empty();
                 }

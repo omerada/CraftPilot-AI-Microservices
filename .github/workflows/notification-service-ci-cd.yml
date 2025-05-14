@@ -130,11 +130,13 @@ jobs:
             echo "Creating Firebase credentials..."
             # Standardize credentials path to /craftpilot/gcp-credentials.json
             echo '${{ secrets.GCP_SA_KEY }}' > /craftpilot/gcp-credentials.json
-            chmod 600 /craftpilot/gcp-credentials.json
+            chmod 644 /craftpilot/gcp-credentials.json
+            ls -la /craftpilot/gcp-credentials.json
 
             # Also keep existing path for backward compatibility
             echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/notification-service/firebase-service-account.json
             chmod 644 /opt/craftpilot/config/notification-service/firebase-service-account.json
+            ls -la /opt/craftpilot/config/notification-service/firebase-service-account.json
 
             echo "#!/bin/sh
             curl -f http://localhost:8053/actuator/health || exit 1" > /opt/craftpilot/config/notification-service/healthcheck.sh
@@ -153,7 +155,7 @@ jobs:
             if [ -n "${{ secrets.MONGODB_URI }}" ]; then
               # Parse the URI and replace the hostname with our container name
               URI_PREFIX=$(echo "${{ secrets.MONGODB_URI }}" | grep -oP 'mongodb://[^@]+@')
-              URI_SUFFIX=$(echo "${{ secrets.MONGODB_URI }}" | grep -oP '(?<=@)[^/]+/.*')
+              URI_SUFFIX=$(echo "$URI_PREFIX" | grep -oP '(?<=@)[^/]+/.*')
               URI_HOST=$(echo "$URI_SUFFIX" | grep -oP '^[^:/]+')
               URI_REMAINDER=$(echo "$URI_SUFFIX" | grep -oP '(?<='"$URI_HOST"')[:/].*')
               

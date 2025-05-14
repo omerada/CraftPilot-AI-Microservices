@@ -1,20 +1,34 @@
 package com.craftpilot.notificationservice.service.impl;
 
 import com.google.firebase.messaging.*;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
+@ConditionalOnBean(FirebaseMessaging.class)
 public class FCMNotificationService {
 
     private final FirebaseMessaging firebaseMessaging;
 
+    @Autowired
+    public FCMNotificationService(FirebaseMessaging firebaseMessaging) {
+        this.firebaseMessaging = firebaseMessaging;
+        if (firebaseMessaging == null) {
+            log.warn("FirebaseMessaging is null - FCM notifications will not be available");
+        }
+    }
+
     public void sendNotification(String token, String title, String body) {
+        if (firebaseMessaging == null) {
+            log.info("FirebaseMessaging is not available. Would send notification - token: {}, title: {}, body: {}", token, title, body);
+            return;
+        }
+        
         Message message = Message.builder()
             .setNotification(Notification.builder()
                 .setTitle(title)
@@ -33,6 +47,11 @@ public class FCMNotificationService {
     }
 
     public void sendMulticastNotification(List<String> tokens, String title, String body) {
+        if (firebaseMessaging == null) {
+            log.info("FirebaseMessaging is not available. Would send multicast notification - tokens: {}, title: {}, body: {}", tokens, title, body);
+            return;
+        }
+        
         MulticastMessage message = MulticastMessage.builder()
             .setNotification(Notification.builder()
                 .setTitle(title)
@@ -52,6 +71,11 @@ public class FCMNotificationService {
     }
 
     public void sendTopicNotification(String topic, String title, String body) {
+        if (firebaseMessaging == null) {
+            log.info("FirebaseMessaging is not available. Would send topic notification - topic: {}, title: {}, body: {}", topic, title, body);
+            return;
+        }
+        
         Message message = Message.builder()
             .setNotification(Notification.builder()
                 .setTitle(title)
