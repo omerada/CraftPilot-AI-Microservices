@@ -25,7 +25,6 @@
 
         <!-- Spring Cloud -->
         <spring-cloud.version>2023.0.2</spring-cloud.version>
-        <spring-cloud-gcp.version>5.0.0</spring-cloud-gcp.version>
 
         <!-- Notification -->
         <firebase-admin.version>9.2.0</firebase-admin.version> 
@@ -76,6 +75,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
         </dependency>
+        
+        <!-- MongoDB Reactive -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-mongodb-reactive</artifactId>
+        </dependency>
 
         <!-- Spring Cloud -->
         <dependency>
@@ -95,17 +100,6 @@
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
-        </dependency>
-
-        <!-- Google Cloud -->
-        <dependency>
-            <groupId>com.google.cloud</groupId>
-            <artifactId>spring-cloud-gcp-starter</artifactId>
-            <version>${spring-cloud-gcp.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.google.cloud</groupId>
-            <artifactId>google-cloud-firestore</artifactId>
         </dependency>
 
         <!-- Notification -->
@@ -202,11 +196,6 @@
             <artifactId>firebase-admin</artifactId>
             <version>${firebase-admin.version}</version>
         </dependency>
-        <dependency>
-            <groupId>com.google.cloud</groupId>
-            <artifactId>google-cloud-firestore</artifactId>
-            <version>3.14.0</version>
-        </dependency>
 
         <!-- Spring Security Dependencies -->
         <dependency>
@@ -264,6 +253,12 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>mongodb</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.wiremock</groupId>
             <artifactId>wiremock</artifactId>
             <version>${wiremock.version}</version>
@@ -294,13 +289,6 @@
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
                 <version>${spring-cloud.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>com.google.cloud</groupId>
-                <artifactId>spring-cloud-gcp-dependencies</artifactId>
-                <version>${spring-cloud-gcp.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

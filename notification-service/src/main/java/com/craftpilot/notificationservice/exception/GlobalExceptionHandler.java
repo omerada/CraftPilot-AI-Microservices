@@ -1,10 +1,13 @@
 package com.craftpilot.notificationservice.exception;
 
-import com.google.api.gax.rpc.ApiException;
 import com.google.firebase.messaging.FirebaseMessagingException;
+import com.mongodb.MongoException;
+import com.mongodb.MongoTimeoutException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.data.mongodb.UncategorizedMongoDbException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -27,8 +30,7 @@ public class GlobalExceptionHandler {
                 ex.getStatus().value(),
                 ex.getErrorCode(),
                 ex.getMessage(),
-                LocalDateTime.now()
-        );
+                LocalDateTime.now());
         return Mono.just(ResponseEntity.status(ex.getStatus()).body(errorResponse));
     }
 
@@ -45,8 +47,7 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_REQUEST.value(),
                 "VALIDATION_ERROR",
                 errors,
-                LocalDateTime.now()
-        );
+                LocalDateTime.now());
 
         return Mono.just(ResponseEntity.badRequest().body(errorResponse));
     }
@@ -63,8 +64,7 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_REQUEST.value(),
                 "VALIDATION_ERROR",
                 errors,
-                LocalDateTime.now()
-        );
+                LocalDateTime.now());
 
         return Mono.just(ResponseEntity.badRequest().body(errorResponse));
     }
@@ -76,8 +76,7 @@ public class GlobalExceptionHandler {
                 HttpStatus.SERVICE_UNAVAILABLE.value(),
                 "CIRCUIT_BREAKER_ERROR",
                 "Servis geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
-                LocalDateTime.now()
-        );
+                LocalDateTime.now());
 
         log.error("Circuit breaker opened: {}", ex.getMessage());
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse));
@@ -87,51 +86,63 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     public Mono<ResponseEntity<ErrorResponse>> handleFirebaseMessagingException(FirebaseMessagingException ex) {
         log.error("Firebase messaging error: {}", ex.getMessage());
-        
+
         ErrorResponse errorResponse = new ErrorResponse(
                 HttpStatus.SERVICE_UNAVAILABLE.value(),
                 "FIREBASE_ERROR",
                 "Bildirim gönderilirken bir hata oluştu",
-                LocalDateTime.now()
-        );
+                LocalDateTime.now());
 
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse));
     }
 
-    @ExceptionHandler(ApiException.class)
+    @ExceptionHandler({ MongoException.class, UncategorizedMongoDbException.class,
+            DataAccessResourceFailureException.class })
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    public Mono<ResponseEntity<ErrorResponse>> handleFirestoreException(ApiException ex) {
-        log.error("Firestore error: {}", ex.getMessage());
-        
+    public Mono<ResponseEntity<ErrorResponse>> handleMongoDbException(Exception ex) {
+        log.error("MongoDB error: {}", ex.getMessage());
+
         ErrorResponse errorResponse = new ErrorResponse(
                 HttpStatus.SERVICE_UNAVAILABLE.value(),
                 "DATABASE_ERROR",
                 "Veritabanı işlemi başarısız oldu",
-                LocalDateTime.now()
-        );
+                LocalDateTime.now());
 
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse));
+    }
+
+    @ExceptionHandler(MongoTimeoutException.class)
+    @ResponseStatus(HttpStatus.GATEWAY_TIMEOUT)
+    public Mono<ResponseEntity<ErrorResponse>> handleMongoTimeoutException(MongoTimeoutException ex) {
+        log.error("MongoDB timeout: {}", ex.getMessage());
+
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.GATEWAY_TIMEOUT.value(),
+                "DATABASE_TIMEOUT",
+                "Veritabanı işlemi zaman aşımına uğradı",
+                LocalDateTime.now());
+
+        return Mono.just(ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(errorResponse));
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Mono<ResponseEntity<ErrorResponse>> handleAllUncaughtException(Exception ex) {
         log.error("Unexpected error occurred: ", ex);
-        
+
         ErrorResponse errorResponse = new ErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 "INTERNAL_SERVER_ERROR",
                 "Beklenmeyen bir hata oluştu",
-                LocalDateTime.now()
-        );
+                LocalDateTime.now());
 
         return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse));
     }
 }
 
 record ErrorResponse(
-    int status,
-    String error,
-    String message,
-    LocalDateTime timestamp
-) {} 
+        int status,
+        String error,
+        String message,
+        LocalDateTime timestamp) {
+}

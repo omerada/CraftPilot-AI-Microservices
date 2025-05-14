@@ -98,11 +98,6 @@ jobs:
             echo "Setting up directories and permissions..."
             mkdir -p /opt/craftpilot/config/notification-service
 
-            echo "Creating GCP credentials..."
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/config/notification-service/gcp-credentials.json
-            chmod 644 /opt/craftpilot/config/notification-service/gcp-credentials.json
-            chown 65532:65532 /opt/craftpilot/config/notification-service/gcp-credentials.json
-
             echo "Creating Firebase credentials..."
             echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /opt/craftpilot/config/notification-service/firebase-service-account.json
             chmod 644 /opt/craftpilot/config/notification-service/firebase-service-account.json
@@ -115,12 +110,9 @@ jobs:
             # Create function definition in a variable to avoid semicolon issues
             FUNCTION_DEF="notificationEventConsumer;notificationEventProducer"
 
-            # GCP ve DNS ayarlarını güncelle
+            # DNS ayarlarını güncelle
             echo "Setting up networking config..."
             cat > /opt/craftpilot/config/notification-service/grpc-netty.properties << EOF
-            io.grpc.netty.negotiationType=TLS
-            io.grpc.netty.keepAliveTime=60
-            io.grpc.netty.keepAliveTimeout=20
             io.netty.handler.ssl.openssl.useKeyManagerFactory=true
             EOF
 
@@ -135,17 +127,12 @@ jobs:
               --cpus="1.0" \
               -p 8053:8053 \
               -v /opt/craftpilot/config/notification-service:/app/config:ro \
-              -v "/opt/craftpilot/config/notification-service/gcp-credentials.json:/app/credentials/gcp-credentials.json:ro" \
               -v "/opt/craftpilot/config/notification-service/firebase-service-account.json:/app/credentials/firebase-credentials.json:ro" \
               -v "/opt/craftpilot/config/notification-service/grpc-netty.properties:/app/config/grpc-netty.properties:ro" \
               -v "/opt/craftpilot/config/notification-service/healthcheck.sh:/app/healthcheck.sh:ro" \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-credentials.json \
               -e FIREBASE_CONFIG=/app/credentials/firebase-credentials.json \
-              -e SPRING_CLOUD_GCP_CREDENTIALS_LOCATION=file:/app/credentials/gcp-credentials.json \
-              -e GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}' \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SERVER_PORT=8053 \
-              -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
               -e SPRING_CLOUD_STREAM_KAFKA_BINDER_BROKERS=kafka:9092 \
@@ -160,6 +147,8 @@ jobs:
               -e SPRING_DATA_REDIS_HOST=redis \
               -e SPRING_DATA_REDIS_PORT=6379 \
               -e SPRING_DATA_REDIS_PASSWORD=13579ada \
+              -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
+              -e MONGO_INITDB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE }} \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e SPRING_MAIL_SENDGRID_FROM='${{ secrets.SENDGRID_FROM_EMAIL }}' \
               -e SPRING_MAIL_HOST=smtp.sendgrid.net \

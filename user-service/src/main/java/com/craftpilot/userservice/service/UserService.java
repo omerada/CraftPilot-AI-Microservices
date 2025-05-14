@@ -4,7 +4,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.craftpilot.userservice.model.user.entity.UserEntity;
 import com.craftpilot.userservice.model.user.enums.UserRole;
-import com.craftpilot.userservice.model.user.enums.UserStatus; 
+import com.craftpilot.userservice.model.user.enums.UserStatus;
 import com.craftpilot.userservice.repository.UserRepository;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
@@ -83,7 +83,8 @@ public class UserService {
     }
 
     /**
-     * Kullanıcı adının başka bir kullanıcı tarafından kullanılıp kullanılmadığını kontrol eder.
+     * Kullanıcı adının başka bir kullanıcı tarafından kullanılıp kullanılmadığını
+     * kontrol eder.
      * 
      * @param username Kontrol edilecek kullanıcı adı
      * @return Kullanıcı adı alınmışsa true, değilse false döner
@@ -113,9 +114,9 @@ public class UserService {
                 baseUsername = "user_" + System.currentTimeMillis() % 10000;
             }
         }
-        
+
         final String username = baseUsername;
-        
+
         return isUsernameTaken(username)
                 .flatMap(taken -> {
                     if (!taken) {
@@ -129,7 +130,8 @@ public class UserService {
     }
 
     /**
-     * Firebase token'ından kullanıcı bilgilerini alır ve benzersiz bir kullanıcı adı ile
+     * Firebase token'ından kullanıcı bilgilerini alır ve benzersiz bir kullanıcı
+     * adı ile
      * UserEntity nesnesi oluşturur.
      * 
      * @param token Firebase kimlik token'ı
@@ -139,14 +141,14 @@ public class UserService {
         String baseUsername;
         String email = token.getEmail();
         String displayName = token.getName();
-        
+
         // Kullanıcı adını displayName veya email'den oluştur
         if (displayName != null && !displayName.trim().isEmpty()) {
             baseUsername = displayName.toLowerCase().replace(" ", "_");
         } else {
             baseUsername = email != null ? email.split("@")[0].toLowerCase() : null;
         }
-        
+
         return generateUniqueUsername(baseUsername)
                 .map(uniqueUsername -> UserEntity.builder()
                         .id(token.getUid())
@@ -182,12 +184,13 @@ public class UserService {
                         // Kendisiyse güncellemeye devam et
                         return updateUserInternal(userId, updates);
                     })
-                    .switchIfEmpty(updateUserInternal(userId, updates)); // Kullanıcı adı alınmamışsa güncellemeye devam et
+                    .switchIfEmpty(updateUserInternal(userId, updates)); // Kullanıcı adı alınmamışsa güncellemeye devam
+                                                                         // et
         }
         // Kullanıcı adı değiştirilmiyorsa normal güncelleme
         return updateUserInternal(userId, updates);
     }
-    
+
     // Kullanıcı güncelleme iç metodu
     private Mono<UserEntity> updateUserInternal(String userId, UserEntity updates) {
         return userRepository.findById(userId)
@@ -209,7 +212,10 @@ public class UserService {
                     return userPreferenceService.deleteUserPreferences(userId)
                             .then(Mono.defer(() -> {
                                 // MongoDB'den kullanıcıyı sil
-                                return userRepository.deleteById(userId);
+                                return userRepository.deleteById(userId)
+                                        .doOnSuccess(v -> log.info("Kullanıcı MongoDB'den silindi: {}", userId))
+                                        .doOnError(
+                                                e -> log.error("Kullanıcı silinirken hata oluştu: {}", e.getMessage()));
                             }))
                             .then(Mono.fromRunnable(() -> {
                                 try {
@@ -235,31 +241,31 @@ public class UserService {
                         .flatMap(existingUser -> {
                             // Mevcut kullanıcıyı güncelle
                             boolean needsUpdate = false;
-                            
+
                             if (!existingUser.getEmail().equals(decodedToken.getEmail())) {
                                 existingUser.setEmail(decodedToken.getEmail());
                                 needsUpdate = true;
                             }
-                            
-                            if (decodedToken.getName() != null && 
-                                (existingUser.getDisplayName() == null || 
-                                !existingUser.getDisplayName().equals(decodedToken.getName()))) {
+
+                            if (decodedToken.getName() != null &&
+                                    (existingUser.getDisplayName() == null ||
+                                            !existingUser.getDisplayName().equals(decodedToken.getName()))) {
                                 existingUser.setDisplayName(decodedToken.getName());
                                 needsUpdate = true;
                             }
-                            
-                            if (decodedToken.getPicture() != null && 
-                                (existingUser.getPhotoUrl() == null || 
-                                !existingUser.getPhotoUrl().equals(decodedToken.getPicture()))) {
+
+                            if (decodedToken.getPicture() != null &&
+                                    (existingUser.getPhotoUrl() == null ||
+                                            !existingUser.getPhotoUrl().equals(decodedToken.getPicture()))) {
                                 existingUser.setPhotoUrl(decodedToken.getPicture());
                                 needsUpdate = true;
                             }
-                            
+
                             if (needsUpdate) {
                                 existingUser.setUpdatedAt(System.currentTimeMillis());
                                 return userRepository.save(existingUser);
                             }
-                            
+
                             return Mono.just(existingUser);
                         })
                         .switchIfEmpty(Mono.defer(() -> {
@@ -287,13 +293,14 @@ public class UserService {
     }
 
     // Bu metot kullanıcının plan bilgisini getirir
-    // Gerçek uygulamada kullanıcı veritabanı veya üyelik servisi üzerinden sorgu yapılmalıdır
+    // Gerçek uygulamada kullanıcı veritabanı veya üyelik servisi üzerinden sorgu
+    // yapılmalıdır
     public Mono<String> getUserPlan(String userId) {
         // Örnek olarak varsayılan değer döndürüyoruz
         // Gerçek uygulamada bu kullanıcı veritabanından veya başka bir servisten alınır
         return Mono.just("free");
     }
-    
+
     public Mono<UserPreference> getUserPreferences(String userId) {
         return userPreferenceService.getUserPreferences(userId);
     }
@@ -318,20 +325,20 @@ public class UserService {
     /**
      * Kullanıcı olay mesajını gönderir
      * 
-     * @param user Kullanıcı varlığı
+     * @param user      Kullanıcı varlığı
      * @param eventType Olay tipi (örn. USER_CREATED, USER_UPDATED)
      */
     private void sendUserEvent(UserEntity user, String eventType) {
         try {
             UserEvent event = UserEvent.fromEntity(user, eventType);
             kafkaTemplate.send(userEventsTopic, user.getId(), event)
-                .whenComplete((result, ex) -> {
-                    if (ex != null) {
-                        log.error("Kullanıcı olayı gönderilirken hata: {}", ex.getMessage());
-                    } else {
-                        log.debug("Kullanıcı olayı gönderildi: userId={}, event={}", user.getId(), eventType);
-                    }
-                });
+                    .whenComplete((result, ex) -> {
+                        if (ex != null) {
+                            log.error("Kullanıcı olayı gönderilirken hata: {}", ex.getMessage());
+                        } else {
+                            log.debug("Kullanıcı olayı gönderildi: userId={}, event={}", user.getId(), eventType);
+                        }
+                    });
         } catch (Exception e) {
             log.error("Kullanıcı olayı gönderilirken beklenmeyen hata: {}", e.getMessage());
         }
@@ -341,7 +348,7 @@ public class UserService {
      * Kullanıcı alanlarını güncellemek için kullanılan yardımcı metot
      * 
      * @param existingUser Mevcut kullanıcı
-     * @param updates Güncellenecek değerler
+     * @param updates      Güncellenecek değerler
      */
     private void updateUserFields(UserEntity existingUser, UserEntity updates) {
         if (updates.getEmail() != null) {
@@ -362,7 +369,7 @@ public class UserService {
         if (updates.getStatus() != null) {
             existingUser.setStatus(updates.getStatus());
         }
-        
+
         existingUser.setUpdatedAt(System.currentTimeMillis());
     }
 
@@ -386,25 +393,27 @@ public class UserService {
                     sendUserEvent(updatedUser, "USER_STATUS_UPDATED");
                     log.info("Kullanıcı durumu başarıyla güncellendi: id={}, status={}", userId, status);
                 })
-                .doOnError(e -> log.error("Kullanıcı durumu güncellenirken hata: id={}, error={}", userId, e.getMessage()));
+                .doOnError(e -> log.error("Kullanıcı durumu güncellenirken hata: id={}, error={}", userId,
+                        e.getMessage()));
     }
 
     /**
      * Email veya kullanıcı adına göre kullanıcı arar
      * 
-     * @param email Email adresi
+     * @param email    Email adresi
      * @param username Kullanıcı adı
      * @return Bulunan kullanıcı veya hata
      */
     public Mono<UserEntity> searchUsers(String email, String username) {
         log.info("Kullanıcı aranıyor: email={}, username={}", email, username);
-        
+
         if (email != null && !email.trim().isEmpty()) {
             return userRepository.findByEmail(email)
                     .switchIfEmpty(Mono.error(new UserNotFoundException("Email ile kullanıcı bulunamadı: " + email)));
         } else if (username != null && !username.trim().isEmpty()) {
             return userRepository.findByUsername(username)
-                    .switchIfEmpty(Mono.error(new UserNotFoundException("Kullanıcı adı ile kullanıcı bulunamadı: " + username)));
+                    .switchIfEmpty(Mono
+                            .error(new UserNotFoundException("Kullanıcı adı ile kullanıcı bulunamadı: " + username)));
         } else {
             return Mono.error(new ValidationException("Arama için email veya username parametresi gereklidir."));
         }
@@ -413,7 +422,7 @@ public class UserService {
     /**
      * Firebase'den gelen güncellemeleri sistemle senkronize eder
      * 
-     * @param userId Kullanıcı ID
+     * @param userId  Kullanıcı ID
      * @param updates Güncellemeler
      * @return Güncellenmiş kullanıcı
      */
@@ -430,6 +439,7 @@ public class UserService {
                     sendUserEvent(updatedUser, "USER_FIREBASE_SYNC");
                     log.info("Firebase güncellemesi başarıyla işlendi: id={}", userId);
                 })
-                .doOnError(e -> log.error("Firebase güncellemesi işlenirken hata: id={}, error={}", userId, e.getMessage()));
+                .doOnError(e -> log.error("Firebase güncellemesi işlenirken hata: id={}, error={}", userId,
+                        e.getMessage()));
     }
 }

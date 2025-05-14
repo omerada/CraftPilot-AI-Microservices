@@ -22,28 +22,13 @@ spring:
     sendgrid:
       api-key: ${SENDGRID_API_KEY}
       from: ${SENDGRID_FROM_EMAIL}
-  cloud:
-    gcp:
-      project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
-      credentials:
-        location: ${GOOGLE_APPLICATION_CREDENTIALS:/app/credentials/gcp-credentials.json}
-      firestore:
-        enabled: true
-        project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:craft-pilot-ai}
-        emulator:
-          enabled: false
-      core:
-        enabled: true
-    discovery:
-      enabled: true
-    stream:
-      bindings:
-        notificationEventConsumer-in-0:
-          destination: notifications
-          group: notification-service-group
-        notificationEventProducer-out-0:
-          destination: notifications
   data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://mongodb:27017/notification_service}
+      database: ${MONGO_INITDB_DATABASE:notification_service}
+      auto-index-creation: true
+      repositories:
+        type: reactive
     redis:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
@@ -64,6 +49,16 @@ spring:
           refresh:
             adaptive: true
             period: 30s
+  cloud:
+    discovery:
+      enabled: true
+    stream:
+      bindings:
+        notificationEventConsumer-in-0:
+          destination: notifications
+          group: notification-service-group
+        notificationEventProducer-out-0:
+          destination: notifications
 
 management:
   endpoints:
@@ -75,12 +70,17 @@ management:
       show-details: always
       probes:
         enabled: true
+      group:
+        readiness:
+          include: mongodb,redis
     metrics:
       enabled: true
     prometheus:
       enabled: true
   health:
     redis:
+      enabled: true
+    mongodb:
       enabled: true
     db:
       enabled: false
