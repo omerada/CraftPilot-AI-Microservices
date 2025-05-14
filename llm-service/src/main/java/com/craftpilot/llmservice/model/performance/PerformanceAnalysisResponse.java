@@ -29,6 +29,8 @@ public class PerformanceAnalysisResponse {
     @Indexed
     private String modelId;
 
+    private String jobId;
+
     @Indexed
     private LocalDateTime timestamp;
 
@@ -44,4 +46,8 @@ public class PerformanceAnalysisResponse {
     private String requestType;
     private String status;
     private String errorMessage;
+    private String message;
+
+    // Performance score
+    private Double performance;
 }

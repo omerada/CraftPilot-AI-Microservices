@@ -137,10 +137,12 @@ public class PerformanceService {
 
                         return Mono.just(PerformanceAnalysisResponse.builder()
                                 .id(jobId)
+                                .jobId(jobId) // job ID alanını ayarla
                                 .url((String) response.getOrDefault("url", ""))
                                 .status("FAILED")
-                                .message("Analysis failed: " + error)
-                                .timestamp(System.currentTimeMillis())
+                                .errorMessage(error)
+                                .message("Analysis failed: " + error) // message alanını ayarla
+                                .timestamp(LocalDateTime.now())
                                 .build());
                     } else if ("NOT_FOUND".equals(status)) {
                         // İş bulunamadı
@@ -271,19 +273,34 @@ public class PerformanceService {
         log.info("Getting performance history for URL: {}", request.getUrl());
 
         return performanceAnalysisRepository.findByUrl(request.getUrl())
-                .map(analysis -> PerformanceHistoryEntry.builder()
-                        .id(analysis.getId())
-                        .url(analysis.getUrl())
-                        .timestamp(LocalDateTime.ofInstant(
-                                Instant.ofEpochMilli(analysis.getTimestamp()),
-                                ZoneId.systemDefault()))
-                        .performance(analysis.getPerformance())
-                        .build())
+                .map(analysis -> {
+                    // LocalDateTime dönüşümünü düzelt
+                    LocalDateTime timestamp = (analysis.getTimestamp() != null) ? analysis.getTimestamp()
+                            : LocalDateTime.ofInstant(
+                                    java.time.Instant.ofEpochMilli(
+                                            analysis.getTimestamp() != null ? 0L
+                                                    : analysis.getTimestamp().atZone(java.time.ZoneId.systemDefault())
+                                                            .toInstant().toEpochMilli()),
+                                    java.time.ZoneId.systemDefault());
+
+                    // performance değerini al veya varsayılan değer kullan
+                    double performanceValue = analysis.getPerformance() != null ? analysis.getPerformance() : 0.0;
+
+                    return PerformanceHistoryEntry.builder()
+                            .id(analysis.getId())
+                            .url(analysis.getUrl())
+                            .timestamp(timestamp)
+                            .performance(performanceValue)
+                            .build();
+                })
                 .collectList()
-                .map(entries -> PerformanceHistoryResponse.builder()
-                        .url(request.getUrl())
-                        .entries(entries)
-                        .build());
+                .map(entries -> {
+                    // Burada tip uyuşmazlığını çözmek için direkt entries nesnesini kullan
+                    return PerformanceHistoryResponse.builder()
+                            .url(request.getUrl())
+                            .entries(entries)
+                            .build();
+                });
     }
 
     /**
@@ -312,10 +329,18 @@ public class PerformanceService {
         PerformanceHistoryResponse.PerformanceHistoryEntry entry = new PerformanceHistoryResponse.PerformanceHistoryEntry();
         // Set properties from map
         if (entryMap.containsKey("timestamp")) {
-            entry.setTimestamp(Long.valueOf(entryMap.get("timestamp").toString()));
+            Object timestampObj = entryMap.get("timestamp");
+            if (timestampObj instanceof Long) {
+                entry.setTimestamp(LocalDateTime.ofInstant(
+                        java.time.Instant.ofEpochMilli((Long) timestampObj),
+                        java.time.ZoneId.systemDefault()));
+            }
         }
         if (entryMap.containsKey("score")) {
-            entry.setScore(Double.valueOf(entryMap.get("score").toString()));
+            Object scoreObj = entryMap.get("score");
+            if (scoreObj instanceof Number) {
+                entry.setScore(((Number) scoreObj).doubleValue());
+            }
         }
         // Add other properties as needed
         return entry;

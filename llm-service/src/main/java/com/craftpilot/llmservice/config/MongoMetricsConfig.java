@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Configuration
@@ -25,6 +26,16 @@ public class MongoMetricsConfig {
     @Bean
     public MeterRegistryCustomizer<MeterRegistry> metricsCommonTags() {
         return registry -> registry.config().commonTags("application", "llm-service");
+    }
+
+    @Bean
+    public MongoMetricsRegistry mongoMetrics(ReactiveMongoTemplate mongoTemplate) {
+        // getDatabaseName() metodu yerine MongoClient üzerinden database adını al
+        String databaseName = mongoTemplate.getMongoDatabase().block().getName();
+
+        return new MongoMetricsRegistry(databaseName,
+                Collections.emptyList(),
+                meterRegistry);
     }
 
     @Scheduled(fixedRate = 60000) // Her 1 dakikada bir

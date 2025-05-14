@@ -26,5 +26,6 @@ public class PerformanceHistoryResponse {
         private String url;
         private LocalDateTime timestamp;
         private double performance;
+        private Double score; // Eklenen alan
     }
 }
