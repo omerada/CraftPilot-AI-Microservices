@@ -141,7 +141,8 @@ public class RedisClientAutoConfiguration {
 
     @Bean
     @ConditionalOnProperty(prefix = "craftpilot.redis", name = "health-indicator-enabled", havingValue = "true", matchIfMissing = true)
-    public RedisHealthIndicator redisHealthIndicator(ReactiveRedisService redisService) {
+    @ConditionalOnMissingBean(name = "redisLibHealthIndicator")
+    public RedisHealthIndicator redisLibHealthIndicator(ReactiveRedisService redisService) {
         return new RedisHealthIndicator(redisService);
     }
 }

@@ -1,2 +1,2 @@
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-com.craftpilot.redis.RedisClientAutoConfiguration
+com.craftpilot.redis.config.RedisClientAutoConfiguration
