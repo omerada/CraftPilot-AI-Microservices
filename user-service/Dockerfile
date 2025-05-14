@@ -19,6 +19,9 @@ ENV MAVEN_OPTS="-XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xmx2g"
 
 WORKDIR /build
 
+# Temizlik adımı ekleyin - build artefaktlarını ve cache'i temizler
+RUN rm -rf /root/.m2/repository/com/craftpilot/userservice/
+
 # Copy Redis client lib first
 COPY redis-client-lib/ /build/redis-client-lib/
 
