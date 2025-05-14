@@ -1,114 +1,122 @@
 package com.craftpilot.adminservice.config;
 
+import com.craftpilot.adminservice.model.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
-import org.springframework.stereotype.Component;
+import org.springframework.data.mongodb.core.index.ReactiveIndexOperations;
+import reactor.core.publisher.Mono;
 
-@Component
+import javax.annotation.PostConstruct;
+import java.util.concurrent.TimeUnit;
+
 @Slf4j
+@Configuration
 @RequiredArgsConstructor
 public class MongoIndexConfig {
 
-        private final ReactiveMongoTemplate mongoTemplate;
+    private final ReactiveMongoTemplate mongoTemplate;
 
-        @EventListener(ContextRefreshedEvent.class)
-        public void initIndexes() {
-                log.info("Initializing MongoDB indexes for admin-service collections");
+    @Value("${spring.data.mongodb.auto-index-creation:false}")
+    private boolean autoIndexCreation;
 
-                // UserActivity collection indexes
-                mongoTemplate.indexOps("user_activities")
-                                .ensureIndex(new Index().on("userId", Sort.Direction.ASC))
-                                .subscribe(result -> log.info("UserActivity userId index created: {}", result));
+    @PostConstruct
+    public void initializeDatabase() {
+        log.info("MongoDB index configuration initialized with auto-index-creation: {}", autoIndexCreation);
+    }
 
-                mongoTemplate.indexOps("user_activities")
-                                .ensureIndex(new Index().on("activityType", Sort.Direction.ASC))
-                                .subscribe(result -> log.info("UserActivity activityType index created: {}", result));
+    @EventListener(ContextRefreshedEvent.class)
+    public void initIndices() {
+        log.info("MongoDB indekslerini oluşturma işlemi başlıyor...");
 
-                mongoTemplate.indexOps("user_activities")
-                                .ensureIndex(new Index().on("timestamp", Sort.Direction.DESC))
-                                .subscribe(result -> log.info("UserActivity timestamp index created: {}", result));
-
-                mongoTemplate.indexOps("user_activities")
-                                .ensureIndex(new Index().on("status", Sort.Direction.ASC))
-                                .subscribe(result -> log.info("UserActivity status index created: {}", result));
-
-                // SystemMetrics collection indexes
-                mongoTemplate.indexOps("system_metrics")
-                                .ensureIndex(new Index().on("serviceId", Sort.Direction.ASC).unique())
-                                .subscribe(result -> log.info("SystemMetrics serviceId index created: {}", result));
-
-                mongoTemplate.indexOps("system_metrics")
-                                .ensureIndex(new Index().on("serviceType", Sort.Direction.ASC))
-                                .subscribe(result -> log.info("SystemMetrics serviceType index created: {}", result));
-
-                mongoTemplate.indexOps("system_metrics")
-                                .ensureIndex(new Index().on("timestamp", Sort.Direction.DESC))
-                                .subscribe(result -> log.info("SystemMetrics timestamp index created: {}", result));
-
-                mongoTemplate.indexOps("system_metrics")
-                                .ensureIndex(new Index().on("status", Sort.Direction.ASC))
-                                .subscribe(result -> log.info("SystemMetrics status index created: {}", result));
-
-                // SystemAlert collection indexes
-                mongoTemplate.indexOps("system_alerts")
-                                .ensureIndex(new Index().on("serviceId", Sort.Direction.ASC))
-                                .subscribe(result -> log.info("SystemAlert serviceId index created: {}", result));
-
-                mongoTemplate.indexOps("system_alerts")
-                                .ensureIndex(new Index().on("alertType", Sort.Direction.ASC))
-                                .subscribe(result -> log.info("SystemAlert alertType index created: {}", result));
-
-                mongoTemplate.indexOps("system_alerts")
-                                .ensureIndex(new Index().on("severity", Sort.Direction.ASC))
-                                .subscribe(result -> log.info("SystemAlert severity index created: {}", result));
-
-                mongoTemplate.indexOps("system_alerts")
-                                .ensureIndex(new Index().on("timestamp", Sort.Direction.DESC))
-                                .subscribe(result -> log.info("SystemAlert timestamp index created: {}", result));
-
-                mongoTemplate.indexOps("system_alerts")
-                                .ensureIndex(new Index().on("status", Sort.Direction.ASC))
-                                .subscribe(result -> log.info("SystemAlert status index created: {}", result));
-
-                // AuditLog collection indexes
-                mongoTemplate.indexOps("audit_logs")
-                                .ensureIndex(new Index().on("userId", Sort.Direction.ASC))
-                                .subscribe(result -> log.info("AuditLog userId index created: {}", result));
-
-                mongoTemplate.indexOps("audit_logs")
-                                .ensureIndex(new Index().on("serviceId", Sort.Direction.ASC))
-                                .subscribe(result -> log.info("AuditLog serviceId index created: {}", result));
-
-                mongoTemplate.indexOps("audit_logs")
-                                .ensureIndex(new Index().on("logType", Sort.Direction.ASC))
-                                .subscribe(result -> log.info("AuditLog logType index created: {}", result));
-
-                mongoTemplate.indexOps("audit_logs")
-                                .ensureIndex(new Index().on("timestamp", Sort.Direction.DESC))
-                                .subscribe(result -> log.info("AuditLog timestamp index created: {}", result));
-
-                // AdminAction collection indexes
-                mongoTemplate.indexOps("admin_actions")
-                                .ensureIndex(new Index().on("adminId", Sort.Direction.ASC))
-                                .subscribe(result -> log.info("AdminAction adminId index created: {}", result));
-
-                mongoTemplate.indexOps("admin_actions")
-                                .ensureIndex(new Index().on("actionType", Sort.Direction.ASC))
-                                .subscribe(result -> log.info("AdminAction actionType index created: {}", result));
-
-                mongoTemplate.indexOps("admin_actions")
-                                .ensureIndex(new Index().on("targetId", Sort.Direction.ASC))
-                                .subscribe(result -> log.info("AdminAction targetId index created: {}", result));
-
-                mongoTemplate.indexOps("admin_actions")
-                                .ensureIndex(new Index().on("timestamp", Sort.Direction.DESC))
-                                .subscribe(result -> log.info("AdminAction timestamp index created: {}", result));
-
-                log.info("MongoDB indexes initialization completed");
+        if (!autoIndexCreation) {
+            log.info("Auto index creation is disabled. Creating indexes manually.");
+            createUserActivityIndexes()
+                    .then(createSystemMetricsIndexes())
+                    .then(createSystemAlertIndexes())
+                    .then(createAuditLogIndexes())
+                    .then(createAdminActionIndexes())
+                    .doOnSuccess(v -> log.info("Tüm MongoDB indeksleri başarıyla oluşturuldu"))
+                    .doOnError(e -> log.error("MongoDB indeksleri oluşturulurken hata: {}", e.getMessage()))
+                    .subscribe();
+        } else {
+            log.info("Auto index creation is enabled. Spring Data MongoDB will handle index creation.");
         }
+    }
+
+    private Mono<Void> createUserActivityIndexes() {
+        log.info("UserActivity indeksleri oluşturuluyor");
+        ReactiveIndexOperations indexOps = mongoTemplate.indexOps(UserActivity.class);
+
+        return Mono.when(
+                indexOps.ensureIndex(new Index().on("userId", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("serviceId", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("activityType", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("status", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("timestamp", Sort.Direction.DESC))
+                        .doOnSuccess(name -> log.debug("UserActivity timestamp index created: {}", name))
+                        .doOnError(e -> log.error("Error creating UserActivity timestamp index: {}", e.getMessage()))
+        ).then();
+    }
+
+    private Mono<Void> createSystemMetricsIndexes() {
+        log.info("SystemMetrics indeksleri oluşturuluyor");
+        ReactiveIndexOperations indexOps = mongoTemplate.indexOps(SystemMetrics.class);
+
+        return Mono.when(
+                indexOps.ensureIndex(new Index().on("serviceId", Sort.Direction.ASC).unique()),
+                indexOps.ensureIndex(new Index().on("serviceType", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("status", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("timestamp", Sort.Direction.DESC))
+        ).then();
+    }
+
+    private Mono<Void> createSystemAlertIndexes() {
+        log.info("SystemAlert indeksleri oluşturuluyor");
+        ReactiveIndexOperations indexOps = mongoTemplate.indexOps(SystemAlert.class);
+
+        return Mono.when(
+                indexOps.ensureIndex(new Index().on("serviceId", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("alertType", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("severity", Sort.Direction.DESC)),
+                indexOps.ensureIndex(new Index().on("status", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("assignedTo", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("timestamp", Sort.Direction.DESC)),
+                indexOps.ensureIndex(new Index().on("createdAt", Sort.Direction.DESC).expire(90, TimeUnit.DAYS))
+        ).then();
+    }
+
+    private Mono<Void> createAuditLogIndexes() {
+        log.info("AuditLog indeksleri oluşturuluyor");
+        ReactiveIndexOperations indexOps = mongoTemplate.indexOps(AuditLog.class);
+
+        return Mono.when(
+                indexOps.ensureIndex(new Index().on("userId", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("serviceId", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("logType", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("resource", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("status", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("timestamp", Sort.Direction.DESC)),
+                indexOps.ensureIndex(new Index().on("createdAt", Sort.Direction.DESC).expire(180, TimeUnit.DAYS))
+        ).then();
+    }
+
+    private Mono<Void> createAdminActionIndexes() {
+        log.info("AdminAction indeksleri oluşturuluyor");
+        ReactiveIndexOperations indexOps = mongoTemplate.indexOps(AdminAction.class);
+
+        return Mono.when(
+                indexOps.ensureIndex(new Index().on("adminId", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("actionType", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("targetId", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("status", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("timestamp", Sort.Direction.DESC))
+        ).then();
+    }
 }
