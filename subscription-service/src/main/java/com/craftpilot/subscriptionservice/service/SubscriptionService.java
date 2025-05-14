@@ -110,7 +110,7 @@ public class SubscriptionService {
 
     @Cacheable(value = "subscriptions", key = "'active:' + #userId")
     public Mono<Subscription> getActiveSubscription(String userId) {
-        return subscriptionRepository.findByUserIdAndIsActiveTrue(userId)
+        return subscriptionRepository.findByUserIdAndActiveTrue(userId)
                 .switchIfEmpty(Mono.error(new RuntimeException("Aktif abonelik bulunamadı")));
     }
 
@@ -152,7 +152,7 @@ public class SubscriptionService {
 
     public Flux<Subscription> getExpiringSubscriptions() {
         LocalDateTime expirationThreshold = LocalDateTime.now().plusDays(7);
-        return subscriptionRepository.findByEndDateBeforeAndIsActiveTrue(expirationThreshold)
+        return subscriptionRepository.findByEndDateBeforeAndActiveTrue(expirationThreshold)
                 .doOnComplete(() -> log.debug("Retrieved all expiring subscriptions"));
     }
 
@@ -179,7 +179,7 @@ public class SubscriptionService {
     public void checkExpiringSubscriptions() {
         LocalDateTime tomorrow = LocalDateTime.now().plusDays(1);
 
-        subscriptionRepository.findByEndDateBeforeAndIsActiveTrue(tomorrow)
+        subscriptionRepository.findByEndDateBeforeAndActiveTrue(tomorrow)
                 .flatMap(subscription -> {
                     subscription.setStatus(SubscriptionStatus.EXPIRED);
                     subscription.setActive(false);

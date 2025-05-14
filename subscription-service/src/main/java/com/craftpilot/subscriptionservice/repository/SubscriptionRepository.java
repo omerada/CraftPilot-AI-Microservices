@@ -14,9 +14,9 @@ import java.time.LocalDateTime;
 public interface SubscriptionRepository extends ReactiveMongoRepository<Subscription, String> {
     Flux<Subscription> findByUserId(String userId);
 
-    Mono<Subscription> findByUserIdAndIsActiveTrue(String userId);
+    Mono<Subscription> findByUserIdAndActiveTrue(String userId);
 
-    Flux<Subscription> findByEndDateBeforeAndIsActiveTrue(LocalDateTime date);
+    Flux<Subscription> findByEndDateBeforeAndActiveTrue(LocalDateTime date);
 
     Flux<Subscription> findByStatus(SubscriptionStatus status);
 
