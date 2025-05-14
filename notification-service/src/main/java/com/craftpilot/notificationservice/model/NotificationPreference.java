@@ -39,4 +39,9 @@ public class NotificationPreference {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // Add explicit getter for Spring Data compatibility
+    public boolean isDeleted() {
+        return deleted;
+    }
 }

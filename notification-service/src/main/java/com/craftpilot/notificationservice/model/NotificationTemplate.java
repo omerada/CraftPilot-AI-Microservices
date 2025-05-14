@@ -39,6 +39,11 @@ public class NotificationTemplate {
     private boolean active;
     private boolean deleted;
 
+    // Add explicit getter for Spring Data compatibility
+    public boolean isDeleted() {
+        return deleted;
+    }
+
     @Version
     private Long version;
 

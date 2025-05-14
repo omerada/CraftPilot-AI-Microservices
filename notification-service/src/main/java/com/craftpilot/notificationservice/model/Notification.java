@@ -38,7 +38,7 @@ public class Notification {
     private NotificationStatus status;
 
     private LocalDateTime scheduledAt;
-    private LocalDateTime scheduledTime; // Alternatif alan - geriye dönük uyumluluk
+    private LocalDateTime scheduledTime;  
     private LocalDateTime sentAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -46,7 +46,16 @@ public class Notification {
     private boolean read;
     private boolean processed;
     private LocalDateTime processedTime;
-    private boolean deleted; // Eklenen alan
+     
+    private boolean deleted;
+    
+    public boolean isDeleted() {
+        return deleted;
+    }
+    
+    public void setDeleted(boolean deleted) {
+        this.deleted = deleted;
+    }
 
     @Version
     private Long version;

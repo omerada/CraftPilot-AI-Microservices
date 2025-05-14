@@ -11,13 +11,14 @@ import java.time.LocalDateTime;
 @Repository
 public interface NotificationRepository extends ReactiveMongoRepository<Notification, String> {
 
-    Flux<Notification> findByUserIdAndDeletedFalse(String userId);
+    // Fix method name to match the isDeleted() getter
+    Flux<Notification> findByUserIdAndDeletedIsFalse(String userId);
 
     Flux<Notification> findByUserId(String userId);
 
     Flux<Notification> findByUserIdAndRead(String userId, boolean read);
 
-    Flux<Notification> findByScheduledAtAfterAndDeletedFalseOrderByScheduledAtAsc(Instant time);
+    Flux<Notification> findByScheduledAtAfterAndDeletedIsFalseOrderByScheduledAtAsc(Instant time);
 
     Flux<Notification> findByScheduledAtAfter(LocalDateTime dateTime);
 
