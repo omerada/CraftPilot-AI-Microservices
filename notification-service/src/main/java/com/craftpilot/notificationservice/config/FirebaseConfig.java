@@ -30,7 +30,7 @@ public class FirebaseConfig {
     private String credentialsClasspath;
 
     @Bean
-    public FirebaseMessaging firebaseMessaging() throws IOException {
+    public FirebaseMessaging firebaseMessaging() {
         if (FirebaseApp.getApps().isEmpty()) {
             try {
                 InputStream serviceAccount = getCredentialsInputStream();
@@ -46,13 +46,24 @@ public class FirebaseConfig {
                 log.info("Firebase application has been initialized successfully");
             } catch (IOException e) {
                 log.error("Failed to initialize Firebase: {}", e.getMessage());
-                throw e;
+                log.warn("Application will continue without Firebase messaging capabilities");
+                return null;
+            } catch (Exception e) {
+                log.error("Unexpected error initializing Firebase: {}", e.getMessage());
+                log.warn("Application will continue without Firebase messaging capabilities");
+                return null;
             }
         }
-        return FirebaseMessaging.getInstance();
+        
+        try {
+            return FirebaseMessaging.getInstance();
+        } catch (Exception e) {
+            log.error("Could not get FirebaseMessaging instance: {}", e.getMessage());
+            return null;
+        }
     }
     
-    private InputStream getCredentialsInputStream() throws IOException {
+    private InputStream getCredentialsInputStream() {
         // İlk olarak classpath'den okumayı dene
         if (StringUtils.hasText(credentialsClasspath)) {
             try {

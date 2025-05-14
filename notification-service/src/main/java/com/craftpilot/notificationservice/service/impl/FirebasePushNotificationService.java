@@ -10,7 +10,6 @@ import com.google.firebase.messaging.FirebaseMessagingException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import io.micrometer.core.instrument.Timer;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -27,8 +26,10 @@ public class FirebasePushNotificationService implements PushNotificationService 
     private final FirebaseMessaging firebaseMessaging;
     private final Timer pushNotificationTimer;
 
-    @Autowired(required = false)
-    public FirebasePushNotificationService(FirebaseMessaging firebaseMessaging, Timer pushNotificationTimer) {
+    @Autowired
+    public FirebasePushNotificationService(
+            @Autowired(required = false) FirebaseMessaging firebaseMessaging, 
+            @Autowired(required = false) Timer pushNotificationTimer) {
         this.firebaseMessaging = firebaseMessaging;
         this.pushNotificationTimer = pushNotificationTimer;
         
@@ -45,9 +46,22 @@ public class FirebasePushNotificationService implements PushNotificationService 
             Timer.Sample sample = Timer.start();
             
             try {
-                String deviceToken = notification.getData().get("deviceToken").toString();
-                if (deviceToken == null || deviceToken.isEmpty()) {
-                    throw new IllegalArgumentException("Device token is required");
+                // Notification data kontrolü
+                if (notification.getData() == null) {
+                    log.error("Notification data is null");
+                    return Mono.error(new InvalidNotificationParametersException("Notification data cannot be null"));
+                }
+                
+                Object deviceTokenObj = notification.getData().get("deviceToken");
+                if (deviceTokenObj == null) {
+                    log.error("Device token is missing in notification data");
+                    return Mono.error(new InvalidNotificationParametersException("Device token is required"));
+                }
+                
+                String deviceToken = deviceTokenObj.toString();
+                if (deviceToken.isEmpty()) {
+                    log.error("Device token is empty");
+                    return Mono.error(new InvalidNotificationParametersException("Device token cannot be empty"));
                 }
                 
                 // Firebase service unavailable - log and continue
