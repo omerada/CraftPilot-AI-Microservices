@@ -137,7 +137,7 @@ jobs:
               echo "Secrets'tan alınan MongoDB URI düzeltildi"
             else
               # Bileşenlerden URI oluşturma - craftpilot-mongodb host adıyla
-              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@$MONGODB_CONTAINER:27017/${{ secrets.MONGO_INITDB_DATABASE || 'llm-service' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@$MONGODB_CONTAINER:27017/craftpilot_llm_db?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"
               echo "Bileşenlerden MongoDB URI oluşturuldu"
             fi
             # Log çıktılarında parolayı maskele
@@ -174,7 +174,7 @@ jobs:
                 -e SPRING_REDIS_PORT=6379 \
                 -e SPRING_REDIS_PASSWORD=13579ada \
                 -e SPRING_DATA_MONGODB_URI="${MONGODB_URI}" \
-                -e SPRING_DATA_MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE || 'llm-service' }}" \
+                -e SPRING_DATA_MONGODB_DATABASE="craftpilot_llm_db" \
                 -e MONGODB_HOST="${MONGODB_CONTAINER}" \
                 -e MONGO_ROOT_USERNAME="${{ secrets.MONGO_ROOT_USERNAME }}" \
                 -e MONGO_ROOT_PASSWORD="${{ secrets.MONGO_ROOT_PASSWORD }}" \
@@ -224,7 +224,7 @@ jobs:
                 -e SPRING_REDIS_PORT=6379 \
                 -e SPRING_REDIS_PASSWORD=13579ada \
                 -e SPRING_DATA_MONGODB_URI="${MONGODB_URI}" \
-                -e SPRING_DATA_MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE || 'llm-service' }}" \
+                -e SPRING_DATA_MONGODB_DATABASE="craftpilot_llm_db" \
                 -e MONGODB_HOST="${MONGODB_CONTAINER}" \
                 -e MONGO_ROOT_USERNAME="${{ secrets.MONGO_ROOT_USERNAME }}" \
                 -e MONGO_ROOT_PASSWORD="${{ secrets.MONGO_ROOT_PASSWORD }}" \

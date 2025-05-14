@@ -92,7 +92,7 @@ jobs:
               echo "Secrets'tan alınan MongoDB URI düzeltildi"
             else
               # Bileşenlerden URI oluşturma - craftpilot-mongodb host adıyla
-              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@$MONGODB_CONTAINER:27017/${{ secrets.MONGO_INITDB_DATABASE || 'analytics' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@$MONGODB_CONTAINER:27017/craftpilot_analytics_db?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"
               echo "Bileşenlerden MongoDB URI oluşturuldu"
             fi
             # Log çıktılarında parolayı maskele
@@ -143,7 +143,7 @@ jobs:
                 -e SERVER_PORT=8064 \
                 -e EUREKA_SERVER_URL=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
-                -e SPRING_DATA_MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE || 'analytics' }}" \
+                -e SPRING_DATA_MONGODB_DATABASE="craftpilot_analytics_db" \
                 -e MONGODB_HOST="$MONGODB_CONTAINER" \
                 -e MONGO_ROOT_USERNAME="${{ secrets.MONGO_ROOT_USERNAME }}" \
                 -e MONGO_ROOT_PASSWORD="${{ secrets.MONGO_ROOT_PASSWORD }}" \
@@ -176,7 +176,7 @@ jobs:
                 -e SERVER_PORT=8064 \
                 -e EUREKA_SERVER_URL=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
-                -e SPRING_DATA_MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE || 'analytics' }}" \
+                -e SPRING_DATA_MONGODB_DATABASE="craftpilot_analytics_db" \
                 -e MONGODB_HOST="$MONGODB_CONTAINER" \
                 -e MONGO_ROOT_USERNAME="${{ secrets.MONGO_ROOT_USERNAME }}" \
                 -e MONGO_ROOT_PASSWORD="${{ secrets.MONGO_ROOT_PASSWORD }}" \

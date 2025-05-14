@@ -8,15 +8,17 @@ else
   echo "Uyarı: .env dosyası bulunamadı, varsayılan değerler kullanılıyor..."
   MONGO_ROOT_USERNAME=${MONGO_ROOT_USERNAME:-craftpilot}
   MONGO_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-secure_password}
-  MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-craftpilot}
   MONGO_PORT=${MONGO_PORT:-27017}
   MONGODB_HOST=${MONGODB_HOST:-craftpilot-mongodb}
 fi
 
+# Veritabanı adını belirle (parametre veya varsayılan)
+DB_NAME=${1:-craftpilot}
+
 # Yedekleme dizini oluştur
 BACKUP_DIR="../backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_PATH="$BACKUP_DIR/backup_$TIMESTAMP"
+BACKUP_PATH="$BACKUP_DIR/backup_${DB_NAME}_$TIMESTAMP"
 
 mkdir -p $BACKUP_DIR
 mkdir -p $BACKUP_PATH
@@ -30,7 +32,7 @@ docker exec craftpilot-mongodb mongodump \
   --username $MONGO_ROOT_USERNAME \
   --password $MONGO_ROOT_PASSWORD \
   --authenticationDatabase admin \
-  --db $MONGO_INITDB_DATABASE \
+  --db $DB_NAME \
   --out /data/db/backup
 
 # Yedeklenen dosyaları host sistemine kopyala
@@ -41,10 +43,10 @@ docker exec craftpilot-mongodb rm -rf /data/db/backup
 
 # Yedekleri sıkıştır
 cd $BACKUP_DIR
-tar -czf "backup_$TIMESTAMP.tar.gz" "backup_$TIMESTAMP"
-rm -rf "backup_$TIMESTAMP"
+tar -czf "backup_${DB_NAME}_$TIMESTAMP.tar.gz" "backup_${DB_NAME}_$TIMESTAMP"
+rm -rf "backup_${DB_NAME}_$TIMESTAMP"
 
-echo "Yedekleme tamamlandı: $BACKUP_DIR/backup_$TIMESTAMP.tar.gz"
+echo "Yedekleme tamamlandı: $BACKUP_DIR/backup_${DB_NAME}_$TIMESTAMP.tar.gz"
 
 # Eski yedekleri temizle (30 günden eski)
 find $BACKUP_DIR -name "backup_*.tar.gz" -type f -mtime +30 -delete

@@ -111,7 +111,7 @@ jobs:
               echo "Modified MongoDB URI with correct container name: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
             else
               # Build URI from components
-              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/craftpilot_admin_db?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
               echo "Built MongoDB URI from credential components: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
             fi
 

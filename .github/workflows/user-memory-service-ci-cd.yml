@@ -119,7 +119,7 @@ jobs:
               echo "Modified MongoDB URI with correct container name: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
             else
               # Build URI from components
-              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE || 'user-memory-db' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/craftpilot_user_memory_db?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
               echo "Built MongoDB URI from credential components: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
             fi
 
@@ -154,7 +154,7 @@ jobs:
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
-                -e SPRING_DATA_MONGODB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE || 'user-memory-db' }} \
+                -e SPRING_DATA_MONGODB_DATABASE=craftpilot_user_memory_db \
                 -e SPRING_DATA_MONGODB_CONNECT_TIMEOUT=60000 \
                 -e SPRING_DATA_MONGODB_SOCKET_TIMEOUT=60000 \
                 -e SPRING_DATA_MONGODB_MAX_WAIT_TIME=120000 \
@@ -187,7 +187,7 @@ jobs:
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
-                -e SPRING_DATA_MONGODB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE || 'user-memory-db' }} \
+                -e SPRING_DATA_MONGODB_DATABASE=craftpilot_user_memory_db \
                 -e SPRING_DATA_MONGODB_CONNECT_TIMEOUT=60000 \
                 -e SPRING_DATA_MONGODB_SOCKET_TIMEOUT=60000 \
                 -e SPRING_DATA_MONGODB_MAX_WAIT_TIME=120000 \

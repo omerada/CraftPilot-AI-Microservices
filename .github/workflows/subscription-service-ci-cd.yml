@@ -57,7 +57,6 @@ jobs:
         env:
           MONGO_ROOT_USERNAME: ${{ secrets.MONGO_ROOT_USERNAME }}
           MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
-          MONGO_INITDB_DATABASE: ${{ secrets.MONGO_INITDB_DATABASE || 'subscription_service' }}
         run: |
           echo "Testing MongoDB connectivity..."
           # Container ismini kontrol et
@@ -81,7 +80,7 @@ jobs:
             MONGODB_URI="${{ secrets.MONGODB_URI }}"
             echo "Using preconfigured MongoDB URI"
           else
-            MONGODB_URI="mongodb://$MONGO_ROOT_USERNAME:$MONGO_ROOT_PASSWORD@$MONGODB_CONTAINER:27017/$MONGO_INITDB_DATABASE?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+            MONGODB_URI="mongodb://$MONGO_ROOT_USERNAME:$MONGO_ROOT_PASSWORD@$MONGODB_CONTAINER:27017/craftpilot_subscription_db?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
             echo "Created MongoDB URI from components"
           fi
           echo "MONGODB_URI=$(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
@@ -167,7 +166,7 @@ jobs:
               echo "Modified MongoDB URI with correct container name: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
             else
               # Bileşenlerden URI oluşturuyoruz
-              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE || 'subscription_service' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/craftpilot_subscription_db?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
               echo "Built MongoDB URI from credential components: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
             fi
 
@@ -197,7 +196,7 @@ jobs:
               -e SPRING_PROFILES_ACTIVE=prod \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
-              -e SPRING_DATA_MONGODB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE || 'subscription_service' }} \
+              -e SPRING_DATA_MONGODB_DATABASE=craftpilot_subscription_db \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \

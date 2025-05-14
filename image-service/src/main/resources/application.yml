@@ -39,8 +39,8 @@ spring:
   data:
     mongodb:
       # MongoDB yapılandırması - güvenli iletişim için standart değişken adları
-      uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:image-service}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000}
-      database: ${MONGODB_DATABASE:image-service}
+      uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:craftpilot_image_db}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000}
+      database: ${MONGODB_DATABASE:craftpilot_image_db}
       # Index yönetimi
       auto-index-creation: false # İndeksleri kendimiz yönetiyoruz
       # Bağlantı parametreleri
@@ -129,7 +129,7 @@ eureka:
     registry-fetch-interval-seconds: 5
     register-with-eureka: true
     fetch-registry: true
-    eureka-server-connect-timeout-seconds: 5
+    eureka-server-connect-time-timeout-seconds: 5
     eureka-server-read-timeout-seconds: 10
     eureka-connection-idle-timeout-seconds: 30
     eureka-server-total-connections: 200

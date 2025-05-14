@@ -52,8 +52,8 @@ spring:
           min-idle: 2
           max-wait: 1000ms
     mongodb:
-      uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:llm-service}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000}
-      database: ${MONGODB_DATABASE:llm-service}
+      uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:craftpilot_llm_db}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000}
+      database: ${MONGODB_DATABASE:craftpilot_llm_db}
       auto-index-creation: true
       # Gelişmiş bağlantı parametreleri
       connect-timeout: 30000

@@ -88,11 +88,9 @@ jobs:
             DOCKERHUB_USERNAME="DOCKERHUB_USERNAME_PLACEHOLDER"
             MONGO_ROOT_USERNAME="MONGO_ROOT_USERNAME_PLACEHOLDER"
             MONGO_ROOT_PASSWORD="MONGO_ROOT_PASSWORD_PLACEHOLDER"
-            MONGO_INITDB_DATABASE="MONGO_INITDB_DATABASE_PLACEHOLDER"
-            OPENAI_API_KEY="OPENAI_API_KEY_PLACEHOLDER"
 
             # MongoDB connection - use actual container name from docker ps output
-            MONGODB_URI="mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@craftpilot-mongodb:27017/${MONGO_INITDB_DATABASE}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"
+            MONGODB_URI="mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@craftpilot-mongodb:27017/craftpilot_image_db?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"
             echo "Using MongoDB URI: $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
 
             # Run the container
@@ -111,7 +109,7 @@ jobs:
               -e SPRING_SECURITY_USER_NAME=craftpilot \
               -e SPRING_SECURITY_USER_PASSWORD=13579ada \
               -e SPRING_DATA_MONGODB_URI="${MONGODB_URI}" \
-              -e SPRING_DATA_MONGODB_DATABASE="${MONGO_INITDB_DATABASE}" \
+              -e SPRING_DATA_MONGODB_DATABASE="craftpilot_image_db" \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \
@@ -131,7 +129,8 @@ jobs:
             sed -i "s|DOCKERHUB_USERNAME_PLACEHOLDER|${{ secrets.DOCKERHUB_USERNAME }}|g" /tmp/deploy-image-service.sh
             sed -i "s|MONGO_ROOT_USERNAME_PLACEHOLDER|${{ secrets.MONGO_ROOT_USERNAME }}|g" /tmp/deploy-image-service.sh
             sed -i "s|MONGO_ROOT_PASSWORD_PLACEHOLDER|${{ secrets.MONGO_ROOT_PASSWORD }}|g" /tmp/deploy-image-service.sh
-            sed -i "s|MONGO_INITDB_DATABASE_PLACEHOLDER|${{ secrets.MONGO_INITDB_DATABASE }}|g" /tmp/deploy-image-service.sh
+            # MONGO_INITDB_DATABASE placeholder'ı artık kullanılmıyor, doğrudan sabit değer kullanılacak
+            # sed -i "s|MONGO_INITDB_DATABASE_PLACEHOLDER|${{ secrets.MONGO_INITDB_DATABASE }}|g" /tmp/deploy-image-service.sh
             sed -i "s|OPENAI_API_KEY_PLACEHOLDER|${{ secrets.OPENAI_API_KEY }}|g" /tmp/deploy-image-service.sh
 
             # Make script executable

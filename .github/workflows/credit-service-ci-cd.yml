@@ -93,7 +93,7 @@ jobs:
               echo "Using MongoDB URI from secrets (with adjusted hostname if needed)"
             else
               # Otherwise, build the URI from components
-              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/craftpilot_credit_db?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"
               echo "Built MongoDB URI from credential components"
             fi
             echo "MongoDB URI: $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
@@ -117,7 +117,7 @@ jobs:
               -e SPRING_SECURITY_USER_NAME=craftpilot \
               -e SPRING_SECURITY_USER_PASSWORD=13579ada \
               -e MONGODB_URI="$MONGODB_URI" \
-              -e MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}" \
+              -e MONGODB_DATABASE="craftpilot_credit_db" \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
               -e REDIS_PASSWORD=13579ada \

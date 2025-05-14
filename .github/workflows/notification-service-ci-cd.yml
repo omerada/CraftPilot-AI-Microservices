@@ -148,7 +148,7 @@ jobs:
               -e SPRING_DATA_REDIS_PORT=6379 \
               -e SPRING_DATA_REDIS_PASSWORD=13579ada \
               -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
-              -e MONGO_INITDB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE }} \
+              -e SPRING_DATA_MONGODB_DATABASE=craftpilot_notification_db \
               -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
               -e SPRING_MAIL_SENDGRID_FROM='${{ secrets.SENDGRID_FROM_EMAIL }}' \
               -e SPRING_MAIL_HOST=smtp.sendgrid.net \

@@ -134,7 +134,7 @@ jobs:
               echo "Using MongoDB URI from secrets (adjusted hostname): $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
             else
               # Komponentlerden URI oluşturma
-              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/craftpilot_activity_log_db?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000"
               echo "Built MongoDB URI from components: $(echo $MONGODB_URI | sed 's/:[^:]*@/:\*\*\*@/g')"
             fi
 
@@ -181,8 +181,8 @@ jobs:
                 -e SPRING_SECURITY_USER_NAME=craftpilot \
                 -e SPRING_SECURITY_USER_PASSWORD=13579ada \
                 -e MONGODB_URI="${MONGODB_URI}" \
-                -e MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE }}" \
-                -e MONGO_INITDB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE }}" \
+                -e MONGODB_DATABASE="craftpilot_activity_log_db" \
+                -e MONGO_INITDB_DATABASE="craftpilot_activity_log_db" \
                 -e MONGO_ROOT_USERNAME="${{ secrets.MONGO_ROOT_USERNAME }}" \
                 -e MONGO_ROOT_PASSWORD="${{ secrets.MONGO_ROOT_PASSWORD }}" \
                 -e MONGODB_HOST="${MONGODB_CONTAINER}" \
@@ -217,8 +217,8 @@ jobs:
                 -e SPRING_SECURITY_USER_NAME=craftpilot \
                 -e SPRING_SECURITY_USER_PASSWORD=13579ada \
                 -e MONGODB_URI="${MONGODB_URI}" \
-                -e MONGODB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE }}" \
-                -e MONGO_INITDB_DATABASE="${{ secrets.MONGO_INITDB_DATABASE }}" \
+                -e MONGODB_DATABASE="craftpilot_activity_log_db" \
+                -e MONGO_INITDB_DATABASE="craftpilot_activity_log_db" \
                 -e MONGO_ROOT_USERNAME="${{ secrets.MONGO_ROOT_USERNAME }}" \
                 -e MONGO_ROOT_PASSWORD="${{ secrets.MONGO_ROOT_PASSWORD }}" \
                 -e MONGODB_HOST="${MONGODB_CONTAINER}" \

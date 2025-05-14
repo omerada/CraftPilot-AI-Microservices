@@ -128,7 +128,7 @@ jobs:
               echo "Modified MongoDB URI with correct container name: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
             else
               # Build URI from components
-              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/craftpilot_user_db?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
               echo "Built MongoDB URI from credential components: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
             fi
 
@@ -149,7 +149,7 @@ jobs:
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=8060 \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
-                -e SPRING_DATA_MONGODB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }} \
+                -e SPRING_DATA_MONGODB_DATABASE="craftpilot_user_db" \
                 -e SPRING_DATA_MONGODB_CONNECT_TIMEOUT=60000 \
                 -e SPRING_DATA_MONGODB_SOCKET_TIMEOUT=60000 \
                 -e SPRING_DATA_MONGODB_MAX_WAIT_TIME=120000 \
@@ -191,7 +191,7 @@ jobs:
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=8060 \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
-                -e SPRING_DATA_MONGODB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }} \
+                -e SPRING_DATA_MONGODB_DATABASE="craftpilot_user_db" \
                 -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
                 -e EUREKA_INSTANCE_HOSTNAME=user-service \
                 -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
