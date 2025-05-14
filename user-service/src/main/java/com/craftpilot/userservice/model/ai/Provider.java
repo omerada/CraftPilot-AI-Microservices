@@ -5,18 +5,16 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.TypeAlias;
-import com.google.cloud.firestore.annotation.DocumentId;
+import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TypeAlias("provider")
+@Document(collection = "providers")
 public class Provider {
     @Id
-    @DocumentId
     private String name;
     private String icon;
     private String description;

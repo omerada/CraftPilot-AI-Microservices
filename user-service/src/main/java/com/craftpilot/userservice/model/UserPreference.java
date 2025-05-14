@@ -5,8 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.TypeAlias;
-import com.google.cloud.firestore.annotation.DocumentId;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,10 +16,9 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@TypeAlias("userPreference")
+@Document(collection = "userPreferences")
 public class UserPreference {
     @Id
-    @DocumentId
     private String userId;
 
     // Tema modu (light, dark, system)
@@ -46,10 +44,10 @@ public class UserPreference {
     // Bildirim tercihleri
     @Builder.Default
     private Map<String, Boolean> notifications = new HashMap<>();
-    
+
     @Builder.Default
     private Boolean pushEnabled = false;
-    
+
     // Son seçilen AI modeli ID'si
     @Builder.Default
     private String lastSelectedModelId = "google/gemini-2.0-flash-lite-001";

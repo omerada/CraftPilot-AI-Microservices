@@ -205,7 +205,7 @@ public class UserService {
                 .doOnError(error -> log.error("Error updating user: {}", error.getMessage()));
     }
 
-    // Kullanıcı silme metodunu güncelleme (kullanıcı tercihlerini de sil)
+    // Kullanıcı silme metodunu güncelleme (MongoDB'ye geçiş)
     public Mono<Void> deleteUser(String userId) {
         return userRepository.findById(userId)
                 .flatMap(user -> {

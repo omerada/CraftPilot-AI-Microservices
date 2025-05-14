@@ -18,6 +18,21 @@ spring:
     redis:
       repositories:
         enabled: false
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:user-service}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000}
+      database: ${MONGODB_DATABASE:user-service}
+      auto-index-creation: true
+      # Bağlantı parametreleri
+      connect-timeout: 30000
+      socket-timeout: 60000
+      max-wait-time: 120000
+      max-connection-idle-time: 300000
+      max-connection-life-time: 600000
+      # MongoDB dayanıklılık ayarları
+      retry-writes: true
+      max-connection-pool-size: 20
+      min-connection-pool-size: 5
+      server-selection-timeout: 30000
   firebase:
     config:
       path: ${FIREBASE_CONFIG_PATH:/etc/gcp/credentials/gcp-credentials.json}
@@ -98,6 +113,8 @@ management:
       enabled: true
     kafka:
       enabled: false
+    mongodb:
+      enabled: true
     validate-group-membership: false
 
 springdoc:

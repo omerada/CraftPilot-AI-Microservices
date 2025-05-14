@@ -69,15 +69,6 @@ jobs:
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64,mode=max
 
-      - id: "auth"
-        name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v1"
-        with:
-          credentials_json: "${{ secrets.GCP_SA_KEY }}"
-
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
-
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
@@ -99,24 +90,52 @@ jobs:
             echo "=== Testing Directory Access ==="
             mkdir -p /opt/craftpilot
 
-            echo "=== Continuing with Deployment ==="
-            echo '${{ secrets.GCP_SA_KEY }}' > /opt/craftpilot/gcp-credentials.json
-            chmod 600 /opt/craftpilot/gcp-credentials.json
+            echo "=== Docker Network Availability ==="
+            docker network create craftpilot-network || true
 
-            echo "=== Verifying Docker Status ==="
-            if ! systemctl is-active --quiet docker; then
-              echo "Docker is not running. Starting Docker..."
-              sudo systemctl start docker
+            echo "=== MongoDB Container Check ==="
+            MONGODB_CONTAINER="craftpilot-mongodb"
+            if ! docker ps | grep -q "$MONGODB_CONTAINER"; then
+              echo "WARNING: Default MongoDB container not found ($MONGODB_CONTAINER)"
+              # Fallback to detect any MongoDB container
+              MONGODB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'mongo|mongodb' | head -n 1)
+              if [ -z "$MONGODB_CONTAINER" ]; then
+                echo "ERROR: No MongoDB container found! Using default name, but connection may fail."
+                MONGODB_CONTAINER="craftpilot-mongodb" # Fallback to default
+              else
+                echo "Found alternative MongoDB container: $MONGODB_CONTAINER"
+              fi
+            fi
+            echo "Using MongoDB container: $MONGODB_CONTAINER"
+
+            echo "=== MongoDB Connection Test ==="
+            if docker run --rm --network craftpilot-network mongo:6.0 mongosh --quiet --eval "db.runCommand({ping:1}).ok" admin --host $MONGODB_CONTAINER --port 27017 -u ${{ secrets.MONGO_ROOT_USERNAME }} -p ${{ secrets.MONGO_ROOT_PASSWORD }} --authenticationDatabase admin | grep -q "1"; then
+              echo "✅ MongoDB connection test successful!"
+            else
+              echo "⚠️ MongoDB connection test failed! Deployment will continue but may have issues."
             fi
 
-            echo "=== Deploying User Service ==="
-            # Force pull latest image
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
+            echo "=== MongoDB URI Construction ==="
+            # Parse the URI if provided, otherwise construct from components
+            if [ -n "${{ secrets.MONGODB_URI }}" ]; then
+              # Parse the URI and replace the hostname with our container name
+              URI_PREFIX=$(echo "${{ secrets.MONGODB_URI }}" | grep -oP 'mongodb://[^@]+@')
+              URI_SUFFIX=$(echo "${{ secrets.MONGODB_URI }}" | grep -oP '(?<=@)[^/]+/.*')
+              URI_HOST=$(echo "$URI_SUFFIX" | grep -oP '^[^:/]+')
+              URI_REMAINDER=$(echo "$URI_SUFFIX" | grep -oP '(?<='"$URI_HOST"')[:/].*')
+              
+              MONGODB_URI="${URI_PREFIX}${MONGODB_CONTAINER}${URI_REMAINDER}"
+              echo "Modified MongoDB URI with correct container name: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
+            else
+              # Build URI from components
+              MONGODB_URI="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@${MONGODB_CONTAINER}:27017/${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000"
+              echo "Built MongoDB URI from credential components: $(echo $MONGODB_URI | sed 's/:[^:]*@/:*****@/g')"
+            fi
 
             echo "=== Stopping Old Container ==="
             docker rm -f user-service || true
 
-            echo "=== Starting User Service ==="
+            echo "=== Deploying User Service ==="
             if [[ "${{ github.event.inputs.environment }}" == "debug" ]]; then
               docker run -d \
                 --name user-service \
@@ -124,11 +143,16 @@ jobs:
                 --restart unless-stopped \
                 -p 8060:8060 \
                 -p 5007:5007 \
-                -v /opt/craftpilot/gcp/credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
+                -v /opt/craftpilot/gcp-credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
                 -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
                 -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=8060 \
+                -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
+                -e SPRING_DATA_MONGODB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }} \
+                -e SPRING_DATA_MONGODB_CONNECT_TIMEOUT=60000 \
+                -e SPRING_DATA_MONGODB_SOCKET_TIMEOUT=60000 \
+                -e SPRING_DATA_MONGODB_MAX_WAIT_TIME=120000 \
                 -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
                 -e EUREKA_INSTANCE_HOSTNAME=user-service \
                 -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
@@ -136,14 +160,13 @@ jobs:
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
-                -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
-                -e MONGO_INITDB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }} \
                 -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
                 -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
                 -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
                 -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
                 -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics,loggers,env" \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e MANAGEMENT_HEALTH_MONGODB_ENABLED=true \
                 -e SPRING_APPLICATION_NAME=user-service \
                 -e LOGGING_LEVEL_COM_CRAFTPILOT=DEBUG \
                 -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_NETFLIX_EUREKA=DEBUG \
@@ -162,11 +185,13 @@ jobs:
                 --network craftpilot-network \
                 --restart unless-stopped \
                 -p 8060:8060 \
-                -v /opt/craftpilot/gcp/credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
+                -v /opt/craftpilot/gcp-credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
                 -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
                 -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=8060 \
+                -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
+                -e SPRING_DATA_MONGODB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }} \
                 -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
                 -e EUREKA_INSTANCE_HOSTNAME=user-service \
                 -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
@@ -174,14 +199,13 @@ jobs:
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
                 -e REDIS_PASSWORD=13579ada \
-                -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
-                -e MONGO_INITDB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE || 'craftpilot' }} \
                 -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
                 -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
                 -e MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED=true \
                 -e MANAGEMENT_HEALTH_READINESSSTATE_ENABLED=true \
                 -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE="health,info,metrics" \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
+                -e MANAGEMENT_HEALTH_MONGODB_ENABLED=true \
                 -e SPRING_APPLICATION_NAME=user-service \
                 --health-cmd="curl -f http://localhost:8060/actuator/health || exit 1" \
                 --health-interval=10s \
@@ -209,9 +233,13 @@ jobs:
               HEALTH_CHECK=$(curl -s http://localhost:8060/actuator/health || echo "Failed to connect")
               
               if echo "$HEALTH_CHECK" | grep -q '"status":"UP"'; then
-                echo "✓ Service is healthy: $HEALTH_CHECK"
-                echo "=== Deployment completed successfully ==="
-                exit 0
+                if echo "$HEALTH_CHECK" | grep -q '"mongo":{.*"status":"UP"'; then
+                  echo "✅ Service is healthy with MongoDB connection: $HEALTH_CHECK"
+                  echo "=== Deployment completed successfully ==="
+                  exit 0
+                else
+                  echo "Service is UP but MongoDB component status needs verification."
+                fi
               else
                 echo "Health check response: $HEALTH_CHECK"
               fi
@@ -226,6 +254,8 @@ jobs:
             docker ps -a | grep user-service
             echo "Container Logs (last 100 lines):"
             docker logs user-service --tail 100
+            echo "MongoDB Connection Test:"
+            docker exec user-service nc -zv $MONGODB_CONTAINER 27017 || echo "Cannot connect to MongoDB"
             echo "Error Messages and Exceptions:"
             docker logs user-service 2>&1 | grep -i "error\|exception\|failed" | tail -20
             echo "Health Check Response:"
