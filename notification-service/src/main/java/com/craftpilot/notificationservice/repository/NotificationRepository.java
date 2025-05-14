@@ -10,8 +10,7 @@ import java.time.LocalDateTime;
 
 @Repository
 public interface NotificationRepository extends ReactiveMongoRepository<Notification, String> {
-
-    // Fix method name to match the isDeleted() getter
+ 
     Flux<Notification> findByUserIdAndDeletedIsFalse(String userId);
 
     Flux<Notification> findByUserId(String userId);
