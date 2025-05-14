@@ -14,23 +14,17 @@ spring:
     include: kafka-base
   data:
     mongodb:
-      # MongoDB yapılandırması - güvenli varsayılan değerler
-      uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:craftpilot_admin_db}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000}
+      # MongoDB yapılandırması - sadeleştirilmiş
+      uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:craftpilot_admin_db}?authSource=admin&retryWrites=true&w=majority}
       database: ${MONGODB_DATABASE:craftpilot_admin_db}
-      auto-index-creation: false
-      # Gelişmiş bağlantı parametreleri
-      connect-timeout: 60000
+      auto-index-creation: false # Otomatik index oluşturma kapalı
+      # Temel bağlantı parametreleri
+      connect-timeout: 30000
       socket-timeout: 60000
-      max-wait-time: 120000
-      max-connection-idle-time: 300000
-      max-connection-life-time: 600000
-      # MongoDB dayanıklılık ayarları
-      retry-writes: true
+      max-wait-time: 60000
       max-connection-pool-size: 20
       min-connection-pool-size: 5
-      server-selection-timeout: 60000
-      maintenance-frequency: 20000
-      maintenance-initial-delay: 5000
+      server-selection-timeout: 30000
     redis:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
@@ -66,3 +60,4 @@ management:
 logging:
   level:
     com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
+# Özel mongodb indeks yapılandırması kaldırıldı

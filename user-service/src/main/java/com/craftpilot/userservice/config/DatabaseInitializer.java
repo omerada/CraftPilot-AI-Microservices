@@ -37,61 +37,25 @@ public class DatabaseInitializer {
         public void initIndexes() {
                 log.info("MongoDB indekslerini oluşturma işlemi başlıyor...");
 
-                // User koleksiyonu indeksleri
-                createUserIndexes();
-
-                // UserPreference koleksiyonu indeksleri
-                createUserPreferenceIndexes();
-
-                // AIModel koleksiyonu indeksleri
-                createAIModelIndexes();
-
-                // Provider koleksiyonu indeksleri
-                createProviderIndexes();
-
+                // İndeksleme kontrolü
+                if (!autoIndexCreation) {
+                    createUserIndexes()
+                            .then(createUserPreferenceIndexes())
+                            .then(createProviderIndexes())
+                            .then(createAIModelIndexes())
+                            .doOnSuccess(v -> log.info("Tüm indeksler başarıyla oluşturuldu"))
+                            .doOnError(e -> log.error("İndeks oluşturma hatası: {}", e.getMessage()))
+                            .subscribe();
+                } else {
+                    log.info("spring.data.mongodb.auto-index-creation etkin. İndeksler otomatik oluşturulacak.");
+                }
+                
                 log.info("MongoDB indeksleri oluşturuldu");
         }
 
         @EventListener(ContextRefreshedEvent.class)
         public void initializeDatabase() {
                 log.info("Veritabanı indeksleri ve koleksiyonlar kontrol ediliyor");
-
-                if (!autoIndexCreation) {
-                        createUserIndexes()
-                                        .then(createUserPreferenceIndexes())
-                                        .then(createProviderIndexes())
-                                        .then(createAIModelIndexes())
-                                        .doOnSuccess(v -> log.info("Tüm indeksler başarıyla oluşturuldu"))
-                                        .doOnError(e -> log.error("İndeks oluşturma hatası: {}", e.getMessage()))
-                                        .subscribe();
-                }
-        }
-
-        private void createUserIndexes() {
-                ReactiveIndexOperations indexOps = mongoTemplate.indexOps("users");
-
-                // uid için unique indeks
-                indexOps.ensureIndex(new Index().on("uid", Sort.Direction.ASC).unique())
-                                .subscribe(
-                                                result -> log.debug("User uid indeksi oluşturuldu: {}", result),
-                                                error -> log.error("User uid indeksi oluşturulurken hata: {}",
-                                                                error.getMessage()));
-
-                // email için indeks
-                indexOps.ensureIndex(new Index().on("email", Sort.Direction.ASC))
-                                .subscribe(
-                                                result -> log.debug("User email indeksi oluşturuldu: {}", result),
-                                                error -> log.error("User email indeksi oluşturulurken hata: {}",
-                                                                error.getMessage()));
-
-                // createdAt için TTL indeksi (opsiyonel, uzun süre etkisiz kullanıcıları silmek
-                // için)
-                indexOps.ensureIndex(new Index().on("createdAt", Sort.Direction.ASC).expire(365, TimeUnit.DAYS))
-                                .subscribe(
-                                                result -> log.debug("User createdAt TTL indeksi oluşturuldu: {}",
-                                                                result),
-                                                error -> log.error("User createdAt TTL indeksi oluşturulurken hata: {}",
-                                                                error.getMessage()));
         }
 
         private Mono<Void> createUserIndexes() {
@@ -104,19 +68,6 @@ public class DatabaseInitializer {
                                 indexOps.ensureIndex(new Index().on("createdAt", Sort.Direction.ASC))).then();
         }
 
-        private void createUserPreferenceIndexes() {
-                ReactiveIndexOperations indexOps = mongoTemplate.indexOps("userPreferences");
-
-                // userId için unique indeks
-                indexOps.ensureIndex(new Index().on("userId", Sort.Direction.ASC).unique())
-                                .subscribe(
-                                                result -> log.debug("UserPreference userId indeksi oluşturuldu: {}",
-                                                                result),
-                                                error -> log.error(
-                                                                "UserPreference userId indeksi oluşturulurken hata: {}",
-                                                                error.getMessage()));
-        }
-
         private Mono<Void> createUserPreferenceIndexes() {
                 log.info("UserPreference indeksleri oluşturuluyor");
                 ReactiveIndexOperations indexOps = mongoTemplate.indexOps(UserPreference.class);
@@ -126,22 +77,14 @@ public class DatabaseInitializer {
                                 indexOps.ensureIndex(new Index().on("lastUpdated", Sort.Direction.ASC))).then();
         }
 
-        private void createAIModelIndexes() {
-                ReactiveIndexOperations indexOps = mongoTemplate.indexOps("aiModels");
+        private Mono<Void> createAIModelIndexes() {
+                log.info("AIModel indeksleri oluşturuluyor");
+                ReactiveIndexOperations indexOps = mongoTemplate.indexOps(AIModel.class);
 
-                // modelId için unique indeks
-                indexOps.ensureIndex(new Index().on("modelId", Sort.Direction.ASC).unique())
-                                .subscribe(
-                                                result -> log.debug("AIModel modelId indeksi oluşturuldu: {}", result),
-                                                error -> log.error("AIModel modelId indeksi oluşturulurken hata: {}",
-                                                                error.getMessage()));
-
-                // provider için indeks
-                indexOps.ensureIndex(new Index().on("provider", Sort.Direction.ASC))
-                                .subscribe(
-                                                result -> log.debug("AIModel provider indeksi oluşturuldu: {}", result),
-                                                error -> log.error("AIModel provider indeksi oluşturulurken hata: {}",
-                                                                error.getMessage()));
+                return Mono.when(
+                                indexOps.ensureIndex(new Index().on("modelId", Sort.Direction.ASC).unique()),
+                                indexOps.ensureIndex(new Index().on("provider", Sort.Direction.ASC)),
+                                indexOps.ensureIndex(new Index().on("category", Sort.Direction.ASC))).then();
         }
 
         private Mono<Void> createProviderIndexes() {
@@ -151,18 +94,5 @@ public class DatabaseInitializer {
                 return Mono.when(
                                 indexOps.ensureIndex(new Index().on("name", Sort.Direction.ASC).unique()),
                                 indexOps.ensureIndex(new Index().on("active", Sort.Direction.ASC))).then();
-        }
-
-        private void createProviderIndexes() {
-                ReactiveIndexOperations indexOps = mongoTemplate.indexOps("providers");
-
-                // providerId için unique indeks
-                indexOps.ensureIndex(new Index().on("providerId", Sort.Direction.ASC).unique())
-                                .subscribe(
-                                                result -> log.debug("Provider providerId indeksi oluşturuldu: {}",
-                                                                result),
-                                                error -> log.error(
-                                                                "Provider providerId indeksi oluşturulurken hata: {}",
-                                                                error.getMessage()));
         }
 }

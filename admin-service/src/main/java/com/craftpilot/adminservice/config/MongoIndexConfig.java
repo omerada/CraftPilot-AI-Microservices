@@ -33,25 +33,25 @@ public class MongoIndexConfig {
 
     @EventListener(ContextRefreshedEvent.class)
     public void initIndices() {
-        log.info("MongoDB indekslerini oluşturma işlemi başlıyor...");
+        log.info("Checking MongoDB index creation...");
 
-        if (!autoIndexCreation) {
-            log.info("Auto index creation is disabled. Creating indexes manually.");
+        if (autoIndexCreation) {
+            log.info("Auto index creation is enabled. Creating indexes manually.");
             createUserActivityIndexes()
                     .then(createSystemMetricsIndexes())
                     .then(createSystemAlertIndexes())
                     .then(createAuditLogIndexes())
                     .then(createAdminActionIndexes())
-                    .doOnSuccess(v -> log.info("Tüm MongoDB indeksleri başarıyla oluşturuldu"))
-                    .doOnError(e -> log.error("MongoDB indeksleri oluşturulurken hata: {}", e.getMessage()))
+                    .doOnSuccess(v -> log.info("All MongoDB indexes successfully created"))
+                    .doOnError(e -> log.error("Error creating MongoDB indexes: {}", e.getMessage()))
                     .subscribe();
         } else {
-            log.info("Auto index creation is enabled. Spring Data MongoDB will handle index creation.");
+            log.info("Auto index creation is disabled. Spring Data MongoDB will handle index creation.");
         }
     }
 
     private Mono<Void> createUserActivityIndexes() {
-        log.info("UserActivity indeksleri oluşturuluyor");
+        log.info("UserActivity indexes are being created");
         ReactiveIndexOperations indexOps = mongoTemplate.indexOps(UserActivity.class);
 
         return Mono.when(
@@ -66,7 +66,7 @@ public class MongoIndexConfig {
     }
 
     private Mono<Void> createSystemMetricsIndexes() {
-        log.info("SystemMetrics indeksleri oluşturuluyor");
+        log.info("SystemMetrics indexes are being created");
         ReactiveIndexOperations indexOps = mongoTemplate.indexOps(SystemMetrics.class);
 
         return Mono.when(
@@ -78,7 +78,7 @@ public class MongoIndexConfig {
     }
 
     private Mono<Void> createSystemAlertIndexes() {
-        log.info("SystemAlert indeksleri oluşturuluyor");
+        log.info("SystemAlert indexes are being created");
         ReactiveIndexOperations indexOps = mongoTemplate.indexOps(SystemAlert.class);
 
         return Mono.when(
@@ -93,7 +93,7 @@ public class MongoIndexConfig {
     }
 
     private Mono<Void> createAuditLogIndexes() {
-        log.info("AuditLog indeksleri oluşturuluyor");
+        log.info("AuditLog indexes are being created");
         ReactiveIndexOperations indexOps = mongoTemplate.indexOps(AuditLog.class);
 
         return Mono.when(
@@ -108,7 +108,7 @@ public class MongoIndexConfig {
     }
 
     private Mono<Void> createAdminActionIndexes() {
-        log.info("AdminAction indeksleri oluşturuluyor");
+        log.info("AdminAction indexes are being created");
         ReactiveIndexOperations indexOps = mongoTemplate.indexOps(AdminAction.class);
 
         return Mono.when(
