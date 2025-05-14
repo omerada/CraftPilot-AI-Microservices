@@ -12,6 +12,8 @@ import io.github.resilience4j.retry.annotation.Retry;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
@@ -19,11 +21,21 @@ import java.util.Map;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
+@ConditionalOnProperty(name = "firebase.enabled", havingValue = "true", matchIfMissing = false)
 public class FirebasePushNotificationService implements PushNotificationService {
 
     private final FirebaseMessaging firebaseMessaging;
     private final Timer pushNotificationTimer;
+
+    @Autowired(required = false)
+    public FirebasePushNotificationService(FirebaseMessaging firebaseMessaging, Timer pushNotificationTimer) {
+        this.firebaseMessaging = firebaseMessaging;
+        this.pushNotificationTimer = pushNotificationTimer;
+        
+        if (firebaseMessaging == null) {
+            log.warn("FirebaseMessaging is not available - push notifications will be logged but not sent");
+        }
+    }
 
     @Override
     @CircuitBreaker(name = "pushNotificationService")
@@ -38,6 +50,13 @@ public class FirebasePushNotificationService implements PushNotificationService 
                     throw new IllegalArgumentException("Device token is required");
                 }
                 
+                // Firebase service unavailable - log and continue
+                if (firebaseMessaging == null) {
+                    log.info("Firebase messaging disabled. Would have sent notification to device: {}, title: {}, content: {}",
+                            deviceToken, notification.getTitle(), notification.getContent());
+                    return Mono.empty();
+                }
+                
                 Message message = Message.builder()
                         .setToken(deviceToken)
                         .setNotification(com.google.firebase.messaging.Notification.builder()
@@ -49,7 +68,9 @@ public class FirebasePushNotificationService implements PushNotificationService 
 
                 try {
                     String messageId = firebaseMessaging.send(message);
-                    sample.stop(pushNotificationTimer);
+                    if (pushNotificationTimer != null) {
+                        sample.stop(pushNotificationTimer);
+                    }
                     log.info("Push notification sent successfully to device: {}, messageId: {}", deviceToken, messageId);
                     return Mono.empty();
                 } catch (FirebaseMessagingException e) {
@@ -71,4 +92,4 @@ public class FirebasePushNotificationService implements PushNotificationService 
                         entry -> String.valueOf(entry.getValue())
                 ));
     }
-} 
+}
