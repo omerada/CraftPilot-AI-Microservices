@@ -25,6 +25,19 @@
     
     <!-- Metrics logları -->
     <logger name="io.micrometer" level="INFO"/>
+    
+    <!-- MongoDB logları -->
+    <logger name="org.mongodb.driver" level="WARN"/>
+    <logger name="org.springframework.data.mongodb" level="WARN"/>
+    
+    <!-- Eureka logları -->
+    <logger name="com.netflix.discovery" level="WARN"/>
+    <logger name="com.netflix.eureka" level="WARN"/>
+    <logger name="org.springframework.cloud.netflix.eureka" level="WARN"/>
+    
+    <!-- Özel konfigürasyon logları -->
+    <logger name="com.craftpilot.llmservice.config.MongoIndexConfig" level="WARN"/>
+    <logger name="com.craftpilot.llmservice.config.MongoMetricsConfig" level="INFO"/>
 
     <root level="INFO">
         <appender-ref ref="Console"/>

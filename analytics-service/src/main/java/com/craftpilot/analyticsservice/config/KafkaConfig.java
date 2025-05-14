@@ -27,7 +27,7 @@ public class KafkaConfig extends KafkaBaseConfig {
     @Value("${kafka.topics.metrics-events}")
     private String metricsEventsTopic;
     
-    @Value("${kafka.bootstrap-servers:${spring.kafka.bootstrap-servers:localhost:9092}}")
+    @Value("${kafka.bootstrap-servers:${spring.kafka.bootstrap-servers:kafka:9092}}")
     private String bootstrapServers;
     
     @Bean

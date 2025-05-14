@@ -193,6 +193,14 @@ logging:
     org.mongodb.driver.connection: INFO # Bağlantı sorunlarını daha iyi görmek için
     org.mongodb.driver.cluster: INFO # MongoDB küme loglaması
     org.mongodb.driver.protocol: INFO # MongoDB protokol loglaması
+    com.craftpilot.llmservice.config.MongoIndexConfig: WARN
+    com.craftpilot.llmservice.config.MongoMetricsConfig: INFO
+    com.netflix.discovery: WARN
+    com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
+    com.netflix.discovery.DiscoveryClient: WARN
+    com.netflix.eureka: WARN
+    org.springframework.cloud.netflix.eureka: WARN
+    com.google.cloud.firestore.CustomClassMapper: ERROR
 
 resilience4j:
   circuitbreaker:
@@ -275,3 +283,9 @@ memory:
 user-info-extraction:
   debug: true
   save-all-messages: false
+
+# MongoDB özel ayarlar
+mongodb:
+  create-indexes: false  # İndeksler zaten oluşturulduğu için kapatıldı
+  metrics:
+    enabled: true
