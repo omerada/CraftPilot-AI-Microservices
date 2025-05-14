@@ -1,7 +1,6 @@
 package com.craftpilot.userservice.config;
 
 import com.craftpilot.redis.config.RedisClientAutoConfiguration;
-import com.craftpilot.redis.health.RedisHealthIndicator;
 import com.craftpilot.redis.metrics.RedisMetricsService;
 import com.craftpilot.redis.service.ReactiveRedisService;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -46,12 +45,7 @@ public class RedisConfig {
     }
     
     /**
-     * RedisHealthIndicator için özel bir bean tanımı yapıyoruz
-     * ve primaryRedisService bean'ini açıkça belirtiyoruz.
+     * Not: RedisHealthIndicator için özel bir bean tanımı gerekli değildir.
+     * redis-client-lib kütüphanesi tarafından sağlanan RedisHealthIndicator kullanılacaktır.
      */
-    @Bean
-    @ConditionalOnMissingBean(name = "redisHealthIndicator")
-    public RedisHealthIndicator redisHealthIndicator(ReactiveRedisService primaryRedisService) {
-        return new RedisHealthIndicator(primaryRedisService);
-    }
 }

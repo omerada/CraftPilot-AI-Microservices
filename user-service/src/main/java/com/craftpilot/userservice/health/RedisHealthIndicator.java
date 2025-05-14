@@ -3,15 +3,15 @@ package com.craftpilot.userservice.health;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.ReactiveHealthIndicator;
-import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import reactor.core.publisher.Mono;
 
 /**
  * @deprecated Bu sınıf artık kullanılmamaktadır. Redis Client Library kendi health indicator'ını sağlamaktadır.
  */
 @Deprecated
-@Component
 @Slf4j
+@ConditionalOnProperty(name = "craftpilot.redis.legacy-health-indicator-enabled", havingValue = "true", matchIfMissing = false)
 public class RedisHealthIndicator implements ReactiveHealthIndicator {
 
     @Override
