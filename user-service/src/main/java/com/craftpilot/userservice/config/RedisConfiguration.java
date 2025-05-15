@@ -103,9 +103,10 @@ public class RedisConfiguration {
     
     /**
      * Redis sağlık kontrolü için health indicator
+     * Bean adı benzersiz olacak şekilde değiştirildi
      */
     @Bean
-    public ReactiveHealthIndicator redisHealthIndicator(ReactiveRedisConnectionFactory connectionFactory) {
+    public ReactiveHealthIndicator userServiceRedisHealthIndicator(ReactiveRedisConnectionFactory connectionFactory) {
         return () -> connectionFactory.getReactiveConnection().ping()
                 .map(ping -> Health.up()
                         .withDetail("ping", ping)
