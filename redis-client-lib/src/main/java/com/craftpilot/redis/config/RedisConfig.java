@@ -5,10 +5,14 @@ import com.craftpilot.redis.service.ReactiveCacheService;
 import com.craftpilot.redis.service.ReactiveRedisService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisPassword;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -18,7 +22,6 @@ import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSeriali
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
-import org.springframework.data.redis.connection.RedisPassword;
 
 import io.lettuce.core.ClientOptions;
 import io.lettuce.core.SocketOptions;
@@ -32,9 +35,10 @@ public class RedisConfig {
     private final RedisClientProperties properties;
 
     @Bean
-    @ConditionalOnMissingBean
-    public ReactiveRedisConnectionFactory reactiveRedisConnectionFactory(RedisClientProperties properties) {
-        log.info("Configuring ReactiveRedisConnectionFactory with host: {}, port: {}", properties.getHost(), properties.getPort());
+    @Primary
+    @ConditionalOnMissingBean(name = "craftPilotRedisConnectionFactory")
+    public RedisConnectionFactory craftPilotRedisConnectionFactory() {
+        log.info("Configuring primary RedisConnectionFactory with host: {}, port: {}", properties.getHost(), properties.getPort());
         
         RedisStandaloneConfiguration redisConfig = new RedisStandaloneConfiguration();
         redisConfig.setHostName(properties.getHost());
@@ -85,9 +89,19 @@ public class RedisConfig {
     }
 
     @Bean
+    @Primary
+    @ConditionalOnMissingBean(name = "craftPilotReactiveRedisConnectionFactory")
+    public ReactiveRedisConnectionFactory craftPilotReactiveRedisConnectionFactory() {
+        // Aynı yapılandırma ile Reactive bağlantı fabrikası oluştur
+        log.info("Configuring primary ReactiveRedisConnectionFactory with host: {}, port: {}", properties.getHost(), properties.getPort());
+        return (ReactiveRedisConnectionFactory) craftPilotRedisConnectionFactory();
+    }
+
+    @Bean
+    @Primary
     @ConditionalOnMissingBean
     public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
-            ReactiveRedisConnectionFactory connectionFactory) {
+            @Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory connectionFactory) {
         
         StringRedisSerializer keySerializer = new StringRedisSerializer();
         GenericJackson2JsonRedisSerializer valueSerializer = new GenericJackson2JsonRedisSerializer();

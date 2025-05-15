@@ -4,6 +4,7 @@ import com.craftpilot.redis.config.RedisClientProperties;
 import com.craftpilot.redis.service.ReactiveCacheService;
 import com.craftpilot.redis.service.ReactiveRedisService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -42,7 +43,7 @@ public class RedisConfiguration {
      * User service için özelleştirilmiş cache yapılandırması sağlar
      */
     @Bean
-    public RedisCacheManager redisCacheManager(RedisConnectionFactory connectionFactory) {
+    public RedisCacheManager redisCacheManager(@Qualifier("craftPilotRedisConnectionFactory") RedisConnectionFactory connectionFactory) {
         log.info("Configuring Redis Cache Manager for user-service");
         
         // User service için özel cache yapılandırması
@@ -78,35 +79,12 @@ public class RedisConfiguration {
     }
     
     /**
-     * ReactiveRedisTemplate beanini oluşturur
-     */
-    @Bean
-    @ConditionalOnMissingBean
-    public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
-            ReactiveRedisConnectionFactory connectionFactory) {
-        log.info("Creating ReactiveRedisTemplate for user-service");
-        
-        StringRedisSerializer keySerializer = new StringRedisSerializer();
-        GenericJackson2JsonRedisSerializer valueSerializer = new GenericJackson2JsonRedisSerializer();
-        
-        RedisSerializationContext.RedisSerializationContextBuilder<String, Object> builder =
-                RedisSerializationContext.newSerializationContext(keySerializer);
-        
-        RedisSerializationContext<String, Object> context = builder
-                .value(valueSerializer)
-                .hashKey(keySerializer)
-                .hashValue(valueSerializer)
-                .build();
-        
-        return new ReactiveRedisTemplate<>(connectionFactory, context);
-    }
-    
-    /**
      * Redis sağlık kontrolü için health indicator
      * Bean adı benzersiz olacak şekilde değiştirildi
      */
     @Bean
-    public ReactiveHealthIndicator userServiceRedisHealthIndicator(ReactiveRedisConnectionFactory connectionFactory) {
+    public ReactiveHealthIndicator userServiceRedisHealthIndicator(
+            @Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory connectionFactory) {
         return () -> connectionFactory.getReactiveConnection().ping()
                 .map(ping -> Health.up()
                         .withDetail("ping", ping)

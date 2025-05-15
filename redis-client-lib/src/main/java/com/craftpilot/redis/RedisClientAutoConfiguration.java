@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -44,7 +45,7 @@ public class RedisClientAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public ReactiveRedisConnectionProvider reactiveRedisConnectionProvider(
-            ReactiveRedisConnectionFactory connectionFactory,
+            @Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory connectionFactory,
             RedisClientProperties properties) {
         
         log.info("Creating ReactiveRedisConnectionProvider bean");

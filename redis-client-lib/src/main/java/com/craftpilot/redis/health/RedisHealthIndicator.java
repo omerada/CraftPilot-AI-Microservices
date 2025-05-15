@@ -2,6 +2,7 @@ package com.craftpilot.redis.health;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.ReactiveHealthIndicator;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
@@ -11,6 +12,7 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class RedisHealthIndicator implements ReactiveHealthIndicator {
 
+    @Qualifier("craftPilotReactiveRedisConnectionFactory")
     private final ReactiveRedisConnectionFactory connectionFactory;
 
     @Override
