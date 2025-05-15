@@ -12,8 +12,12 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class RedisHealthIndicator implements ReactiveHealthIndicator {
 
-    @Qualifier("craftPilotReactiveRedisConnectionFactory")
     private final ReactiveRedisConnectionFactory connectionFactory;
+
+    // Constructor with @Qualifier to ensure the correct bean is injected
+    public RedisHealthIndicator(@Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory connectionFactory) {
+        this.connectionFactory = connectionFactory;
+    }
 
     @Override
     public Mono<Health> health() {

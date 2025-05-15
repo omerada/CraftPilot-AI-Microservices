@@ -63,52 +63,6 @@ public class RedisClientAutoConfiguration {
         return new RedisMetricsService(meterRegistry, redisService);
     }
 
-    @Bean
-    @ConditionalOnMissingBean
-    public ReactiveRedisService reactiveRedisService(
-            ReactiveRedisTemplate<String, Object> redisTemplate) {
-        
-        log.info("Creating ReactiveRedisService bean");
-        return new ReactiveRedisService(redisTemplate);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
-    public ReactiveCacheService reactiveCacheService(
-            ReactiveRedisTemplate<String, Object> redisTemplate,
-            RedisClientProperties properties) {
-        
-        log.info("Creating ReactiveCacheService bean");
-        return new ReactiveCacheService(
-                redisTemplate,
-                properties.getCacheTtl() != null ? properties.getCacheTtl() : Duration.ofMinutes(30)
-        );
-    }
-
-    // Circuit Breaker integrated versions (optional)
-    @Bean
-    @ConditionalOnMissingBean
-    @ConditionalOnBean(CircuitBreakerRegistry.class)
-    @ConditionalOnProperty(name = "redis.client.circuit-breaker.enabled", havingValue = "true")
-    public ReactiveCacheService circuitBreakerEnabledCacheService(
-            ReactiveRedisTemplate<String, Object> redisTemplate,
-            CircuitBreakerRegistry circuitBreakerRegistry,
-            RedisClientProperties properties) {
-        
-        log.info("Creating CircuitBreaker-enabled ReactiveCacheService bean");
-        return new ReactiveCacheService(
-                redisTemplate,
-                circuitBreakerRegistry,
-                properties.getCacheTtl() != null ? properties.getCacheTtl() : Duration.ofMinutes(30)
-        );
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
-    public ReactiveRedisRepository reactiveRedisRepository(
-            ReactiveRedisTemplate<String, Object> redisTemplate) {
-        
-        log.info("Creating ReactiveRedisRepository bean");
-        return new ReactiveRedisRepository(redisTemplate);
-    }
+    // Remove redundant bean definitions that are already defined in RedisConfig
+    // These were causing conflicts with the primary beans
 }

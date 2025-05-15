@@ -2,6 +2,7 @@ package com.craftpilot.redis.connection;
 
 import com.craftpilot.redis.config.RedisClientProperties;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.connection.ReactiveSubscription;
 import reactor.core.publisher.Flux;
@@ -18,7 +19,7 @@ public class ReactiveRedisConnectionProvider {
     private final RedisClientProperties properties;
 
     public ReactiveRedisConnectionProvider(
-            ReactiveRedisConnectionFactory connectionFactory,
+            @Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory connectionFactory,
             RedisClientProperties properties) {
         this.connectionFactory = connectionFactory;
         this.properties = properties;

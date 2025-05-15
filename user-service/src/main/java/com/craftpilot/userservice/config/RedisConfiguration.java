@@ -13,18 +13,11 @@ import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.connection.RedisPassword;
-import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
-import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
-import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
-import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.ReactiveHealthIndicator;
-import io.lettuce.core.ClientOptions;
-import io.lettuce.core.SocketOptions;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
@@ -62,28 +55,13 @@ public class RedisConfiguration {
                 .cacheDefaults(cacheConfig)
                 .build();
     }
-
-    /**
-     * Redis client properties için özelleştirme
-     * Gerekirse redis-client-lib'nin sağladığı özelliklere ek özellikler eklenebilir
-     */
-    @Bean
-    @Primary
-    @ConditionalOnMissingBean
-    public RedisClientProperties redisClientProperties() {
-        log.info("Creating custom RedisClientProperties for user-service");
-        
-        return RedisClientProperties.builder()
-                // Properties will be loaded from application.yml
-                .build();
-    }
     
     /**
-     * Redis sağlık kontrolü için health indicator
-     * Bean adı benzersiz olacak şekilde değiştirildi
+     * Redis Health Indicator
+     * User service için özel health indicator yapılandırması
      */
     @Bean
-    public ReactiveHealthIndicator userServiceRedisHealthIndicator(
+    public ReactiveHealthIndicator redisHealthIndicator(
             @Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory connectionFactory) {
         return () -> connectionFactory.getReactiveConnection().ping()
                 .map(ping -> Health.up()

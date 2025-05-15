@@ -34,7 +34,7 @@ public class RedisConfig {
 
     private final RedisClientProperties properties;
 
-    @Bean
+    @Bean(name = "craftPilotRedisConnectionFactory")
     @Primary
     @ConditionalOnMissingBean(name = "craftPilotRedisConnectionFactory")
     public RedisConnectionFactory craftPilotRedisConnectionFactory() {
@@ -88,7 +88,7 @@ public class RedisConfig {
         return new LettuceConnectionFactory(redisConfig, clientConfig);
     }
 
-    @Bean
+    @Bean(name = "craftPilotReactiveRedisConnectionFactory") 
     @Primary
     @ConditionalOnMissingBean(name = "craftPilotReactiveRedisConnectionFactory")
     public ReactiveRedisConnectionFactory craftPilotReactiveRedisConnectionFactory() {
@@ -99,7 +99,7 @@ public class RedisConfig {
 
     @Bean
     @Primary
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(name = "reactiveRedisTemplate")
     public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
             @Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory connectionFactory) {
         
@@ -119,18 +119,21 @@ public class RedisConfig {
     }
 
     @Bean
+    @ConditionalOnMissingBean(name = "reactiveRedisService") 
     public ReactiveRedisService reactiveRedisService(ReactiveRedisTemplate<String, Object> redisTemplate) {
         log.info("Creating ReactiveRedisService");
         return new ReactiveRedisService(redisTemplate);
     }
 
     @Bean
+    @ConditionalOnMissingBean(name = "reactiveRedisRepository")
     public ReactiveRedisRepository reactiveRedisRepository(ReactiveRedisTemplate<String, Object> redisTemplate) {
         log.info("Creating ReactiveRedisRepository");
         return new ReactiveRedisRepository(redisTemplate);
     }
     
     @Bean
+    @ConditionalOnMissingBean(name = "reactiveCacheService")
     public ReactiveCacheService reactiveCacheService(
             ReactiveRedisTemplate<String, Object> redisTemplate) {
         log.info("Creating ReactiveCacheService");
