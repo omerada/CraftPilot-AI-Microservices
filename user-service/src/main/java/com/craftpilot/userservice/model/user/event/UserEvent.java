@@ -18,6 +18,10 @@ public class UserEvent {
     private User user;
 
     public static UserEvent fromEntity(UserEntity entity, String eventType) {
+        if (entity == null) {
+            return null;
+        }
+        
         return UserEvent.builder()
                 .eventType(eventType)
                 .userId(entity.getId())

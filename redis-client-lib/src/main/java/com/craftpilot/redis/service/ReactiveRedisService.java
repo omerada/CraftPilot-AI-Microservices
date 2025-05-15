@@ -1,221 +1,225 @@
 package com.craftpilot.redis.service;
 
-import com.craftpilot.redis.exception.RedisOperationException;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+import org.springframework.data.redis.core.ReactiveRedisTemplate;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Map;
 
 @Slf4j
+@RequiredArgsConstructor
 public class ReactiveRedisService {
-
-    protected final ReactiveStringRedisTemplate redisTemplate;
-    protected final CircuitBreaker circuitBreaker;
-    protected final Duration defaultTtl;
-    protected final AtomicBoolean redisHealthy = new AtomicBoolean(true);
-    private static final String CIRCUIT_BREAKER_NAME = "redisCircuitBreaker"; // Sabit bir isim kullanıyoruz
-
-    public ReactiveRedisService(
-            ReactiveStringRedisTemplate redisTemplate,
-            CircuitBreakerRegistry circuitBreakerRegistry,
-            Duration defaultTtl) {
-        this.redisTemplate = redisTemplate;
-        // Burada sabit bir isim kullanıyoruz ve bu sayede çakışmaları önlüyoruz
-        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker(CIRCUIT_BREAKER_NAME);
-        this.defaultTtl = defaultTtl;
-        
-        // Devre kesici durumu değişim olaylarını dinle
-        circuitBreaker.getEventPublisher()
-            .onStateTransition(event -> {
-                if (event.getStateTransition().getToState() == CircuitBreaker.State.OPEN) {
-                    log.warn("Redis devre kesici AÇIK durumuna geçti");
-                    redisHealthy.set(false);
-                } else if (event.getStateTransition().getToState() == CircuitBreaker.State.CLOSED) {
-                    log.info("Redis devre kesici KAPALI durumuna döndü");
-                    redisHealthy.set(true);
-                }
-            });
-    }
+    private final ReactiveRedisTemplate<String, Object> redisTemplate;
 
     /**
-     * Redis'e değer kaydet
-     *
-     * @param key Anahtar
-     * @param value Değer
-     * @return İşlem sonucu
+     * Get a value from Redis
+     * @param key Redis key
+     * @return Value as Mono
      */
-    public Mono<Boolean> set(String key, String value) {
-        return set(key, value, defaultTtl);
+    public Mono<Object> get(String key) {
+        return redisTemplate.opsForValue().get(key)
+                .doOnSubscribe(s -> log.debug("Getting value for key: {}", key))
+                .doOnNext(value -> log.debug("Got value for key {}: {}", key, value));
     }
 
     /**
-     * Redis'e belirli bir TTL ile değer kaydet
-     *
-     * @param key Anahtar
-     * @param value Değer
-     * @param ttl TTL süresi
-     * @return İşlem sonucu
+     * Get a value from Redis with type
+     * @param key Redis key
+     * @param clazz Type class
+     * @return Value as Mono
      */
-    public Mono<Boolean> set(String key, String value, Duration ttl) {
-        log.debug("Redis'e değer kaydediliyor: key={}", key);
-        
-        return Mono.defer(() -> redisTemplate.opsForValue().set(key, value, ttl))
-                .transform(CircuitBreakerOperator.of(circuitBreaker))
-                .doOnSuccess(result -> {
-                    if (Boolean.TRUE.equals(result)) {
-                        log.debug("Redis'e değer başarıyla kaydedildi: key={}", key);
-                    } else {
-                        log.warn("Redis'e değer kaydedilemedi: key={}", key);
-                    }
-                })
-                .doOnError(e -> {
-                    log.error("Redis'e değer kaydedilirken hata: key={}, error={}", key, e.getMessage());
-                    redisHealthy.set(false);
-                })
-                .onErrorResume(e -> {
-                    return Mono.error(new RedisOperationException("Redis veri kaydetme hatası", e));
-                });
+    public <T> Mono<T> get(String key, Class<T> clazz) {
+        return redisTemplate.opsForValue().get(key)
+                .cast(clazz)
+                .doOnSubscribe(s -> log.debug("Getting value for key: {} as {}", key, clazz.getSimpleName()))
+                .doOnNext(value -> log.debug("Got value for key {}: {}", key, value));
     }
 
     /**
-     * Redis'ten değer al
-     *
-     * @param key Anahtar
-     * @return Bulunan değer ya da boş Mono
+     * Set a value in Redis
+     * @param key Redis key
+     * @param value Value to set
+     * @return Result of operation
      */
-    public Mono<String> get(String key) {
-        log.debug("Redis'ten değer alınıyor: key={}", key);
-        
-        return Mono.defer(() -> redisTemplate.opsForValue().get(key))
-                .transform(CircuitBreakerOperator.of(circuitBreaker))
-                .doOnSuccess(result -> {
-                    if (result != null) {
-                        log.debug("Redis'ten değer başarıyla alındı: key={}", key);
-                    } else {
-                        log.debug("Redis'te değer bulunamadı: key={}", key);
-                    }
-                })
-                .doOnError(e -> {
-                    log.error("Redis'ten değer alınırken hata: key={}, error={}", key, e.getMessage());
-                    redisHealthy.set(false);
-                })
-                .onErrorResume(e -> {
-                    return Mono.error(new RedisOperationException("Redis veri alma hatası", e));
-                });
+    public Mono<Boolean> set(String key, Object value) {
+        return redisTemplate.opsForValue().set(key, value)
+                .doOnSubscribe(s -> log.debug("Setting value for key: {}", key))
+                .doOnNext(result -> log.debug("Set value for key {}: {}", key, result));
     }
 
     /**
-     * Redis'ten değer sil
-     *
-     * @param key Anahtar
-     * @return İşlem sonucu
+     * Set a value in Redis with expiration
+     * @param key Redis key
+     * @param value Value to set
+     * @param timeout Expiration time
+     * @return Result of operation
+     */
+    public Mono<Boolean> set(String key, Object value, Duration timeout) {
+        return redisTemplate.opsForValue().set(key, value, timeout)
+                .doOnSubscribe(s -> log.debug("Setting value for key: {} with timeout: {}", key, timeout))
+                .doOnNext(result -> log.debug("Set value for key {} with timeout {}: {}", key, timeout, result));
+    }
+
+    /**
+     * Delete a key from Redis
+     * @param key Redis key
+     * @return Result of operation
      */
     public Mono<Boolean> delete(String key) {
-        log.debug("Redis'ten değer siliniyor: key={}", key);
-        
-        return Mono.defer(() -> redisTemplate.opsForValue().delete(key))
-                .transform(CircuitBreakerOperator.of(circuitBreaker))
-                .doOnSuccess(result -> {
-                    if (Boolean.TRUE.equals(result)) {
-                        log.debug("Redis'ten değer başarıyla silindi: key={}", key);
-                    } else {
-                        log.debug("Redis'ten silinecek değer bulunamadı: key={}", key);
-                    }
-                })
-                .doOnError(e -> {
-                    log.error("Redis'ten değer silinirken hata: key={}, error={}", key, e.getMessage());
-                    redisHealthy.set(false);
-                })
-                .onErrorResume(e -> {
-                    return Mono.error(new RedisOperationException("Redis veri silme hatası", e));
-                });
+        return redisTemplate.opsForValue().delete(key)
+                .doOnSubscribe(s -> log.debug("Deleting key: {}", key))
+                .doOnNext(result -> log.debug("Deleted key {}: {}", key, result));
     }
 
     /**
-     * Anahtarın varolup olmadığını kontrol et
-     *
-     * @param key Anahtar
-     * @return Anahtar varsa true, yoksa false
+     * Check if a key exists in Redis
+     * @param key Redis key
+     * @return true if key exists, false otherwise
      */
     public Mono<Boolean> exists(String key) {
-        return Mono.defer(() -> redisTemplate.hasKey(key))
-                .transform(CircuitBreakerOperator.of(circuitBreaker))
-                .onErrorResume(e -> {
-                    log.error("Redis anahtar kontrolünde hata: key={}, error={}", key, e.getMessage());
-                    return Mono.error(new RedisOperationException("Redis anahtar kontrolü hatası", e));
-                });
+        return redisTemplate.hasKey(key)
+                .doOnSubscribe(s -> log.debug("Checking if key exists: {}", key))
+                .doOnNext(result -> log.debug("Key {} exists: {}", key, result));
     }
 
     /**
-     * Anahtarın süresini belirle
-     *
-     * @param key Anahtar
-     * @param ttl TTL süresi
-     * @return İşlem sonucu
+     * Set key expiration
+     * @param key Redis key
+     * @param timeout Expiration time
+     * @return Result of operation
      */
-    public Mono<Boolean> expire(String key, Duration ttl) {
-        return Mono.defer(() -> redisTemplate.expire(key, ttl))
-                .transform(CircuitBreakerOperator.of(circuitBreaker))
-                .onErrorResume(e -> {
-                    log.error("Redis süre belirleme hatası: key={}, error={}", key, e.getMessage());
-                    return Mono.error(new RedisOperationException("Redis süre belirleme hatası", e));
-                });
+    public Mono<Boolean> expire(String key, Duration timeout) {
+        return redisTemplate.expire(key, timeout)
+                .doOnSubscribe(s -> log.debug("Setting expiration for key: {} to {}", key, timeout))
+                .doOnNext(result -> log.debug("Set expiration for key {} to {}: {}", key, timeout, result));
     }
 
     /**
-     * Bir anahtarın süresini sorgula
-     *
-     * @param key Anahtar
-     * @return Kalan süre (saniye)
+     * Get key expiration
+     * @param key Redis key
+     * @return Expiration time in seconds
      */
-    public Mono<Long> ttl(String key) {
-        return Mono.defer(() -> redisTemplate.getExpire(key))
-                .transform(CircuitBreakerOperator.of(circuitBreaker))
-                .map(duration -> {
-                    if (duration == null) {
-                        return -1L;
-                    }
-                    return duration.getSeconds();
-                })
-                .onErrorResume(e -> {
-                    log.error("Redis TTL sorgulama hatası: key={}, error={}", key, e.getMessage());
-                    return Mono.error(new RedisOperationException("Redis TTL sorgulama hatası", e));
-                });
+    public Mono<Duration> getExpire(String key) {
+        return redisTemplate.getExpire(key)
+                .map(Duration::ofSeconds)
+                .doOnSubscribe(s -> log.debug("Getting expiration for key: {}", key))
+                .doOnNext(expire -> log.debug("Got expiration for key {}: {}", key, expire));
     }
 
     /**
-     * Redis bağlantısını kontrol et
-     *
-     * @return Redis sağlıklıysa true, değilse false
+     * Increment a key
+     * @param key Redis key
+     * @return New value
      */
-    public Mono<Boolean> ping() {
-        return Mono.defer(() -> redisTemplate.getConnectionFactory().getReactiveConnection().ping()
-                .map(pong -> "PONG".equalsIgnoreCase(pong)))
-                .doOnSuccess(result -> {
-                    if (Boolean.TRUE.equals(result)) {
-                        redisHealthy.set(true);
-                    } else {
-                        redisHealthy.set(false);
-                    }
-                })
-                .doOnError(e -> {
-                    log.error("Redis ping hatası: {}", e.getMessage());
-                    redisHealthy.set(false);
-                })
-                .onErrorReturn(false);
+    public Mono<Long> increment(String key) {
+        return redisTemplate.opsForValue().increment(key)
+                .doOnSubscribe(s -> log.debug("Incrementing key: {}", key))
+                .doOnNext(value -> log.debug("Incremented key {}: {}", key, value));
     }
 
     /**
-     * Redis'in sağlıklı olup olmadığını kontrol et
-     *
-     * @return Redis sağlıklıysa true, değilse false
+     * Publish a message to a channel
+     * @param channel Channel name
+     * @param message Message to publish
+     * @return Number of subscribers that received the message
+     */
+    public Mono<Long> publish(String channel, Object message) {
+        return redisTemplate.convertAndSend(channel, message)
+                .doOnSubscribe(s -> log.debug("Publishing to channel: {}", channel))
+                .doOnNext(subscribers -> log.debug("Published to channel {}: {} subscribers", channel, subscribers));
+    }
+
+    /**
+     * Hash operations - Get all entries
+     * @param key Redis key
+     * @return Map of hash entries
+     */
+    public Mono<Map<Object, Object>> hGetAll(String key) {
+        return redisTemplate.opsForHash().entries(key)
+                .collectMap(entry -> entry.getKey(), entry -> entry.getValue())
+                .doOnSubscribe(s -> log.debug("Getting all hash entries for key: {}", key))
+                .doOnNext(entries -> log.debug("Got {} hash entries for key {}", entries.size(), key));
+    }
+
+    /**
+     * Hash operations - Set a hash entry
+     * @param key Redis key
+     * @param hashKey Hash key
+     * @param value Value to set
+     * @return Result of operation
+     */
+    public Mono<Boolean> hSet(String key, Object hashKey, Object value) {
+        return redisTemplate.opsForHash().put(key, hashKey, value)
+                .doOnSubscribe(s -> log.debug("Setting hash entry for key: {}, hashKey: {}", key, hashKey))
+                .doOnNext(result -> log.debug("Set hash entry for key {}, hashKey {}: {}", key, hashKey, result));
+    }
+
+    /**
+     * Hash operations - Get a hash entry
+     * @param key Redis key
+     * @param hashKey Hash key
+     * @return Hash entry value
+     */
+    public Mono<Object> hGet(String key, Object hashKey) {
+        return redisTemplate.opsForHash().get(key, hashKey)
+                .doOnSubscribe(s -> log.debug("Getting hash entry for key: {}, hashKey: {}", key, hashKey))
+                .doOnNext(value -> log.debug("Got hash entry for key {}, hashKey {}: {}", key, hashKey, value));
+    }
+
+    /**
+     * List operations - Push to list
+     * @param key Redis key
+     * @param value Value to push
+     * @return New list size
+     */
+    public Mono<Long> lPush(String key, Object value) {
+        return redisTemplate.opsForList().leftPush(key, value)
+                .doOnSubscribe(s -> log.debug("Pushing to list for key: {}", key))
+                .doOnNext(size -> log.debug("Pushed to list for key {}, new size: {}", key, size));
+    }
+
+    /**
+     * List operations - Get list range
+     * @param key Redis key
+     * @param start Start index
+     * @param end End index
+     * @return List elements
+     */
+    public Flux<Object> lRange(String key, long start, long end) {
+        return redisTemplate.opsForList().range(key, start, end)
+                .doOnSubscribe(s -> log.debug("Getting list range for key: {}, start: {}, end: {}", key, start, end))
+                .doOnComplete(() -> log.debug("Got list range for key {}, start: {}, end: {}", key, start, end));
+    }
+
+    /**
+     * Redis server sağlık durumunu kontrol eder
+     * @return Redis server sağlıklı ise true, değilse false
      */
     public boolean isRedisHealthy() {
-        return redisHealthy.get();
+        try {
+            return redisTemplate.getConnectionFactory() != null &&
+                   redisTemplate.getConnectionFactory().getReactiveConnection() != null;
+        } catch (Exception e) {
+            log.error("Redis sağlık kontrolü başarısız: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Redis sunucusuna ping gönderir
+     * @return Ping başarılı ise true, değilse false
+     */
+    public Mono<Boolean> ping() {
+        return redisTemplate.getConnectionFactory()
+                .getReactiveConnection()
+                .ping()
+                .map(pong -> "PONG".equalsIgnoreCase(pong))
+                .doOnSubscribe(s -> log.debug("Redis'e ping gönderiliyor"))
+                .doOnNext(result -> log.debug("Redis ping sonucu: {}", result))
+                .doOnError(e -> log.error("Redis ping hatası: {}", e.getMessage()))
+                .onErrorReturn(false);
     }
 }

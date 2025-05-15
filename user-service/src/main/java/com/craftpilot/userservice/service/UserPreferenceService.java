@@ -89,9 +89,9 @@ public class UserPreferenceService {
         log.info("Kullanıcı tercihleri kaydediliyor: userId={}", userPreference.getUserId());
         return userPreferenceRepository.save(userPreference)
             .flatMap(savedPreference -> {
-                // savedPreference tipini UserPreference olarak belirtiyoruz
+                // Cast to UserPreference type 
                 UserPreference preference = (UserPreference) savedPreference;
-                // metot adını düzeltiyoruz: saveUserPreference -> saveUserPreferences
+                // Save to Redis cache
                 return redisCacheService.saveUserPreferences(preference)
                     .thenReturn(preference);
             })
@@ -280,7 +280,8 @@ public class UserPreferenceService {
                         .doOnSuccess(saved -> {
                             // Kafka ile tercih değişikliği olayını yayınla
                             publishPreferenceUpdated(userId, updates);
-                        });
+                        })
+                        .cast(UserPreference.class); // Ensure we're returning UserPreference
                 })
                 .doOnError(e -> log.error("Kullanıcı tercihleri güncellenirken hata: userId={}, error={}", 
                         userId, e.getMessage()));

@@ -2,117 +2,206 @@ package com.craftpilot.userservice.service;
 
 import com.craftpilot.redis.service.ReactiveCacheService;
 import com.craftpilot.userservice.model.UserPreference;
-import com.craftpilot.userservice.model.user.entity.UserEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
-import java.util.HashMap;
+import java.util.function.Supplier;
 
 /**
- * Redis önbellekleme işlemlerini yöneten servis.
- * Bu servis, Redis Client Library'yi kullanarak Redis operasyonlarını gerçekleştirir.
+ * User service için Redis cache servis wrapper'ı
+ * Bu sınıf redis-client-lib'nin ReactiveCacheService sınıfını kullanarak
+ * user-service için özel cache işlemlerini gerçekleştirir.
  */
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class RedisCacheService {
-    
+
     private final ReactiveCacheService cacheService;
-    private static final String USER_KEY_PREFIX = "user:";
-    private static final String PREFERENCE_KEY_PREFIX = "preference:";
+    
+    // Default cache TTL
+    private static final Duration DEFAULT_USER_TTL = Duration.ofMinutes(15);
+    private static final Duration DEFAULT_PREFERENCE_TTL = Duration.ofMinutes(10);
+    
+    private static final String USER_CACHE_PREFIX = "user:";
+    private static final String PREFERENCE_CACHE_PREFIX = "preference:";
 
-    // UserEntity için önbellekleme işlemleri
-    public Mono<UserEntity> getUser(String userId) {
-        log.debug("Kullanıcı Redis'den getiriliyor: userId={}", userId);
-        return cacheService.getFromCache(USER_KEY_PREFIX + userId, UserEntity.class)
-                .flatMap(optionalUser -> optionalUser.map(Mono::just).orElse(Mono.empty()));
+    /**
+     * Get a cached user or compute if not found
+     */
+    public <T> Mono<T> getCachedUser(String userId, Supplier<Mono<T>> supplier) {
+        String cacheKey = getUserCacheKey(userId);
+        log.debug("Getting cached user with key: {}", cacheKey);
+        
+        return cacheService.get(cacheKey, (Class<T>)Object.class)
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.debug("Cache miss for user {}, computing value", userId);
+                    return supplier.get()
+                            .flatMap(value -> cacheService.put(cacheKey, value, DEFAULT_USER_TTL).thenReturn(value));
+                }));
     }
 
-    public Mono<Boolean> saveUser(String userId, UserEntity user) {
-        log.debug("Kullanıcı Redis'e kaydediliyor: userId={}", userId);
-        return cacheService.cache(USER_KEY_PREFIX + userId, user);
+    /**
+     * Cache a user object
+     */
+    public <T> Mono<Boolean> cacheUser(String userId, T user) {
+        String cacheKey = getUserCacheKey(userId);
+        log.debug("Caching user with key: {}", cacheKey);
+        
+        return cacheService.put(cacheKey, user, DEFAULT_USER_TTL);
     }
 
-    public Mono<Boolean> deleteUser(String userId) {
-        log.debug("Kullanıcı Redis'den siliniyor: userId={}", userId);
-        return cacheService.delete(USER_KEY_PREFIX + userId);
+    /**
+     * Invalidate user cache
+     */
+    public Mono<Boolean> invalidateUserCache(String userId) {
+        String cacheKey = getUserCacheKey(userId);
+        log.debug("Invalidating user cache with key: {}", cacheKey);
+        
+        return cacheService.invalidate(cacheKey);
     }
 
-    // UserPreference için önbellekleme işlemleri
+    /**
+     * Get a cached preference or compute if not found
+     */
+    public <T> Mono<T> getCachedPreference(String userId, Supplier<Mono<T>> supplier) {
+        String cacheKey = getPreferenceCacheKey(userId);
+        log.debug("Getting cached preference with key: {}", cacheKey);
+        
+        return cacheService.get(cacheKey, (Class<T>)Object.class)
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.debug("Cache miss for preference {}, computing value", userId);
+                    return supplier.get()
+                            .flatMap(value -> cacheService.put(cacheKey, value, DEFAULT_PREFERENCE_TTL).thenReturn(value));
+                }));
+    }
+
+    /**
+     * Cache a preference object
+     */
+    public <T> Mono<Boolean> cachePreference(String userId, T preference) {
+        String cacheKey = getPreferenceCacheKey(userId);
+        log.debug("Caching preference with key: {}", cacheKey);
+        
+        return cacheService.put(cacheKey, preference, DEFAULT_PREFERENCE_TTL);
+    }
+
+    /**
+     * Invalidate preference cache
+     */
+    public Mono<Boolean> invalidatePreferenceCache(String userId) {
+        String cacheKey = getPreferenceCacheKey(userId);
+        log.debug("Invalidating preference cache with key: {}", cacheKey);
+        
+        return cacheService.invalidate(cacheKey);
+    }
+
+    /**
+     * Generic cache-or-compute method
+     */
+    public <T> Mono<T> getOrCompute(String key, Supplier<Mono<T>> supplier, Duration ttl) {
+        log.debug("Getting or computing value for key: {}", key);
+        
+        return cacheService.get(key, (Class<T>)Object.class)
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.debug("Cache miss for key {}, computing value", key);
+                    return supplier.get()
+                            .flatMap(value -> cacheService.put(key, value, ttl).thenReturn(value));
+                }));
+    }
+
+    /**
+     * Get a UserPreference from cache
+     */
+    public Mono<UserPreference> getUserPreference(String userId) {
+        String cacheKey = getPreferenceCacheKey(userId);
+        log.debug("Getting user preference from cache with key: {}", cacheKey);
+        
+        return cacheService.get(cacheKey, UserPreference.class);
+    }
+
+    /**
+     * Get a UserPreference from cache
+     * Method required by UserPreferenceService
+     */
     public Mono<UserPreference> getUserPreferences(String userId) {
-        log.debug("Kullanıcı tercihleri getiriliyor: userId={}", userId);
-        return cacheService.getFromCache(PREFERENCE_KEY_PREFIX + userId, UserPreference.class)
-                .flatMap(optionalPref -> {
-                    if (optionalPref.isPresent()) {
-                        return Mono.just(optionalPref.get());
-                    } else {
-                        // Varsayılan tercihleri oluştur
-                        UserPreference defaultPref = UserPreference.builder()
-                                .userId(userId)
-                                .theme("light")
-                                .language("tr")
-                                .layout("collapsibleSide")
-                                // Map<String, Boolean> oluştur
-                                .notifications(new HashMap<String, Boolean>() {{
-                                    put("general", true);
-                                }})
-                                .pushEnabled(true)
-                                .createdAt(System.currentTimeMillis())
-                                .updatedAt(System.currentTimeMillis())
-                                .build();
-                        log.debug("Varsayılan tercihler döndürülüyor: userId={}", userId);
-                        return Mono.just(defaultPref);
-                    }
-                });
+        String cacheKey = getPreferenceCacheKey(userId);
+        log.debug("Getting user preferences from cache with key: {}", cacheKey);
+        
+        return cacheService.get(cacheKey, UserPreference.class);
     }
 
+    /**
+     * Cache a UserPreference
+     */
+    public Mono<Boolean> cacheUserPreference(String userId, UserPreference preference) {
+        String cacheKey = getPreferenceCacheKey(userId);
+        log.debug("Caching user preference with key: {}", cacheKey);
+        
+        return cacheService.put(cacheKey, preference, DEFAULT_PREFERENCE_TTL);
+    }
+
+    /**
+     * Save UserPreference to cache
+     * Method required by UserPreferenceService
+     */
     public Mono<Boolean> saveUserPreferences(UserPreference preference) {
-        log.debug("Kullanıcı tercihleri Redis'e kaydediliyor: userId={}", preference.getUserId());
-        preference.setUpdatedAt(System.currentTimeMillis());
-        return cacheService.cache(PREFERENCE_KEY_PREFIX + preference.getUserId(), preference)
-            .doOnSuccess(result -> {
-                if (Boolean.TRUE.equals(result)) {
-                    log.debug("Kullanıcı tercihleri başarıyla kaydedildi: userId={}", preference.getUserId());
-                } else {
-                    log.warn("Kullanıcı tercihleri kaydedilemedi: userId={}", preference.getUserId());
-                }
-            })
-            .doOnError(err -> log.error("Kullanıcı tercihleri kaydedilirken hata: userId={}, error={}", 
-                preference.getUserId(), err.getMessage()));
+        String userId = preference.getUserId();
+        String cacheKey = getPreferenceCacheKey(userId);
+        log.debug("Saving user preferences to cache with key: {}", cacheKey);
+        
+        return cacheService.put(cacheKey, preference, DEFAULT_PREFERENCE_TTL);
     }
 
+    /**
+     * Delete UserPreference from cache
+     * Method required by UserPreferenceService
+     */
     public Mono<Boolean> deleteUserPreferences(String userId) {
-        log.debug("Kullanıcı tercihleri Redis'den siliniyor: userId={}", userId);
-        return cacheService.delete(PREFERENCE_KEY_PREFIX + userId);
+        String cacheKey = getPreferenceCacheKey(userId);
+        log.debug("Deleting user preferences from cache with key: {}", cacheKey);
+        
+        return cacheService.invalidate(cacheKey);
     }
 
-    // Genel önbellekleme işlemleri
-    public <T> Mono<T> getOrCache(String key, Class<T> type, Mono<T> fallback) {
-        return cacheService.getOrCache(key, () -> fallback, type);
+    /**
+     * Check if a UserPreference exists in cache
+     */
+    public Mono<Boolean> hasUserPreferenceInCache(String userId) {
+        String cacheKey = getPreferenceCacheKey(userId);
+        
+        return cacheService.get(cacheKey, UserPreference.class)
+                .map(preference -> true)
+                .defaultIfEmpty(false);
     }
 
-    public <T> Mono<T> getOrCache(String key, Class<T> type, Mono<T> fallback, Duration ttl) {
-        return cacheService.getOrCache(key, () -> fallback, type, ttl);
+    /**
+     * Batch invalidate user preferences
+     */
+    public Mono<Void> batchInvalidatePreferences(String... userIds) {
+        if (userIds == null || userIds.length == 0) {
+            return Mono.empty();
+        }
+        
+        return Mono.fromRunnable(() -> {
+            for (String userId : userIds) {
+                invalidatePreferenceCache(userId).subscribe(
+                    result -> log.debug("Preference cache invalidated for user {}: {}", userId, result),
+                    error -> log.error("Error invalidating preference cache for user {}: {}", userId, error)
+                );
+            }
+        });
     }
-    
-    // Direct get and set methods used by UserService
-    public Mono<String> get(String key) {
-        log.debug("Redis'ten doğrudan değer alınıyor: key={}", key);
-        return cacheService.get(key);
+
+    // Helper methods for key generation
+    private String getUserCacheKey(String userId) {
+        return USER_CACHE_PREFIX + userId;
     }
-    
-    // Specific method for UserEntity to ensure type compatibility
-    public Mono<Boolean> set(String key, UserEntity value) {
-        log.debug("Redis'e doğrudan UserEntity kaydediliyor: key={}", key);
-        return cacheService.cache(key, value);
-    }
-    
-    // Generic set method for other types
-    public <T> Mono<Boolean> setGeneric(String key, T value) {
-        log.debug("Redis'e doğrudan değer kaydediliyor: key={}", key);
-        return cacheService.cache(key, value);
+
+    private String getPreferenceCacheKey(String userId) {
+        return PREFERENCE_CACHE_PREFIX + userId;
     }
 }

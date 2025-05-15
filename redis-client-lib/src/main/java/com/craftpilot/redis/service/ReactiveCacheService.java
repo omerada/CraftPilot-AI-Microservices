@@ -1,151 +1,113 @@
 package com.craftpilot.redis.service;
 
 import com.craftpilot.redis.exception.RedisOperationException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
-import java.util.Optional;
 import java.util.function.Supplier;
 
+/**
+ * Reactive Redis Cache Service
+ * Cache operasyonları için reactive API sağlar
+ */
 @Slf4j
-public class ReactiveCacheService extends ReactiveRedisService {
+public class ReactiveCacheService {
 
-    private final ObjectMapper objectMapper;
-    private static final String NULL_VALUE = "@@NULL@@";
+    private final ReactiveRedisTemplate<String, Object> redisTemplate;
+    private final CircuitBreaker circuitBreaker;
+    private final Duration defaultTtl;
 
     public ReactiveCacheService(
-            ReactiveStringRedisTemplate redisTemplate,
+            ReactiveRedisTemplate<String, Object> redisTemplate,
             CircuitBreakerRegistry circuitBreakerRegistry,
-            Duration defaultTtl,
-            ObjectMapper objectMapper) {
-        super(redisTemplate, circuitBreakerRegistry, defaultTtl);
-        this.objectMapper = objectMapper;
+            Duration defaultTtl) {
+        this.redisTemplate = redisTemplate;
+        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("redisCache");
+        this.defaultTtl = defaultTtl;
     }
 
     /**
-     * Nesneyi önbellekten alır, yoksa sağlayıcı fonksiyonu çalıştırır
-     *
-     * @param key Önbellek anahtarı
-     * @param supplier Önbellekte yoksa değer üretecek fonksiyon
-     * @param type Nesne türü
-     * @param <T> Nesne tipi
-     * @return Nesne ya da boş Mono
+     * Redis'ten bir değer alır
+     * @param key Cache key
+     * @param clazz Dönüş tipi
+     * @return Cache değeri
      */
-    public <T> Mono<T> getOrCache(String key, Supplier<Mono<T>> supplier, Class<T> type) {
-        return getOrCache(key, supplier, type, defaultTtl);
+    public <T> Mono<T> get(String key, Class<T> clazz) {
+        return redisTemplate.opsForValue().get(key)
+                .cast(clazz)
+                .transform(CircuitBreakerOperator.of(circuitBreaker))
+                .doOnSubscribe(s -> log.debug("Getting value from cache: key={}, type={}", key, clazz.getSimpleName()))
+                .doOnSuccess(value -> {
+                    if (value != null) {
+                        log.debug("Value retrieved from cache: key={}, type={}", key, clazz.getSimpleName());
+                    } else {
+                        log.debug("Value not found in cache: key={}, type={}", key, clazz.getSimpleName());
+                    }
+                })
+                .doOnError(e -> log.error("Error retrieving from cache: key={}, type={}, error={}", 
+                    key, clazz.getSimpleName(), e.getMessage()));
     }
 
     /**
-     * Nesneyi önbellekten alır, yoksa sağlayıcı fonksiyonu çalıştırır
-     *
-     * @param key Önbellek anahtarı
-     * @param supplier Önbellekte yoksa değer üretecek fonksiyon
-     * @param type Nesne türü
-     * @param ttl Önbellek süresi
-     * @param <T> Nesne tipi
-     * @return Nesne ya da boş Mono
-     */
-    public <T> Mono<T> getOrCache(String key, Supplier<Mono<T>> supplier, Class<T> type, Duration ttl) {
-        log.debug("Önbellekten veri alınıyor veya sağlayıcı çalıştırılıyor: key={}", key);
-        
-        return get(key)
-            .flatMap(cachedValue -> {
-                if (NULL_VALUE.equals(cachedValue)) {
-                    log.debug("Önbellekte null değer bulundu: key={}", key);
-                    return Mono.empty();
-                }
-                
-                try {
-                    T value = objectMapper.readValue(cachedValue, type);
-                    log.debug("Önbellekten veri alındı: key={}", key);
-                    return Mono.justOrEmpty(value);
-                } catch (JsonProcessingException e) {
-                    log.error("Önbellekteki veri dönüştürülemedi: key={}, error={}", key, e.getMessage());
-                    return delete(key).then(Mono.empty());
-                }
-            })
-            .switchIfEmpty(Mono.defer(() -> {
-                log.debug("Önbellekte veri bulunamadı, sağlayıcı çalıştırılıyor: key={}", key);
-                return supplier.get()
-                    .flatMap(value -> {
-                        if (value == null) {
-                            return set(key, NULL_VALUE, ttl).thenReturn(null);
-                        }
-                        
-                        try {
-                            String json = objectMapper.writeValueAsString(value);
-                            return set(key, json, ttl).thenReturn(value);
-                        } catch (JsonProcessingException e) {
-                            log.error("Nesne JSON'a dönüştürülemedi: key={}, error={}", key, e.getMessage());
-                            return Mono.just(value);
-                        }
-                    });
-            }));
-    }
-
-    /**
-     * Nesneyi önbelleğe kaydeder
-     *
-     * @param key Önbellek anahtarı
-     * @param value Kaydedilecek nesne
-     * @param <T> Nesne tipi
+     * Redis'e bir değer kaydeder
+     * @param key Cache key
+     * @param value Cache değeri
+     * @param ttl Cache timeout
      * @return İşlem sonucu
      */
-    public <T> Mono<Boolean> cache(String key, T value) {
-        return cache(key, value, defaultTtl);
+    public <T> Mono<Boolean> put(String key, T value, Duration ttl) {
+        return redisTemplate.opsForValue().set(key, value, ttl)
+                .transform(CircuitBreakerOperator.of(circuitBreaker))
+                .doOnSubscribe(s -> log.debug("Cache'e değer kaydediliyor: key={}, ttl={}", key, ttl))
+                .doOnSuccess(result -> log.debug("Cache'e değer kaydedildi: key={}, success={}", key, result))
+                .doOnError(e -> log.error("Cache'e değer kaydedilirken hata: key={}, error={}", key, e.getMessage()))
+                .onErrorMap(e -> new RedisOperationException("Cache write failed for key: " + key, e));
     }
 
     /**
-     * Nesneyi belirli bir TTL ile önbelleğe kaydeder
-     *
-     * @param key Önbellek anahtarı
-     * @param value Kaydedilecek nesne
-     * @param ttl Önbellek süresi
-     * @param <T> Nesne tipi
+     * Redis'ten bir değeri siler
+     * @param key Cache key
      * @return İşlem sonucu
      */
-    public <T> Mono<Boolean> cache(String key, T value, Duration ttl) {
-        if (value == null) {
-            return set(key, NULL_VALUE, ttl);
-        }
-        
-        try {
-            String json = objectMapper.writeValueAsString(value);
-            return set(key, json, ttl);
-        } catch (JsonProcessingException e) {
-            log.error("Nesne JSON'a dönüştürülemedi: key={}, error={}", key, e.getMessage());
-            return Mono.error(new RedisOperationException("JSON dönüştürme hatası", e));
-        }
+    public Mono<Boolean> invalidate(String key) {
+        return redisTemplate.delete(key)
+                .map(count -> count > 0)
+                .transform(CircuitBreakerOperator.of(circuitBreaker))
+                .doOnSubscribe(s -> log.debug("Cache değeri siliniyor: key={}", key))
+                .doOnSuccess(result -> log.debug("Cache değeri silindi: key={}, success={}", key, result))
+                .doOnError(e -> log.error("Cache değeri silinirken hata: key={}, error={}", key, e.getMessage()))
+                .onErrorMap(e -> new RedisOperationException("Cache invalidation failed for key: " + key, e));
     }
 
     /**
-     * Önbellekten nesneyi getirir
-     *
-     * @param key Önbellek anahtarı
-     * @param type Nesne türü
-     * @param <T> Nesne tipi
-     * @return Nesne ya da boş Optional
+     * Cache'te değer varsa alır, yoksa hesaplar ve cache'e kaydeder
+     * @param key Cache key
+     * @param supplier Değer sağlayıcı fonksiyon
+     * @param ttl Cache timeout
+     * @return Cache değeri veya hesaplanan değer
      */
-    public <T> Mono<Optional<T>> getFromCache(String key, Class<T> type) {
-        return get(key)
-            .flatMap(cachedValue -> {
-                if (NULL_VALUE.equals(cachedValue)) {
-                    return Mono.just(Optional.<T>empty());
-                }
-                
-                try {
-                    T value = objectMapper.readValue(cachedValue, type);
-                    return Mono.just(Optional.ofNullable(value));
-                } catch (JsonProcessingException e) {
-                    log.error("Önbellekteki veri dönüştürülemedi: key={}, error={}", key, e.getMessage());
-                    return delete(key).then(Mono.just(Optional.<T>empty()));
-                }
-            })
-            .defaultIfEmpty(Optional.empty());
+    public <T> Mono<T> getOrCompute(String key, Supplier<Mono<T>> supplier, Duration ttl) {
+        return get(key, (Class<T>) Object.class)
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.debug("Cache'te değer bulunamadı, hesaplanıyor: key={}", key);
+                    return supplier.get()
+                            .flatMap(value -> put(key, value, ttl).thenReturn(value))
+                            .doOnSuccess(value -> log.debug("Değer hesaplandı ve cache'e kaydedildi: key={}", key));
+                }));
+    }
+
+    /**
+     * Cache'te değer varsa alır, yoksa hesaplar ve varsayılan TTL ile cache'e kaydeder
+     * @param key Cache key
+     * @param supplier Değer sağlayıcı fonksiyon
+     * @return Cache değeri veya hesaplanan değer
+     */
+    public <T> Mono<T> getOrCompute(String key, Supplier<Mono<T>> supplier) {
+        return getOrCompute(key, supplier, defaultTtl);
     }
 }

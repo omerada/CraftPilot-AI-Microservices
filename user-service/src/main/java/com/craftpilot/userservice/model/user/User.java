@@ -30,12 +30,16 @@ public class User {
     private LocalDateTime lastLoginAt;
 
     public static User fromEntity(UserEntity entity) {
+        if (entity == null) {
+            return null;
+        }
+        
         return User.builder()
                 .id(entity.getId())
                 .email(entity.getEmail())
                 .displayName(entity.getDisplayName())
                 .photoUrl(entity.getPhotoUrl())
-                .role(entity.getRole().name())
+                .role(entity.getRole() != null ? entity.getRole().name() : null)
                 .createdAt(LocalDateTime.ofInstant(
                     Instant.ofEpochMilli(entity.getCreatedAt()), 
                     ZoneOffset.UTC))

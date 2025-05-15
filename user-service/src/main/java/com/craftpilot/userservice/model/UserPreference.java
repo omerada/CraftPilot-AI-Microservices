@@ -55,4 +55,24 @@ public class UserPreference {
     // Zaman damgaları
     private Long createdAt;
     private Long updatedAt;
+    
+    // Varsayılan tercihler oluşturma yardımcı metodu
+    public static UserPreference createDefaultPreference(String userId) {
+        Map<String, Boolean> notificationsMap = new HashMap<>();
+        notificationsMap.put("general", true);
+        
+        return UserPreference.builder()
+                .userId(userId)
+                .theme("light")
+                .language("tr")
+                .themeSchema("default")
+                .layout("collapsibleSide")
+                .notifications(notificationsMap)
+                .pushEnabled(true)
+                .aiModelFavorites(new ArrayList<>())
+                .lastSelectedModelId("google/gemini-2.0-flash-lite-001")
+                .createdAt(System.currentTimeMillis())
+                .updatedAt(System.currentTimeMillis())
+                .build();
+    }
 }

@@ -1,67 +1,134 @@
 package com.craftpilot.redis.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.craftpilot.redis.connection.ReactiveRedisConnectionProvider;
+import com.craftpilot.redis.health.RedisHealthIndicator;
+import com.craftpilot.redis.repository.ReactiveRedisRepository;
+import com.craftpilot.redis.service.ReactiveCacheService;
+import com.craftpilot.redis.service.ReactiveRedisService;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.lettuce.core.ClientOptions;
+import io.lettuce.core.SocketOptions;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisPassword;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettucePoolingClientConfiguration;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
-import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+
+import java.time.Duration;
 
 @Configuration
 @Slf4j
+@RequiredArgsConstructor
 public class RedisConfig {
 
-    @Value("${spring.redis.host:redis}")
-    private String redisHost;
-
-    @Value("${spring.redis.port:6379}")
-    private int redisPort;
-
-    @Value("${spring.redis.password:}")
-    private String redisPassword;
-
-    @Value("${spring.redis.database:0}")
-    private int redisDatabase;
+    private final RedisClientProperties properties;
 
     @Bean
-    public RedisStandaloneConfiguration redisStandaloneConfiguration() {
-        log.info("Configuring Redis connection with host: {}, port: {}", redisHost, redisPort);
-        RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration();
-        configuration.setHostName(redisHost);
-        configuration.setPort(redisPort);
-        if (redisPassword != null && !redisPassword.isEmpty()) {
-            configuration.setPassword(redisPassword);
+    @ConditionalOnMissingBean
+    public ReactiveRedisConnectionFactory reactiveRedisConnectionFactory(RedisClientProperties properties) {
+        log.info("Configuring ReactiveRedisConnectionFactory with host: {}, port: {}", properties.getHost(), properties.getPort());
+        
+        RedisStandaloneConfiguration redisConfig = new RedisStandaloneConfiguration();
+        redisConfig.setHostName(properties.getHost());
+        redisConfig.setPort(properties.getPort());
+        redisConfig.setDatabase(properties.getDatabase());
+        
+        if (properties.getPassword() != null && !properties.getPassword().isEmpty()) {
+            redisConfig.setPassword(RedisPassword.of(properties.getPassword()));
         }
-        configuration.setDatabase(redisDatabase);
-        return configuration;
+        
+        if (properties.getUsername() != null && !properties.getUsername().isEmpty()) {
+            redisConfig.setUsername(properties.getUsername());
+        }
+        
+        // Socket options
+        SocketOptions socketOptions = SocketOptions.builder()
+                .connectTimeout(properties.getConnectTimeout())
+                .build();
+        
+        // Client options
+        ClientOptions clientOptions = ClientOptions.builder()
+                .socketOptions(socketOptions)
+                .build();
+
+        LettuceClientConfiguration.LettuceClientConfigurationBuilder builder;
+        
+        // Configure pooling if enabled
+        if (properties.getPool().isEnabled()) {
+            GenericObjectPoolConfig<?> poolConfig = new GenericObjectPoolConfig<>();
+            poolConfig.setMaxTotal(properties.getPool().getMaxActive());
+            poolConfig.setMaxIdle(properties.getPool().getMaxIdle());
+            poolConfig.setMinIdle(properties.getPool().getMinIdle());
+            poolConfig.setMaxWait(properties.getPool().getMaxWait());
+            
+            builder = LettucePoolingClientConfiguration.builder()
+                    .poolConfig(poolConfig);
+        } else {
+            builder = LettuceClientConfiguration.builder();
+        }
+        
+        // Set common configuration
+        LettuceClientConfiguration clientConfig = builder
+                .clientOptions(clientOptions)
+                .commandTimeout(properties.getCommandTimeout())
+                .build();
+        
+        return new LettuceConnectionFactory(redisConfig, clientConfig);
     }
 
     @Bean
-    public LettuceConnectionFactory lettuceConnectionFactory(RedisStandaloneConfiguration redisStandaloneConfiguration) {
-        log.info("Creating Lettuce Connection Factory for Redis at {}:{}", redisHost, redisPort);
-        return new LettuceConnectionFactory(redisStandaloneConfiguration);
-    }
-
-    @Bean
-    public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(RedisConnectionFactory connectionFactory) {
+    @ConditionalOnMissingBean
+    public <T> ReactiveRedisTemplate<String, T> reactiveRedisTemplate(
+            ReactiveRedisConnectionFactory connectionFactory) {
+        
         StringRedisSerializer keySerializer = new StringRedisSerializer();
-        Jackson2JsonRedisSerializer<Object> valueSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
-
-        RedisSerializationContext.RedisSerializationContextBuilder<String, Object> builder =
+        Jackson2JsonRedisSerializer<T> valueSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
+        
+        RedisSerializationContext.RedisSerializationContextBuilder<String, T> builder =
                 RedisSerializationContext.newSerializationContext(keySerializer);
-
-        RedisSerializationContext<String, Object> context = builder
+        
+        RedisSerializationContext<String, T> context = builder
                 .value(valueSerializer)
                 .hashKey(keySerializer)
                 .hashValue(valueSerializer)
                 .build();
-
+        
         return new ReactiveRedisTemplate<>(connectionFactory, context);
+    }
+
+    @Bean
+    public ReactiveRedisService reactiveRedisService(ReactiveRedisTemplate<String, Object> redisTemplate) {
+        log.info("Creating ReactiveRedisService");
+        return new ReactiveRedisService(redisTemplate);
+    }
+
+    @Bean
+    public ReactiveRedisRepository reactiveRedisRepository(ReactiveRedisTemplate<String, Object> redisTemplate) {
+        log.info("Creating ReactiveRedisRepository");
+        return new ReactiveRedisRepository(redisTemplate);
+    }
+    
+    @Bean
+    public ReactiveCacheService reactiveCacheService(
+            ReactiveRedisTemplate<String, Object> redisTemplate,
+            CircuitBreakerRegistry circuitBreakerRegistry) {
+        log.info("Creating ReactiveCacheService");
+        return new ReactiveCacheService(
+                redisTemplate, 
+                circuitBreakerRegistry, 
+                properties.getCacheTtl() != null ? properties.getCacheTtl() : Duration.ofMinutes(30));
     }
 }

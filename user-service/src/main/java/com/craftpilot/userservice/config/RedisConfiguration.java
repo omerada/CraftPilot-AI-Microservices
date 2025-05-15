@@ -1,65 +1,69 @@
 package com.craftpilot.userservice.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.craftpilot.redis.config.RedisClientProperties;
+import com.craftpilot.redis.service.ReactiveCacheService;
+import com.craftpilot.redis.service.ReactiveRedisService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.redis.cache.RedisCacheConfiguration;
+import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
-import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
-import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
-import org.springframework.data.redis.core.ReactiveRedisTemplate;
-import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
-import lombok.extern.slf4j.Slf4j;
+import java.time.Duration;
 
+/**
+ * User Service için özel Redis yapılandırması
+ * Bu sınıf, redis-client-lib'nin sağladığı temel altyapıya ek olarak
+ * User service'e özel Redis yapılandırmalarını sağlar.
+ */
 @Configuration
 @Slf4j
 public class RedisConfiguration {
 
-    @Value("${spring.redis.host:redis}")
-    private String redisHost;
-
-    @Value("${spring.redis.port:6379}")
-    private int redisPort;
-
-    @Value("${spring.redis.password:}")
-    private String redisPassword;
-
-    @Value("${spring.redis.database:0}")
-    private int redisDatabase;
-
+    /**
+     * Redis Cache Manager yapılandırması
+     * User service için özelleştirilmiş cache yapılandırması sağlar
+     */
     @Bean
-    @Primary
-    public LettuceConnectionFactory redisConnectionFactory() {
-        log.info("Creating Redis connection factory with host: {}, port: {}", redisHost, redisPort);
+    public RedisCacheManager redisCacheManager(RedisConnectionFactory connectionFactory) {
+        log.info("Configuring Redis Cache Manager for user-service");
         
-        RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration();
-        configuration.setHostName(redisHost);
-        configuration.setPort(redisPort);
-        if (redisPassword != null && !redisPassword.isEmpty()) {
-            configuration.setPassword(redisPassword);
-        }
-        configuration.setDatabase(redisDatabase);
+        // User service için özel cache yapılandırması
+        RedisCacheConfiguration cacheConfig = RedisCacheConfiguration.defaultCacheConfig()
+                .entryTtl(Duration.ofMinutes(30))
+                .disableCachingNullValues()
+                .serializeKeysWith(
+                        RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer())
+                )
+                .serializeValuesWith(
+                        RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer())
+                )
+                .prefixCacheNameWith("user-service:");
         
-        return new LettuceConnectionFactory(configuration);
+        return RedisCacheManager.builder(connectionFactory)
+                .cacheDefaults(cacheConfig)
+                .build();
     }
 
+    /**
+     * Redis client properties için özelleştirme
+     * Gerekirse redis-client-lib'nin sağladığı özelliklere ek özellikler eklenebilir
+     */
     @Bean
     @Primary
-    public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(ReactiveRedisConnectionFactory connectionFactory) {
-        log.info("Creating ReactiveRedisTemplate with connection factory");
+    @ConditionalOnMissingBean
+    public RedisClientProperties redisClientProperties() {
+        log.info("Creating custom RedisClientProperties for user-service");
         
-        Jackson2JsonRedisSerializer<Object> serializer = new Jackson2JsonRedisSerializer<>(Object.class);
-        RedisSerializationContext.RedisSerializationContextBuilder<String, Object> builder =
-                RedisSerializationContext.newSerializationContext(new StringRedisSerializer());
-        
-        RedisSerializationContext<String, Object> context = builder
-                .value(serializer)
-                .hashValue(serializer)
+        return RedisClientProperties.builder()
+                // Properties will be loaded from application.yml
                 .build();
-        
-        return new ReactiveRedisTemplate<>(connectionFactory, context);
     }
 }

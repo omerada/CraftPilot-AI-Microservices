@@ -25,6 +25,7 @@ import java.util.concurrent.TimeoutException;
 @Slf4j
 @Tag(name = "User Preferences", description = "Kullanıcı tercihlerini yönetme API'leri")
 public class UserPreferenceController {
+    
     private final UserPreferenceService userPreferenceService;
     private final UserPreferenceMapper userPreferenceMapper;
 
