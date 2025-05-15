@@ -58,6 +58,29 @@ on:
           - zookeeper
         default: "all"
         required: false
+      clean_redis_cache:
+        type: boolean
+        description: "Redis önbelleğini temizle"
+        default: false
+      redis_cache_pattern:
+        type: choice
+        description: "Redis önbellek temizleme deseni"
+        options:
+          - all
+          - user
+          - preference
+          - notification
+          - subscription
+          - analytics
+          - response
+          - custom
+        default: "all"
+        required: false
+      redis_custom_pattern:
+        type: string
+        description: "Özel Redis önbellek deseni (örn: user:*, pref:*)"
+        required: false
+        default: ""
 
 jobs:
   cleanup:
@@ -309,3 +332,95 @@ jobs:
 
           echo ""
           echo "=== Temizlik İşlemi Tamamlandı ==="
+
+      - name: Redis Cache Temizliği
+        if: ${{ github.event.inputs.clean_redis_cache == 'true' }}
+        run: |
+          echo "=== Redis Cache Temizliği ==="
+
+          # Redis bağlantı parametreleri
+          REDIS_HOST="${{ env.REDIS_HOST || 'redis' }}"
+          REDIS_PORT="${{ env.REDIS_PORT || '6379' }}"
+          REDIS_PASS="${{ env.REDIS_PASSWORD || '13579ada' }}"
+
+          # Redis CLI komutu oluştur
+          REDIS_CLI="redis-cli -h $REDIS_HOST -p $REDIS_PORT"
+          if [ ! -z "$REDIS_PASS" ]; then
+            REDIS_CLI="$REDIS_CLI -a $REDIS_PASS"
+          fi
+
+          # Pattern seçimine göre temizlik yap
+          case "${{ github.event.inputs.redis_cache_pattern }}" in
+            "all")
+              echo "Tüm Redis önbelleği temizleniyor..."
+              $REDIS_CLI FLUSHALL
+              ;;
+              
+            "user")
+              echo "Kullanıcı önbellekleri temizleniyor..."
+              $REDIS_CLI EVAL "for _,k in ipairs(redis.call('keys','user:*')) do redis.call('del',k) end" 0
+              $REDIS_CLI EVAL "for _,k in ipairs(redis.call('keys','cache:user:*')) do redis.call('del',k) end" 0
+              ;;
+              
+            "preference")
+              echo "Tercih önbellekleri temizleniyor..."
+              $REDIS_CLI EVAL "for _,k in ipairs(redis.call('keys','preference:*')) do redis.call('del',k) end" 0
+              ;;
+              
+            "notification")
+              echo "Bildirim önbellekleri temizleniyor..."
+              $REDIS_CLI EVAL "for _,k in ipairs(redis.call('keys','notification:*')) do redis.call('del',k) end" 0
+              ;;
+              
+            "subscription")
+              echo "Abonelik önbellekleri temizleniyor..."
+              $REDIS_CLI EVAL "for _,k in ipairs(redis.call('keys','subscription:*')) do redis.call('del',k) end" 0
+              $REDIS_CLI EVAL "for _,k in ipairs(redis.call('keys','cache:subscription:*')) do redis.call('del',k) end" 0
+              ;;
+              
+            "analytics")
+              echo "Analitik önbellekleri temizleniyor..."
+              $REDIS_CLI EVAL "for _,k in ipairs(redis.call('keys','analytics:*')) do redis.call('del',k) end" 0
+              ;;
+              
+            "response")
+              echo "LLM yanıt önbellekleri temizleniyor..."
+              $REDIS_CLI EVAL "for _,k in ipairs(redis.call('keys','llm:response:*')) do redis.call('del',k) end" 0
+              ;;
+              
+            "custom")
+              if [ ! -z "${{ github.event.inputs.redis_custom_pattern }}" ]; then
+                echo "Özel desen ile önbellek temizleniyor: ${{ github.event.inputs.redis_custom_pattern }}"
+                $REDIS_CLI EVAL "for _,k in ipairs(redis.call('keys','${{ github.event.inputs.redis_custom_pattern }}')) do redis.call('del',k) end" 0
+              else
+                echo "Özel desen belirtilmedi, temizlik yapılmadı."
+              fi
+              ;;
+          esac
+
+          echo "Redis önbellek temizliği tamamlandı."
+          echo "Mevcut Redis bellek kullanımı:"
+          $REDIS_CLI INFO memory | grep "used_memory_human"
+
+  clean-redis-lib-cache:
+    runs-on: self-hosted
+    steps:
+      - name: Clean Redis Client Lib Maven Cache
+        run: |
+          echo "=== Redis Client Lib Maven Cache Temizliği ==="
+
+          # Redis client lib'e ait Maven cache'ini temizle
+          rm -rf ~/.m2/repository/com/craftpilot/redis-client-lib
+
+          # LastUpdated dosyalarını temizle
+          find ~/.m2 -name "*.lastUpdated" -type f -delete
+          find ~/.m2 -name "*.repositories" -type f -delete
+          find ~/.m2 -name "*_remote.repositories" -type f -delete
+          find ~/.m2 -name "resolver-status.properties" -type f -delete
+
+          echo "Redis client lib Maven cache temizlendi"
+
+      - name: Verify Cache Cleanup
+        run: |
+          echo "Cache durumu kontrol ediliyor..."
+          ls -la ~/.m2/repository/com/craftpilot/ || echo "Craftpilot cache temizlendi"
