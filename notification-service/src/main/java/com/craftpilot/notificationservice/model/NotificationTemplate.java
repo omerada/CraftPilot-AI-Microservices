@@ -39,6 +39,16 @@ public class NotificationTemplate {
     private boolean active;
     private boolean deleted;
 
+    // Add explicit getter for Spring Data compatibility
+    public boolean isDeleted() {
+        return deleted;
+    }
+
+    // Spring Data MongoDB için açık boolean getter - isActive() metodunu açıkça tanımlıyoruz
+    public boolean isActive() {
+        return active;
+    }
+
     @Version
     private Long version;
 

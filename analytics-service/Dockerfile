@@ -99,17 +99,25 @@ if [ "\$KAFKA_ENABLED" = "true" ] && [ ! -z "\$KAFKA_BOOTSTRAP_SERVERS" ]; then
   KAFKA_PORT=\$(echo \$KAFKA_BOOTSTRAP_SERVERS | cut -d':' -f2)
   
   echo "Testing connection to Kafka at \$KAFKA_HOST:\$KAFKA_PORT..."
-  for i in {1..10}; do
+  for i in {1..5}; do
     if nc -z -w 2 \$KAFKA_HOST \$KAFKA_PORT; then
       echo "✅ Successfully connected to Kafka at \$KAFKA_HOST:\$KAFKA_PORT"
+      export SPRING_KAFKA_BOOTSTRAP_SERVERS=\$KAFKA_BOOTSTRAP_SERVERS
+      export KAFKA_ENABLED=true
       break
     fi
-    echo "⏳ Waiting for Kafka to be available... (\$i/10)"
-    if [ \$i -eq 10]; then
-      echo "⚠️ Could not connect to Kafka within timeout, but will continue startup"
+    echo "⏳ Waiting for Kafka to be available... (\$i/5)"
+    if [ \$i -eq 5 ]; then
+      echo "⚠️ Could not connect to Kafka within timeout, disabling Kafka integration"
+      export KAFKA_ENABLED=false
+      export SPRING_KAFKA_ENABLED=false
     fi
     sleep 2
   done
+else
+  echo "Kafka integration disabled by configuration"
+  export KAFKA_ENABLED=false
+  export SPRING_KAFKA_ENABLED=false
 fi
 
 echo "Starting application with options: \$JAVA_OPTS"

@@ -143,9 +143,6 @@ jobs:
                 --restart unless-stopped \
                 -p 8060:8060 \
                 -p 5007:5007 \
-                -v /opt/craftpilot/gcp-credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
-                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
-                -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=8060 \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
@@ -172,6 +169,7 @@ jobs:
                 -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_NETFLIX_EUREKA=DEBUG \
                 -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_REDIS=DEBUG \
                 -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_MONGODB=DEBUG \
+                -e LOGGING_LEVEL_COM_CRAFTPILOT_USERSERVICE_CONFIG=TRACE \
                 -e "JAVA_TOOL_OPTIONS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5007" \
                 --health-cmd="curl -f http://localhost:8060/actuator/health || exit 1" \
                 --health-interval=10s \
@@ -185,9 +183,6 @@ jobs:
                 --network craftpilot-network \
                 --restart unless-stopped \
                 -p 8060:8060 \
-                -v /opt/craftpilot/gcp-credentials.json:/etc/gcp/credentials/gcp-credentials.json:ro \
-                -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials/gcp-credentials.json \
-                -e FIREBASE_CONFIG_PATH=/etc/gcp/credentials/gcp-credentials.json \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=8060 \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \

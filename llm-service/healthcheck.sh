@@ -9,12 +9,12 @@ if ! pgrep -f "java -jar app.jar" > /dev/null; then
     exit 1
 fi
 
-# Health endpoint kontrolü
-if ! curl -sf http://localhost:8062/health > /dev/null; then
+# Health endpoint kontrolü - port 8066 olarak düzeltildi
+if ! curl -sf http://localhost:8066/health > /dev/null; then
     echo "Application health check failed on /health endpoint"
     
     # Alternatif olarak actuator endpoint'ini dene
-    if ! curl -sf http://localhost:8062/actuator/health > /dev/null; then
+    if ! curl -sf http://localhost:8066/actuator/health > /dev/null; then
         echo "Application health check also failed on /actuator/health endpoint"
         exit 1
     fi

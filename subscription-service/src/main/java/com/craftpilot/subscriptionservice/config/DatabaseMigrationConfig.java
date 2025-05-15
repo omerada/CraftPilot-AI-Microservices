@@ -41,7 +41,8 @@ public class DatabaseMigrationConfig {
     public void initializeDatabase() {
         log.info("Veritabanı indeksleri ve koleksiyonlar kontrol ediliyor");
 
-        if (autoIndexCreation) {
+        if (!autoIndexCreation) {
+            log.info("Manuel indeks oluşturma işlemi başlatılıyor");
             createSubscriptionIndexes()
                     .then(createSubscriptionPlanIndexes())
                     .then(createPaymentIndexes())
@@ -49,6 +50,8 @@ public class DatabaseMigrationConfig {
                     .doOnSuccess(v -> log.info("Tüm indeksler başarıyla oluşturuldu"))
                     .doOnError(e -> log.error("İndeks oluşturma hatası: {}", e.getMessage()))
                     .subscribe();
+        } else {
+            log.info("Otomatik indeks oluşturma etkin. Manuel indeks oluşturulmayacak.");
         }
     }
 
@@ -57,8 +60,8 @@ public class DatabaseMigrationConfig {
         ReactiveIndexOperations indexOps = mongoTemplate.indexOps(Subscription.class);
 
         return Mono.when(
-                indexOps.ensureIndex(new Index().on("userId", Sort.Direction.ASC)),
-                indexOps.ensureIndex(new Index().on("isActive", Sort.Direction.ASC)),
+                indexOps.ensureIndex(new Index().on("userId", Sort.Direction.ASC).unique()),
+                indexOps.ensureIndex(new Index().on("active", Sort.Direction.ASC)),
                 indexOps.ensureIndex(new Index().on("endDate", Sort.Direction.ASC))).then();
     }
 

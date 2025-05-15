@@ -53,10 +53,10 @@ ENV JAVA_TOOL_OPTIONS="\
     --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
     --add-opens=java.base/java.lang=ALL-UNNAMED"
 
-# Health check düzeltmesi
+# Health check düzeltmesi - port 8066 olarak düzeltildi
 HEALTHCHECK --interval=5s --timeout=5s --start-period=30s --retries=3 \
-  CMD curl -f http://localhost:8062/health || curl -f http://localhost:8062/actuator/health || exit 1
+  CMD curl -f http://localhost:8066/health || curl -f http://localhost:8066/actuator/health || exit 1
 
-EXPOSE 8062
+EXPOSE 8066
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

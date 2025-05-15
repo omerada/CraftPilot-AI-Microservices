@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.ReactiveHealthIndicator;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
@@ -42,6 +43,7 @@ public class HealthConfig {
      */
     @Bean
     @ConditionalOnMissingBean(name = "redisHealthIndicator")
+    @ConditionalOnProperty(name = "spring.data.redis.host", matchIfMissing = true, havingValue = "not-configured")
     public ReactiveHealthIndicator fallbackRedisHealthIndicator() {
         log.info("Creating fallback Redis health indicator - Redis is not configured");
         return () -> Mono.just(Health.unknown()

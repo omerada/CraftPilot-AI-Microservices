@@ -7,7 +7,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
-import org.springframework.data.mongodb.core.index.IndexOperations;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -17,9 +17,17 @@ import reactor.core.publisher.Mono;
 public class MongoIndexConfig {
 
     private final ReactiveMongoTemplate mongoTemplate;
+    
+    @Value("${mongodb.create-indexes:false}")
+    private boolean createIndexes;
 
     @EventListener(ContextRefreshedEvent.class)
     public void initIndexes() {
+        if (!createIndexes) {
+            log.debug("MongoDB indeks oluşturma devre dışı bırakıldı");
+            return;
+        }
+        
         log.info("MongoDB indeksleri başlatılıyor");
 
         try {

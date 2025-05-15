@@ -129,8 +129,7 @@ jobs:
             sed -i "s|DOCKERHUB_USERNAME_PLACEHOLDER|${{ secrets.DOCKERHUB_USERNAME }}|g" /tmp/deploy-image-service.sh
             sed -i "s|MONGO_ROOT_USERNAME_PLACEHOLDER|${{ secrets.MONGO_ROOT_USERNAME }}|g" /tmp/deploy-image-service.sh
             sed -i "s|MONGO_ROOT_PASSWORD_PLACEHOLDER|${{ secrets.MONGO_ROOT_PASSWORD }}|g" /tmp/deploy-image-service.sh
-            # MONGO_INITDB_DATABASE placeholder'ı artık kullanılmıyor, doğrudan sabit değer kullanılacak
-            # sed -i "s|MONGO_INITDB_DATABASE_PLACEHOLDER|${{ secrets.MONGO_INITDB_DATABASE }}|g" /tmp/deploy-image-service.sh
+            # MONGO_INITDB_DATABASE placeholder'ı kaldırıldı, doğrudan sabit değer kullanılıyor
             sed -i "s|OPENAI_API_KEY_PLACEHOLDER|${{ secrets.OPENAI_API_KEY }}|g" /tmp/deploy-image-service.sh
 
             # Make script executable

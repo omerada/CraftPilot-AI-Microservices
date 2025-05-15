@@ -31,13 +31,17 @@ public class MongoHealthIndicator implements ReactiveHealthIndicator {
         return mongoTemplate.executeCommand("{ ping: 1 }")
                 .map(result -> {
                     if (result.getDouble("ok") == 1.0) {
+                        // Get database name safely
+                        String dbName = mongoTemplate.getMongoDatabase().block().getName();
                         return Health.up()
-                                .withDetail("database", mongoTemplate.getMongoDatabase().getName())
+                                .withDetail("database", dbName)
                                 .withDetail("status", "MongoDB bağlantısı sağlıklı")
                                 .build();
                     } else {
+                        // Get database name safely
+                        String dbName = mongoTemplate.getMongoDatabase().block().getName();
                         return Health.down()
-                                .withDetail("database", mongoTemplate.getMongoDatabase().getName())
+                                .withDetail("database", dbName)
                                 .withDetail("error", "MongoDB sunucusu ping yanıtında hata döndü")
                                 .build();
                     }

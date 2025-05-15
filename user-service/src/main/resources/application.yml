@@ -232,7 +232,7 @@ user-preference:
 
 # AI Model yapılandırmaları
 app:
-  load-models: ${LOAD_MODELS:false}
+  load-models: ${LOAD_MODELS:true}
   models:
     file: ${MODELS_FILE:newmodels.json}
     version: ${MODELS_VERSION:1}

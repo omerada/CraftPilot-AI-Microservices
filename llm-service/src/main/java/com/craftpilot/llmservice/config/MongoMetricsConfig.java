@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicReference;
@@ -20,6 +21,9 @@ public class MongoMetricsConfig {
 
     private final ReactiveMongoTemplate mongoTemplate;
     private final MeterRegistry meterRegistry;
+    
+    @Value("${mongodb.metrics.enabled:true}")
+    private boolean metricsEnabled;
 
     private final AtomicReference<Double> connectionPoolSize = new AtomicReference<>(0.0);
 
@@ -40,6 +44,10 @@ public class MongoMetricsConfig {
 
     @Scheduled(fixedRate = 60000) // Her 1 dakikada bir
     public void collectMongoMetrics() {
+        if (!metricsEnabled) {
+            return;
+        }
+        
         mongoTemplate.executeCommand("{ serverStatus: 1 }")
                 .doOnNext(serverStatus -> {
                     try {
@@ -52,15 +60,14 @@ public class MongoMetricsConfig {
                                 double available = connections.getInteger("available", 0);
 
                                 meterRegistry.gauge("mongodb.connections.current",
-                                        Tags.of("database", mongoTemplate.getMongoDatabase().block().getName()), // getDatabaseName()
-                                                                                                                 // yerine
-                                                                                                                 // getMongoDatabase().block().getName()
-                                                                                                                 // kullanıldı
+                                        Tags.of("database", mongoTemplate.getMongoDatabase().block().getName()),
                                         connectionPoolSize,
                                         ref -> current);
 
-                                log.debug("MongoDB bağlantı metrikleri güncellendi: mevcut={}, kullanılabilir={}",
-                                        current, available);
+                                if (log.isTraceEnabled()) {
+                                    log.trace("MongoDB bağlantı metrikleri güncellendi: mevcut={}, kullanılabilir={}",
+                                            current, available);
+                                }
                             }
                         }
                     } catch (Exception e) {

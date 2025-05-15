@@ -21,6 +21,7 @@ public class AIModel {
     private String modelId;
     private String modelName;
     private String provider;
+    private String providerId; // Provider ID için yeni alan ekliyoruz
     private Integer maxInputTokens;
     private String requiredPlan;
     private Integer creditCost; // Her kullanımda tüketilecek kredi miktarı
@@ -29,4 +30,13 @@ public class AIModel {
     @Indexed
     private String category; // Model kategorisi (basic, standard, premium gibi)
     private Integer contextLength; // Modelin bağlam penceresi uzunluğu
+    
+    // providerId için getter ve setter metotları
+    public String getProviderId() {
+        return providerId;
+    }
+    
+    public void setProviderId(String providerId) {
+        this.providerId = providerId;
+    }
 }

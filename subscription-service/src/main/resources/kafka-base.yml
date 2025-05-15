@@ -11,6 +11,8 @@ spring:
       properties:
         enable.idempotence: true
         max.in.flight.requests.per.connection: 1
+        reconnect.backoff.ms: 1000
+        reconnect.backoff.max.ms: 5000
     consumer:
       group-id: ${spring.application.name}-group
       auto-offset-reset: earliest
@@ -23,10 +25,13 @@ spring:
         heartbeat.interval.ms: 3000
         session.timeout.ms: 45000
     admin:
-      auto-create: true
+      auto-create: false
       fail-fast: false
+      operation-timeout: 10000
+      close-timeout: 10000
 
 kafka:
+  enabled: ${KAFKA_ENABLED:true}
   topic:
     partitions: 3
     replicas: 1

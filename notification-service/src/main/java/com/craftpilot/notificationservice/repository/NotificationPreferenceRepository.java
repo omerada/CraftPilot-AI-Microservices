@@ -8,6 +8,8 @@ import reactor.core.publisher.Mono;
 @Repository
 public interface NotificationPreferenceRepository extends ReactiveMongoRepository<NotificationPreference, String> {
 
+    // Changed from findByUserIdAndDeletedIsFalse to findByUserIdAndDeletedFalse
+    // to match the property name pattern
     Mono<NotificationPreference> findByUserIdAndDeletedFalse(String userId);
 
     Mono<NotificationPreference> findByUserId(String userId);

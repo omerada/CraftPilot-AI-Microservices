@@ -2,6 +2,7 @@ package com.craftpilot.imageservice.config;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Sort;
@@ -16,9 +17,17 @@ import reactor.core.publisher.Mono;
 public class MongoIndexConfig {
 
     private final ReactiveMongoTemplate mongoTemplate;
+    
+    @Value("${mongodb.create-indexes:false}")
+    private boolean createIndexes;
 
     @EventListener(ContextRefreshedEvent.class)
     public void initIndexes() {
+        if (!createIndexes) {
+            log.info("MongoDB indeks oluşturma devre dışı bırakıldı, indeksler zaten mevcut");
+            return;
+        }
+        
         log.info("MongoDB indeksleri başlatılıyor");
         
         try {

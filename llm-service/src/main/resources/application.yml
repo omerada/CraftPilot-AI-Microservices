@@ -54,7 +54,7 @@ spring:
     mongodb:
       uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:craftpilot_llm_db}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000}
       database: ${MONGODB_DATABASE:craftpilot_llm_db}
-      auto-index-creation: true
+      auto-index-creation: ${MONGODB_AUTO_INDEX_CREATION:false}
       # Gelişmiş bağlantı parametreleri
       connect-timeout: 30000
       socket-timeout: 60000
@@ -96,7 +96,7 @@ webclient:
 # Kullanıcı bellek servisi yapılandırması
 user-memory:
   service:
-    url: http://user-memory-service:8067
+    url: ${USER_MEMORY_SERVICE_URL:http://user-memory-service:8067}
     # Kubernetes veya Docker Compose ortamında servis adı kullanılır
     # Lokal geliştirme için localhost:8067 olarak değiştirilebilir
   non-meaningful-strings: >
@@ -136,7 +136,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
       base-path: /actuator
   endpoint:
     health:
@@ -153,6 +153,8 @@ management:
       enabled: true
     readinessstate:
       enabled: true
+    mongodb:
+      enabled: true
 
 # OpenRouter API ayarları
 openrouter:
@@ -168,9 +170,10 @@ openrouter:
   requestTimeoutSeconds: 60
   streamTimeoutSeconds: 120
   keepAliveIntervalSeconds: 5
-  defaultModel: google/gemini-pro
+  defaultModel: google/gemini-2.0-flash-lite-001
 
-# Logging ayarları
+# Logging ayarları - Temizlenmiş ve basitleştirilmiş
+# Detaylı logger yapılandırmaları logback-spring.xml'e taşındı
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
@@ -178,21 +181,6 @@ logging:
     root: INFO
     com.craftpilot: DEBUG
     org.springframework.web: INFO
-    reactor.netty: INFO
-    io.netty: INFO
-    com.craftpilot.llmservice: DEBUG
-    com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
-
-    # MongoDB log seviyesi - daha etkin loglama ve sorun tespiti için
-    org.springframework.data.mongodb: INFO
-    org.springframework.data.mongodb.core.MongoTemplate: DEBUG # MongoDB işlemlerini kapsamlı loglama
-    org.springframework.data.mongodb.repository.Query: DEBUG # MongoDB sorgularını loglama
-    org.springframework.data.mongodb.repository.query: DEBUG # Repository sorgu logları
-    org.springframework.data.mongodb.core.convert: INFO # Dönüşüm logları
-    org.mongodb.driver: WARN # MongoDB driver temel logları
-    org.mongodb.driver.connection: INFO # Bağlantı sorunlarını daha iyi görmek için
-    org.mongodb.driver.cluster: INFO # MongoDB küme loglaması
-    org.mongodb.driver.protocol: INFO # MongoDB protokol loglaması
 
 resilience4j:
   circuitbreaker:
@@ -248,13 +236,9 @@ lighthouse:
   service:
     url: ${LIGHTHOUSE_SERVICE_URL:http://lighthouse-service:8085}
 
-service:
-  user-memory:
-    url: ${USER_MEMORY_SERVICE_URL:http://user-memory-service:8067}
-
 ai:
   model:
-    extraction: anthropic/claude-3-haiku # Daha güçlü bir model kullan
+    extraction: anthropic/claude-3-haiku
 
 # Extraksiyon ayarları
 extraction:
@@ -275,3 +259,9 @@ memory:
 user-info-extraction:
   debug: true
   save-all-messages: false
+
+# MongoDB özel ayarlar
+mongodb:
+  create-indexes: ${MONGODB_CREATE_INDEXES:false}
+  metrics:
+    enabled: ${MONGODB_METRICS_ENABLED:true}

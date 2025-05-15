@@ -19,4 +19,12 @@ public class Provider {
     private String icon;
     private String description;
     private List<AIModel> models;
+    
+    /**
+     * MongoDB ID'yi döndürür. Bu durumda name alanıdır.
+     * @return Provider ID'si (name alanı)
+     */
+    public String getId() {
+        return this.name;
+    }
 }

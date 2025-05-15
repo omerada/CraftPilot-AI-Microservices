@@ -2,6 +2,7 @@ package com.craftpilot.creditservice.config;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Sort;
@@ -17,9 +18,17 @@ import reactor.core.publisher.Mono;
 public class MongoIndexConfig {
 
     private final ReactiveMongoTemplate mongoTemplate;
+    
+    @Value("${mongodb.indexes.enabled:false}")
+    private boolean indexesEnabled;
 
     @EventListener(ContextRefreshedEvent.class)
     public void initIndexes() {
+        if (!indexesEnabled) {
+            log.info("MongoDB indeks oluşturma işlemi devre dışı bırakılmıştır. İndeksler elle oluşturulmalıdır.");
+            return;
+        }
+        
         log.info("Checking and initializing MongoDB indexes if needed");
         
         // Credit koleksiyonu için indeksler

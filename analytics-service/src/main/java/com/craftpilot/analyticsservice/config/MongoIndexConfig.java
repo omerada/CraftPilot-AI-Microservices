@@ -18,12 +18,13 @@ import java.util.concurrent.TimeUnit;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@ConditionalOnProperty(name = "spring.data.mongodb.auto-index-creation", havingValue = "true", matchIfMissing = false)
+// Özelliği sadece mongodb.indexes.creation.enabled=true olduğunda etkinleştir, varsayılan olarak false
+@ConditionalOnProperty(name = "mongodb.indexes.creation.enabled", havingValue = "true", matchIfMissing = false)
 public class MongoIndexConfig {
 
     private final ReactiveMongoTemplate mongoTemplate;
     
-    @Value("${mongodb.indexes.creation.enabled:true}")
+    @Value("${mongodb.indexes.creation.enabled:false}")
     private boolean indexCreationEnabled;
     
     @EventListener(ContextRefreshedEvent.class)

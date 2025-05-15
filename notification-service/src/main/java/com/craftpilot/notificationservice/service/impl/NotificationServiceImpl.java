@@ -77,7 +77,7 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public Flux<NotificationResponse> getUserNotifications(String userId, boolean onlyUnread) {
         return (onlyUnread ? notificationRepository.findByUserIdAndRead(userId, false)
-                : notificationRepository.findByUserId(userId))
+                : notificationRepository.findByUserIdAndDeletedFalse(userId))
                 .map(NotificationResponse::fromEntity)
                 .doOnComplete(() -> log.debug("Retrieved notifications for user: {}", userId));
     }
@@ -137,6 +137,7 @@ public class NotificationServiceImpl implements NotificationService {
         notification.setScheduledAt(request.getScheduledAt());
         notification.setCreatedAt(LocalDateTime.now());
         notification.setRead(false);
+        notification.setDeleted(false); // Varsayılan olarak false ayarla
         return Mono.just(notification);
     }
 

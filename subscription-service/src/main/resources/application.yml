@@ -167,6 +167,11 @@ logging:
     org.springframework.data.mongodb.core.MongoTemplate: DEBUG
     org.springframework.kafka: INFO
     org.springframework.web: INFO
+    org.apache.kafka.clients.NetworkClient: ERROR
+    org.apache.kafka.clients.admin.AdminClient: WARN
+    org.apache.kafka.common.utils.AppInfoParser: WARN
+    org.apache.kafka.clients.admin.internals.AdminMetadataManager: WARN
+    org.springframework.kafka.core.KafkaAdmin: WARN
 
 eureka:
   client:

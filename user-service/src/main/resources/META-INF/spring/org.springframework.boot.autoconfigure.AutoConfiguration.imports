@@ -1,1 +1,1 @@
-com.craftpilot.redis.RedisClientAutoConfiguration
+com.craftpilot.redis.config.RedisClientAutoConfiguration
