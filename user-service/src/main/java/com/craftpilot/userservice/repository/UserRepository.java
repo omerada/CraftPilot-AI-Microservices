@@ -9,8 +9,6 @@ import reactor.core.publisher.Mono;
 
 @Repository
 public interface UserRepository extends ReactiveMongoRepository<User, String> {
-    Mono<User> findByUid(String uid);
-
     Mono<User> findByEmail(String email);
 
     @Query("{ 'roles.?0': true }")
