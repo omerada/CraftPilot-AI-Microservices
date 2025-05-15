@@ -128,8 +128,8 @@ public class ReactiveRedisService {
     public Mono<Duration> getExpire(String key) {
         return redisTemplate.getExpire(key)
             .map(seconds -> {
-                if (seconds == null || seconds <= 0L) return Duration.ZERO;
-                return Duration.ofSeconds(seconds);
+                if (seconds == null || seconds.toSeconds() <= 0L) return Duration.ZERO;
+                return Duration.ofSeconds(seconds.toSeconds());
             })
             .doOnSubscribe(s -> log.debug("Getting expiration for key: {}", key))
             .doOnNext(expire -> log.debug("Got expiration for key {}: {}", key, expire));
