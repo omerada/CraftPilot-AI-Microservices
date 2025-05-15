@@ -1,24 +1,17 @@
 spring:
   application:
     name: user-service
-    redis:
-      host: ${REDIS_HOST:redis}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:13579ada}
+  data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:craftpilot_user_db}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000}
+      uri: mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:craftpilot_user_db}?authSource=admin&retryWrites=true&w=majority
       database: ${MONGODB_DATABASE:craftpilot_user_db}
-      # Bağlantı optimizasyonları
-      server-selection-timeout: 30000
-      connect-timeout: 20000
-      socket-timeout: 60000
-      max-wait-time: 120000
-      max-connection-idle-time: 300000
-      max-connection-life-time: 600000
-      retry-writes: true
-      # Bağlantı havuzu ayarları
-      max-connection-pool-size: 20
-      min-connection-pool-size: 5
+      auto-index-creation: true
+  redis:
+    host: ${REDIS_HOST:redis}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:13579ada}
+    timeout: 2000
+    database: 0
   # Firestore'u devre dışı bırak
   cloud:
     gcp:
