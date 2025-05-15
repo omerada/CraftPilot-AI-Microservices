@@ -12,13 +12,24 @@ spring:
       connection-pool-max-size: 20
       auto-index-creation: true
     redis:
-      enabled: false # Spring Boot'un varsayılan Redis yapılandırmasını devre dışı bırak
+      enabled: false
   redis:
     host: ${REDIS_HOST:redis}
     port: ${REDIS_PORT:6379}
     password: ${REDIS_PASSWORD:13579ada}
-    timeout: 2000
     database: 0
+    # Client'in doğru host'a bağlanmasını zorlamak için
+    client-name: user-service
+    # Bağlantı ayarlarını belirle
+    connect-timeout: 5000
+    timeout: 3000
+    # Lettuce-specific config
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 2
+        max-wait: -1
   # Firestore'u devre dışı bırak
   cloud:
     gcp:

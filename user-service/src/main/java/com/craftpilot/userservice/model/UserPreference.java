@@ -16,7 +16,7 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Document(collection = "userPreferences")
+@Document(collection = "user_preferences")
 public class UserPreference {
     @Id
     private String userId;

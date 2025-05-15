@@ -8,6 +8,12 @@
         </encoder>
     </appender>
 
+    <!-- Redis-specific logging -->
+    <logger name="org.springframework.data.redis" level="DEBUG"/>
+    <logger name="io.lettuce.core" level="DEBUG"/>
+    <logger name="com.craftpilot.redis" level="DEBUG"/>
+    <logger name="com.craftpilot.userservice.config.RedisConfiguration" level="DEBUG"/>
+    
     <root level="INFO">
         <appender-ref ref="Console"/>
     </root>

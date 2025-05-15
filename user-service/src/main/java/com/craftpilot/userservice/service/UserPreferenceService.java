@@ -48,7 +48,7 @@ public class UserPreferenceService {
     @Value("${kafka.topics.preference-events:preference-events}")
     private String preferencesEventsTopic;
 
-    @CircuitBreaker(name = "userPreferences", fallbackMethod = "getDefaultPreferences")
+    @CircuitBreaker(name = "user_preferences", fallbackMethod = "getDefaultPreferences")
     public Mono<UserPreference> getUserPreferences(String userId) {
         log.info("Kullanıcı tercihleri getiriliyor: userId={}", userId);
         return redisCacheService.getUserPreferences(userId)
@@ -140,7 +140,7 @@ public class UserPreferenceService {
         return Mono.just(fallbackPreference);
     }
 
-    @CircuitBreaker(name = "userPreferences", fallbackMethod = "updateLanguageFallback")
+    @CircuitBreaker(name = "user_preferences", fallbackMethod = "updateLanguageFallback")
     public Mono<UserPreference> updateLanguage(String userId, String language) {
         log.info("Dil güncelleniyor: userId={}, language={}", userId, language);
         return getUserPreferences(userId)

@@ -26,7 +26,7 @@ public class AIModelService {
     private final AIModelRepository modelRepository;
     private final ProviderRepository providerRepository;
     
-    @CircuitBreaker(name = "aiModels", fallbackMethod = "getDefaultModels")
+    @CircuitBreaker(name = "ai_models", fallbackMethod = "getDefaultModels")
     public Mono<ModelsData> getAvailableModels(String userPlan) {
         log.info("Tüm AI modeller getiriliyor (filtreleme yapılmadan)");
         
