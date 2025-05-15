@@ -3,8 +3,13 @@ spring:
     name: user-service
   data:
     mongodb:
-      uri: mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:craftpilot_user_db}?authSource=admin&retryWrites=true&w=majority
+      uri: ${MONGODB_URI:mongodb://${MONGO_ROOT_USERNAME:craftpilot}:${MONGO_ROOT_PASSWORD:secure_password}@${MONGODB_HOST:craftpilot-mongodb}:27017/${MONGODB_DATABASE:craftpilot_user_db}?authSource=admin&retryWrites=true&w=majority&serverSelectionTimeoutMS=30000&connectTimeoutMS=20000&socketTimeoutMS=60000}
       database: ${MONGODB_DATABASE:craftpilot_user_db}
+      # Gelişmiş bağlantı parametreleri
+      connection-timeout: 30000
+      socket-timeout: 60000
+      max-connection-idle-time: 300000
+      connection-pool-max-size: 20
       auto-index-creation: true
   redis:
     host: ${REDIS_HOST:redis}

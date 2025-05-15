@@ -13,6 +13,8 @@ import org.springframework.data.mongodb.config.EnableReactiveMongoAuditing;
 import org.springframework.data.mongodb.repository.config.EnableReactiveMongoRepositories;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
+import java.util.concurrent.TimeUnit;
+
 @Slf4j
 @Configuration
 @EnableReactiveMongoRepositories(basePackages = "com.craftpilot.userservice.repository")
@@ -35,20 +37,29 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
     @Bean
     public MongoClient reactiveMongoClient() {
         try {
+            if (!mongoUri.startsWith("mongodb://") && !mongoUri.startsWith("mongodb+srv://")) {
+                throw new IllegalArgumentException("MongoDB URI must start with 'mongodb://' or 'mongodb+srv://'");
+            }
+
             ConnectionString connectionString = new ConnectionString(mongoUri);
             MongoClientSettings settings = MongoClientSettings.builder()
                     .applyConnectionString(connectionString)
+                    .applyToSocketSettings(builder -> builder.connectTimeout(5000, TimeUnit.MILLISECONDS))
+                    .applyToServerSettings(builder -> builder.heartbeatFrequency(10000, TimeUnit.MILLISECONDS))
                     .build();
 
-            log.info("Connecting to MongoDB at: {}", maskConnectionString(mongoUri));
+            log.info("Attempting to connect to MongoDB at: {}", maskConnectionString(mongoUri));
             return MongoClients.create(settings);
         } catch (Exception e) {
-            log.error("Error creating MongoDB client: {}", e.getMessage(), e);
-            throw e;
+            log.error("Failed to create MongoDB client: {}", e.getMessage(), e);
+            throw new RuntimeException("Could not create MongoDB client", e);
         }
     }
 
     private String maskConnectionString(String connectionString) {
-        return connectionString.replaceAll(":[^:]*@", ":***@");
+        // Daha güvenli maskeleme
+        if (connectionString == null)
+            return null;
+        return connectionString.replaceAll(":[^/@]+@", ":****@");
     }
 }
