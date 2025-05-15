@@ -14,32 +14,38 @@ public class RedisClientProperties {
     /**
      * Redis sunucu adı
      */
+    @Builder.Default
     private String host = "localhost";
     
     /**
      * Redis port numarası
      */
+    @Builder.Default
     private int port = 6379;
     
     /**
      * Redis veritabanı indeksi
      */
+    @Builder.Default
     private int database = 0;
     
     /**
      * Redis şifresi
      */
-    private String password;
+    @Builder.Default
+    private String password = null;
     
     /**
      * Bağlantı zaman aşımı
      */
-    private Duration connectTimeout = Duration.ofMillis(3000);
+    @Builder.Default
+    private Duration connectTimeout = Duration.ofSeconds(2);
     
     /**
      * Komut zaman aşımı
      */
-    private Duration timeout = Duration.ofMillis(3000);
+    @Builder.Default
+    private Duration timeout = Duration.ofSeconds(2);
     
     /**
      * Önbellek TTL süresi (saat)
