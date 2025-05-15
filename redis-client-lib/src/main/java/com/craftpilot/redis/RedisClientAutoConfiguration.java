@@ -63,6 +63,6 @@ public class RedisClientAutoConfiguration {
         return new RedisMetricsService(meterRegistry, redisService);
     }
 
-    // Remove redundant bean definitions that are already defined in RedisConfig
-    // These were causing conflicts with the primary beans
+    // Auto-config sınıfları çift tanımlama yapmaz, sadece ilgili beanler yoksa oluşturur
+    // Bu nedenle bu sınıftan gereksiz tanımlamaları kaldırıyoruz
 }

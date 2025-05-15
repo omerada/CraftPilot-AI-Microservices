@@ -35,7 +35,6 @@ public class RedisConfig {
     private final RedisClientProperties properties;
 
     @Bean(name = "craftPilotRedisConnectionFactory")
-    @Primary
     @ConditionalOnMissingBean(name = "craftPilotRedisConnectionFactory")
     public RedisConnectionFactory craftPilotRedisConnectionFactory() {
         log.info("Configuring primary RedisConnectionFactory with host: {}, port: {}", properties.getHost(), properties.getPort());
@@ -89,7 +88,6 @@ public class RedisConfig {
     }
 
     @Bean(name = "craftPilotReactiveRedisConnectionFactory") 
-    @Primary
     @ConditionalOnMissingBean(name = "craftPilotReactiveRedisConnectionFactory")
     public ReactiveRedisConnectionFactory craftPilotReactiveRedisConnectionFactory() {
         // Aynı yapılandırma ile Reactive bağlantı fabrikası oluştur
@@ -98,7 +96,6 @@ public class RedisConfig {
     }
 
     @Bean
-    @Primary
     @ConditionalOnMissingBean(name = "reactiveRedisTemplate")
     public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
             @Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory connectionFactory) {
