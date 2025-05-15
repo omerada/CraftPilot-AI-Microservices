@@ -13,10 +13,8 @@ spring:
       max-connection-idle-time: 300000
       connection-pool-max-size: 20
       auto-index-creation: true
-    redis:
-      enabled: ${REDIS_ENABLED:true}
   redis:
-    host: ${REDIS_HOST:localhost}
+    host: ${REDIS_HOST:redis}
     port: ${REDIS_PORT:6379}
     database: ${REDIS_DATABASE:0}
     password: ${REDIS_PASSWORD:}
