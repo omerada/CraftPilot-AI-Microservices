@@ -31,7 +31,9 @@ import org.springframework.util.StringUtils;
 import java.time.Duration;
 
 @AutoConfiguration
-@EnableConfigurationProperties(RedisClientProperties.class)
+@EnableConfigurationProperties(RedisClientProperties.class) 
+@AutoConfigureAfter(RedisAutoConfiguration.class) 
+@ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "false", matchIfMissing = true)
 public class RedisClientAutoConfiguration {
 
     @Bean
@@ -41,7 +43,8 @@ public class RedisClientAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnMissingBean
+    @Primary
+    @ConditionalOnMissingBean(name = "reactiveRedisConnectionFactory")
     public ReactiveRedisConnectionFactory reactiveRedisConnectionFactory(
             ReactiveRedisConnectionProvider connectionProvider) {
         return connectionProvider.createConnectionFactory();

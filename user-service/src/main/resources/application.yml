@@ -11,6 +11,8 @@ spring:
       max-connection-idle-time: 300000
       connection-pool-max-size: 20
       auto-index-creation: true
+    redis:
+      enabled: false # Spring Boot'un varsayılan Redis yapılandırmasını devre dışı bırak
   redis:
     host: ${REDIS_HOST:redis}
     port: ${REDIS_PORT:6379}
