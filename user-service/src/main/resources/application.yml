@@ -14,10 +14,11 @@ spring:
     redis:
       enabled: true
   redis:
-    host: ${REDIS_HOST:redis}
+    host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:13579ada}
-    database: 0
+    database: ${REDIS_DATABASE:0}
+    password: ${REDIS_PASSWORD:}
+    timeout: 2000ms
     # Client'in doğru host'a bağlanmasını zorlamak için
     client-name: user-service
     # Bağlantı ayarlarını belirle
@@ -39,21 +40,19 @@ spring:
         enabled: false
 
   kafka:
-    enabled: true
-    bootstrap-servers: ${KAFKA_BROKERS:kafka:9092}
+    enabled: ${KAFKA_ENABLED:true}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
-      retries: 3
-      acks: 1
-      batch-size: 16384
-      buffer-memory: 33554432
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      properties:
-        request.timeout.ms: 5000
-        retry.backoff.ms: 1000
-        max.block.ms: 5000
-        # Bağlantı sorunlarında daha hızlı hata vermesi için
-        delivery.timeout.ms: 10000
+    topic:
+      user-preferences: ${KAFKA_TOPIC_USER_PREFERENCES:user-preferences}
+    properties:
+      request.timeout.ms: 5000
+      retry.backoff.ms: 1000
+      max.block.ms: 5000
+      # Bağlantı sorunlarında daha hızlı hata vermesi için
+      delivery.timeout.ms: 10000
 
 eureka:
   instance:

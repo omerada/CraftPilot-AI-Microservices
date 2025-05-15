@@ -137,7 +137,10 @@ public class UserService {
      */
     public Mono<Void> deleteUser(String id) {
         log.info("Kullanıcı siliniyor: {}", id);
-        return Mono.empty();
+        return userRepository.deleteById(id)
+            .then(userPreferenceService.deleteUserPreferences(id))
+            .doOnSuccess(v -> log.info("Kullanıcı ve tercihleri başarıyla silindi: {}", id))
+            .doOnError(e -> log.error("Kullanıcı silinirken hata oluştu: id={}, error={}", id, e.getMessage()));
     }
 
     /**
@@ -184,17 +187,18 @@ public class UserService {
     }
 
     /**
-     * Kullanıcının planını getir
+     * Kullanıcı planını getir (abonelik bilgisi)
      */
     public Mono<String> getUserPlan(String userId) {
-        log.info("Kullanıcı planı getiriliyor: {}", userId);
-        return Mono.just("free");
+        // Basit bir örnek - gerçekte bu veritabanı veya başka bir hizmetten alınabilir
+        return Mono.just("standard");
     }
 
     /**
      * Kullanıcı tercihlerini getir
      */
     public Mono<UserPreference> getUserPreferences(String userId) {
-        return userPreferenceService.getUserPreferences(userId);
+        return userPreferenceService.getUserPreferences(userId)
+            .doOnError(e -> log.error("Kullanıcı tercihleri alınırken hata: userId={}, error={}", userId, e.getMessage()));
     }
 }
