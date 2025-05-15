@@ -56,6 +56,7 @@ on:
           - mongodb
           - kafka
           - zookeeper
+          - redis-client-lib
         default: "all"
         required: false
       clean_redis_cache:
@@ -404,21 +405,26 @@ jobs:
 
   clean-redis-lib-cache:
     runs-on: self-hosted
+    if: ${{ github.event.inputs.target_service == 'redis-client-lib' || github.event.inputs.target_service == 'all' }}
     steps:
       - name: Clean Redis Client Lib Maven Cache
         run: |
           echo "=== Redis Client Lib Maven Cache Temizliği ==="
+          if [ "${{ github.event.inputs.clean_redis_cache }}" == "true" ]; then
+            echo "Redis client lib önbelleği temizleniyor..."
+            # Redis client lib'e ait Maven cache'ini temizle
+            rm -rf ~/.m2/repository/com/craftpilot/redis-client-lib
 
-          # Redis client lib'e ait Maven cache'ini temizle
-          rm -rf ~/.m2/repository/com/craftpilot/redis-client-lib
+            # LastUpdated dosyalarını temizle
+            find ~/.m2 -name "*.lastUpdated" -type f -delete
+            find ~/.m2 -name "*.repositories" -type f -delete
+            find ~/.m2 -name "*_remote.repositories" -type f -delete
+            find ~/.m2 -name "resolver-status.properties" -type f -delete
 
-          # LastUpdated dosyalarını temizle
-          find ~/.m2 -name "*.lastUpdated" -type f -delete
-          find ~/.m2 -name "*.repositories" -type f -delete
-          find ~/.m2 -name "*_remote.repositories" -type f -delete
-          find ~/.m2 -name "resolver-status.properties" -type f -delete
-
-          echo "Redis client lib Maven cache temizlendi"
+            echo "Redis client lib Maven cache temizlendi"
+          else
+            echo "Redis önbellek temizliği seçilmedi, işlem atlanıyor..."
+          fi
 
       - name: Verify Cache Cleanup
         run: |
