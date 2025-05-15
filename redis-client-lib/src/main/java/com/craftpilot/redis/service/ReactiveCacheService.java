@@ -1,6 +1,7 @@
 package com.craftpilot.redis.service;
 
 import com.craftpilot.redis.exception.RedisOperationException;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import reactor.core.publisher.Mono;
@@ -17,6 +18,7 @@ public class ReactiveCacheService {
 
     private final ReactiveRedisTemplate<String, Object> redisTemplate;
     private final Duration defaultTtl;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     public ReactiveCacheService(ReactiveRedisTemplate<String, Object> redisTemplate) {
         this(redisTemplate, Duration.ofMinutes(30));
@@ -27,14 +29,16 @@ public class ReactiveCacheService {
             Duration defaultTtl) {
         this.redisTemplate = redisTemplate;
         this.defaultTtl = defaultTtl;
+        this.circuitBreakerRegistry = null;
     }
 
-    // Üçüncü bir constructor CircuitBreaker için
+    // With circuit breaker registry
     public ReactiveCacheService(
             ReactiveRedisTemplate<String, Object> redisTemplate,
-            Object circuitBreakerRegistry,
+            CircuitBreakerRegistry circuitBreakerRegistry,
             Duration defaultTtl) {
         this.redisTemplate = redisTemplate;
+        this.circuitBreakerRegistry = circuitBreakerRegistry;
         this.defaultTtl = defaultTtl;
     }
 

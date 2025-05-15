@@ -79,6 +79,12 @@ public class RedisClientProperties {
     private String password;
     
     /**
+     * Circuit breaker configuration
+     */
+    @Builder.Default
+    private CircuitBreaker circuitBreaker = new CircuitBreaker();
+    
+    /**
      * Havuz yapılandırması
      */
     @Builder.Default
@@ -89,6 +95,22 @@ public class RedisClientProperties {
      */
     @Builder.Default
     private Retry retry = new Retry();
+    
+    /**
+     * Circuit breaker configuration
+     */
+    @Data
+    public static class CircuitBreaker {
+        /**
+         * Whether to enable circuit breaker
+         */
+        private boolean enabled = false;
+        
+        /**
+         * Name of the circuit breaker
+         */
+        private String name = "redis";
+    }
     
     /**
      * Redis bağlantı havuzu yapılandırması
