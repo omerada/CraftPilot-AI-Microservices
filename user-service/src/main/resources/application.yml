@@ -88,7 +88,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,metrics,prometheus,info,loggers
+        include: health,metrics,prometheus,info,loggers,env,beans
       base-path: /actuator
   endpoint:
     health:
@@ -97,27 +97,18 @@ management:
         enabled: true
       group:
         readiness:
-          include: diskSpace,redis
-          show-details: always
+          include: redis,mongo,diskSpace
         liveness:
           include: ping
-          show-details: always
   health:
     redis:
       enabled: true
-    livenessState:
+    mongo:
       enabled: true
-    readinessState:
-      enabled: true
-    diskspace:
-      enabled: true
-    circuitbreakers:
-      enabled: true
-    kafka:
-      enabled: false
-    mongodb:
-      enabled: true
-    validate-group-membership: false
+  metrics:
+    export:
+      prometheus:
+        enabled: true
 
 springdoc:
   api-docs:
@@ -205,13 +196,10 @@ kafka:
 logging:
   level:
     root: INFO
-    com.craftpilot: DEBUG
-    com.craftpilot.userservice: DEBUG
-    com.craftpilot.redis: INFO # DEBUG yerine INFO seviyesi
-    org.springframework.data.redis: DEBUG
-    org.springframework.boot.actuate: DEBUG
-    org.springframework.web: INFO
-    io.lettuce: INFO # DEBUG yerine INFO seviyesi
+    com.craftpilot: INFO
+    org.springframework.data.redis: WARN
+    org.springframework.data.mongodb: WARN
+    com.craftpilot.redis: INFO
 
 # Kullanıcı tercihleri operasyon timeout değeri
 user-preference:

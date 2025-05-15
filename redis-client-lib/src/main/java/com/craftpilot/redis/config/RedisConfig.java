@@ -1,32 +1,27 @@
 package com.craftpilot.redis.config;
 
-import com.craftpilot.redis.connection.ReactiveRedisConnectionProvider;
-import com.craftpilot.redis.health.RedisHealthIndicator;
 import com.craftpilot.redis.repository.ReactiveRedisRepository;
 import com.craftpilot.redis.service.ReactiveCacheService;
 import com.craftpilot.redis.service.ReactiveRedisService;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.lettuce.core.ClientOptions;
-import io.lettuce.core.SocketOptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
-import org.springframework.data.redis.connection.RedisPassword;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettucePoolingClientConfiguration;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
-import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+import org.springframework.data.redis.connection.RedisPassword;
 
+import io.lettuce.core.ClientOptions;
+import io.lettuce.core.SocketOptions;
 import java.time.Duration;
 
 @Configuration
@@ -91,16 +86,16 @@ public class RedisConfig {
 
     @Bean
     @ConditionalOnMissingBean
-    public <T> ReactiveRedisTemplate<String, T> reactiveRedisTemplate(
+    public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
             ReactiveRedisConnectionFactory connectionFactory) {
         
         StringRedisSerializer keySerializer = new StringRedisSerializer();
-        Jackson2JsonRedisSerializer<T> valueSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
+        GenericJackson2JsonRedisSerializer valueSerializer = new GenericJackson2JsonRedisSerializer();
         
-        RedisSerializationContext.RedisSerializationContextBuilder<String, T> builder =
+        RedisSerializationContext.RedisSerializationContextBuilder<String, Object> builder =
                 RedisSerializationContext.newSerializationContext(keySerializer);
         
-        RedisSerializationContext<String, T> context = builder
+        RedisSerializationContext<String, Object> context = builder
                 .value(valueSerializer)
                 .hashKey(keySerializer)
                 .hashValue(valueSerializer)
@@ -123,12 +118,10 @@ public class RedisConfig {
     
     @Bean
     public ReactiveCacheService reactiveCacheService(
-            ReactiveRedisTemplate<String, Object> redisTemplate,
-            CircuitBreakerRegistry circuitBreakerRegistry) {
+            ReactiveRedisTemplate<String, Object> redisTemplate) {
         log.info("Creating ReactiveCacheService");
         return new ReactiveCacheService(
                 redisTemplate, 
-                circuitBreakerRegistry, 
                 properties.getCacheTtl() != null ? properties.getCacheTtl() : Duration.ofMinutes(30));
     }
 }

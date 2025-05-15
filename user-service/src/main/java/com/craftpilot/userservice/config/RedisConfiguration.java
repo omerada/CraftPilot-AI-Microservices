@@ -12,9 +12,19 @@ import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisPassword;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.boot.actuate.health.Health;
+import org.springframework.boot.actuate.health.ReactiveHealthIndicator;
+import io.lettuce.core.ClientOptions;
+import io.lettuce.core.SocketOptions;
+import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 
@@ -65,5 +75,45 @@ public class RedisConfiguration {
         return RedisClientProperties.builder()
                 // Properties will be loaded from application.yml
                 .build();
+    }
+    
+    /**
+     * ReactiveRedisTemplate beanini oluşturur
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
+            ReactiveRedisConnectionFactory connectionFactory) {
+        log.info("Creating ReactiveRedisTemplate for user-service");
+        
+        StringRedisSerializer keySerializer = new StringRedisSerializer();
+        GenericJackson2JsonRedisSerializer valueSerializer = new GenericJackson2JsonRedisSerializer();
+        
+        RedisSerializationContext.RedisSerializationContextBuilder<String, Object> builder =
+                RedisSerializationContext.newSerializationContext(keySerializer);
+        
+        RedisSerializationContext<String, Object> context = builder
+                .value(valueSerializer)
+                .hashKey(keySerializer)
+                .hashValue(valueSerializer)
+                .build();
+        
+        return new ReactiveRedisTemplate<>(connectionFactory, context);
+    }
+    
+    /**
+     * Redis sağlık kontrolü için health indicator
+     */
+    @Bean
+    public ReactiveHealthIndicator redisHealthIndicator(ReactiveRedisConnectionFactory connectionFactory) {
+        return () -> connectionFactory.getReactiveConnection().ping()
+                .map(ping -> Health.up()
+                        .withDetail("ping", ping)
+                        .withDetail("service", "user-service")
+                        .build())
+                .onErrorResume(e -> Mono.just(Health.down()
+                        .withException(e)
+                        .withDetail("service", "user-service")
+                        .build()));
     }
 }

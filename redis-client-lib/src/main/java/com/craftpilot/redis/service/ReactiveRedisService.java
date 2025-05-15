@@ -58,9 +58,27 @@ public class ReactiveRedisService {
      * @return Result of operation
      */
     public Mono<Boolean> set(String key, Object value, Duration timeout) {
-        return redisTemplate.opsForValue().set(key, value, timeout)
+        // Timeout süresi için geçerlilik kontrolü
+        if (timeout == null || timeout.isNegative() || timeout.isZero()) {
+            return Mono.error(new IllegalArgumentException("Timeout must be a positive duration"));
+        }
+        
+        return redisTemplate.opsForValue()
+                .set(key, value, timeout)
                 .doOnSubscribe(s -> log.debug("Setting value for key: {} with timeout: {}", key, timeout))
                 .doOnNext(result -> log.debug("Set value for key {} with timeout {}: {}", key, timeout, result));
+    }
+
+    /**
+     * Conditionally set a key with timeout
+     */
+    public <T> Mono<Boolean> setIfNotExists(String key, T value, Duration timeout) {
+        // Convert Duration to seconds for comparison
+        if (timeout == null || timeout.isNegative() || timeout.isZero()) {
+            return redisTemplate.opsForValue().setIfAbsent(key, value);
+        }
+        
+        return redisTemplate.opsForValue().setIfAbsent(key, value, timeout);
     }
 
     /**
@@ -92,9 +110,14 @@ public class ReactiveRedisService {
      * @return Result of operation
      */
     public Mono<Boolean> expire(String key, Duration timeout) {
+        // Timeout süresi için geçerlilik kontrolü
+        if (timeout == null || timeout.isNegative() || timeout.isZero()) {
+            return Mono.error(new IllegalArgumentException("Timeout must be a positive duration"));
+        }
+        
         return redisTemplate.expire(key, timeout)
-                .doOnSubscribe(s -> log.debug("Setting expiration for key: {} to {}", key, timeout))
-                .doOnNext(result -> log.debug("Set expiration for key {} to {}: {}", key, timeout, result));
+                .doOnSubscribe(s -> log.debug("Setting expiration for key: {}, timeout: {}", key, timeout))
+                .doOnNext(result -> log.debug("Set expiration for key {}: {}", key, result));
     }
 
     /**
@@ -104,9 +127,12 @@ public class ReactiveRedisService {
      */
     public Mono<Duration> getExpire(String key) {
         return redisTemplate.getExpire(key)
-                .map(Duration::ofSeconds)
-                .doOnSubscribe(s -> log.debug("Getting expiration for key: {}", key))
-                .doOnNext(expire -> log.debug("Got expiration for key {}: {}", key, expire));
+            .map(seconds -> {
+                if (seconds == null || seconds <= 0L) return Duration.ZERO;
+                return Duration.ofSeconds(seconds);
+            })
+            .doOnSubscribe(s -> log.debug("Getting expiration for key: {}", key))
+            .doOnNext(expire -> log.debug("Got expiration for key {}: {}", key, expire));
     }
 
     /**
@@ -195,20 +221,6 @@ public class ReactiveRedisService {
     }
 
     /**
-     * Redis server sağlık durumunu kontrol eder
-     * @return Redis server sağlıklı ise true, değilse false
-     */
-    public boolean isRedisHealthy() {
-        try {
-            return redisTemplate.getConnectionFactory() != null &&
-                   redisTemplate.getConnectionFactory().getReactiveConnection() != null;
-        } catch (Exception e) {
-            log.error("Redis sağlık kontrolü başarısız: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    /**
      * Redis sunucusuna ping gönderir
      * @return Ping başarılı ise true, değilse false
      */
@@ -221,5 +233,19 @@ public class ReactiveRedisService {
                 .doOnNext(result -> log.debug("Redis ping sonucu: {}", result))
                 .doOnError(e -> log.error("Redis ping hatası: {}", e.getMessage()))
                 .onErrorReturn(false);
+    }
+
+    /**
+     * Redis server sağlık durumunu kontrol eder
+     * @return Redis server sağlıklı ise true, değilse false
+     */
+    public boolean isRedisHealthy() {
+        try {
+            return redisTemplate.getConnectionFactory() != null &&
+                   redisTemplate.getConnectionFactory().getReactiveConnection() != null;
+        } catch (Exception e) {
+            log.error("Redis sağlık kontrolü başarısız: {}", e.getMessage());
+            return false;
+        }
     }
 }

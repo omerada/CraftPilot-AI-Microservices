@@ -1,19 +1,14 @@
 package com.craftpilot.redis.connection;
 
 import com.craftpilot.redis.config.RedisClientProperties;
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryConfig;
-import io.lettuce.core.ClientOptions;
-import io.lettuce.core.ReadFrom;
-import io.lettuce.core.SocketOptions;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.connection.ReactiveSubscription;
-import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.function.Function;
 
@@ -21,24 +16,12 @@ import java.util.function.Function;
 public class ReactiveRedisConnectionProvider {
     private final ReactiveRedisConnectionFactory connectionFactory;
     private final RedisClientProperties properties;
-    private final Retry connectionRetry;
 
     public ReactiveRedisConnectionProvider(
             ReactiveRedisConnectionFactory connectionFactory,
             RedisClientProperties properties) {
         this.connectionFactory = connectionFactory;
         this.properties = properties;
-        
-        // Create retry configuration if enabled
-        if (properties.getRetry().isEnabled()) {
-            RetryConfig retryConfig = RetryConfig.custom()
-                    .maxAttempts(properties.getRetry().getMaxAttempts())
-                    .waitDuration(properties.getRetry().getBackoff())
-                    .build();
-            this.connectionRetry = Retry.of("redis-connection", retryConfig);
-        } else {
-            this.connectionRetry = null;
-        }
     }
 
     /**
@@ -54,19 +37,14 @@ public class ReactiveRedisConnectionProvider {
     }
 
     /**
-     * Executes a Redis operation with retry logic if enabled
+     * Executes a Redis operation
      * @param operation Redis operation function to execute
      * @param <T> Return type
      * @return Result of the operation
      */
-    public <T> Mono<T> executeWithRetry(Function<ReactiveRedisConnectionFactory, Mono<T>> operation) {
-        Mono<T> operationMono = operation.apply(connectionFactory);
-        
-        if (connectionRetry != null) {
-            return Retry.decoratePublisher(operationMono, connectionRetry);
-        }
-        
-        return operationMono;
+    public <T> Mono<T> execute(Function<ReactiveRedisConnectionFactory, Mono<T>> operation) {
+        return operation.apply(connectionFactory)
+                .doOnError(e -> log.error("Redis operation error: {}", e.getMessage()));
     }
 
     /**
@@ -75,8 +53,43 @@ public class ReactiveRedisConnectionProvider {
      * @return Flux of messages
      */
     public Flux<ReactiveSubscription.Message<String, String>> subscribeToChannel(String channel) {
+        ByteBuffer channelBuffer = ByteBuffer.wrap(channel.getBytes(StandardCharsets.UTF_8));
+
         return connectionFactory.getReactiveConnection()
                 .pubSubCommands()
-                .subscribe(channel);
+                .subscribe(channelBuffer)
+                .flatMapMany(subscription -> Flux.<ReactiveSubscription.Message<String, String>>create(sink -> {
+                    // This is a placeholder implementation - actual implementation would depend on 
+                    // how ReactiveRedisConnectionFactory handles subscriptions
+                    log.debug("Subscribed to channel: {}", channel);
+                    // Actual subscription handling would happen here
+                }));
+    }
+
+    /**
+     * Subscribes to Redis channel using PubSub
+     * @param channel Channel name
+     * @return Flux of messages
+     */
+    public Flux<ReactiveSubscription.Message<String, String>> subscribeToChannelPubSub(String channel) {
+        log.info("Subscribing to channel: {}", channel);
+        return Flux.<ReactiveSubscription.Message<String, String>>create(sink -> {
+            try {
+                ByteBuffer channelBuffer = ByteBuffer.wrap(channel.getBytes(StandardCharsets.UTF_8));
+                connectionFactory.getReactiveConnection()
+                        .pubSubCommands()
+                        .subscribe(channelBuffer)
+                        .subscribe(
+                            subscription -> log.info("Successfully subscribed to channel: {}", channel),
+                            error -> {
+                                log.error("Error in subscription: {}", error.getMessage(), error);
+                                sink.error(error);
+                            }
+                        );
+            } catch (Exception ex) {
+                log.error("Error setting up subscription: {}", ex.getMessage(), ex);
+                sink.error(ex);
+            }
+        });
     }
 }

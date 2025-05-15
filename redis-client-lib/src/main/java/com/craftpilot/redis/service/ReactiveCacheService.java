@@ -1,9 +1,6 @@
 package com.craftpilot.redis.service;
 
 import com.craftpilot.redis.exception.RedisOperationException;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import reactor.core.publisher.Mono;
@@ -19,15 +16,25 @@ import java.util.function.Supplier;
 public class ReactiveCacheService {
 
     private final ReactiveRedisTemplate<String, Object> redisTemplate;
-    private final CircuitBreaker circuitBreaker;
     private final Duration defaultTtl;
+
+    public ReactiveCacheService(ReactiveRedisTemplate<String, Object> redisTemplate) {
+        this(redisTemplate, Duration.ofMinutes(30));
+    }
 
     public ReactiveCacheService(
             ReactiveRedisTemplate<String, Object> redisTemplate,
-            CircuitBreakerRegistry circuitBreakerRegistry,
             Duration defaultTtl) {
         this.redisTemplate = redisTemplate;
-        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("redisCache");
+        this.defaultTtl = defaultTtl;
+    }
+
+    // Üçüncü bir constructor CircuitBreaker için
+    public ReactiveCacheService(
+            ReactiveRedisTemplate<String, Object> redisTemplate,
+            Object circuitBreakerRegistry,
+            Duration defaultTtl) {
+        this.redisTemplate = redisTemplate;
         this.defaultTtl = defaultTtl;
     }
 
@@ -40,7 +47,6 @@ public class ReactiveCacheService {
     public <T> Mono<T> get(String key, Class<T> clazz) {
         return redisTemplate.opsForValue().get(key)
                 .cast(clazz)
-                .transform(CircuitBreakerOperator.of(circuitBreaker))
                 .doOnSubscribe(s -> log.debug("Getting value from cache: key={}, type={}", key, clazz.getSimpleName()))
                 .doOnSuccess(value -> {
                     if (value != null) {
@@ -62,7 +68,6 @@ public class ReactiveCacheService {
      */
     public <T> Mono<Boolean> put(String key, T value, Duration ttl) {
         return redisTemplate.opsForValue().set(key, value, ttl)
-                .transform(CircuitBreakerOperator.of(circuitBreaker))
                 .doOnSubscribe(s -> log.debug("Cache'e değer kaydediliyor: key={}, ttl={}", key, ttl))
                 .doOnSuccess(result -> log.debug("Cache'e değer kaydedildi: key={}, success={}", key, result))
                 .doOnError(e -> log.error("Cache'e değer kaydedilirken hata: key={}, error={}", key, e.getMessage()))
@@ -77,7 +82,6 @@ public class ReactiveCacheService {
     public Mono<Boolean> invalidate(String key) {
         return redisTemplate.delete(key)
                 .map(count -> count > 0)
-                .transform(CircuitBreakerOperator.of(circuitBreaker))
                 .doOnSubscribe(s -> log.debug("Cache değeri siliniyor: key={}", key))
                 .doOnSuccess(result -> log.debug("Cache değeri silindi: key={}, success={}", key, result))
                 .doOnError(e -> log.error("Cache değeri silinirken hata: key={}, error={}", key, e.getMessage()))
@@ -91,6 +95,7 @@ public class ReactiveCacheService {
      * @param ttl Cache timeout
      * @return Cache değeri veya hesaplanan değer
      */
+    @SuppressWarnings("unchecked")
     public <T> Mono<T> getOrCompute(String key, Supplier<Mono<T>> supplier, Duration ttl) {
         return get(key, (Class<T>) Object.class)
                 .switchIfEmpty(Mono.defer(() -> {
@@ -109,5 +114,34 @@ public class ReactiveCacheService {
      */
     public <T> Mono<T> getOrCompute(String key, Supplier<Mono<T>> supplier) {
         return getOrCompute(key, supplier, defaultTtl);
+    }
+
+    /**
+     * Cache'te değer varsa alır, yoksa hesaplar ve cache'e kaydeder
+     * @param key Cache key
+     * @param clazz Value class type
+     * @param supplier Değer sağlayıcı fonksiyon
+     * @param ttl Cache timeout
+     * @return Cache değeri veya hesaplanan değer
+     */
+    public <T> Mono<T> getOrCompute(String key, Class<T> clazz, Supplier<Mono<T>> supplier, Duration ttl) {
+        return get(key, clazz)
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.debug("Cache'te değer bulunamadı, hesaplanıyor: key={}", key);
+                    return supplier.get()
+                            .flatMap(value -> put(key, value, ttl).thenReturn(value))
+                            .doOnSuccess(value -> log.debug("Değer hesaplandı ve cache'e kaydedildi: key={}", key));
+                }));
+    }
+
+    /**
+     * Cache'te değer varsa alır, yoksa hesaplar ve varsayılan TTL ile cache'e kaydeder
+     * @param key Cache key
+     * @param clazz Value class type
+     * @param supplier Değer sağlayıcı fonksiyon 
+     * @return Cache değeri veya hesaplanan değer
+     */
+    public <T> Mono<T> getOrCompute(String key, Class<T> clazz, Supplier<Mono<T>> supplier) {
+        return getOrCompute(key, clazz, supplier, defaultTtl);
     }
 }

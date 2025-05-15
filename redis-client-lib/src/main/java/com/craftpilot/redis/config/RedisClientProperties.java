@@ -41,10 +41,104 @@ public class RedisClientProperties {
     /**
      * Redis bağlantı timeout
      */
-    private Duration connectTimeout;
+    @Builder.Default
+    private Duration connectTimeout = Duration.ofSeconds(3);
     
     /**
      * Redis komut timeout
      */
-    private Duration commandTimeout;
+    @Builder.Default
+    private Duration commandTimeout = Duration.ofSeconds(5);
+    
+    /**
+     * Redis host
+     */
+    @Builder.Default
+    private String host = "localhost";
+    
+    /**
+     * Redis port
+     */
+    @Builder.Default
+    private int port = 6379;
+    
+    /**
+     * Redis database index
+     */
+    @Builder.Default
+    private int database = 0;
+    
+    /**
+     * Redis username
+     */
+    private String username;
+    
+    /**
+     * Redis password
+     */
+    private String password;
+    
+    /**
+     * Havuz yapılandırması
+     */
+    @Builder.Default
+    private Pool pool = new Pool();
+    
+    /**
+     * Retry yapılandırması
+     */
+    @Builder.Default
+    private Retry retry = new Retry();
+    
+    /**
+     * Redis bağlantı havuzu yapılandırması
+     */
+    @Data
+    public static class Pool {
+        /**
+         * Havuz kullanımını etkinleştir
+         */
+        private boolean enabled = true;
+        
+        /**
+         * Maksimum aktif bağlantı sayısı
+         */
+        private int maxActive = 8;
+        
+        /**
+         * Maksimum boşta bekleyen bağlantı sayısı
+         */
+        private int maxIdle = 8;
+        
+        /**
+         * Minimum boşta bekleyen bağlantı sayısı
+         */
+        private int minIdle = 0;
+        
+        /**
+         * Bağlantı havuzu tükendiğinde maksimum bekleme süresi
+         */
+        private Duration maxWait = Duration.ofMillis(1000);
+    }
+    
+    /**
+     * Retry yapılandırması
+     */
+    @Data
+    public static class Retry {
+        /**
+         * Retry mekanizmasını etkinleştir
+         */
+        private boolean enabled = true;
+        
+        /**
+         * Maksimum deneme sayısı
+         */
+        private int maxAttempts = 3;
+        
+        /**
+         * Denemeler arası bekleme süresi
+         */
+        private Duration backoff = Duration.ofMillis(1000);
+    }
 }

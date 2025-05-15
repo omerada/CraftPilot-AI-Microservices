@@ -2,19 +2,54 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/base.xml"/>
     
-    <appender name="Console" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-    </appender>
-
-    <!-- Redis-specific logging -->
-    <logger name="org.springframework.data.redis" level="DEBUG"/>
-    <logger name="io.lettuce.core" level="DEBUG"/>
-    <logger name="com.craftpilot.redis" level="DEBUG"/>
-    <logger name="com.craftpilot.userservice.config.RedisConfiguration" level="DEBUG"/>
+    <!-- Define common pattern for all appenders -->
+    <property name="CONSOLE_LOG_PATTERN" value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n%wEx"/>
     
-    <root level="INFO">
-        <appender-ref ref="Console"/>
-    </root>
+    <!-- Configure JSON format for production environments -->
+    <springProfile name="prod">
+        <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <includeMdc>true</includeMdc>
+                <includeLevelValue>true</includeLevelValue>
+                <timeZone>UTC</timeZone>
+                <includeCaller>true</includeCaller>
+                <includeContext>true</includeContext>
+                <customFields>{"app":"user-service"}</customFields>
+            </encoder>
+        </appender>
+        
+        <root level="INFO">
+            <appender-ref ref="JSON_CONSOLE" />
+        </root>
+    </springProfile>
+    
+    <!-- Configure standard pattern for dev environments -->
+    <springProfile name="dev,default">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+                <charset>utf8</charset>
+            </encoder>
+        </appender>
+        
+        <root level="INFO">
+            <appender-ref ref="CONSOLE" />
+        </root>
+    </springProfile>
+    
+    <!-- Configuring log levels for specific packages -->
+    <logger name="com.craftpilot" level="INFO" />
+    <logger name="org.springframework" level="INFO" />
+    <logger name="org.springframework.data.mongodb" level="WARN" />
+    <logger name="org.springframework.data.redis" level="WARN" />
+    <logger name="org.springframework.kafka" level="WARN" />
+    <logger name="io.lettuce" level="WARN" />
+    <logger name="io.netty" level="WARN" />
+    <logger name="org.apache.kafka" level="WARN" />
+    <logger name="reactor.netty" level="WARN" />
+    
+    <!-- Enable debug logging for redis-client-lib during development -->
+    <springProfile name="dev">
+        <logger name="com.craftpilot.redis" level="DEBUG" />
+    </springProfile>
 </configuration>
