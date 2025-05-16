@@ -162,8 +162,7 @@ public class ModelDataLoader {
                                                     continue;
                                                 }
                                                 
-                                                AIModel model = AIModel.builder()
-                                                    .id(modelId)
+                                                AIModel model = AIModel.builder() 
                                                     .modelId(modelId)
                                                     .modelName(String.valueOf(modelMap.get("name")))
                                                     .provider(savedProvider.getName())

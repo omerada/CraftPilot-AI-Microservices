@@ -20,9 +20,5 @@ public class UserEntity {
     private UserRole role;
     private UserStatus status;
     private long createdAt;
-    private long updatedAt;
-    
-    // Lombok'un Data kullandığımızda otomatik oluşturduğu getter ve setterlar:
-    // getId(), getEmail(), getUsername(), getDisplayName(), getPhotoUrl(), getRole(), getStatus(), getCreatedAt(), getUpdatedAt(),
-    // setId(String), setEmail(String), setUsername(String), setDisplayName(String), setPhotoUrl(String), setRole(UserRole), setStatus(UserStatus), setCreatedAt(long), setUpdatedAt(long)
+    private long updatedAt; 
 }

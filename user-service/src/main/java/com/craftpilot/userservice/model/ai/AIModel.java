@@ -14,7 +14,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Document(collection = "ai_models")
 public class AIModel {
     @Id
-    private String modelId;  // Now using modelId as the primary key
+    private String modelId;  
     private String modelName;
     private String provider;
     private Integer maxInputTokens;

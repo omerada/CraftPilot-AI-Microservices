@@ -78,8 +78,7 @@ public class AIModelService {
         
         // Basit varsayılan modeller oluştur
         List<AIModel> defaultModels = new ArrayList<>();
-        defaultModels.add(AIModel.builder()
-            .id("google/gemini-2.0-flash-lite-001")
+        defaultModels.add(AIModel.builder() 
             .modelId("google/gemini-2.0-flash-lite-001")
             .modelName("Gemini Flash Lite")
             .provider("Google") 
@@ -131,7 +130,7 @@ public class AIModelService {
     }
     
     public Mono<AIModel> saveModel(AIModel model) {
-        log.info("AI Model kaydediliyor: modelId={}", model.getModelId() != null ? model.getModelId() : model.getId());
+        log.info("AI Model kaydediliyor: modelId={}", model.getModelId());
         return modelRepository.save(model);
     }
 
@@ -152,6 +151,6 @@ public class AIModelService {
         if ("STANDARD".equals(creditType1) && "ADVANCED".equals(creditType2)) return -1;
         if ("ADVANCED".equals(creditType1) && "STANDARD".equals(creditType2)) return 1;
         
-        return 0;  // Aynı kredi tipi
+        return 0;   
     }
 }
