@@ -18,7 +18,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 public class RedisConfig {
 
         @Bean
-        @Primary // Bu bean'i varsayılan olarak işaretleyelim
+        @Primary // Primary annotation'ı koruyalım
         public ReactiveRedisTemplate<String, Object> userServiceRedisTemplate(
                         @Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory connectionFactory) {
 

@@ -89,6 +89,7 @@ public class RedisConfig {
 
     @Bean(name = "craftPilotReactiveRedisConnectionFactory") 
     @ConditionalOnMissingBean(name = "craftPilotReactiveRedisConnectionFactory")
+    @Primary 
     public ReactiveRedisConnectionFactory craftPilotReactiveRedisConnectionFactory() {
         // Aynı yapılandırma ile Reactive bağlantı fabrikası oluştur
         log.info("Configuring primary ReactiveRedisConnectionFactory with host: {}, port: {}", properties.getHost(), properties.getPort());
