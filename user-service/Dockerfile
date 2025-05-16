@@ -66,5 +66,5 @@ RUN mkdir -p /app/config
 # Expose port
 EXPOSE 8080
 
-# Basitleştirilmiş entrypoint - Firebase kaldırıldığından entrypoint.sh yerine doğrudan JAR'ı çalıştırıyoruz
+# Basitleştirilmiş entrypoint  
 CMD ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar"]
