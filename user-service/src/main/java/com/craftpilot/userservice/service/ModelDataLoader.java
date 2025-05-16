@@ -9,12 +9,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -29,10 +31,10 @@ public class ModelDataLoader {
     private final AIModelRepository modelRepository;
     private final ObjectMapper objectMapper;
 
-    @Value("${app.models.file:newmodels.json}")
+    @Value("${spring.models.file:newmodels.json}")
     private String modelsFile;
     
-    @Value("${app.load-models:false}")
+    @Value("${spring.load-models:false}")
     private boolean loadModelsEnabled;
 
     /**
@@ -42,7 +44,7 @@ public class ModelDataLoader {
     @PostConstruct
     public void loadModelsOnStartup() {
         if (!loadModelsEnabled) {
-            log.info("Otomatik model yükleme devre dışı bırakılmış (app.load-models=false)");
+            log.info("Otomatik model yükleme devre dışı bırakılmış (spring.load-models=false)");
             return;
         }
         
@@ -59,16 +61,44 @@ public class ModelDataLoader {
         log.info("Modeller {} yolundan yükleniyor", path);
 
         try {
-            Path filePath = Paths.get(path.replace("classpath:", ""));
-            
-            // Dosyanın varlığını kontrol et
-            if (!Files.exists(filePath)) {
-                log.error("Model yükleme başarısız: Dosya bulunamadı: {}", filePath.toAbsolutePath());
-                return Mono.error(new IOException("Model dosyası bulunamadı: " + filePath.toAbsolutePath()));
+            // Önce classpath'ten yüklemeyi dene
+            String resourcePath = path;
+            if (!path.startsWith("classpath:")) {
+                resourcePath = "classpath:" + path;
             }
             
-            String jsonContent = Files.readString(filePath);
-
+            org.springframework.core.io.Resource resource = 
+                new org.springframework.core.io.ClassPathResource(path.replace("classpath:", ""));
+            
+            if (!resource.exists()) {
+                // Eğer classpath'te yoksa, dosya sisteminden yüklemeyi dene
+                Path filePath = Paths.get(path.replace("classpath:", ""));
+                
+                // Dosyanın varlığını kontrol et
+                if (!Files.exists(filePath)) {
+                    log.error("Model yükleme başarısız: Dosya bulunamadı: {}", filePath.toAbsolutePath());
+                    return Mono.error(new IOException("Model dosyası bulunamadı: " + filePath.toAbsolutePath()));
+                }
+                
+                log.info("Models loading from file system: {}", filePath.toAbsolutePath());
+                String jsonContent = Files.readString(filePath);
+                return processJsonContent(jsonContent);
+            } else {
+                // Classpath'ten yükle
+                log.info("Models loading from classpath resource: {}", resource.getURL());
+                try (InputStream is = resource.getInputStream()) {
+                    String jsonContent = new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                    return processJsonContent(jsonContent);
+                }
+            }
+        } catch (IOException e) {
+            log.error("JSON model verisi yüklenirken hata: {}", e.getMessage());
+            return Mono.error(e);
+        }
+    }
+    
+    private Mono<Integer> processJsonContent(String jsonContent) {
+        try {
             List<Provider> providers = objectMapper.readValue(
                     jsonContent,
                     new TypeReference<List<Provider>>() {
@@ -95,9 +125,8 @@ public class ModelDataLoader {
                     })
                     .count()
                     .map(Long::intValue);
-
-        } catch (IOException e) {
-            log.error("JSON model verisi yüklenirken hata: {}", e.getMessage());
+        } catch (Exception e) {
+            log.error("JSON model verisi işlenirken hata: {}", e.getMessage());
             return Mono.error(e);
         }
     }

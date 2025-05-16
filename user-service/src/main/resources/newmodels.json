@@ -478,5 +478,23 @@
     "creditType": "ADVANCED",
     "category": "ENTERPRISE",
     "contextLength": 200000
+  },
+  {
+    "provider": "Meta",
+    "contextLength": 131072,
+    "models": [
+      {
+        "name": "Meta Llama 3 70B",
+        "modelId": "meta/llama3-70b-instruct",
+        "maxTokens": 8192,
+        "defaultTemperature": 0.7
+      },
+      {
+        "name": "Meta Llama 3 8B",
+        "modelId": "meta/llama3-8b-instruct",
+        "maxTokens": 8192,
+        "defaultTemperature": 0.7
+      }
+    ]
   }
 ]
