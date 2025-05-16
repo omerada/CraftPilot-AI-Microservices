@@ -31,46 +31,47 @@ import java.time.Duration;
 @Slf4j
 public class RedisConfiguration {
 
-    /**
-     * Redis Cache Manager yapılandırması
-     * User service için özelleştirilmiş cache yapılandırması sağlar
-     */
-    @Bean
-    public RedisCacheManager redisCacheManager(@Qualifier("craftPilotRedisConnectionFactory") RedisConnectionFactory connectionFactory) {
-        log.info("Configuring Redis Cache Manager for user-service");
-        
-        // User service için özel cache yapılandırması
-        RedisCacheConfiguration cacheConfig = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(30))
-                .disableCachingNullValues()
-                .serializeKeysWith(
-                        RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer())
-                )
-                .serializeValuesWith(
-                        RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer())
-                )
-                .prefixCacheNameWith("user-service:");
-        
-        return RedisCacheManager.builder(connectionFactory)
-                .cacheDefaults(cacheConfig)
-                .build();
-    }
-    
-    /**
-     * Redis Health Indicator
-     * User service için özel health indicator yapılandırması
-     */
-    @Bean
-    public ReactiveHealthIndicator redisHealthIndicator(
-            @Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory connectionFactory) {
-        return () -> connectionFactory.getReactiveConnection().ping()
-                .map(ping -> Health.up()
-                        .withDetail("ping", ping)
-                        .withDetail("service", "user-service")
-                        .build())
-                .onErrorResume(e -> Mono.just(Health.down()
-                        .withException(e)
-                        .withDetail("service", "user-service")
-                        .build()));
-    }
+        /**
+         * Redis Cache Manager yapılandırması
+         * User service için özelleştirilmiş cache yapılandırması sağlar
+         */
+        @Bean
+        public RedisCacheManager redisCacheManager(
+                        @Qualifier("craftPilotRedisConnectionFactory") RedisConnectionFactory connectionFactory) {
+                log.info("Configuring Redis Cache Manager for user-service");
+
+                // User service için özel cache yapılandırması
+                RedisCacheConfiguration cacheConfig = RedisCacheConfiguration.defaultCacheConfig()
+                                .entryTtl(Duration.ofMinutes(30))
+                                .disableCachingNullValues()
+                                .serializeKeysWith(
+                                                RedisSerializationContext.SerializationPair
+                                                                .fromSerializer(new StringRedisSerializer()))
+                                .serializeValuesWith(
+                                                RedisSerializationContext.SerializationPair.fromSerializer(
+                                                                new GenericJackson2JsonRedisSerializer()))
+                                .prefixCacheNameWith("user-service:");
+
+                return RedisCacheManager.builder(connectionFactory)
+                                .cacheDefaults(cacheConfig)
+                                .build();
+        }
+
+        /**
+         * Redis Health Indicator
+         * User service için özel health indicator yapılandırması
+         */
+        @Bean("userServiceRedisHealthIndicator")
+        public ReactiveHealthIndicator userServiceRedisHealthIndicator(
+                        @Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory connectionFactory) {
+                return () -> connectionFactory.getReactiveConnection().ping()
+                                .map(ping -> Health.up()
+                                                .withDetail("ping", ping)
+                                                .withDetail("service", "user-service")
+                                                .build())
+                                .onErrorResume(e -> Mono.just(Health.down()
+                                                .withException(e)
+                                                .withDetail("service", "user-service")
+                                                .build()));
+        }
 }
