@@ -35,7 +35,7 @@ COPY user-service/ /build/user-service/
 
 # Build user-service
 WORKDIR /build/user-service
-RUN mvn clean package -DskipTests -B -ntp
+RUN rm -rf target && mvn clean package -DskipTests -B -ntp
 
 # Run stage
 FROM eclipse-temurin:21-jre-alpine
