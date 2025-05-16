@@ -273,6 +273,7 @@
 					<showWarnings>true</showWarnings>
 					<forceJavacCompilerUse>true</forceJavacCompilerUse>
 					<optimize>true</optimize>
+					<compilerVersion>${java.version}</compilerVersion>
 				</configuration>
 			</plugin>
 		</plugins>
