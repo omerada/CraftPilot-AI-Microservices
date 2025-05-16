@@ -32,34 +32,47 @@ public class DatabaseInitializer {
 
         @Value("${spring.data.mongodb.auto-index-creation:false}")
         private boolean autoIndexCreation;
+        
+        @Value("${app.mongodb.create-indexes:false}")
+        private boolean createIndexes;
 
         @PostConstruct
         public void initIndexes() {
-                log.info("MongoDB indekslerini oluşturma işlemi başlıyor...");
+                if (log.isDebugEnabled()) {
+                    log.debug("Checking MongoDB index configuration");
+                }
 
-                // İndeksleme kontrolü
-                if (!autoIndexCreation) {
+                // Index creation is now controlled by both Spring's auto-index-creation 
+                // and our custom property - disable by default
+                if (createIndexes && !autoIndexCreation) {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Creating MongoDB indexes manually");
+                    }
+                    
                     createUserIndexes()
                             .then(createUserPreferenceIndexes())
                             .then(createProviderIndexes())
                             .then(createAIModelIndexes())
-                            .doOnSuccess(v -> log.info("Tüm indeksler başarıyla oluşturuldu"))
-                            .doOnError(e -> log.error("İndeks oluşturma hatası: {}", e.getMessage()))
+                            .doOnSuccess(v -> log.debug("All indexes created successfully"))
+                            .doOnError(e -> log.error("Error creating indexes: {}", e.getMessage()))
                             .subscribe();
-                } else {
-                    log.info("spring.data.mongodb.auto-index-creation etkin. İndeksler otomatik oluşturulacak.");
+                } else if (log.isDebugEnabled()) {
+                    log.debug("Index creation skipped: createIndexes={}, autoIndexCreation={}", 
+                             createIndexes, autoIndexCreation);
                 }
-                
-                log.info("MongoDB indeksleri oluşturuldu");
         }
 
         @EventListener(ContextRefreshedEvent.class)
         public void initializeDatabase() {
-                log.info("Veritabanı indeksleri ve koleksiyonlar kontrol ediliyor");
+                if (log.isDebugEnabled()) {
+                    log.debug("Database initialization complete");
+                }
         }
 
         private Mono<Void> createUserIndexes() {
-                log.info("User indeksleri oluşturuluyor");
+                if (log.isDebugEnabled()) {
+                    log.debug("Creating User indexes");
+                }
                 ReactiveIndexOperations indexOps = mongoTemplate.indexOps(User.class);
 
                 return Mono.when(
@@ -69,7 +82,9 @@ public class DatabaseInitializer {
         }
 
         private Mono<Void> createUserPreferenceIndexes() {
-                log.info("UserPreference indeksleri oluşturuluyor");
+                if (log.isDebugEnabled()) {
+                    log.debug("Creating UserPreference indexes");
+                }
                 ReactiveIndexOperations indexOps = mongoTemplate.indexOps(UserPreference.class);
 
                 return Mono.when(
@@ -78,7 +93,9 @@ public class DatabaseInitializer {
         }
 
         private Mono<Void> createAIModelIndexes() {
-                log.info("AIModel indeksleri oluşturuluyor");
+                if (log.isDebugEnabled()) {
+                    log.debug("Creating AIModel indexes");
+                }
                 ReactiveIndexOperations indexOps = mongoTemplate.indexOps(AIModel.class);
 
                 return Mono.when(
@@ -88,7 +105,9 @@ public class DatabaseInitializer {
         }
 
         private Mono<Void> createProviderIndexes() {
-                log.info("Provider indeksleri oluşturuluyor");
+                if (log.isDebugEnabled()) {
+                    log.debug("Creating Provider indexes");
+                }
                 ReactiveIndexOperations indexOps = mongoTemplate.indexOps(Provider.class);
 
                 return Mono.when(
