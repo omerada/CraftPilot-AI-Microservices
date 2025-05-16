@@ -1,5 +1,6 @@
 package com.craftpilot.userservice.config;
 
+import com.craftpilot.userservice.event.UserPreferenceEvent;
 import com.craftpilot.userservice.model.user.event.UserEvent;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -18,7 +19,6 @@ import org.springframework.util.backoff.ExponentialBackOff;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.kafka.KafkaException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -29,7 +29,7 @@ public class KafkaConfig {
 
     @Value("${spring.kafka.bootstrap-servers:kafka:9092}")
     private String bootstrapServers;
-    
+
     @Value("${spring.kafka.enabled:true}")
     private boolean kafkaEnabled;
 
@@ -55,7 +55,8 @@ public class KafkaConfig {
         try {
             return new KafkaTemplate<>(producerFactory());
         } catch (Exception e) {
-            log.error("Kafka yapılandırması oluşturulamadı. Kafka bağlantısına erişilemiyor olabilir: {}", e.getMessage());
+            log.error("Kafka yapılandırması oluşturulamadı. Kafka bağlantısına erişilemiyor olabilir: {}",
+                    e.getMessage());
             return null;
         }
     }
@@ -98,7 +99,7 @@ public class KafkaConfig {
     public KafkaTemplate<String, String> stringKafkaTemplate() {
         return new KafkaTemplate<>(stringProducerFactory());
     }
-    
+
     // UserEvent değerleri için ProducerFactory
     @Bean
     public ProducerFactory<String, UserEvent> userEventProducerFactory() {
@@ -107,13 +108,13 @@ public class KafkaConfig {
         configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
         return new DefaultKafkaProducerFactory<>(configProps);
     }
-    
+
     // UserEvent değerleri için KafkaTemplate
     @Bean
     public KafkaTemplate<String, UserEvent> userEventKafkaTemplate() {
         return new KafkaTemplate<>(userEventProducerFactory());
     }
-    
+
     // Generic Object değerleri için ProducerFactory
     @Bean
     public ProducerFactory<String, Object> objectProducerFactory() {
@@ -122,11 +123,26 @@ public class KafkaConfig {
         configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
         return new DefaultKafkaProducerFactory<>(configProps);
     }
-    
+
     // Object değerleri için KafkaTemplate
     @Bean
     public KafkaTemplate<String, Object> kafkaTemplateObject() {
         return new KafkaTemplate<>(objectProducerFactory());
+    }
+
+    // UserPreferenceEvent için ProducerFactory
+    @Bean
+    public ProducerFactory<String, UserPreferenceEvent> userPreferenceEventProducerFactory() {
+        Map<String, Object> configProps = getBaseProducerConfigs();
+        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+        return new DefaultKafkaProducerFactory<>(configProps);
+    }
+
+    // UserPreferenceEvent için KafkaTemplate
+    @Bean
+    public KafkaTemplate<String, UserPreferenceEvent> userPreferenceEventKafkaTemplate() {
+        return new KafkaTemplate<>(userPreferenceEventProducerFactory());
     }
 
     @Bean
@@ -134,11 +150,11 @@ public class KafkaConfig {
         ExponentialBackOff backOff = new ExponentialBackOff(1000L, 2.0);
         backOff.setMaxInterval(10000L); // 10 saniye
         backOff.setMaxElapsedTime(60000L); // 1 dakika
-        
+
         DefaultErrorHandler errorHandler = new DefaultErrorHandler((consumerRecord, e) -> {
             // Burada özel hata işleme ve loglama yapılabilir
         }, backOff);
-        
+
         // Belirli hatalar için yeniden deneme yapma
         errorHandler.addNotRetryableExceptions(IllegalArgumentException.class);
         return errorHandler;
