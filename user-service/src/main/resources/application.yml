@@ -40,8 +40,23 @@ spring:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     topic:
       user-preferences: ${KAFKA_TOPIC_USER_PREFERENCES:user-preferences}
-      user-events: user-events
-      activity-events: activity-events
+      user-events: ${KAFKA_TOPIC_USER_EVENTS:user-events}
+      activity-events: ${KAFKA_TOPIC_ACTIVITY_EVENTS:activity-events}
+
+kafka:
+  topics:
+    user-events: ${KAFKA_TOPIC_USER_EVENTS:user-events}
+    user-preferences: ${KAFKA_TOPIC_USER_PREFERENCES:user-preferences}
+    activity-events: ${KAFKA_TOPIC_ACTIVITY_EVENTS:activity-events}
+  producer:
+    timeout: 5
+    enabled: true
+  retry:
+    backoff:
+      initial-interval: 1000
+      max-interval: 10000
+      multiplier: 2.0
+    max-attempts: 3
 
 eureka:
   instance:
@@ -162,17 +177,6 @@ resilience4j:
       userPreferences:
         timeoutDuration: 3s
         cancelRunningFuture: true
-
-kafka:
-  producer:
-    timeout: 5
-    enabled: true
-  retry:
-    backoff:
-      initial-interval: 1000
-      max-interval: 10000
-      multiplier: 2.0
-    max-attempts: 3
 
 logging:
   level:

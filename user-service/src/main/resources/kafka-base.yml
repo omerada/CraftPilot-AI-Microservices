@@ -34,3 +34,14 @@ kafka:
   topic:
     partitions: 3
     replicas: 1
+  topics:
+    user-events: user-events
+    user-preferences: user-preferences
+    activity-events: activity-events
+    payment-events: payment-events
+    subscription-events: subscription-events
+    notification-events: notification-events
+    credit-events: credit-events
+    ai-events: ai-events
+    image-events: image-events
+    analytics-events: analytics-events
