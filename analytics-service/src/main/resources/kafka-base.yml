@@ -27,7 +27,7 @@ spring:
       fail-fast: false
 
 kafka:
-  enabled: ${KAFKA_ENABLED:false}
+  enabled: ${KAFKA_ENABLED:true}
   topic:
     partitions: 3
     replicas: 1

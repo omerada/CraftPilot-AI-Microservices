@@ -29,8 +29,8 @@ spring:
     name: llm-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:prod}
-    # Kafka profilini isteğe bağlı hale getir
-    include: ${KAFKA_ENABLED:false} ? kafka-base
+    # Kafka profilini varsayılan olarak aktif et
+    include: kafka-base
   main:
     web-application-type: reactive
     allow-bean-definition-overriding: true

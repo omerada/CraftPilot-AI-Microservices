@@ -43,7 +43,7 @@ kafka:
     analytics-events: analytics-events
     metrics-events: metrics-events
   bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
-  enabled: ${KAFKA_ENABLED:false}
+  enabled: ${KAFKA_ENABLED:true}
   admin:
     fail-fast: false
     auto-create: true
