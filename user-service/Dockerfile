@@ -39,7 +39,7 @@ RUN rm -rf target && \
     rm -rf /root/.m2/repository/com/craftpilot/userservice/ && \
     find . -name "*.class" -delete && \
     find . -name "MapperImpl.java" -delete && \
-    find . -name "*Mapper*.java" -not -name "UserMapper.java" -delete && \
+    find . -name "*Mapper*.java" -not -name "UserMapper.java" -not -name "UserPreferenceMapper.java" -delete && \
     mvn clean package -Dmaven.compiler.forceJavacCompilerUse=true -Dmapstruct.defaultComponentModel=spring -Dmapstruct.verbose=true -DskipTests -B -ntp
 
 # Run stage
