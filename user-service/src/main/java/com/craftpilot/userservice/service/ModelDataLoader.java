@@ -195,7 +195,7 @@ public class ModelDataLoader {
                             processTasks.add(providerTask);
                         } 
                         // Normal model objeleri için
-                        else if (itemMap.containsKey("id") && itemMap.containsKey("modelId")) {
+                        else if (itemMap.containsKey("modelId")) {
                             AIModel model = objectMapper.convertValue(obj, AIModel.class);
                             
                             // Provider adı kontrolü
