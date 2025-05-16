@@ -27,7 +27,7 @@ public class UserPreferenceService {
     private final EventService eventService;
     private final KafkaTemplate<String, UserPreferenceEvent> kafkaTemplate;
 
-    @Value("${spring.kafka.enabled:true}")
+    @Value("${kafka.enabled:true}")
     private boolean kafkaEnabled;
 
     @Value("${spring.kafka.topic.user-preferences:user-preferences}")

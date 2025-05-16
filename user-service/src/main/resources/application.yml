@@ -38,16 +38,13 @@ spring:
     commons:
       logging:
         level: WARN
-  # Kafka konfigürasyonu (kafka-base.yml'de temel ayarlar tanımlanmış)
+  # Kafka konfigürasyonu - kafka-base.yml'den import ediliyor
   kafka:
-    enabled: ${KAFKA_ENABLED:true}
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    topic:
-      user-preferences: ${KAFKA_TOPIC_USER_PREFERENCES:user-preferences}
-      user-events: ${KAFKA_TOPIC_USER_EVENTS:user-events}
-      activity-events: ${KAFKA_TOPIC_ACTIVITY_EVENTS:activity-events}
 
+# Kafka spesifik ayarları ayrı bir namespace'te tanımla
 kafka:
+  enabled: ${KAFKA_ENABLED:true}
   topics:
     user-events: ${KAFKA_TOPIC_USER_EVENTS:user-events}
     user-preferences: ${KAFKA_TOPIC_USER_PREFERENCES:user-preferences}

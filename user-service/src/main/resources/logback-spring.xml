@@ -54,7 +54,10 @@
     <!-- Diğer paket düzeyinde loglar -->
     <logger name="org.springframework.data.mongodb" level="WARN" />
     <logger name="org.springframework.data.redis" level="WARN" />
-    <logger name="org.springframework.kafka" level="WARN" />
+    <logger name="org.springframework.kafka" level="INFO" />
+    <logger name="org.springframework.kafka.config" level="DEBUG" />
+    <logger name="org.springframework.kafka.core" level="DEBUG" />
+    <logger name="com.craftpilot.userservice.config" level="DEBUG" />
     <logger name="io.lettuce" level="WARN" />
     <logger name="io.netty" level="WARN" />
     <logger name="org.apache.kafka" level="WARN" />

@@ -25,6 +25,7 @@ import java.util.Map;
 
 @Configuration
 @Slf4j
+@ConditionalOnProperty(name = "kafka.enabled", havingValue = "true", matchIfMissing = true)
 public class KafkaConfig {
 
     @Value("${spring.kafka.bootstrap-servers:kafka:9092}")
@@ -34,7 +35,7 @@ public class KafkaConfig {
     private boolean kafkaEnabled;
 
     @Bean
-    @ConditionalOnProperty(name = "spring.kafka.enabled", havingValue = "true", matchIfMissing = true)
+    @ConditionalOnProperty(name = "kafka.enabled", havingValue = "true", matchIfMissing = true)
     public ProducerFactory<String, Object> producerFactory() {
         Map<String, Object> configProps = new HashMap<>();
         configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
@@ -50,7 +51,7 @@ public class KafkaConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(name = "spring.kafka.enabled", havingValue = "true", matchIfMissing = true)
+    @ConditionalOnProperty(name = "kafka.enabled", havingValue = "true", matchIfMissing = true)
     public KafkaTemplate<String, Object> kafkaTemplate() {
         try {
             return new KafkaTemplate<>(producerFactory());
@@ -62,7 +63,7 @@ public class KafkaConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(name = "spring.kafka.enabled", havingValue = "true", matchIfMissing = true)
+    @ConditionalOnProperty(name = "kafka.enabled", havingValue = "true", matchIfMissing = true)
     public KafkaAdmin kafkaAdmin() {
         Map<String, Object> configs = new HashMap<>();
         configs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
