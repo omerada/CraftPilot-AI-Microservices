@@ -1,11 +1,10 @@
 package com.craftpilot.userservice.config;
 
-import com.craftpilot.userservice.model.UserPreference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
@@ -18,22 +17,23 @@ import org.springframework.beans.factory.annotation.Qualifier;
 @RequiredArgsConstructor
 public class RedisConfig {
 
-    private final ObjectMapper objectMapper;
+        @Bean
+        @Primary // Bu bean'i varsayılan olarak işaretleyelim
+        public ReactiveRedisTemplate<String, Object> userServiceRedisTemplate(
+                        @Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory connectionFactory) {
 
-    @Bean
-    public ReactiveRedisTemplate<String, Object> userServiceRedisTemplate(
-            @Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory factory) {
-        
-        Jackson2JsonRedisSerializer<Object> serializer = new Jackson2JsonRedisSerializer<>(Object.class);
-        serializer.setObjectMapper(objectMapper);
-        
-        RedisSerializationContext.RedisSerializationContextBuilder<String, Object> builder =
-                RedisSerializationContext.newSerializationContext(new StringRedisSerializer());
-        
-        RedisSerializationContext<String, Object> context = builder
-                .value(serializer)
-                .build();
-        
-        return new ReactiveRedisTemplate<>(factory, context);
-    }
+                StringRedisSerializer keySerializer = new StringRedisSerializer();
+                Jackson2JsonRedisSerializer<Object> valueSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
+
+                RedisSerializationContext.RedisSerializationContextBuilder<String, Object> builder = RedisSerializationContext
+                                .newSerializationContext(keySerializer);
+
+                RedisSerializationContext<String, Object> context = builder
+                                .value(valueSerializer)
+                                .hashKey(keySerializer)
+                                .hashValue(valueSerializer)
+                                .build();
+
+                return new ReactiveRedisTemplate<>(connectionFactory, context);
+        }
 }

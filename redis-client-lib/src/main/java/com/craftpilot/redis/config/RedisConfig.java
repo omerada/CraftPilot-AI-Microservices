@@ -95,26 +95,26 @@ public class RedisConfig {
         return (ReactiveRedisConnectionFactory) craftPilotRedisConnectionFactory();
     }
 
-    @Bean
-    @ConditionalOnMissingBean(name = "reactiveRedisTemplate")
+    @Bean(name = "redisClientReactiveRedisTemplate") // Bean adını daha belirleyici yapıyoruz
+    @ConditionalOnMissingBean(name = "redisClientReactiveRedisTemplate")
     public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
-            @Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory connectionFactory) {
+        @Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory connectionFactory) {
         
         StringRedisSerializer keySerializer = new StringRedisSerializer();
         GenericJackson2JsonRedisSerializer valueSerializer = new GenericJackson2JsonRedisSerializer();
         
-        RedisSerializationContext.RedisSerializationContextBuilder<String, Object> builder =
-                RedisSerializationContext.newSerializationContext(keySerializer);
-        
+        RedisSerializationContext.RedisSerializationContextBuilder<String, Object> builder = 
+            RedisSerializationContext.newSerializationContext(keySerializer);
+            
         RedisSerializationContext<String, Object> context = builder
-                .value(valueSerializer)
-                .hashKey(keySerializer)
-                .hashValue(valueSerializer)
-                .build();
-        
+            .value(valueSerializer)
+            .hashKey(keySerializer)
+            .hashValue(valueSerializer)
+            .build();
+            
         return new ReactiveRedisTemplate<>(connectionFactory, context);
     }
-
+    
     @Bean
     @ConditionalOnMissingBean(name = "reactiveRedisService") 
     public ReactiveRedisService reactiveRedisService(ReactiveRedisTemplate<String, Object> redisTemplate) {
