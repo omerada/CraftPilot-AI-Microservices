@@ -34,6 +34,10 @@ spring:
         enabled: false
       core:
         enabled: false
+    # Spring Cloud genel loglama seviyesini ayarla
+    commons:
+      logging:
+        level: WARN
   # Kafka konfigürasyonu (kafka-base.yml'de temel ayarlar tanımlanmış)
   kafka:
     enabled: ${KAFKA_ENABLED:true}
@@ -184,6 +188,11 @@ logging:
     com.craftpilot: INFO
     org.springframework.data.redis: WARN
     org.springframework.data.mongodb: WARN
+    org.springframework.data.repository.config: WARN
+    org.springframework.context.support: ERROR
+    org.springframework.cloud: WARN
+    com.netflix: WARN
+    org.mongodb.driver: WARN
     com.craftpilot.redis: INFO
 
 # Kullanıcı tercihleri operasyon timeout değeri

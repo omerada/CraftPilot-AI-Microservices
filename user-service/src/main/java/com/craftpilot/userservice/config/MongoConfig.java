@@ -48,10 +48,11 @@ public class MongoConfig extends AbstractReactiveMongoConfiguration {
                     .applyToServerSettings(builder -> builder.heartbeatFrequency(10000, TimeUnit.MILLISECONDS))
                     .build();
 
-            log.info("Attempting to connect to MongoDB at: {}", maskConnectionString(mongoUri));
+            // Daha kısa, özlü log mesajı
+            log.info("MongoDB bağlantısı başlatılıyor: {}", maskConnectionString(mongoUri));
             return MongoClients.create(settings);
         } catch (Exception e) {
-            log.error("Failed to create MongoDB client: {}", e.getMessage(), e);
+            log.error("MongoDB istemcisi oluşturulamadı: {}", e.getMessage(), e);
             throw new RuntimeException("Could not create MongoDB client", e);
         }
     }

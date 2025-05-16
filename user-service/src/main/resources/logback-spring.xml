@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+    <!-- Spring Boot base şablonunu içe aktar, ancak appender'ları almadan -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
     
     <!-- Define common pattern for all appenders -->
     <property name="CONSOLE_LOG_PATTERN" value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n%wEx"/>
@@ -40,6 +41,17 @@
     <!-- Configuring log levels for specific packages -->
     <logger name="com.craftpilot" level="INFO" />
     <logger name="org.springframework" level="INFO" />
+    
+    <!-- Spring Cloud loglarını azalt -->
+    <logger name="org.springframework.cloud" level="WARN" />
+    <logger name="org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker" level="ERROR" />
+    <logger name="com.netflix" level="WARN" />
+    
+    <!-- Repository ayarlarıyla ilgili loglama bilgilerini azalt -->
+    <logger name="org.springframework.data.repository.config" level="WARN" />
+    <logger name="org.springframework.data.repository.config.RepositoryConfigurationExtensionSupport" level="ERROR" />
+    
+    <!-- Diğer paket düzeyinde loglar -->
     <logger name="org.springframework.data.mongodb" level="WARN" />
     <logger name="org.springframework.data.redis" level="WARN" />
     <logger name="org.springframework.kafka" level="WARN" />
@@ -47,8 +59,13 @@
     <logger name="io.netty" level="WARN" />
     <logger name="org.apache.kafka" level="WARN" />
     <logger name="reactor.netty" level="WARN" />
+    <logger name="org.mongodb.driver" level="WARN" />
     
-    <!-- Enable debug logging for redis-client-lib during development -->
+    <!-- MongoDB sürücüsü için client detaylarını sınırla -->
+    <logger name="org.mongodb.driver.client" level="WARN" />
+    <logger name="org.mongodb.driver.cluster" level="INFO" />
+    
+    <!-- Develop ortamında redis-client-lib için debug logları etkinleştir -->
     <springProfile name="dev">
         <logger name="com.craftpilot.redis" level="DEBUG" />
     </springProfile>
