@@ -22,6 +22,11 @@ on:
         options:
           - prod
           - debug
+      clean_cache:
+        description: "Clean all caches before deployment"
+        required: false
+        default: true
+        type: boolean
 
 jobs:
   build-and-deploy:
@@ -49,6 +54,19 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           logout: true
 
+      - name: Clean local Docker cache
+        run: |
+          echo "Cleaning local Docker cache for user-service and redis-client-lib"
+          docker system prune -af --filter "label=com.docker.compose.project=user-service" || true
+          docker images "${{ secrets.DOCKERHUB_USERNAME }}/user-service" --format "{{.ID}}" | xargs -r docker rmi -f || true
+          docker builder prune -af || true
+
+      - name: Clean local Maven cache
+        run: |
+          echo "Cleaning local Maven cache for user-service and redis-client-lib"
+          rm -rf ~/.m2/repository/com/craftpilot/user-service || true
+          rm -rf ~/.m2/repository/com/craftpilot/redis-client-lib || true
+
       - name: Copy user-service files for context
         run: |
           mkdir -p /tmp/build-context
@@ -68,6 +86,8 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/user-service:${{ github.sha }}-arm64
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64,mode=max
+          no-cache: ${{ github.event.inputs.clean_cache == 'true' }}
+          pull: true
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
@@ -86,6 +106,18 @@ jobs:
 
             echo "=== System Architecture ==="
             uname -m
+
+            echo "=== Cleaning Remote Caches ==="
+            echo "Cleaning Docker cache..."
+            docker system prune -af --filter "until=24h" --filter "label!=persistence=keep" || true
+            docker images "${{ secrets.DOCKERHUB_USERNAME }}/user-service" --format "{{.ID}}" | xargs -r docker rmi -f || true
+
+            echo "Cleaning Maven cache..."
+            rm -rf ~/.m2/repository/com/craftpilot/user-service || true
+            rm -rf ~/.m2/repository/com/craftpilot/redis-client-lib || true
+
+            echo "Cleaning Redis cache related to user-service..."
+            docker exec -i redis redis-cli -a 13579ada KEYS "user:preferences:*" | xargs -r docker exec -i redis redis-cli -a 13579ada DEL || true
 
             echo "=== Testing Directory Access ==="
             mkdir -p /opt/craftpilot
@@ -134,6 +166,9 @@ jobs:
 
             echo "=== Stopping Old Container ==="
             docker rm -f user-service || true
+
+            echo "=== Pulling Latest Image ==="
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest-arm64
 
             echo "=== Deploying User Service ==="
             if [[ "${{ github.event.inputs.environment }}" == "debug" ]]; then
