@@ -265,7 +265,6 @@
 						</path>
 					</annotationProcessorPaths>
 					<compilerArgs>
-						<arg>-Amapstruct.defaultComponentModel=spring</arg>
 						<arg>-Amapstruct.suppressGeneratorTimestamp=true</arg>
 						<arg>-Amapstruct.suppressGeneratorVersionInfoComment=true</arg>
 						<arg>-Amapstruct.verbose=false</arg>
