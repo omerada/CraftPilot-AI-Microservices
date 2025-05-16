@@ -200,6 +200,8 @@ user-preference:
 # AI Model yapılandırmaları
 app:
   load-models: ${LOAD_MODELS:true}
+  mongodb:
+    create-indexes: ${MONGODB_CREATE_INDEXES:false}
   models:
     file: ${MODELS_FILE:newmodels.json}
     version: ${MODELS_VERSION:1}

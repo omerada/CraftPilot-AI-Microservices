@@ -20,7 +20,9 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @Slf4j
@@ -31,10 +33,10 @@ public class ModelDataLoader {
     private final AIModelRepository modelRepository;
     private final ObjectMapper objectMapper;
 
-    @Value("${spring.models.file:newmodels.json}")
+    @Value("${app.models.file:newmodels.json}")
     private String modelsFile;
     
-    @Value("${spring.load-models:false}")
+    @Value("${app.load-models:false}")
     private boolean loadModelsEnabled;
 
     /**
@@ -44,7 +46,7 @@ public class ModelDataLoader {
     @PostConstruct
     public void loadModelsOnStartup() {
         if (!loadModelsEnabled) {
-            log.info("Otomatik model yükleme devre dışı bırakılmış (spring.load-models=false)");
+            log.info("Otomatik model yükleme devre dışı bırakılmış (app.load-models=false)");
             return;
         }
         
@@ -53,7 +55,7 @@ public class ModelDataLoader {
         loadModels(modelsFile)
                 .subscribe(
                         count -> log.info("{} adet model başarıyla yüklendi", count),
-                        error -> log.error("Model yükleme sırasında hata oluştu: {}", error.getMessage()));
+                        error -> log.error("Model yükleme sırasında hata oluştu: {}", error.getMessage(), error));
     }
 
     public Mono<Integer> loadModels(String configuredPath) {
@@ -80,53 +82,123 @@ public class ModelDataLoader {
                     return Mono.error(new IOException("Model dosyası bulunamadı: " + filePath.toAbsolutePath()));
                 }
                 
-                log.info("Models loading from file system: {}", filePath.toAbsolutePath());
+                log.info("Modeller dosya sisteminden yükleniyor: {}", filePath.toAbsolutePath());
                 String jsonContent = Files.readString(filePath);
                 return processJsonContent(jsonContent);
             } else {
                 // Classpath'ten yükle
-                log.info("Models loading from classpath resource: {}", resource.getURL());
+                log.info("Modeller classpath kaynağından yükleniyor: {}", resource.getURL());
                 try (InputStream is = resource.getInputStream()) {
                     String jsonContent = new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
                     return processJsonContent(jsonContent);
                 }
             }
         } catch (IOException e) {
-            log.error("JSON model verisi yüklenirken hata: {}", e.getMessage());
+            log.error("JSON model verisi yüklenirken hata: {}", e.getMessage(), e);
             return Mono.error(e);
         }
     }
     
     private Mono<Integer> processJsonContent(String jsonContent) {
         try {
-            List<Provider> providers = objectMapper.readValue(
+            log.debug("JSON içeriği işleniyor");
+            List<Object> jsonObjects = objectMapper.readValue(
                     jsonContent,
-                    new TypeReference<List<Provider>>() {
-                    });
-
-            return Flux.fromIterable(providers)
-                    .flatMap(provider -> {
-                        List<AIModel> models = provider.getModels();
-                        provider.setModels(null);
-
-                        return providerRepository.save(provider)
-                                .flatMapMany(savedProvider -> {
-                                    if (models != null) {
-                                        return Flux.fromIterable(models)
-                                                .map(model -> {
-                                                    // AIModel.provider alanını kullanarak providerId'yi tanımlama
-                                                    model.setProvider(savedProvider.getName());
-                                                    return model;
-                                                })
-                                                .flatMap(modelRepository::save);
-                                    }
-                                    return Flux.empty();
-                                });
-                    })
-                    .count()
-                    .map(Long::intValue);
+                    new TypeReference<List<Object>>() {});
+            
+            AtomicInteger modelCount = new AtomicInteger(0);
+            List<Mono<Void>> processTasks = new ArrayList<>();
+            
+            for (Object obj : jsonObjects) {
+                try {
+                    // Her bir JSON objesini ayrı ayrı değerlendir
+                    if (obj instanceof java.util.Map) {
+                        java.util.Map<String, Object> itemMap = (java.util.Map<String, Object>) obj;
+                        
+                        // Meta provider gibi özel formatlar için
+                        if (itemMap.containsKey("provider") && itemMap.containsKey("models") && itemMap.get("models") instanceof List) {
+                            String providerName = (String) itemMap.get("provider");
+                            Integer contextLength = itemMap.containsKey("contextLength") ? 
+                                                    ((Number)itemMap.get("contextLength")).intValue() : null;
+                            
+                            Provider provider = Provider.builder()
+                                    .name(providerName)
+                                    .build();
+                            
+                            // Provider kaydetme
+                            Mono<Void> providerTask = providerRepository.save(provider)
+                                    .flatMap(savedProvider -> {
+                                        List<Object> modelsList = (List<Object>) itemMap.get("models");
+                                        List<Mono<AIModel>> modelSaveOps = new ArrayList<>();
+                                        
+                                        for (Object modelObj : modelsList) {
+                                            if (modelObj instanceof java.util.Map) {
+                                                java.util.Map<String, Object> modelMap = (java.util.Map<String, Object>) modelObj;
+                                                
+                                                AIModel model = AIModel.builder()
+                                                    .id(String.valueOf(modelMap.get("modelId")))
+                                                    .modelId(String.valueOf(modelMap.get("modelId")))
+                                                    .modelName(String.valueOf(modelMap.get("name")))
+                                                    .provider(savedProvider.getName())
+                                                    .maxInputTokens(modelMap.containsKey("maxTokens") ? 
+                                                                   ((Number)modelMap.get("maxTokens")).intValue() : 8000)
+                                                    .contextLength(contextLength != null ? contextLength : 131072)
+                                                    .build();
+                                                
+                                                modelSaveOps.add(modelRepository.save(model)
+                                                    .doOnSuccess(m -> modelCount.incrementAndGet()));
+                                            }
+                                        }
+                                        
+                                        return Flux.concat(modelSaveOps).then();
+                                    })
+                                    .then();
+                            
+                            processTasks.add(providerTask);
+                        } 
+                        // Normal model objeleri için
+                        else if (itemMap.containsKey("id") && itemMap.containsKey("modelId")) {
+                            AIModel model = objectMapper.convertValue(obj, AIModel.class);
+                            
+                            // Eğer provider yoksa varsayılan bir değer belirle
+                            if (model.getProvider() == null && itemMap.containsKey("provider")) {
+                                model.setProvider((String) itemMap.get("provider"));
+                            }
+                            
+                            // Provider'ı kaydet
+                            Provider provider = Provider.builder()
+                                .name(model.getProvider())
+                                .build();
+                            
+                            Mono<Void> modelTask = providerRepository.save(provider)
+                                .then(modelRepository.save(model))
+                                .doOnSuccess(savedModel -> {
+                                    modelCount.incrementAndGet();
+                                    log.debug("Model kaydedildi: {}", savedModel.getModelId());
+                                })
+                                .then();
+                            
+                            processTasks.add(modelTask);
+                        } else {
+                            log.warn("Desteklenmeyen model format, atlanıyor: {}", itemMap);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("Tek bir model işlenirken hata: {}", e.getMessage(), e);
+                    // Hatayı yut ve diğer modelleri işlemeye devam et
+                }
+            }
+            
+            if (processTasks.isEmpty()) {
+                log.warn("İşlenecek model bulunamadı");
+                return Mono.just(0);
+            }
+            
+            return Flux.concat(processTasks)
+                .then(Mono.just(modelCount.get()));
+                
         } catch (Exception e) {
-            log.error("JSON model verisi işlenirken hata: {}", e.getMessage());
+            log.error("JSON model verisi işlenirken hata: {}", e.getMessage(), e);
             return Mono.error(e);
         }
     }
