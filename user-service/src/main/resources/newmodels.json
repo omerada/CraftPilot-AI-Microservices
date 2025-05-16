@@ -1,6 +1,5 @@
 [
   {
-    "id": "meta-llama/llama-3.2-1b-instruct",
     "modelId": "meta-llama/llama-3.2-1b-instruct",
     "modelName": "Meta: Llama 3.2 1B Instruct",
     "provider": "Meta",
@@ -12,7 +11,6 @@
     "contextLength": 131072
   },
   {
-    "id": "deepseek/deepseek-r1-distill-qwen-1.5b",
     "modelId": "deepseek/deepseek-r1-distill-qwen-1.5b",
     "modelName": "DeepSeek: R1 Distill Qwen 1.5B",
     "provider": "DeepSeek",
@@ -24,7 +22,6 @@
     "contextLength": 131072
   },
   {
-    "id": "liquid/lfm-3b",
     "modelId": "liquid/lfm-3b",
     "modelName": "Liquid: LFM 3B",
     "provider": "Liquid",
@@ -36,7 +33,6 @@
     "contextLength": 32768
   },
   {
-    "id": "mistral/ministral-3b",
     "modelId": "mistralai/ministral-3b",
     "modelName": "Mistral: Ministral 3B",
     "provider": "Mistral",
@@ -48,7 +44,6 @@
     "contextLength": 131072
   },
   {
-    "id": "nvidia/llama-3.1-nemotron-nano-8b-v1",
     "modelId": "nvidia/llama-3.1-nemotron-nano-8b-v1:free",
     "modelName": "NVIDIA: Llama 3.1 Nemotron Nano 8B v1 (free)",
     "provider": "NVIDIA",
@@ -60,7 +55,6 @@
     "contextLength": 131072
   },
   {
-    "id": "cohere/command-r7b-12-2024",
     "modelId": "cohere/command-r7b-12-2024",
     "modelName": "Cohere: Command R7B (12-2024)",
     "provider": "Cohere",
@@ -72,7 +66,6 @@
     "contextLength": 128000
   },
   {
-    "id": "microsoft/phi-4",
     "modelId": "microsoft/phi-4",
     "modelName": "Microsoft: Phi 4",
     "provider": "Microsoft",
@@ -84,7 +77,6 @@
     "contextLength": 16384
   },
   {
-    "id": "perplexity/sonar",
     "modelId": "perplexity/sonar",
     "modelName": "Perplexity: Sonar",
     "provider": "Perplexity",
@@ -96,7 +88,6 @@
     "contextLength": 127072
   },
   {
-    "id": "qwen/qwen-turbo",
     "modelId": "qwen/qwen-turbo",
     "modelName": "Qwen: Qwen-Turbo",
     "provider": "Qwen",
@@ -108,7 +99,6 @@
     "contextLength": 1000000
   },
   {
-    "id": "anthropic/claude-3-haiku",
     "modelId": "anthropic/claude-3-haiku",
     "modelName": "Anthropic: Claude 3 Haiku",
     "provider": "Anthropic",
@@ -120,7 +110,6 @@
     "contextLength": 200000
   },
   {
-    "id": "anthropic/claude-3.5-haiku",
     "modelId": "anthropic/claude-3.5-haiku",
     "modelName": "Anthropic: Claude 3.5 Haiku",
     "provider": "Anthropic",
@@ -132,7 +121,6 @@
     "contextLength": 200000
   },
   {
-    "id": "openai/gpt-4.1-nano",
     "modelId": "openai/gpt-4.1-nano",
     "modelName": "OpenAI: GPT-4.1 Nano",
     "provider": "OpenAI",
@@ -144,7 +132,6 @@
     "contextLength": 1047576
   },
   {
-    "id": "google/gemini-2.0-flash-001",
     "modelId": "google/gemini-2.0-flash-001",
     "modelName": "Google: Gemini 2.0 Flash",
     "provider": "Google",
@@ -156,8 +143,7 @@
     "contextLength": 1000000
   },
   {
-    "id": "google/gemini-2.0-flash",
-    "modelId": "google/gemini-2.0-flash-001",
+    "modelId": "google/gemini-2.0-flash",
     "modelName": "Google: Gemini 2.0 Flash",
     "provider": "Google",
     "maxInputTokens": 25000,
@@ -168,7 +154,6 @@
     "contextLength": 1000000
   },
   {
-    "id": "qwen/qwen-plus",
     "modelId": "qwen/qwen-plus",
     "modelName": "Qwen: Qwen-Plus",
     "provider": "Qwen",
@@ -180,7 +165,6 @@
     "contextLength": 131072
   },
   {
-    "id": "openai/o1-mini",
     "modelId": "openai/o1-mini",
     "modelName": "OpenAI: o1-mini",
     "provider": "OpenAI",
@@ -192,7 +176,6 @@
     "contextLength": 128000
   },
   {
-    "id": "openai/gpt-4o-mini",
     "modelId": "openai/gpt-4o-mini",
     "modelName": "OpenAI: GPT-4o Mini",
     "provider": "OpenAI",
@@ -204,7 +187,6 @@
     "contextLength": 128000
   },
   {
-    "id": "openai/o3-mini",
     "modelId": "openai/o3-mini",
     "modelName": "OpenAI: o3-mini",
     "provider": "OpenAI",
@@ -216,7 +198,6 @@
     "contextLength": 200000
   },
   {
-    "id": "mistralai/codestral-2501",
     "modelId": "mistralai/codestral-2501",
     "modelName": "Mistral: Codestral 2501",
     "provider": "Mistral",
@@ -228,7 +209,6 @@
     "contextLength": 262144
   },
   {
-    "id": "qwen/qwen-2.5-coder-32b-instruct",
     "modelId": "qwen/qwen-2.5-coder-32b-instruct",
     "modelName": "Qwen2.5 Coder 32B Instruct",
     "provider": "Qwen",
@@ -240,7 +220,6 @@
     "contextLength": 32768
   },
   {
-    "id": "qwen/qwen-2.5-vl-72b-instruct",
     "modelId": "qwen/qwen-2.5-vl-72b-instruct",
     "modelName": "Qwen: Qwen2.5 VL 72B Instruct",
     "provider": "Qwen",
@@ -252,7 +231,6 @@
     "contextLength": 128000
   },
   {
-    "id": "openai/gpt-4o-2024-11-20",
     "modelId": "openai/gpt-4o-2024-11-20",
     "modelName": "OpenAI: GPT-4o (2024-11-20)",
     "provider": "OpenAI",
@@ -264,7 +242,6 @@
     "contextLength": 128000
   },
   {
-    "id": "anthropic/claude-3.5-sonnet",
     "modelId": "anthropic/claude-3.5-sonnet",
     "modelName": "Anthropic: Claude 3.5 Sonnet",
     "provider": "Anthropic",
@@ -276,8 +253,7 @@
     "contextLength": 200000
   },
   {
-    "id": "google/gemini-2.5-pro-preview",
-    "modelId": "google/gemini-2.5-pro-preview-03-25",
+    "modelId": "google/gemini-2.5-pro-preview",
     "modelName": "Google: Gemini 2.5 Pro Preview",
     "provider": "Google",
     "maxInputTokens": 80000,
@@ -288,7 +264,6 @@
     "contextLength": 1048576
   },
   {
-    "id": "mistralai/mistral-large-2411",
     "modelId": "mistralai/mistral-large-2411",
     "modelName": "Mistral Large 2411",
     "provider": "Mistral",
@@ -300,7 +275,6 @@
     "contextLength": 131072
   },
   {
-    "id": "qwen/qwq-32b",
     "modelId": "qwen/qwq-32b",
     "modelName": "Qwen: QwQ 32B",
     "provider": "Qwen",
@@ -312,7 +286,6 @@
     "contextLength": 131072
   },
   {
-    "id": "ai21/jamba-1.6-large",
     "modelId": "ai21/jamba-1.6-large",
     "modelName": "AI21: Jamba 1.6 Large",
     "provider": "AI21",
@@ -324,8 +297,7 @@
     "contextLength": 256000
   },
   {
-    "id": "deepseek/deepseek-v3",
-    "modelId": "deepseek/deepseek-chat-v3",
+    "modelId": "deepseek/deepseek-v3",
     "modelName": "DeepSeek: DeepSeek V3",
     "provider": "DeepSeek",
     "maxInputTokens": 65000,
@@ -336,7 +308,6 @@
     "contextLength": 163840
   },
   {
-    "id": "deepseek/deepseek-r1",
     "modelId": "deepseek/deepseek-r1",
     "modelName": "DeepSeek: R1",
     "provider": "DeepSeek",
@@ -348,7 +319,6 @@
     "contextLength": 163840
   },
   {
-    "id": "x-ai/grok-beta",
     "modelId": "x-ai/grok-beta",
     "modelName": "xAI: Grok Beta",
     "provider": "xAI",
@@ -360,7 +330,6 @@
     "contextLength": 131072
   },
   {
-    "id": "meta-llama/llama-4-scout",
     "modelId": "meta-llama/llama-4-scout",
     "modelName": "Meta: Llama 4 Scout",
     "provider": "Meta",
@@ -372,7 +341,6 @@
     "contextLength": 1048576
   },
   {
-    "id": "meta-llama/llama-4-maverick",
     "modelId": "meta-llama/llama-4-maverick",
     "modelName": "Meta: Llama 4 Maverick",
     "provider": "Meta",
@@ -384,7 +352,6 @@
     "contextLength": 1048576
   },
   {
-    "id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
     "modelId": "nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
     "modelName": "NVIDIA: Llama 3.1 Nemotron Ultra 253B v1 (free)",
     "provider": "NVIDIA",
@@ -396,7 +363,6 @@
     "contextLength": 131072
   },
   {
-    "id": "openai/gpt-4.1",
     "modelId": "openai/gpt-4.1",
     "modelName": "OpenAI: GPT-4.1",
     "provider": "OpenAI",
@@ -408,7 +374,6 @@
     "contextLength": 1047576
   },
   {
-    "id": "openai/gpt-4.5-preview",
     "modelId": "openai/gpt-4.5-preview",
     "modelName": "OpenAI: GPT-4.5 (Preview)",
     "provider": "OpenAI",
@@ -420,7 +385,6 @@
     "contextLength": 128000
   },
   {
-    "id": "openai/o1",
     "modelId": "openai/o1",
     "modelName": "OpenAI: o1",
     "provider": "OpenAI",
@@ -432,7 +396,6 @@
     "contextLength": 200000
   },
   {
-    "id": "google/gemini-2.5-pro-exp-03-25",
     "modelId": "google/gemini-2.5-pro-exp-03-25:free",
     "modelName": "Google: Gemini 2.5 Pro Experimental (free)",
     "provider": "Google",
@@ -444,7 +407,6 @@
     "contextLength": 1000000
   },
   {
-    "id": "anthropic/claude-3.7-sonnet",
     "modelId": "anthropic/claude-3.7-sonnet",
     "modelName": "Anthropic: Claude 3.7 Sonnet",
     "provider": "Anthropic",
@@ -456,7 +418,6 @@
     "contextLength": 200000
   },
   {
-    "id": "openai/o1-pro",
     "modelId": "openai/o1-pro",
     "modelName": "OpenAI: o1-pro",
     "provider": "OpenAI",
@@ -468,8 +429,7 @@
     "contextLength": 200000
   },
   {
-    "id": "anthropic/claude-3.7-sonnet-thinking",
-    "modelId": "anthropic/claude-3.7-sonnet:thinking",
+    "modelId": "anthropic/claude-3.7-sonnet-thinking",
     "modelName": "Anthropic: Claude 3.7 Sonnet (thinking)",
     "provider": "Anthropic",
     "maxInputTokens": 80000,

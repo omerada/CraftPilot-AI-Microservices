@@ -21,7 +21,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
@@ -108,6 +110,9 @@ public class ModelDataLoader {
             
             AtomicInteger modelCount = new AtomicInteger(0);
             List<Mono<Void>> processTasks = new ArrayList<>();
+            
+            // Create a map to collect all providers from models
+            Map<String, Provider> providerMap = new HashMap<>();
             
             for (Object obj : jsonObjects) {
                 try {
@@ -246,6 +251,22 @@ public class ModelDataLoader {
                     log.error("Tek bir model işlenirken hata: {}", e.getMessage(), e);
                     // Hatayı yut ve diğer modelleri işlemeye devam et
                 }
+            }
+            
+            // Now save all collected providers
+            for (Provider provider : providerMap.values()) {
+                Mono<Void> providerTask = providerRepository.save(provider)
+                    .onErrorResume(e -> {
+                        if (e instanceof org.springframework.dao.DuplicateKeyException) {
+                            log.info("Provider '{}' zaten var, yeniden kullanılıyor", provider.getName());
+                            return Mono.empty();
+                        }
+                        log.error("Provider kaydedilirken hata: {}", e.getMessage());
+                        return Mono.error(e);
+                    })
+                    .then();
+                
+                processTasks.add(providerTask);
             }
             
             if (processTasks.isEmpty()) {
