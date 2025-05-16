@@ -54,7 +54,6 @@ public class RedisConfiguration {
         private long commandTimeout;
 
         @Bean(name = "craftPilotRedisConnectionFactory")
-        @Primary
         public RedisConnectionFactory craftPilotRedisConnectionFactory() {
                 log.info("Creating custom Redis connection factory for user-service with host: {}, port: {}", redisHost,
                                 redisPort);

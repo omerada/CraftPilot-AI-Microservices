@@ -53,7 +53,15 @@ public class RedisCacheService {
                         log.debug("Kullanıcı tercihleri önbellekte bulunamadı: userId={}", userId);
                     }
                 })
-                .doOnError(error -> log.error("Redis'ten kullanıcı tercihleri alınırken hata: {}", error.getMessage()));
+                .doOnError(error -> log.error("Redis'ten kullanıcı tercihleri alınırken hata: {}", error.getMessage()))
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.debug("Cache'de bulunamadı, veri kaynağından yükleniyor: userId={}", userId);
+                    return loader.get()
+                            .flatMap(preference -> {
+                                // Cache'e kaydet ve değeri döndür
+                                return cacheUserPreference(userId, preference, ttl);
+                            });
+                }));
     }
 
     /**

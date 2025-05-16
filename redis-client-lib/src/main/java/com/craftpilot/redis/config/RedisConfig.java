@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisPassword;
@@ -37,7 +36,7 @@ public class RedisConfig {
     @Bean(name = "craftPilotRedisConnectionFactory")
     @ConditionalOnMissingBean(name = "craftPilotRedisConnectionFactory")
     public RedisConnectionFactory craftPilotRedisConnectionFactory() {
-        log.info("Configuring primary RedisConnectionFactory with host: {}, port: {}", properties.getHost(), properties.getPort());
+        log.info("Configuring RedisConnectionFactory with host: {}, port: {}", properties.getHost(), properties.getPort());
         
         RedisStandaloneConfiguration redisConfig = new RedisStandaloneConfiguration();
         redisConfig.setHostName(properties.getHost());
@@ -89,10 +88,8 @@ public class RedisConfig {
 
     @Bean(name = "craftPilotReactiveRedisConnectionFactory") 
     @ConditionalOnMissingBean(name = "craftPilotReactiveRedisConnectionFactory")
-    @Primary 
     public ReactiveRedisConnectionFactory craftPilotReactiveRedisConnectionFactory() {
-        // Aynı yapılandırma ile Reactive bağlantı fabrikası oluştur
-        log.info("Configuring primary ReactiveRedisConnectionFactory with host: {}, port: {}", properties.getHost(), properties.getPort());
+        log.info("Configuring ReactiveRedisConnectionFactory with host: {}, port: {}", properties.getHost(), properties.getPort());
         return (ReactiveRedisConnectionFactory) craftPilotRedisConnectionFactory();
     }
 

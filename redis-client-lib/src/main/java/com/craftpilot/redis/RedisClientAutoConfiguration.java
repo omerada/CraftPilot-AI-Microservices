@@ -18,6 +18,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
@@ -48,7 +49,7 @@ public class RedisClientAutoConfiguration {
             @Qualifier("craftPilotReactiveRedisConnectionFactory") ReactiveRedisConnectionFactory connectionFactory,
             RedisClientProperties properties) {
         
-        log.info("Creating ReactiveRedisConnectionProvider bean");
+        log.debug("Creating ReactiveRedisConnectionProvider bean"); 
         return new ReactiveRedisConnectionProvider(connectionFactory, properties);
     }
 
@@ -59,10 +60,7 @@ public class RedisClientAutoConfiguration {
             MeterRegistry meterRegistry,
             ReactiveRedisService redisService) {
         
-        log.info("Creating RedisMetricsService bean with MeterRegistry");
+        log.debug("Creating RedisMetricsService bean with MeterRegistry");
         return new RedisMetricsService(meterRegistry, redisService);
     }
-
-    // Auto-config sınıfları çift tanımlama yapmaz, sadece ilgili beanler yoksa oluşturur
-    // Bu nedenle bu sınıftan gereksiz tanımlamaları kaldırıyoruz
 }
