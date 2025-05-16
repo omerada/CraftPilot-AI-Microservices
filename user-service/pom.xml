@@ -242,11 +242,12 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				 <version>3.11.0</version>
+				<version>3.11.0</version>
 				<configuration>
 					<source>${java.version}</source>
 					<target>${java.version}</target>
-					 <parameters>true</parameters>
+					<parameters>true</parameters>
+					<forceJavacCompilerUse>true</forceJavacCompilerUse>
 					<annotationProcessorPaths>
 						<path>
 							<groupId>org.projectlombok</groupId>
@@ -268,10 +269,10 @@
 						<arg>-Amapstruct.suppressGeneratorTimestamp=true</arg>
 						<arg>-Amapstruct.suppressGeneratorVersionInfoComment=true</arg>
 						<arg>-Amapstruct.verbose=false</arg>
+						<arg>-Amapstruct.defaultComponentModel=spring</arg>
 					</compilerArgs>
 					<showWarnings>true</showWarnings>
-					<forceJavacCompilerUse>true</forceJavacCompilerUse>
-					<optimize>true</optimize>
+					<optimize>false</optimize>
 					<compilerVersion>${java.version}</compilerVersion>
 				</configuration>
 			</plugin>

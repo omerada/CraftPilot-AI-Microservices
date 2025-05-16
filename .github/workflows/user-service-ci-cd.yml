@@ -66,13 +66,18 @@ jobs:
           echo "Cleaning local Maven cache for user-service and redis-client-lib"
           rm -rf ~/.m2/repository/com/craftpilot/user-service || true
           rm -rf ~/.m2/repository/com/craftpilot/redis-client-lib || true
+          rm -rf ~/.m2/repository/org/mapstruct || true
+          find . -name "*MapperImpl*.java" -delete || true
 
-      - name: Copy user-service files for context
+      - name: Prepare clean build context
         run: |
           mkdir -p /tmp/build-context
           cp -r ../redis-client-lib /tmp/build-context/
           cp -r . /tmp/build-context/user-service
-        working-directory: ./user-service
+          # Clean any generated files to prevent MapStruct issues
+          find /tmp/build-context -name "target" -type d -exec rm -rf {} + 2>/dev/null || true
+          find /tmp/build-context -name "*MapperImpl*.java" -delete || true
+          find /tmp/build-context -name "*.class" -delete || true
 
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
@@ -86,7 +91,7 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/user-service:${{ github.sha }}-arm64
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/user-service:buildcache-arm64,mode=max
-          no-cache: ${{ github.event.inputs.clean_cache == 'true' }}
+          no-cache: true
           pull: true
 
       - name: Deploy to VPS
