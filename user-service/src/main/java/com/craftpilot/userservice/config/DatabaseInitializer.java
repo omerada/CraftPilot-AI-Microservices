@@ -33,7 +33,7 @@ public class DatabaseInitializer {
         @Value("${spring.data.mongodb.auto-index-creation:false}")
         private boolean autoIndexCreation;
         
-        @Value("${app.mongodb.create-indexes:false}")
+        @Value("${app.mongodb.create-indexes:true}")
         private boolean createIndexes;
 
         @PostConstruct

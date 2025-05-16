@@ -27,4 +27,13 @@ public class Provider {
     public String getId() {
         return this.name;
     }
+    
+    /**
+     * Name alanı atanırken null değeri kontrolü yapar.
+     * @param name atanacak name değeri
+     */
+    public void setName(String name) {
+        // Null değerleri için varsayılan değer kullan
+        this.name = (name != null && !name.trim().isEmpty()) ? name : "Bilinmeyen";
+    }
 }

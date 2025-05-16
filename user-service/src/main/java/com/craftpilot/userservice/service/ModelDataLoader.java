@@ -118,6 +118,12 @@ public class ModelDataLoader {
                         // Meta provider gibi özel formatlar için
                         if (itemMap.containsKey("provider") && itemMap.containsKey("models") && itemMap.get("models") instanceof List) {
                             String providerName = (String) itemMap.get("provider");
+                            // Provider adı null kontrolü - null ise bu provider'ı atla
+                            if (providerName == null || providerName.trim().isEmpty()) {
+                                log.warn("Provider ismi boş veya null olan bir provider bulundu. Bu provider atlanıyor.");
+                                continue;
+                            }
+                            
                             Integer contextLength = itemMap.containsKey("contextLength") ? 
                                                     ((Number)itemMap.get("contextLength")).intValue() : null;
                             
@@ -127,6 +133,15 @@ public class ModelDataLoader {
                             
                             // Provider kaydetme
                             Mono<Void> providerTask = providerRepository.save(provider)
+                                    .onErrorResume(e -> {
+                                        // Bu provider zaten varsa hatayı yut ve provider'ı getir
+                                        if (e instanceof org.springframework.dao.DuplicateKeyException) {
+                                            log.info("Provider '{}' zaten var, yeniden kullanılıyor", providerName);
+                                            return providerRepository.findById(providerName);
+                                        }
+                                        log.error("Provider kaydedilirken hata: {}", e.getMessage());
+                                        return Mono.error(e);
+                                    })
                                     .flatMap(savedProvider -> {
                                         List<Object> modelsList = (List<Object>) itemMap.get("models");
                                         List<Mono<AIModel>> modelSaveOps = new ArrayList<>();
@@ -135,9 +150,16 @@ public class ModelDataLoader {
                                             if (modelObj instanceof java.util.Map) {
                                                 java.util.Map<String, Object> modelMap = (java.util.Map<String, Object>) modelObj;
                                                 
+                                                // Model ID kontrolü
+                                                String modelId = String.valueOf(modelMap.get("modelId"));
+                                                if (modelId == null || "null".equals(modelId)) {
+                                                    log.warn("Geçersiz modelId bulundu, model atlanıyor");
+                                                    continue;
+                                                }
+                                                
                                                 AIModel model = AIModel.builder()
-                                                    .id(String.valueOf(modelMap.get("modelId")))
-                                                    .modelId(String.valueOf(modelMap.get("modelId")))
+                                                    .id(modelId)
+                                                    .modelId(modelId)
                                                     .modelName(String.valueOf(modelMap.get("name")))
                                                     .provider(savedProvider.getName())
                                                     .maxInputTokens(modelMap.containsKey("maxTokens") ? 
@@ -146,11 +168,23 @@ public class ModelDataLoader {
                                                     .build();
                                                 
                                                 modelSaveOps.add(modelRepository.save(model)
-                                                    .doOnSuccess(m -> modelCount.incrementAndGet()));
+                                                    .doOnSuccess(m -> modelCount.incrementAndGet())
+                                                    .onErrorResume(e -> {
+                                                        log.error("Model '{}' kaydedilirken hata: {}", modelId, e.getMessage());
+                                                        return Mono.empty();
+                                                    }));
                                             }
                                         }
                                         
+                                        if (modelSaveOps.isEmpty()) {
+                                            return Mono.empty();
+                                        }
+                                        
                                         return Flux.concat(modelSaveOps).then();
+                                    })
+                                    .onErrorResume(e -> {
+                                        log.error("Provider '{}' işlenirken hata: {}", providerName, e.getMessage());
+                                        return Mono.empty();
                                     })
                                     .then();
                             
@@ -160,21 +194,46 @@ public class ModelDataLoader {
                         else if (itemMap.containsKey("id") && itemMap.containsKey("modelId")) {
                             AIModel model = objectMapper.convertValue(obj, AIModel.class);
                             
-                            // Eğer provider yoksa varsayılan bir değer belirle
-                            if (model.getProvider() == null && itemMap.containsKey("provider")) {
-                                model.setProvider((String) itemMap.get("provider"));
+                            // Provider adı kontrolü
+                            String providerName = model.getProvider();
+                            if (providerName == null || providerName.trim().isEmpty()) {
+                                if (itemMap.containsKey("provider")) {
+                                    providerName = (String) itemMap.get("provider");
+                                }
+                                
+                                // Hala null ise varsayılan değer ata
+                                if (providerName == null || providerName.trim().isEmpty()) {
+                                    log.warn("Model '{}' için provider adı bulunamadı, 'Bilinmeyen' olarak ayarlanıyor", 
+                                             model.getModelId());
+                                    providerName = "Bilinmeyen";
+                                    model.setProvider(providerName);
+                                }
                             }
                             
                             // Provider'ı kaydet
+                            final String finalProviderName = providerName;
                             Provider provider = Provider.builder()
-                                .name(model.getProvider())
+                                .name(finalProviderName)
                                 .build();
                             
                             Mono<Void> modelTask = providerRepository.save(provider)
+                                .onErrorResume(e -> {
+                                    // Bu provider zaten varsa hatayı yut ve provider'ı getir
+                                    if (e instanceof org.springframework.dao.DuplicateKeyException) {
+                                        log.info("Provider '{}' zaten var, yeniden kullanılıyor", finalProviderName);
+                                        return providerRepository.findById(finalProviderName);
+                                    }
+                                    log.error("Provider kaydedilirken hata: {}", e.getMessage());
+                                    return Mono.error(e);
+                                })
                                 .then(modelRepository.save(model))
                                 .doOnSuccess(savedModel -> {
                                     modelCount.incrementAndGet();
                                     log.debug("Model kaydedildi: {}", savedModel.getModelId());
+                                })
+                                .onErrorResume(e -> {
+                                    log.error("Model '{}' kaydedilirken hata: {}", model.getModelId(), e.getMessage());
+                                    return Mono.empty();
                                 })
                                 .then();
                             
@@ -194,7 +253,7 @@ public class ModelDataLoader {
                 return Mono.just(0);
             }
             
-            return Flux.concat(processTasks)
+            return Flux.mergeSequential(processTasks)
                 .then(Mono.just(modelCount.get()));
                 
         } catch (Exception e) {
