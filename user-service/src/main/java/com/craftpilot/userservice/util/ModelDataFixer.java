@@ -36,26 +36,44 @@ public class ModelDataFixer {
             
             JsonNode rootNode = objectMapper.readTree(jsonContent);
             
+            // Root elementinin bir array olduğunu kontrol et
+            if (!rootNode.isArray()) {
+                log.error("JSON içeriği bir dizi olmalıdır, ancak şu tipte: {}", rootNode.getNodeType());
+                throw new RuntimeException("JSON content must be an array");
+            }
+            
+            log.info("Toplam {} model girişi bulundu", rootNode.size());
+            
             for (JsonNode modelNode : rootNode) {
-                // Özel model formatını kontrol et
-                if (modelNode.has("provider") && modelNode.has("models") && modelNode.has("contextLength")) {
-                    // Bu, özel bir model formatı - models array'i içerir
-                    processProviderModelsFormat(modelNode, fixedModels, providers);
-                } else if (modelNode.has("modelId") && modelNode.has("modelName") && modelNode.has("provider")) {
-                    // Standart model formatı
-                    AIModel model = processStandardModelFormat(modelNode);
-                    if (model != null) {
-                        fixedModels.add(model);
-                        
-                        // Provider bilgisini sakla
-                        String providerName = modelNode.get("provider").asText();
-                        if (!providers.containsKey(providerName)) {
-                            Provider provider = Provider.builder()
-                                    .name(providerName)
-                                    .build();
-                            providers.put(providerName, provider);
+                try {
+                    // Özel model formatını kontrol et
+                    if (modelNode.has("provider") && modelNode.has("models") && modelNode.has("contextLength")) {
+                        // Bu, özel bir model formatı - models array'i içerir
+                        log.debug("Özel format model işleniyor: {}", modelNode.get("provider").asText());
+                        processProviderModelsFormat(modelNode, fixedModels, providers);
+                    } else if (modelNode.has("modelId") && (modelNode.has("modelName") || modelNode.has("name")) && modelNode.has("provider")) {
+                        // Standart model formatı
+                        log.debug("Standart format model işleniyor: {}", 
+                                modelNode.has("modelId") ? modelNode.get("modelId").asText() : "bilinmeyen");
+                        AIModel model = processStandardModelFormat(modelNode);
+                        if (model != null) {
+                            fixedModels.add(model);
+                            
+                            // Provider bilgisini sakla
+                            String providerName = modelNode.get("provider").asText();
+                            if (!providers.containsKey(providerName)) {
+                                Provider provider = Provider.builder()
+                                        .name(providerName)
+                                        .build();
+                                providers.put(providerName, provider);
+                            }
                         }
+                    } else {
+                        log.warn("Tanınmayan model formatı, atlanan model: {}", modelNode);
                     }
+                } catch (Exception e) {
+                    log.error("Model işlenirken hata: {}", e.getMessage());
+                    // Hata durumunda bu modeli atla, diğer modeller ile devam et
                 }
             }
             
@@ -82,8 +100,11 @@ public class ModelDataFixer {
         if (!providers.containsKey(providerName)) {
             Provider provider = Provider.builder()
                     .name(providerName)
+                    .icon(modelNode.has("icon") ? modelNode.get("icon").asText() : null)
+                    .description(modelNode.has("description") ? modelNode.get("description").asText() : null)
                     .build();
             providers.put(providerName, provider);
+            log.debug("Yeni provider oluşturuldu: {}", providerName);
         }
         
         // Her bir alt model için AIModel oluştur
@@ -104,9 +125,11 @@ public class ModelDataFixer {
                             .creditCost(1)
                             .creditType("STANDARD")
                             .category("FREE")
+                            .isActive(true)
                             .build();
                     
                     models.add(model);
+                    log.debug("Alt model eklendi: {} - {}", modelId, name);
                 }
             }
         }
@@ -114,7 +137,13 @@ public class ModelDataFixer {
     
     private AIModel processStandardModelFormat(JsonNode modelNode) {
         String modelId = modelNode.has("modelId") ? modelNode.get("modelId").asText() : null;
-        String modelName = modelNode.has("modelName") ? modelNode.get("modelName").asText() : null;
+        // modelName veya name alanını kontrol et 
+        String modelName = null;
+        if (modelNode.has("modelName")) {
+            modelName = modelNode.get("modelName").asText();
+        } else if (modelNode.has("name")) {
+            modelName = modelNode.get("name").asText();
+        }
         String provider = modelNode.has("provider") ? modelNode.get("provider").asText() : null;
         
         // Model ID, isim veya provider boşsa bu modeli atla
@@ -133,6 +162,7 @@ public class ModelDataFixer {
                 .creditType(modelNode.has("creditType") ? modelNode.get("creditType").asText() : "STANDARD")
                 .category(modelNode.has("category") ? modelNode.get("category").asText() : "FREE")
                 .contextLength(modelNode.has("contextLength") ? modelNode.get("contextLength").asInt() : 8000)
+                .isActive(true)
                 .build();
     }
 }

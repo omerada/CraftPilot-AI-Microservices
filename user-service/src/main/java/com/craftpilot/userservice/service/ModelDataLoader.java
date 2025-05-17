@@ -9,6 +9,7 @@ import com.mongodb.MongoWriteException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.dao.DuplicateKeyException;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -34,6 +36,35 @@ public class ModelDataLoader {
     private final ProviderRepository providerRepository;
     private final ModelDataFixer modelDataFixer;
     private final ResourceLoader resourceLoader;
+
+    /**
+     * Uygulama başlangıcında varsayılan modelleri yükler
+     */
+    @PostConstruct
+    public void loadDefaultModels() {
+        log.info("Varsayılan modelleri yükleme girişimi başlatılıyor");
+        
+        // Önce model sayısını kontrol et, eğer veri zaten varsa tekrar yükleme
+        modelRepository.count()
+            .flatMap(modelCount -> {
+                if (modelCount > 0) {
+                    log.info("Veritabanında zaten {} model var, yeniden yükleme yapılmayacak", modelCount);
+                    return Mono.just(0);
+                }
+
+                log.info("Veritabanında hiç model yok, varsayılan modelleri yüklüyorum");
+                return loadModelsFromJson("newmodels.json")
+                       .onErrorResume(e -> {
+                           log.error("Varsayılan model yükleme hatası: {}", e.getMessage(), e);
+                           // Alternatif dosya adı dene
+                           return loadModelsFromJson("classpath:newmodels.json");
+                       });
+            })
+            .subscribe(
+                count -> log.info("Varsayılan model yükleme işlemi tamamlandı: {} model yüklendi", count),
+                error -> log.error("Varsayılan model yükleme hatası: {}", error.getMessage(), error)
+            );
+    }
 
     /**
      * JSON dosyasından model verilerini yükler
@@ -67,9 +98,12 @@ public class ModelDataLoader {
     private Mono<Integer> saveAllProvidersThenModels(List<Provider> providers, List<AIModel> models) {
         AtomicInteger savedModelsCount = new AtomicInteger(0);
 
+        // Önce provider'ları kaydet, sonra modelleri kaydet
         return Flux.fromIterable(providers)
-                .flatMap(provider -> saveProvider(provider))
+                .flatMap(this::saveProvider)
                 .collectList()
+                .doOnSuccess(savedProviders -> 
+                    log.info("{} provider başarıyla kaydedildi", savedProviders.size()))
                 .flatMapMany(savedProviders -> Flux.fromIterable(models))
                 .concatMap(model -> saveModel(model, savedModelsCount))
                 .then(Mono.just(savedModelsCount.get()))
@@ -80,6 +114,11 @@ public class ModelDataLoader {
      * Provider'ı kaydeder, zaten varsa var olanı döndürür
      */
     private Mono<Provider> saveProvider(Provider provider) {
+        if (provider.getName() == null || provider.getName().trim().isEmpty()) {
+            log.warn("Geçersiz provider ismi, atlanan provider: {}", provider);
+            return Mono.empty();
+        }
+        
         return providerRepository.findByName(provider.getName())
                 .flatMap(existingProvider -> {
                     log.info("Provider '{}' zaten var, yeniden kullanılıyor", provider.getName());
@@ -89,6 +128,9 @@ public class ModelDataLoader {
                         providerRepository.save(provider)
                                 .doOnSuccess(savedProvider -> 
                                     log.info("Yeni provider kaydedildi: {}", savedProvider.getName()))
+                                .doOnError(e -> 
+                                    log.error("Provider '{}' kaydedilirken hata: {}", 
+                                        provider.getName(), e.getMessage()))
                 );
     }
 
@@ -132,31 +174,37 @@ public class ModelDataLoader {
      */
     private Mono<String> readJsonContent(String jsonFilePath) {
         try {
+            Resource resource;
+            
             if (jsonFilePath.startsWith("classpath:")) {
-                String resourcePath = jsonFilePath.replace("classpath:", "");
-                Resource resource = resourceLoader.getResource("classpath:" + resourcePath);
-                
-                log.info("Modeller classpath kaynağından yükleniyor: {}", resource.getURL());
-                
-                try (var inputStream = resource.getInputStream()) {
-                    byte[] bytes = inputStream.readAllBytes();
-                    return Mono.just(new String(bytes, StandardCharsets.UTF_8));
-                }
+                // ClassPath kaynaklarını yükle
+                resource = resourceLoader.getResource(jsonFilePath);
+            } else if (Files.exists(Paths.get(jsonFilePath))) {
+                // Dosya sisteminden yükle
+                resource = new FileSystemResource(jsonFilePath);
             } else {
-                Path path = Paths.get(jsonFilePath);
-                if (Files.exists(path)) {
-                    log.info("Modeller dosya sisteminden yükleniyor: {}", path.toAbsolutePath());
-                    return Mono.just(Files.readString(path));
-                } else {
-                    // Dosya bulunamadı, ClassPathResource olarak dene
-                    ClassPathResource resource = new ClassPathResource(jsonFilePath);
-                    log.info("Modeller ClassPathResource'dan yükleniyor: {}", resource.getURL());
-                    
-                    try (var inputStream = resource.getInputStream()) {
-                        byte[] bytes = inputStream.readAllBytes();
-                        return Mono.just(new String(bytes, StandardCharsets.UTF_8));
+                // Önce sınıf yolunda ara
+                resource = new ClassPathResource(jsonFilePath);
+                if (!resource.exists()) {
+                    // Sonra resources klasöründe ara
+                    resource = resourceLoader.getResource("classpath:" + jsonFilePath);
+                    if (!resource.exists()) {
+                        throw new IOException("Dosya bulunamadı: " + jsonFilePath);
                     }
                 }
+            }
+            
+            log.info("Model dosyası bulundu: {}", resource.getURL());
+            
+            try (var inputStream = resource.getInputStream()) {
+                byte[] bytes = inputStream.readAllBytes();
+                String content = new String(bytes, StandardCharsets.UTF_8);
+                
+                if (content.isEmpty()) {
+                    throw new IOException("JSON dosyası boş");
+                }
+                
+                return Mono.just(content);
             }
         } catch (IOException e) {
             log.error("JSON dosyası okunamadı: {}", e.getMessage(), e);

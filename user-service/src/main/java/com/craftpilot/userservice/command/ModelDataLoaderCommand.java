@@ -13,7 +13,7 @@ import java.time.Duration;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@ConditionalOnProperty(name = "spring.load-models", havingValue = "true")
+@ConditionalOnProperty(name = "spring.load-models", havingValue = "true", matchIfMissing = true)
 public class ModelDataLoaderCommand implements CommandLineRunner {
 
     private final ModelDataLoader modelDataLoader;
@@ -26,21 +26,27 @@ public class ModelDataLoaderCommand implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        log.info("Başlangıçta model yükleme etkin. '{}' dosyasından modeller yükleniyor", modelsFile);
+        log.info("CommandLineRunner ile model yükleme başlatılıyor. '{}' dosyasından modeller yükleniyor", modelsFile);
         
         // Dosya yolunu belirle
         String jsonFilePath = args.length > 0 && args[0] != null && !args[0].isEmpty() ? 
                               args[0] : modelsFile;
         
-        // Modelleri yükle ve işlem tamamlanana kadar bekle
-        modelDataLoader.loadModelsFromJson(jsonFilePath)
-            .timeout(Duration.ofSeconds(loadTimeoutSeconds))
-            .doOnSuccess(count -> {
-                log.info("AI model yükleme işlemi tamamlandı: {} model yüklendi", count);
-            })
-            .doOnError(error -> {
-                log.error("AI model yükleme sırasında hata: {}", error.getMessage(), error);
-            })
-            .block(Duration.ofSeconds(loadTimeoutSeconds + 10)); // Bloke etme süresi timeout + 10 saniye
+        try {
+            // Modelleri yükle ve işlem tamamlanana kadar bekle
+            Integer count = modelDataLoader.loadModelsFromJson(jsonFilePath)
+                .timeout(Duration.ofSeconds(loadTimeoutSeconds))
+                .doOnSuccess(loadedCount -> {
+                    log.info("CommandLineRunner: AI model yükleme işlemi tamamlandı: {} model yüklendi", loadedCount);
+                })
+                .doOnError(error -> {
+                    log.error("CommandLineRunner: AI model yükleme sırasında hata: {}", error.getMessage(), error);
+                })
+                .block(Duration.ofSeconds(loadTimeoutSeconds + 10)); // Bloke etme süresi timeout + 10 saniye
+            
+            log.info("CommandLineRunner: Model yükleme işlemi sonucu: {} model yüklendi", count != null ? count : 0);
+        } catch (Exception e) {
+            log.error("CommandLineRunner: Model yükleme işlemi sırasında beklenmeyen hata: {}", e.getMessage(), e);
+        }
     }
 }
