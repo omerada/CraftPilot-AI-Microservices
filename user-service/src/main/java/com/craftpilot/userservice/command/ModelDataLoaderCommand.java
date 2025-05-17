@@ -6,12 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 
 @Component
@@ -24,50 +20,27 @@ public class ModelDataLoaderCommand implements CommandLineRunner {
     
     @Value("${spring.models.file:newmodels.json}")
     private String modelsFile;
+    
+    @Value("${spring.models.timeout:300}")
+    private int loadTimeoutSeconds;
 
     @Override
     public void run(String... args) {
-        log.info("AI modelleri yükleme işlemi başlıyor...");
+        log.info("Başlangıçta model yükleme etkin. '{}' dosyasından modeller yükleniyor", modelsFile);
         
         // Dosya yolunu belirle
         String jsonFilePath = args.length > 0 && args[0] != null && !args[0].isEmpty() ? 
                               args[0] : modelsFile;
         
-        // Önce classpath resource olarak kontrol et
-        org.springframework.core.io.Resource resource = 
-            new ClassPathResource(jsonFilePath.replace("classpath:", ""));
-            
-        if (resource.exists()) {
-            log.info("'{}' classpath kaynağından modeller yükleniyor", jsonFilePath);
-            modelDataLoader.loadModelsFromJson(jsonFilePath)
-                .timeout(Duration.ofMinutes(5))
-                .doOnSuccess(count -> {
-                    log.info("AI model yükleme işlemi tamamlandı: {} model yüklendi", count);
-                })
-                .doOnError(error -> {
-                    log.error("AI model yükleme sırasında hata: {}", error.getMessage(), error);
-                })
-                .subscribe();
-            return;
-        }
-        
-        // Resource olarak bulunamazsa, dosya sistemi olarak kontrol et
-        Path path = Paths.get(jsonFilePath);
-        if (!Files.exists(path)) {
-            log.error("Model dosyası bulunamadı: {}", path.toAbsolutePath());
-            return;
-        }
-        
-        log.info("'{}' dosyasından modeller yükleniyor", jsonFilePath);
-        
+        // Modelleri yükle ve işlem tamamlanana kadar bekle
         modelDataLoader.loadModelsFromJson(jsonFilePath)
-            .timeout(Duration.ofMinutes(5))
+            .timeout(Duration.ofSeconds(loadTimeoutSeconds))
             .doOnSuccess(count -> {
                 log.info("AI model yükleme işlemi tamamlandı: {} model yüklendi", count);
             })
             .doOnError(error -> {
                 log.error("AI model yükleme sırasında hata: {}", error.getMessage(), error);
             })
-            .subscribe();
+            .block(Duration.ofSeconds(loadTimeoutSeconds + 10)); // Bloke etme süresi timeout + 10 saniye
     }
 }

@@ -4,297 +4,163 @@ import com.craftpilot.userservice.model.ai.AIModel;
 import com.craftpilot.userservice.model.ai.Provider;
 import com.craftpilot.userservice.repository.AIModelRepository;
 import com.craftpilot.userservice.repository.ProviderRepository;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.craftpilot.userservice.util.ModelDataFixer;
+import com.mongodb.MongoWriteException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import jakarta.annotation.PostConstruct;
 import java.io.IOException;
-import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
-@Slf4j
 @RequiredArgsConstructor
+@Slf4j
 public class ModelDataLoader {
 
-    private final ProviderRepository providerRepository;
     private final AIModelRepository modelRepository;
-    private final ObjectMapper objectMapper;
-
-    @Value("${app.models.file:newmodels.json}")
-    private String modelsFile;
-    
-    @Value("${app.load-models:false}")
-    private boolean loadModelsEnabled;
+    private final ProviderRepository providerRepository;
+    private final ModelDataFixer modelDataFixer;
+    private final ResourceLoader resourceLoader;
 
     /**
-     * Yapılandırılabilir JSON dosya yolundan modelleri yükler ve MongoDB'ye
-     * kaydeder - sadece app.load-models=true ise PostConstruct sırasında çalışır
-     */
-    @PostConstruct
-    public void loadModelsOnStartup() {
-        if (!loadModelsEnabled) {
-            log.info("Otomatik model yükleme devre dışı bırakılmış (app.load-models=false)");
-            return;
-        }
-        
-        log.info("Başlangıçta model yükleme etkin. '{}' dosyasından modeller yükleniyor", modelsFile);
-        
-        loadModels(modelsFile)
-                .subscribe(
-                        count -> log.info("{} adet model başarıyla yüklendi", count),
-                        error -> log.error("Model yükleme sırasında hata oluştu: {}", error.getMessage(), error));
-    }
-
-    public Mono<Integer> loadModels(String configuredPath) {
-        String path = configuredPath != null ? configuredPath : modelsFile;
-        log.info("Modeller {} yolundan yükleniyor", path);
-
-        try {
-            // Önce classpath'ten yüklemeyi dene
-            String resourcePath = path;
-            if (!path.startsWith("classpath:")) {
-                resourcePath = "classpath:" + path;
-            }
-            
-            org.springframework.core.io.Resource resource = 
-                new org.springframework.core.io.ClassPathResource(path.replace("classpath:", ""));
-            
-            if (!resource.exists()) {
-                // Eğer classpath'te yoksa, dosya sisteminden yüklemeyi dene
-                Path filePath = Paths.get(path.replace("classpath:", ""));
-                
-                // Dosyanın varlığını kontrol et
-                if (!Files.exists(filePath)) {
-                    log.error("Model yükleme başarısız: Dosya bulunamadı: {}", filePath.toAbsolutePath());
-                    return Mono.error(new IOException("Model dosyası bulunamadı: " + filePath.toAbsolutePath()));
-                }
-                
-                log.info("Modeller dosya sisteminden yükleniyor: {}", filePath.toAbsolutePath());
-                String jsonContent = Files.readString(filePath);
-                return processJsonContent(jsonContent);
-            } else {
-                // Classpath'ten yükle
-                log.info("Modeller classpath kaynağından yükleniyor: {}", resource.getURL());
-                try (InputStream is = resource.getInputStream()) {
-                    String jsonContent = new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-                    return processJsonContent(jsonContent);
-                }
-            }
-        } catch (IOException e) {
-            log.error("JSON model verisi yüklenirken hata: {}", e.getMessage(), e);
-            return Mono.error(e);
-        }
-    }
-    
-    private Mono<Integer> processJsonContent(String jsonContent) {
-        try {
-            log.debug("JSON içeriği işleniyor");
-            List<Object> jsonObjects = objectMapper.readValue(
-                    jsonContent,
-                    new TypeReference<List<Object>>() {});
-            
-            AtomicInteger modelCount = new AtomicInteger(0);
-            List<Mono<Void>> processTasks = new ArrayList<>();
-            
-            // Create a map to collect all providers from models
-            Map<String, Provider> providerMap = new HashMap<>();
-            
-            for (Object obj : jsonObjects) {
-                try {
-                    // Her bir JSON objesini ayrı ayrı değerlendir
-                    if (obj instanceof java.util.Map) {
-                        java.util.Map<String, Object> itemMap = (java.util.Map<String, Object>) obj;
-                        
-                        // Meta provider gibi özel formatlar için
-                        if (itemMap.containsKey("provider") && itemMap.containsKey("models") && itemMap.get("models") instanceof List) {
-                            String providerName = (String) itemMap.get("provider");
-                            // Provider adı null kontrolü - null ise bu provider'ı atla
-                            if (providerName == null || providerName.trim().isEmpty()) {
-                                log.warn("Provider ismi boş veya null olan bir provider bulundu. Bu provider atlanıyor.");
-                                continue;
-                            }
-                            
-                            Integer contextLength = itemMap.containsKey("contextLength") ? 
-                                                    ((Number)itemMap.get("contextLength")).intValue() : null;
-                            
-                            Provider provider = Provider.builder()
-                                    .name(providerName)
-                                    .build();
-                            
-                            // Provider kaydetme
-                            Mono<Void> providerTask = providerRepository.save(provider)
-                                    .onErrorResume(e -> {
-                                        // Bu provider zaten varsa hatayı yut ve provider'ı getir
-                                        if (e instanceof org.springframework.dao.DuplicateKeyException) {
-                                            log.info("Provider '{}' zaten var, yeniden kullanılıyor", providerName);
-                                            return providerRepository.findById(providerName);
-                                        }
-                                        log.error("Provider kaydedilirken hata: {}", e.getMessage());
-                                        return Mono.error(e);
-                                    })
-                                    .flatMap(savedProvider -> {
-                                        List<Object> modelsList = (List<Object>) itemMap.get("models");
-                                        List<Mono<AIModel>> modelSaveOps = new ArrayList<>();
-                                        
-                                        for (Object modelObj : modelsList) {
-                                            if (modelObj instanceof java.util.Map) {
-                                                java.util.Map<String, Object> modelMap = (java.util.Map<String, Object>) modelObj;
-                                                
-                                                // Model ID kontrolü
-                                                String modelId = String.valueOf(modelMap.get("modelId"));
-                                                if (modelId == null || "null".equals(modelId)) {
-                                                    log.warn("Geçersiz modelId bulundu, model atlanıyor");
-                                                    continue;
-                                                }
-                                                
-                                                AIModel model = AIModel.builder() 
-                                                    .modelId(modelId)
-                                                    .modelName(String.valueOf(modelMap.get("name")))
-                                                    .provider(savedProvider.getName())
-                                                    .maxInputTokens(modelMap.containsKey("maxTokens") ? 
-                                                                   ((Number)modelMap.get("maxTokens")).intValue() : 8000)
-                                                    .contextLength(contextLength != null ? contextLength : 131072)
-                                                    .build();
-                                                
-                                                modelSaveOps.add(modelRepository.save(model)
-                                                    .doOnSuccess(m -> modelCount.incrementAndGet())
-                                                    .onErrorResume(e -> {
-                                                        log.error("Model '{}' kaydedilirken hata: {}", modelId, e.getMessage());
-                                                        return Mono.empty();
-                                                    }));
-                                            }
-                                        }
-                                        
-                                        if (modelSaveOps.isEmpty()) {
-                                            return Mono.empty();
-                                        }
-                                        
-                                        return Flux.concat(modelSaveOps).then();
-                                    })
-                                    .onErrorResume(e -> {
-                                        log.error("Provider '{}' işlenirken hata: {}", providerName, e.getMessage());
-                                        return Mono.empty();
-                                    })
-                                    .then();
-                            
-                            processTasks.add(providerTask);
-                        } 
-                        // Normal model objeleri için
-                        else if (itemMap.containsKey("modelId")) {
-                            AIModel model = objectMapper.convertValue(obj, AIModel.class);
-                            
-                            // Provider adı kontrolü
-                            String providerName = model.getProvider();
-                            if (providerName == null || providerName.trim().isEmpty()) {
-                                if (itemMap.containsKey("provider")) {
-                                    providerName = (String) itemMap.get("provider");
-                                }
-                                
-                                // Hala null ise varsayılan değer ata
-                                if (providerName == null || providerName.trim().isEmpty()) {
-                                    log.warn("Model '{}' için provider adı bulunamadı, 'Bilinmeyen' olarak ayarlanıyor", 
-                                             model.getModelId());
-                                    providerName = "Bilinmeyen";
-                                    model.setProvider(providerName);
-                                }
-                            }
-                            
-                            // Provider'ı kaydet
-                            final String finalProviderName = providerName;
-                            Provider provider = Provider.builder()
-                                .name(finalProviderName)
-                                .build();
-                            
-                            Mono<Void> modelTask = providerRepository.save(provider)
-                                .onErrorResume(e -> {
-                                    // Bu provider zaten varsa hatayı yut ve provider'ı getir
-                                    if (e instanceof org.springframework.dao.DuplicateKeyException) {
-                                        log.info("Provider '{}' zaten var, yeniden kullanılıyor", finalProviderName);
-                                        return providerRepository.findById(finalProviderName);
-                                    }
-                                    log.error("Provider kaydedilirken hata: {}", e.getMessage());
-                                    return Mono.error(e);
-                                })
-                                .then(modelRepository.save(model))
-                                .doOnSuccess(savedModel -> {
-                                    modelCount.incrementAndGet();
-                                    log.debug("Model kaydedildi: {}", savedModel.getModelId());
-                                })
-                                .onErrorResume(e -> {
-                                    log.error("Model '{}' kaydedilirken hata: {}", model.getModelId(), e.getMessage());
-                                    return Mono.empty();
-                                })
-                                .then();
-                            
-                            processTasks.add(modelTask);
-                        } else {
-                            log.warn("Desteklenmeyen model format, atlanıyor: {}", itemMap);
-                        }
-                    }
-                } catch (Exception e) {
-                    log.error("Tek bir model işlenirken hata: {}", e.getMessage(), e);
-                    // Hatayı yut ve diğer modelleri işlemeye devam et
-                }
-            }
-            
-            // Now save all collected providers
-            for (Provider provider : providerMap.values()) {
-                Mono<Void> providerTask = providerRepository.save(provider)
-                    .onErrorResume(e -> {
-                        if (e instanceof org.springframework.dao.DuplicateKeyException) {
-                            log.info("Provider '{}' zaten var, yeniden kullanılıyor", provider.getName());
-                            return Mono.empty();
-                        }
-                        log.error("Provider kaydedilirken hata: {}", e.getMessage());
-                        return Mono.error(e);
-                    })
-                    .then();
-                
-                processTasks.add(providerTask);
-            }
-            
-            if (processTasks.isEmpty()) {
-                log.warn("İşlenecek model bulunamadı");
-                return Mono.just(0);
-            }
-            
-            return Flux.mergeSequential(processTasks)
-                .then(Mono.just(modelCount.get()));
-                
-        } catch (Exception e) {
-            log.error("JSON model verisi işlenirken hata: {}", e.getMessage(), e);
-            return Mono.error(e);
-        }
-    }
-    
-    /**
-     * Belirtilen JSON dosyasından modelleri yükler.
-     * ModelDataLoaderCommand için gereklidir.
-     * 
+     * JSON dosyasından model verilerini yükler
+     *
      * @param jsonFilePath JSON dosya yolu
      * @return Yüklenen model sayısı
      */
     public Mono<Integer> loadModelsFromJson(String jsonFilePath) {
-        if (jsonFilePath == null || jsonFilePath.isEmpty()) {
-            return Mono.error(new IllegalArgumentException("JSON dosya yolu belirtilmemiş"));
+        log.info("Modeller {} yolundan yükleniyor", jsonFilePath);
+
+        return readJsonContent(jsonFilePath)
+                .flatMap(jsonContent -> {
+                    Map<String, Object> validatedData = modelDataFixer.validateAndFixModelData(jsonContent);
+                    List<AIModel> models = (List<AIModel>) validatedData.get("models");
+                    List<Provider> providers = (List<Provider>) validatedData.get("providers");
+
+                    log.info("Doğrulanmış veri: {} model ve {} sağlayıcı", 
+                            models.size(), providers.size());
+
+                    return saveAllProvidersThenModels(providers, models);
+                })
+                .onErrorResume(e -> {
+                    log.error("Model yükleme hatası: {}", e.getMessage(), e);
+                    return Mono.just(0);
+                });
+    }
+
+    /**
+     * Önce tüm sağlayıcıları sonra tüm modelleri kaydeder
+     */
+    private Mono<Integer> saveAllProvidersThenModels(List<Provider> providers, List<AIModel> models) {
+        AtomicInteger savedModelsCount = new AtomicInteger(0);
+
+        return Flux.fromIterable(providers)
+                .flatMap(provider -> saveProvider(provider))
+                .collectList()
+                .flatMapMany(savedProviders -> Flux.fromIterable(models))
+                .concatMap(model -> saveModel(model, savedModelsCount))
+                .then(Mono.just(savedModelsCount.get()))
+                .doOnSuccess(count -> log.info("{} adet model başarıyla yüklendi", count));
+    }
+
+    /**
+     * Provider'ı kaydeder, zaten varsa var olanı döndürür
+     */
+    private Mono<Provider> saveProvider(Provider provider) {
+        return providerRepository.findByName(provider.getName())
+                .flatMap(existingProvider -> {
+                    log.info("Provider '{}' zaten var, yeniden kullanılıyor", provider.getName());
+                    return Mono.just(existingProvider);
+                })
+                .switchIfEmpty(
+                        providerRepository.save(provider)
+                                .doOnSuccess(savedProvider -> 
+                                    log.info("Yeni provider kaydedildi: {}", savedProvider.getName()))
+                );
+    }
+
+    /**
+     * Modeli kaydeder, hata durumunda loglar ve devam eder
+     */
+    private Mono<AIModel> saveModel(AIModel model, AtomicInteger counter) {
+        // Eksik veya geçersiz modelId varsa atla
+        if (model.getModelId() == null || model.getModelId().isEmpty()) {
+            log.warn("Geçersiz modelId, atlanan model: {}", model.getModelName());
+            return Mono.empty();
         }
-        
-        log.info("Modeller {} dosyasından yükleniyor", jsonFilePath);
-        return loadModels(jsonFilePath);
+
+        return modelRepository.findByModelId(model.getModelId())
+                .flatMap(existingModel -> {
+                    log.debug("Model zaten var, güncelleniyor: {}", model.getModelId());
+                    // Model ID'yi koru, diğer alanları güncelle
+                    model.setId(existingModel.getId());
+                    return modelRepository.save(model);
+                })
+                .switchIfEmpty(
+                        modelRepository.save(model)
+                                .doOnSuccess(savedModel -> {
+                                    counter.incrementAndGet();
+                                    log.debug("Yeni model kaydedildi: {}", savedModel.getModelId());
+                                })
+                )
+                .onErrorResume(e -> {
+                    if (e instanceof DuplicateKeyException || e instanceof MongoWriteException) {
+                        log.error("Model '{}' kaydedilirken hata: {}", 
+                                model.getModelId(), e.getMessage());
+                    } else {
+                        log.error("Beklenmeyen hata: {}", e.getMessage(), e);
+                    }
+                    return Mono.empty();
+                });
+    }
+
+    /**
+     * JSON içeriğini dosya yolundan okur
+     */
+    private Mono<String> readJsonContent(String jsonFilePath) {
+        try {
+            if (jsonFilePath.startsWith("classpath:")) {
+                String resourcePath = jsonFilePath.replace("classpath:", "");
+                Resource resource = resourceLoader.getResource("classpath:" + resourcePath);
+                
+                log.info("Modeller classpath kaynağından yükleniyor: {}", resource.getURL());
+                
+                try (var inputStream = resource.getInputStream()) {
+                    byte[] bytes = inputStream.readAllBytes();
+                    return Mono.just(new String(bytes, StandardCharsets.UTF_8));
+                }
+            } else {
+                Path path = Paths.get(jsonFilePath);
+                if (Files.exists(path)) {
+                    log.info("Modeller dosya sisteminden yükleniyor: {}", path.toAbsolutePath());
+                    return Mono.just(Files.readString(path));
+                } else {
+                    // Dosya bulunamadı, ClassPathResource olarak dene
+                    ClassPathResource resource = new ClassPathResource(jsonFilePath);
+                    log.info("Modeller ClassPathResource'dan yükleniyor: {}", resource.getURL());
+                    
+                    try (var inputStream = resource.getInputStream()) {
+                        byte[] bytes = inputStream.readAllBytes();
+                        return Mono.just(new String(bytes, StandardCharsets.UTF_8));
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.error("JSON dosyası okunamadı: {}", e.getMessage(), e);
+            return Mono.error(e);
+        }
     }
 }

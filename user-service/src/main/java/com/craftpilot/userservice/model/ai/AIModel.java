@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Data
@@ -14,6 +15,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Document(collection = "ai_models")
 public class AIModel {
     @Id
+    private String id;
+    
+    @Indexed(unique = true)
     private String modelId;  
     private String modelName;
     private String provider;
@@ -23,12 +27,5 @@ public class AIModel {
     private String creditType;
     private String category;
     private Integer contextLength;
-    private Double defaultTemperature;
-    private String icon;
-    private String description;
-    private Double fee;
-    private Boolean featured;
-    private Integer maxTokens;
-    private Boolean multimodal;
-    private Boolean active;
+    private Boolean isActive;
 }
