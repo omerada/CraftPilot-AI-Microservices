@@ -33,14 +33,12 @@ RUN cd /build/redis-client-lib && mvn clean install -DskipTests -B -ntp && \
 # Copy user-service
 COPY user-service/ /build/user-service/
 
-# Build user-service - MapStruct sorununu çözen iyileştirilmiş derleme adımı
+# Build user-service - Düzeltilmiş ve daha güvenli derleme adımı
 WORKDIR /build/user-service
 RUN rm -rf target && \
-    rm -rf /root/.m2/repository/com/craftpilot/userservice/ && \
-    find . -name "*.class" -delete && \
-    find . -name "MapperImpl.java" -delete && \
-    find . -name "*Mapper*.java" -not -name "UserMapper.java" -not -name "UserPreferenceMapper.java" -delete && \
-    mvn clean package -Dmaven.compiler.forceJavacCompilerUse=true -Dmapstruct.defaultComponentModel=spring -Dmapstruct.verbose=true -DskipTests -B -ntp
+    rm -rf ~/.m2/repository/com/craftpilot/userservice/ && \
+    # MapStruct ve diğer dosyaları silme işlemini kaldırıyoruz, bu işlemi maven temizleyecek
+    mvn clean package -DskipTests -B -ntp
 
 # Run stage
 FROM eclipse-temurin:21-jre-alpine
