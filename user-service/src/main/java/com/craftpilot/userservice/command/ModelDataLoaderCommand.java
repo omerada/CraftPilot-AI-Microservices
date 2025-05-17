@@ -34,7 +34,7 @@ public class ModelDataLoaderCommand implements CommandLineRunner {
         
         try {
             // Modelleri yükle ve işlem tamamlanana kadar bekle
-            Integer count = modelDataLoader.loadModelsFromJson(jsonFilePath)
+            Integer count = modelDataLoader.loadModelsFromFile(jsonFilePath)
                 .timeout(Duration.ofSeconds(loadTimeoutSeconds))
                 .doOnSuccess(loadedCount -> {
                     log.info("CommandLineRunner: AI model yükleme işlemi tamamlandı: {} model yüklendi", loadedCount);

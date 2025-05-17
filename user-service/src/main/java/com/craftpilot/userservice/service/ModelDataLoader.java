@@ -27,6 +27,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import static java.util.Map.entry;
 
 /**
  * AI Modellerini ve Provider'ları JSON dosyasından yükleyip veritabanına kaydeden servis
@@ -42,21 +43,21 @@ public class ModelDataLoader {
     private final ObjectMapper objectMapper;
 
     // Icon isimlerini provider'lara eşleştiren map
-    private static final Map<String, String> PROVIDER_ICONS = Map.of(
-            "openai", "TbBrandOpenai",
-            "google", "TbBrandGoogle",
-            "anthropic", "SiAnthropic",
-            "meta", "TbBrandMeta",
-            "mistral", "SiMistral",
-            "cohere", "SiCohere",
-            "nvidia", "TbBrandNvidia",
-            "microsoft", "TbMicrosoft",
-            "perplexity", "TbBrain",
-            "qwen", "SiQiita",
-            "deepseek", "TbSearch",
-            "liquid", "TbDroplet",
-            "ai21", "TbNumber21",
-            "x-ai", "TbBrandX"
+    private static final Map<String, String> PROVIDER_ICONS = Map.ofEntries(
+            entry("openai", "TbBrandOpenai"),
+            entry("google", "TbBrandGoogle"),
+            entry("anthropic", "SiAnthropic"),
+            entry("meta", "TbBrandMeta"),
+            entry("mistral", "SiMistral"),
+            entry("cohere", "SiCohere"),
+            entry("nvidia", "TbBrandNvidia"),
+            entry("microsoft", "TbMicrosoft"),
+            entry("perplexity", "TbBrain"),
+            entry("qwen", "SiQiita"),
+            entry("deepseek", "TbSearch"),
+            entry("liquid", "TbDroplet"),
+            entry("ai21", "TbNumber21"),
+            entry("x-ai", "TbBrandX")
     );
 
     // Varsayılan icon
