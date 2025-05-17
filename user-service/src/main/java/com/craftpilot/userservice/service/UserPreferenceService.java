@@ -112,7 +112,19 @@ public class UserPreferenceService {
                     break;
                 case "aiModelFavorites":
                     if (value instanceof List) {
-                        preferences.setAiModelFavorites((List<String>) value);
+                        List<?> rawList = (List<?>) value;
+                        List<String> validatedList = rawList.stream()
+                            .filter(item -> item instanceof String)
+                            .map(item -> (String) item)
+                            .filter(s -> s != null && !s.trim().isEmpty())
+                            .distinct()
+                            .collect(Collectors.toList());
+                        
+                        preferences.setAiModelFavorites(validatedList);
+                        if (validatedList.size() != rawList.size()) {
+                            log.warn("aiModelFavorites listesinde geçersiz öğeler filtrelendi. Orijinal: {}, Filtrelenmiş: {}", 
+                                    rawList.size(), validatedList.size());
+                        }
                     }
                     break;
                 case "notifications":

@@ -9,11 +9,9 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -42,7 +40,9 @@ public class AIModelService {
                     }
                     
                     // Kredi tipi aynıysa, kredi maliyetine göre sırala (küçükten büyüğe)
-                    return model1.getCreditCost().compareTo(model2.getCreditCost());
+                    return Integer.compare(
+                        model1.getCreditCost() != null ? model1.getCreditCost() : 0, 
+                        model2.getCreditCost() != null ? model2.getCreditCost() : 0);
                 });
                 
                 // Provider'ları getir
@@ -73,6 +73,19 @@ public class AIModelService {
             .doOnError(e -> log.error("AI modelleri getirilirken hata: error={}", e.getMessage()));
     }
     
+    // Helper method to compare credit types
+    private int compareCreditTypes(String type1, String type2) {
+        if (type1 == null) return type2 == null ? 0 : 1;
+        if (type2 == null) return -1;
+        
+        if ("STANDARD".equals(type1) && "ADVANCED".equals(type2)) {
+            return -1;
+        } else if ("ADVANCED".equals(type1) && "STANDARD".equals(type2)) {
+            return 1;
+        }
+        return 0;
+    }
+    
     public ModelsData getDefaultModels(String userPlan, Throwable t) {
         log.warn("Varsayılan AI modeller döndürülüyor (fallback): userPlan={}, error={}", userPlan, t.getMessage());
         
@@ -90,8 +103,8 @@ public class AIModelService {
         List<Provider> defaultProviders = new ArrayList<>();
         defaultProviders.add(Provider.builder()
             .name("Google")
-            .icon("TbBrandGoogle")
-            .description("Gemini serisi modeller")
+            .description("Google AI models")
+            .active(true)
             .models(defaultModels)
             .build());
             
@@ -99,58 +112,5 @@ public class AIModelService {
             .models(defaultModels)
             .providers(defaultProviders)
             .build();
-    }
-    
-    public String getDefaultModelForPlan(String userPlan) {
-        switch(userPlan.toLowerCase()) {
-            case "premium":
-            case "enterprise":
-                return "google/gemini-2.0-pro-001";
-            case "pro":
-                return "google/gemini-2.0-pro-001";
-            case "free":
-            default:
-                return "google/gemini-2.0-flash-lite-001";
-        }
-    }
-    
-    private Mono<List<AIModel>> filterModelsByPlan(String userPlan) { 
-        log.info("Tüm AI modeller getiriliyor (filtreleme yapılmadan)");
-        return modelRepository.findAll().collectList();
-    }
-    
-    private String mapLegacyModelId(String modelId) {
-        // Eski ID'den yeni ID'ye eşleme
-        Map<String, String> modelMappings = new HashMap<>();
-        modelMappings.put("gemini-pro", "google/gemini-1.5-pro");
-        modelMappings.put("gpt-4-turbo", "openai/gpt-4-turbo");
-        
-        // Eşleşen bir eski ID varsa yeni ID'yi döndür, yoksa orijinal ID'yi kullan
-        return modelMappings.getOrDefault(modelId, modelId);
-    }
-    
-    public Mono<AIModel> saveModel(AIModel model) {
-        log.info("AI Model kaydediliyor: modelId={}", model.getModelId());
-        return modelRepository.save(model);
-    }
-
-    public Flux<AIModel> saveAllModels(List<AIModel> models) {
-        log.info("{} AI model kaydediliyor", models.size());
-        return Flux.fromIterable(models)
-            .flatMap(this::saveModel);
-    }
-    
-    // Kredi tipi karşılaştırma yardımcı metodu
-    private int compareCreditTypes(String creditType1, String creditType2) {
-        // "STANDARD" < "ADVANCED" olacak şekilde sırala
-        if (creditType1 == null && creditType2 == null) return 0;
-        if (creditType1 == null) return -1;  // null değerler başta olsun
-        if (creditType2 == null) return 1;
-        
-        // STANDARD önce, ADVANCED sonra
-        if ("STANDARD".equals(creditType1) && "ADVANCED".equals(creditType2)) return -1;
-        if ("ADVANCED".equals(creditType1) && "STANDARD".equals(creditType2)) return 1;
-        
-        return 0;   
     }
 }

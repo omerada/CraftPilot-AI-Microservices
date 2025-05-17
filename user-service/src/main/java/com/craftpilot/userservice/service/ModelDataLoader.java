@@ -235,19 +235,8 @@ public class ModelDataLoader {
             }
             
             if (!isValid) {
-                log.warn("Geçersiz model verisi: {} - {}", model.modelId, errors.toString());
-                invalidModels++;
-                invalidModelIds.add(model.modelId);
-            }
-        }
-        
-        if (invalidModels > 0) {
-            log.warn("{} model geçersiz veri içeriyor: {}", invalidModels, String.join(", ", invalidModelIds));
-            
-            // Kritik doğrulama başarısız olursa işlemi durdur
-            if (invalidModels > models.size() * 0.2) { // %20'den fazla model geçersizse
-                throw new IllegalArgumentException("Model dosyasında çok fazla geçersiz veri bulundu: " + 
-                    invalidModels + " / " + models.size());
+                // Log error or handle invalid model
+                log.error("Model validation failed: {}", errors.toString());
             }
         }
         
@@ -351,12 +340,7 @@ public class ModelDataLoader {
                                 continue;
                             }
                             
-                            Provider newProvider = Provider.builder()
-                                .name(providerName)
-                                .active(true)
-                                .createdAt(LocalDateTime.now())
-                                .updatedAt(LocalDateTime.now())
-                                .build();
+                            Provider newProvider = createProvider(providerName, null);
                                 
                             newProviders.add(newProvider);
                             log.info("Yeni provider hazırlanıyor: {}", newProvider.getName());
@@ -375,12 +359,12 @@ public class ModelDataLoader {
                     // Önce yeni provider'ları kaydet
                     Mono<List<Provider>> saveNewProvidersMono = newProviders.isEmpty() ? 
                         Mono.just(Collections.emptyList()) : 
-                        providerRepository.saveAll(newProviders).collectList();
+                        Flux.fromIterable(newProviders).flatMap(providerRepository::save).collectList();
                     
                     // Sonra güncellenen provider'ları kaydet
                     Mono<List<Provider>> updateProvidersMono = updatedProviders.isEmpty() ? 
                         Mono.just(Collections.emptyList()) : 
-                        providerRepository.saveAll(updatedProviders).collectList();
+                        Flux.fromIterable(updatedProviders).flatMap(providerRepository::save).collectList();
                     
                     // Her iki işlemi de tamamla ve providerMap'i döndür
                     return saveNewProvidersMono.flatMap(savedNewProviders -> {
@@ -517,7 +501,8 @@ public class ModelDataLoader {
                             counter.errorCount, counter.skippedCount, counter.invalidProviderCount);
                         
                         // Modelleri toplu olarak kaydet, daha verimli
-                        return aiModelRepository.saveAll(modelsToSave)
+                        return Flux.fromIterable(modelsToSave)
+                                .flatMap(aiModelRepository::save)
                                 .collectList()
                                 .map(savedModels -> {
                                     log.info("{} model başarıyla kaydedildi", savedModels.size());
@@ -589,5 +574,18 @@ public class ModelDataLoader {
         status.put("lastLoadedFile", lastLoadedFile);
         status.put("lastLoadedModelCount", lastLoadedModelCount);
         return status;
+    }
+    
+    /**
+     * Provider oluşturma işlemini gerçekleştiren yardımcı metod
+     */
+    private Provider createProvider(String name, String description) {
+        return Provider.builder()
+                .name(name)
+                .description(description)
+                .active(true)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
     }
 }
