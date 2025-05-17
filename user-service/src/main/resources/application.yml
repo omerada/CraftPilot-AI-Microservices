@@ -205,3 +205,14 @@ app:
   models:
     file: ${MODELS_FILE:newmodels.json}
     version: ${MODELS_VERSION:1}
+    load-on-startup: ${LOAD_MODELS_ON_STARTUP:true}
+    timeout-seconds: ${MODELS_LOAD_TIMEOUT:90}
+    validation:
+      fail-on-error: ${MODELS_VALIDATION_FAIL:false}
+      error-threshold-percent: ${MODELS_ERROR_THRESHOLD:20}
+    retry:
+      max-attempts: ${MODELS_LOAD_RETRY:3}
+      delay-seconds: ${MODELS_LOAD_RETRY_DELAY:5}
+  providers:
+    create-missing: ${CREATE_MISSING_PROVIDERS:true}
+    auto-activate: ${AUTO_ACTIVATE_PROVIDERS:true}

@@ -4,498 +4,556 @@ import com.craftpilot.userservice.model.ai.AIModel;
 import com.craftpilot.userservice.model.ai.Provider;
 import com.craftpilot.userservice.repository.AIModelRepository;
 import com.craftpilot.userservice.repository.ProviderRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import reactor.util.retry.Retry;
 
-import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import static java.util.Map.entry;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 /**
- * AI Modellerini ve Provider'ları JSON dosyasından yükleyip veritabanına kaydeden servis
+ * Service responsible for loading AI model and provider data from JSON 
+ * configuration into the database during application startup.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
+@RequiredArgsConstructor
 public class ModelDataLoader {
 
-    private final AIModelRepository modelRepository;
     private final ProviderRepository providerRepository;
-    private final ResourceLoader resourceLoader;
+    private final AIModelRepository aiModelRepository;
     private final ObjectMapper objectMapper;
-
-    // Icon isimlerini provider'lara eşleştiren map
-    private static final Map<String, String> PROVIDER_ICONS = Map.ofEntries(
-            entry("openai", "TbBrandOpenai"),
-            entry("google", "TbBrandGoogle"),
-            entry("anthropic", "SiAnthropic"),
-            entry("meta", "TbBrandMeta"),
-            entry("mistral", "SiMistral"),
-            entry("cohere", "SiCohere"),
-            entry("nvidia", "TbBrandNvidia"),
-            entry("microsoft", "TbMicrosoft"),
-            entry("perplexity", "TbBrain"),
-            entry("qwen", "SiQiita"),
-            entry("deepseek", "TbSearch"),
-            entry("liquid", "TbDroplet"),
-            entry("ai21", "TbNumber21"),
-            entry("x-ai", "TbBrandX")
-    );
-
-    // Varsayılan icon
-    private static final String DEFAULT_ICON = "TbBrain";
-
-    @Value("${app.load-models-on-startup:true}")
-    private boolean loadModelsOnStartup;
-
-    @Value("${app.models.default-file:newmodels.json}")
-    private String defaultModelFile;
+    private final ResourceLoader resourceLoader;
     
-    @Value("${app.models.additional-files:}")
-    private String additionalModelFiles;
+    // Model yükleme işleminin durumunu takip etmek için 
+    private final AtomicInteger loadAttempts = new AtomicInteger(0);
+    private final ReentrantLock loadLock = new ReentrantLock();
+    private final AtomicBoolean loadInProgress = new AtomicBoolean(false);
+    private LocalDateTime lastLoadTime;
+    private LocalDateTime lastSuccessfulLoadTime;
+    private String lastLoadedFile;
+    private int lastLoadedModelCount = 0;
+
+    @Value("classpath:${app.models.file:newmodels.json}")
+    private Resource modelsResource;
+    
+    @Value("${app.models.load-on-startup:true}")
+    private boolean loadOnStartup;
+    
+    @Value("${app.models.timeout-seconds:60}")
+    private int timeoutSeconds;
+    
+    @Value("${app.models.retry.max-attempts:3}")
+    private int maxRetryAttempts;
+    
+    @Value("${app.models.retry.delay-seconds:5}")
+    private int retryDelaySeconds;
+    
+    @Value("${app.providers.create-missing:true}")
+    private boolean createMissingProviders;
 
     /**
-     * Uygulama başlangıcında modelleri yükler
+     * Data transfer object to map the JSON structure to Java objects
      */
-    @PostConstruct
-    public void loadDefaultModels() {
-        if (!loadModelsOnStartup) {
-            log.info("Model otomatik yükleme devre dışı (app.load-models-on-startup=false)");
+    private static class ModelDTO {
+        public String modelId;
+        public String modelName;
+        public String provider;
+        public int maxInputTokens;
+        public String requiredPlan;
+        public int creditCost;
+        public String creditType;
+        public String category;
+        public int contextLength;
+    }
+
+    /**
+     * Loads model data when the application is ready
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    @Transactional
+    public void loadModelData() {
+        if (!loadOnStartup) {
+            log.info("Model yükleme devre dışı bırakıldı (app.models.load-on-startup=false). Manuel olarak çağrılabilir.");
             return;
         }
         
-        log.info("Varsayılan AI modelleri yükleme işlemi başlatılıyor");
+        // Concurrent yükleme isteklerini önlemek için kilit kullan
+        if (!loadLock.tryLock()) {
+            log.warn("Model yükleme işlemi zaten devam ediyor. Önceki işlem tamamlanana kadar bekleyin.");
+            return;
+        }
         
-        // Önce model sayısını kontrol et, eğer veri zaten varsa tekrar yükleme
-        modelRepository.count()
-            .flatMap(modelCount -> {
-                if (modelCount > 0) {
-                    log.info("Veritabanında zaten {} model var, varsayılan modeller yüklenmeyecek", modelCount);
-                    return Mono.just(0);
-                }
-
-                log.info("Veritabanında hiç model yok, varsayılan modeller yükleniyor");
-                return loadModelsFromFile(defaultModelFile)
-                    .onErrorResume(e -> {
-                        log.error("Varsayılan model dosyası yüklenirken hata: {}", e.getMessage());
-                        // ClassPath'de farklı konumlarda dene
-                        return loadModelsFromFile("classpath:" + defaultModelFile)
-                            .onErrorResume(e2 -> loadModelsFromFile("classpath:newmodels.json"));
-                    });
-            })
-            .subscribe(
-                count -> log.info("Varsayılan model yükleme işlemi tamamlandı: {} model yüklendi", count),
-                error -> log.error("Model yükleme işleminde hata: {}", error.getMessage(), error)
-            );
-            
-        // Ek model dosyalarını yükle (eğer belirtilmişse)
-        if (additionalModelFiles != null && !additionalModelFiles.trim().isEmpty()) {
-            String[] fileNames = additionalModelFiles.split(",");
-            for (String fileName : fileNames) {
-                if (fileName != null && !fileName.trim().isEmpty()) {
-                    loadModelsFromFile(fileName.trim())
-                        .subscribe(
-                            count -> log.info("Ek model dosyası ({}) yükleme tamamlandı: {} model yüklendi", 
-                                    fileName.trim(), count),
-                            error -> log.error("Ek model dosyası ({}) yüklenirken hata: {}", 
-                                    fileName.trim(), error.getMessage())
-                        );
-                }
+        try {
+            if (loadInProgress.getAndSet(true)) {
+                log.warn("Başka bir thread model yükleme işlemini başlattı. İşlem zaten devam ediyor.");
+                return;
             }
+            
+            log.info("AI model verilerini yükleme başlıyor - Deneme {}", loadAttempts.incrementAndGet());
+            
+            // Model yükleme işlemini timeout ile sınırla ve ayrı bir thread'de çalıştır
+            loadModelsFromFile(modelsResource.getURL().toString())
+                .timeout(Duration.ofSeconds(timeoutSeconds))
+                .subscribeOn(Schedulers.boundedElastic())
+                .doOnSuccess(count -> {
+                    lastLoadTime = LocalDateTime.now();
+                    lastSuccessfulLoadTime = LocalDateTime.now();
+                    lastLoadedModelCount = count;
+                    lastLoadedFile = modelsResource.getFilename();
+                    log.info("AI model verileri başarıyla yüklendi: {} model", count);
+                })
+                .doOnError(error -> {
+                    lastLoadTime = LocalDateTime.now();
+                    log.error("AI model verileri yüklenirken hata oluştu: {}", error.getMessage(), error);
+                    
+                    if (loadAttempts.get() < maxRetryAttempts) {
+                        log.info("{} saniye sonra yeniden deneme yapılacak ({})", 
+                                retryDelaySeconds, loadAttempts.get());
+                        try {
+                            Thread.sleep(retryDelaySeconds * 1000);
+                            loadInProgress.set(false);
+                            loadLock.unlock();
+                            loadModelData(); // Yeniden dene
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                })
+                .doFinally(signal -> {
+                    loadInProgress.set(false);
+                    if (loadLock.isHeldByCurrentThread()) {
+                        loadLock.unlock();
+                    }
+                })
+                .subscribe();
+                
+        } catch (Exception e) {
+            loadInProgress.set(false);
+            if (loadLock.isHeldByCurrentThread()) {
+                loadLock.unlock();
+            }
+            log.error("Model yükleme işlemi başlatılırken beklenmeyen hata: {}", e.getMessage(), e);
         }
     }
-    
+
     /**
-     * Belirtilen dosyadan modelleri yükler
-     * 
-     * @param filePath Model dosyasının yolu
-     * @return Yüklenen model sayısı
+     * Reads model data from the JSON file
      */
-    public Mono<Integer> loadModelsFromFile(String filePath) {
-        log.info("'{}' dosyasından AI modelleri yükleniyor", filePath);
+    private List<ModelDTO> readModelsFromJson(String filePath) throws IOException {
+        log.debug("JSON dosyasından model verilerini okuma: {}", filePath);
         
-        return readJsonContent(filePath)
-            .flatMap(jsonContent -> {
-                try {
-                    // JSON içeriğini model listesi olarak parse et
-                    List<AIModel> models = parseModelList(jsonContent);
-                    
-                    if (models.isEmpty()) {
-                        log.warn("JSON dosyasında model bulunamadı: {}", filePath);
-                        return Mono.just(0);
-                    }
-                    
-                    log.info("{} dosyasında {} model bulundu", filePath, models.size());
-                    
-                    // Modelleri doğrula ve geçersiz olanları filtrele
-                    List<AIModel> validModels = models.stream()
-                        .filter(this::validateModel)
-                        .toList();
-                    
-                    if (validModels.size() < models.size()) {
-                        log.warn("{} model geçersiz veri nedeniyle atlandı", models.size() - validModels.size());
-                    }
-                    
-                    // Provider'ları modeller üzerinden çıkar
-                    List<Provider> providers = extractProvidersFromModels(validModels);
-                    log.info("{} farklı provider bulundu", providers.size());
-                    
-                    // Önce provider'ları, sonra modelleri kaydet
-                    return saveAllProvidersThenModels(providers, validModels);
-                    
-                } catch (Exception e) {
-                    log.error("JSON işlenirken hata: {}", e.getMessage(), e);
-                    return Mono.error(e);
-                }
-            })
-            .onErrorResume(e -> {
-                log.error("Model yükleme işlemi başarısız: {}", e.getMessage(), e);
-                return Mono.just(0); // Hata durumunda 0 döndür
-            });
-    }
-    
-    /**
-     * JSON içeriğini model listesine dönüştürür
-     * 
-     * @param jsonContent JSON içeriği
-     * @return Model listesi
-     */
-    private List<AIModel> parseModelList(String jsonContent) throws JsonProcessingException {
-        try {
-            // Önce bir dizi olarak okumayı dene
-            return objectMapper.readValue(jsonContent, new TypeReference<List<AIModel>>() {});
-        } catch (JsonProcessingException e) {
-            log.warn("JSON doğrudan dizi olarak okunamadı, 'models' anahtarını deniyorum");
+        Resource resource = resourceLoader.getResource(filePath.startsWith("classpath:") || 
+                                                     filePath.startsWith("file:") || 
+                                                     filePath.startsWith("http") ? 
+            filePath : "file:" + filePath);
+        
+        if (!resource.exists()) {
+            log.error("Model dosyası bulunamadı: {}", filePath);
+            throw new IOException("Model dosyası bulunamadı: " + filePath);
+        }
+        
+        try (InputStream inputStream = resource.getInputStream()) {
+            List<ModelDTO> models = objectMapper.readValue(
+                inputStream, 
+                new TypeReference<List<ModelDTO>>() {}
+            );
+            log.info("JSON dosyasından {} model okundu", models.size());
             
-            // Eski format olabilir, "models" anahtarını dene
-            try {
-                Map<String, Object> jsonMap = objectMapper.readValue(jsonContent, new TypeReference<Map<String, Object>>() {});
-                if (jsonMap.containsKey("models")) {
-                    @SuppressWarnings("unchecked")
-                    List<Map<String, Object>> modelMaps = (List<Map<String, Object>>) jsonMap.get("models");
-                    
-                    List<AIModel> models = new ArrayList<>();
-                    for (Map<String, Object> modelMap : modelMaps) {
-                        models.add(objectMapper.convertValue(modelMap, AIModel.class));
-                    }
-                    return models;
-                }
-            } catch (Exception ignored) {
-                // İkinci deneme de başarısız olursa, asıl hatayı yeniden fırlat
-            }
+            // Okunan verileri doğrula
+            validateModels(models);
             
-            // Hiçbir format uyuşmadıysa, orijinal hatayı fırlat
+            return models;
+        } catch (IOException e) {
+            log.error("JSON dosyasından model okunamadı: {}", e.getMessage(), e);
             throw e;
         }
     }
-
-    /**
-     * Modelin geçerli olup olmadığını kontrol eder
-     * 
-     * @param model Kontrol edilecek model
-     * @return Model geçerli ise true, değilse false
-     */
-    private boolean validateModel(AIModel model) {
-        if (model.getModelId() == null || model.getModelId().trim().isEmpty()) {
-            log.warn("Geçersiz model: modelId boş");
-            return false;
-        }
-        
-        if (model.getProvider() == null || model.getProvider().trim().isEmpty()) {
-            log.warn("Geçersiz model: provider boş, model={}", model.getModelId());
-            return false;
-        }
-        
-        // Varsayılan değerleri ata, eğer eksikse
-        if (model.getMaxInputTokens() == null) {
-            model.setMaxInputTokens(8000);
-        }
-        
-        if (model.getRequiredPlan() == null) {
-            model.setRequiredPlan("FREE");
-        }
-        
-        if (model.getCreditCost() == null) {
-            model.setCreditCost(1);
-        }
-        
-        if (model.getCreditType() == null) {
-            model.setCreditType("STANDARD");
-        }
-        
-        if (model.getCategory() == null) {
-            model.setCategory(model.getRequiredPlan());
-        }
-        
-        if (model.getIsActive() == null) {
-            model.setIsActive(true);
-        }
-        
-        return true;
-    }
     
     /**
-     * Model listesinden unique provider'ları çıkarır
-     * 
-     * @param models Model listesi
-     * @return Provider listesi
+     * Validates the models read from JSON
      */
-    private List<Provider> extractProvidersFromModels(List<AIModel> models) {
-        Map<String, Provider> providerMap = new ConcurrentHashMap<>();
+    private void validateModels(List<ModelDTO> models) {
+        int invalidModels = 0;
+        List<String> invalidModelIds = new ArrayList<>();
+        Map<String, Integer> duplicateCheckMap = new HashMap<>();
         
-        for (AIModel model : models) {
-            String providerName = model.getProvider();
-            if (!providerMap.containsKey(providerName)) {
-                Provider provider = Provider.builder()
-                        .name(providerName)
-                        .icon(getProviderIcon(providerName))
-                        .description(generateProviderDescription(providerName))
-                        .build();
-                providerMap.put(providerName, provider);
-            }
-        }
-        
-        return new ArrayList<>(providerMap.values());
-    }
-    
-    /**
-     * Provider adına göre icon bulur
-     * 
-     * @param providerName Provider adı
-     * @return Icon adı
-     */
-    private String getProviderIcon(String providerName) {
-        if (providerName == null) return DEFAULT_ICON;
-        
-        String normalizedName = providerName.toLowerCase();
-        
-        // Önce tam eşleşme kontrolü
-        if (PROVIDER_ICONS.containsKey(normalizedName)) {
-            return PROVIDER_ICONS.get(normalizedName);
-        }
-        
-        // Kısmi eşleşme kontrolü
-        for (Map.Entry<String, String> entry : PROVIDER_ICONS.entrySet()) {
-            if (normalizedName.contains(entry.getKey())) {
-                return entry.getValue();
-            }
-        }
-        
-        return DEFAULT_ICON;
-    }
-    
-    /**
-     * Provider için açıklama oluşturur
-     * 
-     * @param providerName Provider adı
-     * @return Açıklama metni
-     */
-    private String generateProviderDescription(String providerName) {
-        if (providerName == null) return "AI Modelleri";
-        return providerName + " AI modelleri";
-    }
-
-    /**
-     * Önce tüm provider'ları sonra tüm modelleri kaydeder
-     * 
-     * @param providers Kaydedilecek provider listesi
-     * @param models Kaydedilecek model listesi
-     * @return Kaydedilen model sayısı
-     */
-    private Mono<Integer> saveAllProvidersThenModels(List<Provider> providers, List<AIModel> models) {
-        AtomicInteger savedModelsCount = new AtomicInteger(0);
-        
-        // Önce provider'ları kaydet, sonra modelleri kaydet
-        return Flux.fromIterable(providers)
-                .flatMap(this::saveProvider)
-                .collectList()
-                .doOnSuccess(savedProviders -> 
-                    log.info("{} provider başarıyla kaydedildi", savedProviders.size()))
-                .flatMapMany(savedProviders -> Flux.fromIterable(models))
-                .flatMap(model -> saveModel(model, savedModelsCount))
-                .collectList()
-                .map(saved -> savedModelsCount.get())
-                .onErrorResume(e -> {
-                    log.error("Toplu kayıt işleminde hata: {}", e.getMessage(), e);
-                    return Mono.just(savedModelsCount.get());
-                });
-    }
-
-    /**
-     * Provider'ı kaydeder, zaten varsa var olan kayıtı günceller
-     * 
-     * @param provider Kaydedilecek provider
-     * @return Kaydedilen veya güncellenen provider
-     */
-    private Mono<Provider> saveProvider(Provider provider) {
-        // Provider adı geçersizse atla
-        if (provider.getName() == null || provider.getName().trim().isEmpty()) {
-            log.warn("Geçersiz provider adı, provider atlanıyor");
-            return Mono.empty();
-        }
-        
-        return providerRepository.findByName(provider.getName())
-                .flatMap(existingProvider -> {
-                    log.debug("Provider '{}' zaten var, eksik bilgiler güncelleniyor", provider.getName());
-                    
-                    boolean updated = false;
-                    
-                    // Eksik bilgileri güncelle
-                    if (existingProvider.getIcon() == null && provider.getIcon() != null) {
-                        existingProvider.setIcon(provider.getIcon());
-                        updated = true;
-                    }
-                    
-                    if (existingProvider.getDescription() == null && provider.getDescription() != null) {
-                        existingProvider.setDescription(provider.getDescription());
-                        updated = true;
-                    }
-                    
-                    if (updated) {
-                        return providerRepository.save(existingProvider)
-                            .doOnSuccess(p -> log.debug("Provider güncellendi: {}", p.getName()));
-                    }
-                    
-                    return Mono.just(existingProvider);
-                })
-                .switchIfEmpty(
-                    providerRepository.save(provider)
-                        .doOnSuccess(savedProvider -> 
-                            log.info("Yeni provider kaydedildi: {}", savedProvider.getName()))
-                        .onErrorResume(e -> {
-                            if (e instanceof DuplicateKeyException) {
-                                log.warn("Provider kaydedilirken çakışma: {} - tekrar deneniyor", provider.getName());
-                                return providerRepository.findByName(provider.getName())
-                                        .switchIfEmpty(Mono.defer(() -> {
-                                            log.warn("Provider bulunamadı, yeniden kayıt deneniyor");
-                                            return providerRepository.save(Provider.builder()
-                                                    .name(provider.getName())
-                                                    .icon(provider.getIcon())
-                                                    .description(provider.getDescription())
-                                                    .build());
-                                        }));
-                            }
-                            log.error("Provider kaydedilirken beklenmeyen hata: {}", e.getMessage(), e);
-                            return Mono.empty();
-                        })
-                );
-    }
-
-    /**
-     * Modeli kaydeder ve kaydedilen model sayısını günceller
-     * 
-     * @param model Kaydedilecek model
-     * @param counter Kaydedilen model sayacı
-     * @return Kaydedilen model
-     */
-    private Mono<AIModel> saveModel(AIModel model, AtomicInteger counter) {
-        // Model ID boş veya null ise atla
-        if (model.getModelId() == null || model.getModelId().isEmpty()) {
-            log.warn("Geçersiz model ID, model atlanıyor");
-            return Mono.empty();
-        }
-
-        // Provider bilgisi boş veya null ise uyarı ver ve atla
-        if (model.getProvider() == null || model.getProvider().isEmpty()) {
-            log.warn("Provider bilgisi eksik, model atlanıyor: {}", model.getModelId());
-            return Mono.empty();
-        }
-
-        // Önce model ID'ye göre kontrol et
-        return modelRepository.findByModelId(model.getModelId())
-                .flatMap(existingModel -> {
-                    log.debug("Model ID '{}' zaten var, güncelleniyor", model.getModelId());
-                    // ID ve oluşturma bilgilerini koru, diğer alanları güncelle 
-                    model.setId(existingModel.getId());
-                    return modelRepository.save(model)
-                            .doOnSuccess(updatedModel -> 
-                                log.debug("Model güncellendi: {}", updatedModel.getModelId()));
-                })
-                .switchIfEmpty(
-                        modelRepository.save(model)
-                                .doOnSuccess(savedModel -> {
-                                    counter.incrementAndGet();
-                                    log.info("Yeni model kaydedildi: {} - {}", 
-                                            savedModel.getModelId(), savedModel.getModelName());
-                                })
-                )
-                .onErrorResume(e -> {
-                    if (e instanceof DuplicateKeyException) {
-                        log.warn("Model kaydedilirken çakışma: {} - atlanıyor", model.getModelId());
-                    } else {
-                        log.error("Model '{}' kaydedilirken hata: {}", 
-                                model.getModelId(), e.getMessage(), e);
-                    }
-                    return Mono.empty();
-                });
-    }
-
-    /**
-     * JSON içeriğini dosya yolundan veya classpath'den okur
-     * 
-     * @param jsonFilePath JSON dosyasının yolu
-     * @return JSON içeriği
-     */
-    private Mono<String> readJsonContent(String jsonFilePath) {
-        try {
-            Resource resource;
+        for (ModelDTO model : models) {
+            boolean isValid = true;
+            StringBuilder errors = new StringBuilder();
             
-            // Kaynak türüne göre Resource nesnesi oluştur
-            if (jsonFilePath.startsWith("classpath:")) {
-                // ClassPath kaynaklarını yükle
-                String path = jsonFilePath.substring("classpath:".length());
-                resource = resourceLoader.getResource("classpath:" + path);
-                log.debug("ClassPath kaynağı yükleniyor: {}", path);
-            } else if (Files.exists(Paths.get(jsonFilePath))) {
-                // Dosya sisteminden yükle
-                resource = resourceLoader.getResource("file:" + jsonFilePath);
-                log.debug("Dosya sisteminden kaynak yükleniyor: {}", jsonFilePath);
+            if (model.modelId == null || model.modelId.isEmpty()) {
+                errors.append("modelId boş olamaz; ");
+                isValid = false;
             } else {
-                // Önce sınıf yolunda ara
-                resource = new ClassPathResource(jsonFilePath);
-                if (!resource.exists()) {
-                    // Sonra genel resources klasöründe ara
-                    resource = resourceLoader.getResource("classpath:" + jsonFilePath);
-                    if (!resource.exists()) {
-                        return Mono.error(new IOException("Dosya bulunamadı: " + jsonFilePath));
+                // Yinelenen modelId'leri kontrol et
+                duplicateCheckMap.put(model.modelId, duplicateCheckMap.getOrDefault(model.modelId, 0) + 1);
+                if (duplicateCheckMap.get(model.modelId) > 1) {
+                    errors.append("Yinelenen modelId: ").append(model.modelId).append("; ");
+                    isValid = false;
+                }
+            }
+            
+            if (model.modelName == null || model.modelName.isEmpty()) {
+                errors.append("modelName boş olamaz; ");
+                isValid = false;
+            }
+            
+            if (model.provider == null || model.provider.isEmpty()) {
+                errors.append("provider boş olamaz; ");
+                isValid = false;
+            }
+            
+            if (model.maxInputTokens <= 0) {
+                errors.append("maxInputTokens 0'dan büyük olmalı; ");
+                isValid = false;
+            }
+            
+            if (model.contextLength <= 0) {
+                errors.append("contextLength 0'dan büyük olmalı; ");
+                isValid = false;
+            }
+            
+            if (!isValid) {
+                log.warn("Geçersiz model verisi: {} - {}", model.modelId, errors.toString());
+                invalidModels++;
+                invalidModelIds.add(model.modelId);
+            }
+        }
+        
+        if (invalidModels > 0) {
+            log.warn("{} model geçersiz veri içeriyor: {}", invalidModels, String.join(", ", invalidModelIds));
+            
+            // Kritik doğrulama başarısız olursa işlemi durdur
+            if (invalidModels > models.size() * 0.2) { // %20'den fazla model geçersizse
+                throw new IllegalArgumentException("Model dosyasında çok fazla geçersiz veri bulundu: " + 
+                    invalidModels + " / " + models.size());
+            }
+        }
+        
+        // Yinelenen modelId'leri kontrol et ve raporla
+        List<String> duplicateModelIds = duplicateCheckMap.entrySet().stream()
+            .filter(e -> e.getValue() > 1)
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toList());
+            
+        if (!duplicateModelIds.isEmpty()) {
+            log.warn("Yinelenen modelId'ler tespit edildi: {}", duplicateModelIds);
+        }
+    }
+
+    /**
+     * Loads model data from a specified file path
+     */
+    public Mono<Integer> loadModelsFromFile(String filePath) {
+        log.info("Dosyadan AI model verilerini yükleme: {}", filePath);
+        
+        if (loadInProgress.get() && !loadLock.isHeldByCurrentThread()) {
+            log.warn("Model yükleme işlemi zaten devam ediyor. İşlem tamamlanana kadar bekleyin.");
+            return Mono.error(new IllegalStateException("Model yükleme işlemi zaten devam ediyor"));
+        }
+        
+        return Mono.fromCallable(() -> readModelsFromJson(filePath))
+            .flatMap(modelDTOs -> {
+                log.info("Dosyadan {} model okundu: {}", modelDTOs.size(), filePath);
+                
+                // Provider'ları önce işle
+                return saveProvidersReactive(modelDTOs)
+                    .flatMap(providerMap -> {
+                        // Sonra modelleri işle
+                        return saveModelsReactive(modelDTOs, providerMap)
+                            .doOnSuccess(count -> {
+                                log.info("Toplam {} model başarıyla kaydedildi", count);
+                                lastLoadedModelCount = count;
+                                lastLoadedFile = filePath;
+                            });
+                    });
+            })
+            .retryWhen(Retry.backoff(2, Duration.ofSeconds(2))
+                .filter(e -> !(e instanceof IllegalArgumentException)) // Doğrulama hatalarını yeniden deneme
+                .doBeforeRetry(rs -> log.warn("Model yükleme hatası, yeniden deneniyor: {} ({})", 
+                    rs.failure().getMessage(), rs.totalRetries())))
+            .onErrorResume(e -> {
+                log.error("Model yükleme işlemi başarısız oldu: {}", e.getMessage(), e);
+                return Mono.error(e);
+            });
+    }
+
+    /**
+     * Reactive version of saveProviders
+     */
+    private Mono<Map<String, Provider>> saveProvidersReactive(List<ModelDTO> modelDTOs) {
+        // Benzersiz provider isimlerini çıkar
+        Set<String> uniqueProviderNames = modelDTOs.stream()
+                .map(dto -> dto.provider)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        
+        log.info("{} benzersiz provider bulundu", uniqueProviderNames.size());
+        
+        // Veritabanından mevcut provider'ları getir
+        return providerRepository.findAll()
+                .collectList()
+                .flatMap(existingProviders -> {
+                    Map<String, Provider> existingProviderMap = existingProviders.stream()
+                            .collect(Collectors.toMap(
+                                Provider::getName, 
+                                provider -> provider,
+                                (p1, p2) -> p1 // Duplicate names durumunda ilkini kullan
+                            ));
+                    
+                    // Henüz var olmayan provider'lar için yenilerini oluştur
+                    Map<String, Provider> providerMap = new ConcurrentHashMap<>(existingProviderMap);
+                    List<Provider> newProviders = new ArrayList<>();
+                    List<Provider> updatedProviders = new ArrayList<>();
+                    
+                    for (String providerName : uniqueProviderNames) {
+                        if (!providerMap.containsKey(providerName)) {
+                            if (!createMissingProviders) {
+                                log.warn("Provider bulunamadı ve otomatik oluşturma devre dışı: {}", providerName);
+                                continue;
+                            }
+                            
+                            Provider newProvider = new Provider();
+                            newProvider.setName(providerName);
+                            newProvider.setActive(true);
+                            newProvider.setCreatedAt(LocalDateTime.now());
+                            newProvider.setUpdatedAt(LocalDateTime.now());
+                            newProviders.add(newProvider);
+                            log.info("Yeni provider hazırlanıyor: {}", providerName);
+                        } else {
+                            // Mevcut provider'ı güncelle
+                            Provider existingProvider = providerMap.get(providerName);
+                            if (!existingProvider.isActive()) {
+                                existingProvider.setActive(true);
+                                existingProvider.setUpdatedAt(LocalDateTime.now());
+                                updatedProviders.add(existingProvider);
+                                log.info("Provider yeniden aktifleştiriliyor: {}", providerName);
+                            }
+                        }
                     }
-                }
+                    
+                    // Önce yeni provider'ları kaydet
+                    Mono<List<Provider>> saveNewProvidersMono = newProviders.isEmpty() ? 
+                        Mono.just(Collections.emptyList()) : 
+                        providerRepository.saveAll(newProviders).collectList();
+                    
+                    // Sonra güncellenen provider'ları kaydet
+                    Mono<List<Provider>> updateProvidersMono = updatedProviders.isEmpty() ? 
+                        Mono.just(Collections.emptyList()) : 
+                        providerRepository.saveAll(updatedProviders).collectList();
+                    
+                    // Her iki işlemi de tamamla ve providerMap'i döndür
+                    return saveNewProvidersMono.flatMap(savedNewProviders -> {
+                        // Yeni provider'ları map'e ekle
+                        for (Provider provider : savedNewProviders) {
+                            providerMap.put(provider.getName(), provider);
+                            log.debug("Yeni provider kaydedildi: {}", provider.getName());
+                        }
+                        
+                        return updateProvidersMono.map(updatedProvidersList -> {
+                            // Güncellenen provider'ları map'e ekle (aslında zaten var)
+                            for (Provider provider : updatedProvidersList) {
+                                log.debug("Provider güncellendi: {}", provider.getName());
+                            }
+                            
+                            log.info("Toplam {} provider işlendi ({} yeni, {} güncellendi)", 
+                                savedNewProviders.size() + updatedProvidersList.size(),
+                                savedNewProviders.size(), 
+                                updatedProvidersList.size());
+                                
+                            return providerMap;
+                        });
+                    });
+                });
+    }
+
+    /**
+     * Reactive version of saveModels
+     */
+    private Mono<Integer> saveModelsReactive(List<ModelDTO> modelDTOs, Map<String, Provider> providerMap) {
+        // Sayaç sınıfı ile istatistikleri takip et
+        class ModelCounter {
+            int updatedCount = 0;
+            int newCount = 0;
+            int errorCount = 0;
+            int skippedCount = 0;
+        }
+        
+        // Veritabanından mevcut modelleri getir
+        return aiModelRepository.findAll()
+                .collectList()
+                .flatMap(existingModels -> {
+                    Map<String, AIModel> existingModelMap = existingModels.stream()
+                            .collect(Collectors.toMap(
+                                AIModel::getModelId, 
+                                model -> model,
+                                (m1, m2) -> m1 // Duplicate IDs durumunda ilkini kullan
+                            ));
+                    
+                    List<AIModel> modelsToSave = new ArrayList<>();
+                    ModelCounter counter = new ModelCounter();
+                    List<String> processedModelIds = new ArrayList<>();
+                    
+                    for (ModelDTO dto : modelDTOs) {
+                        try {
+                            // Eğer bu modelId zaten işlendiyse, atla (yinelenen modelId'ler için)
+                            if (processedModelIds.contains(dto.modelId)) {
+                                log.warn("Yinelenen modelId atlanıyor: {}", dto.modelId);
+                                counter.skippedCount++;
+                                continue;
+                            }
+                            
+                            processedModelIds.add(dto.modelId);
+                            
+                            Provider provider = providerMap.get(dto.provider);
+                            
+                            if (provider == null) {
+                                log.warn("Model için provider bulunamadı {}: {}", dto.modelId, dto.provider);
+                                counter.errorCount++;
+                                continue;
+                            }
+                            
+                            AIModel model;
+                            boolean isNewModel = false;
+                            
+                            // Modelin halihazırda var olup olmadığını kontrol et
+                            if (existingModelMap.containsKey(dto.modelId)) {
+                                // Mevcut modeli güncelle
+                                model = existingModelMap.get(dto.modelId);
+                                counter.updatedCount++;
+                            } else {
+                                // Yeni model oluştur
+                                model = new AIModel();
+                                model.setModelId(dto.modelId);
+                                model.setCreatedAt(LocalDateTime.now());
+                                isNewModel = true;
+                                counter.newCount++;
+                            }
+                            
+                            // Model alanlarını güncelle
+                            model.setModelName(dto.modelName);
+                            model.setProviderId(provider.getId());
+                            model.setProvider(provider.getName()); 
+                            model.setMaxInputTokens(dto.maxInputTokens);
+                            model.setRequiredPlan(dto.requiredPlan);
+                            model.setCreditCost(dto.creditCost);
+                            model.setCreditType(dto.creditType);
+                            model.setCategory(dto.category);
+                            model.setContextLength(dto.contextLength);
+                            model.setActive(true);
+                            model.setUpdatedAt(LocalDateTime.now());
+                            
+                            modelsToSave.add(model);
+                            
+                            if (isNewModel) {
+                                log.debug("Yeni model hazırlandı: {}", dto.modelId);
+                            } else {
+                                log.debug("Mevcut model güncellendi: {}", dto.modelId);
+                            }
+                        } catch (Exception e) {
+                            log.error("Model işlenirken hata oluştu {}: {}", dto.modelId, e.getMessage(), e);
+                            counter.errorCount++;
+                        }
+                    }
+                    
+                    if (!modelsToSave.isEmpty()) {
+                        log.info("{} model kaydediliyor ({} yeni, {} güncelleme, {} hatalı, {} atlandı)", 
+                            modelsToSave.size(), counter.newCount, counter.updatedCount, 
+                            counter.errorCount, counter.skippedCount);
+                            
+                        // Modelleri toplu olarak kaydet, daha verimli
+                        return aiModelRepository.saveAll(modelsToSave)
+                                .collectList()
+                                .map(savedModels -> {
+                                    log.info("{} model başarıyla kaydedildi", savedModels.size());
+                                    if (counter.errorCount > 0) {
+                                        log.warn("{} modelde hata oluştu ve kaydedilemedi", counter.errorCount);
+                                    }
+                                    return modelsToSave.size();
+                                });
+                    } else {
+                        log.info("Kaydedilecek model yok");
+                        return Mono.just(0);
+                    }
+                });
+    }
+    
+    /**
+     * Manual trigger for reloading model data
+     */
+    public Mono<Integer> reloadModelData() {
+        log.info("Model verilerinin manuel olarak yeniden yüklenmesi başlatılıyor");
+        loadAttempts.set(0); // Sayaçları sıfırla
+        
+        // Kilit kullanarak concurrent yükleme isteklerini önle
+        if (!loadLock.tryLock()) {
+            log.warn("Model yükleme işlemi zaten devam ediyor. İşlem tamamlanana kadar bekleyin.");
+            return Mono.error(new IllegalStateException("Model yükleme işlemi zaten devam ediyor"));
+        }
+        
+        try {
+            if (loadInProgress.getAndSet(true)) {
+                loadLock.unlock();
+                log.warn("Başka bir thread model yükleme işlemini başlattı. İşlem zaten devam ediyor.");
+                return Mono.error(new IllegalStateException("Model yükleme işlemi zaten devam ediyor"));
             }
             
-            log.info("Model dosyası bulundu: {}", resource.getURI());
-            
-            try (InputStream inputStream = resource.getInputStream()) {
-                byte[] bytes = inputStream.readAllBytes();
-                String content = new String(bytes, StandardCharsets.UTF_8);
-                
-                if (content.isEmpty()) {
-                    return Mono.error(new IOException("JSON dosyası boş: " + jsonFilePath));
-                }
-                
-                log.debug("JSON içeriği başarıyla okundu ({} karakter)", content.length());
-                return Mono.just(content);
-            }
-        } catch (IOException e) {
-            log.error("JSON dosyası okunamadı: {}", e.getMessage(), e);
+            return loadModelsFromFile(modelsResource.getURL().toString())
+                .timeout(Duration.ofSeconds(timeoutSeconds))
+                .doOnSuccess(count -> {
+                    lastLoadTime = LocalDateTime.now();
+                    lastSuccessfulLoadTime = LocalDateTime.now();
+                    log.info("AI model verileri başarıyla yüklendi: {} model", count);
+                })
+                .doOnError(error -> {
+                    lastLoadTime = LocalDateTime.now();
+                    log.error("AI model verileri yüklenirken hata oluştu: {}", error.getMessage());
+                })
+                .doFinally(signal -> {
+                    loadInProgress.set(false);
+                    loadLock.unlock();
+                });
+        } catch (Exception e) {
+            loadInProgress.set(false);
+            loadLock.unlock();
+            log.error("Model yükleme işlemi başlatılırken beklenmeyen hata: {}", e.getMessage(), e);
             return Mono.error(e);
         }
+    }
+    
+    /**
+     * Get current model loading status
+     */
+    public Map<String, Object> getModelLoadingStatus() {
+        Map<String, Object> status = new HashMap<>();
+        status.put("loadInProgress", loadInProgress.get());
+        status.put("loadAttempts", loadAttempts.get());
+        status.put("lastLoadTime", lastLoadTime);
+        status.put("lastSuccessfulLoadTime", lastSuccessfulLoadTime);
+        status.put("configuredModelFile", modelsResource.getFilename());
+        status.put("lastLoadedFile", lastLoadedFile);
+        status.put("lastLoadedModelCount", lastLoadedModelCount);
+        return status;
     }
 }

@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -21,6 +22,7 @@ public class AIModel {
     private String modelId;  
     private String modelName;
     private String provider;
+    private String providerId;
     private Integer maxInputTokens;
     private String requiredPlan;
     private Integer creditCost;
@@ -28,4 +30,15 @@ public class AIModel {
     private String category;
     private Integer contextLength;
     private Boolean isActive;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    
+    // Additional helper methods
+    public void setActive(boolean active) {
+        this.isActive = active;
+    }
+    
+    public boolean getActive() {
+        return this.isActive != null ? this.isActive : false;
+    }
 }

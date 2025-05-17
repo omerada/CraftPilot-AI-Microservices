@@ -16,7 +16,9 @@ import reactor.core.publisher.Mono;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -157,13 +159,31 @@ public class UserPreferenceService {
     public Mono<UserPreference> updateAiModelFavorites(String userId, List<String> favorites) {
         return getUserPreferences(userId)
                 .flatMap(preferences -> {
-                    preferences.setAiModelFavorites(favorites);
+                    // Null kontrolü yap
+                    if (favorites == null) {
+                        log.warn("Null favorites listesi geldi: userId={}", userId);
+                        return Mono.error(new IllegalArgumentException("Favorites listesi null olamaz"));
+                    }
+                    
+                    // Yinelenen model ID'leri önlemek için favori listesini distinct hale getir
+                    List<String> distinctFavorites = favorites.stream()
+                            .filter(Objects::nonNull)
+                            .filter(id -> !id.trim().isEmpty())
+                            .distinct()
+                            .collect(Collectors.toList());
+                    
+                    if (distinctFavorites.size() != favorites.size()) {
+                        log.info("Favori modellerden null, boş veya yinelenen değerler temizlendi: userId={}, original={}, distinct={}",
+                                userId, favorites.size(), distinctFavorites.size());
+                    }
+                    
+                    preferences.setAiModelFavorites(distinctFavorites);
                     preferences.setUpdatedAt(System.currentTimeMillis());
                     return userPreferenceRepository.save(preferences)
                             .flatMap(savedPreference -> redisCacheService.saveUserPreferences(savedPreference))
                             .doOnSuccess(savedPreference -> {
-                                log.info("Kullanıcı favori AI modelleri güncellendi: userId={}",
-                                        savedPreference.getUserId());
+                                log.info("Kullanıcı favori AI modelleri güncellendi: userId={}, favorites={}",
+                                        savedPreference.getUserId(), distinctFavorites);
                                 sendUserPreferenceEvent(savedPreference, "USER_FAVORITES_UPDATED");
                             });
                 });
