@@ -40,4 +40,14 @@ public class Provider {
         // Null değerleri için varsayılan değer kullan
         this.name = (name != null && !name.trim().isEmpty()) ? name : "Bilinmeyen";
     }
+    
+    /**
+     * Builder ile oluşturulan nesnelerde name alanı kontrolü için
+     */
+    public static class ProviderBuilder {
+        public ProviderBuilder name(String name) {
+            this.name = (name != null && !name.trim().isEmpty()) ? name : "Bilinmeyen";
+            return this;
+        }
+    }
 }

@@ -303,13 +303,24 @@ public class ModelDataLoader {
      * Reactive version of saveProviders
      */
     private Mono<Map<String, Provider>> saveProvidersReactive(List<ModelDTO> modelDTOs) {
-        // Benzersiz provider isimlerini çıkar
+        // Benzersiz provider isimlerini çıkar ve null/boş olanları filtrele
         Set<String> uniqueProviderNames = modelDTOs.stream()
                 .map(dto -> dto.provider)
-                .filter(Objects::nonNull)
+                .filter(providerName -> providerName != null && !providerName.trim().isEmpty())
                 .collect(Collectors.toSet());
         
         log.info("{} benzersiz provider bulundu", uniqueProviderNames.size());
+        
+        // Eğer toplamdan daha az provider bulunduysa, bazı null/boş olanlar filtrelenmiş demektir
+        long originalProviderCount = modelDTOs.stream()
+                .map(dto -> dto.provider)
+                .distinct()
+                .count();
+                
+        if (originalProviderCount > uniqueProviderNames.size()) {
+            log.warn("{} model null veya boş provider içeriyor ve işlenmeyecek", 
+                    originalProviderCount - uniqueProviderNames.size());
+        }
         
         // Veritabanından mevcut provider'ları getir
         return providerRepository.findAll()
@@ -328,19 +339,27 @@ public class ModelDataLoader {
                     List<Provider> updatedProviders = new ArrayList<>();
                     
                     for (String providerName : uniqueProviderNames) {
+                        // Ekstra kontrol: yine de null/boş kontrolü yapalım
+                        if (providerName == null || providerName.trim().isEmpty()) {
+                            log.warn("Null veya boş provider ismi filtreleme sonrası bulundu, atlanıyor");
+                            continue;
+                        }
+                        
                         if (!providerMap.containsKey(providerName)) {
                             if (!createMissingProviders) {
                                 log.warn("Provider bulunamadı ve otomatik oluşturma devre dışı: {}", providerName);
                                 continue;
                             }
                             
-                            Provider newProvider = new Provider();
-                            newProvider.setName(providerName);
-                            newProvider.setActive(true);
-                            newProvider.setCreatedAt(LocalDateTime.now());
-                            newProvider.setUpdatedAt(LocalDateTime.now());
+                            Provider newProvider = Provider.builder()
+                                .name(providerName)
+                                .active(true)
+                                .createdAt(LocalDateTime.now())
+                                .updatedAt(LocalDateTime.now())
+                                .build();
+                                
                             newProviders.add(newProvider);
-                            log.info("Yeni provider hazırlanıyor: {}", providerName);
+                            log.info("Yeni provider hazırlanıyor: {}", newProvider.getName());
                         } else {
                             // Mevcut provider'ı güncelle
                             Provider existingProvider = providerMap.get(providerName);
@@ -398,6 +417,7 @@ public class ModelDataLoader {
             int newCount = 0;
             int errorCount = 0;
             int skippedCount = 0;
+            int invalidProviderCount = 0;
         }
         
         // Veritabanından mevcut modelleri getir
@@ -417,6 +437,13 @@ public class ModelDataLoader {
                     
                     for (ModelDTO dto : modelDTOs) {
                         try {
+                            // ModelId kontrolü
+                            if (dto.modelId == null || dto.modelId.trim().isEmpty()) {
+                                log.warn("ModelId null veya boş, model atlanıyor");
+                                counter.skippedCount++;
+                                continue;
+                            }
+                            
                             // Eğer bu modelId zaten işlendiyse, atla (yinelenen modelId'ler için)
                             if (processedModelIds.contains(dto.modelId)) {
                                 log.warn("Yinelenen modelId atlanıyor: {}", dto.modelId);
@@ -425,6 +452,13 @@ public class ModelDataLoader {
                             }
                             
                             processedModelIds.add(dto.modelId);
+                            
+                            // Provider kontrolü
+                            if (dto.provider == null || dto.provider.trim().isEmpty()) {
+                                log.warn("Model için provider null veya boş: {}", dto.modelId);
+                                counter.invalidProviderCount++;
+                                continue;
+                            }
                             
                             Provider provider = providerMap.get(dto.provider);
                             
@@ -478,10 +512,10 @@ public class ModelDataLoader {
                     }
                     
                     if (!modelsToSave.isEmpty()) {
-                        log.info("{} model kaydediliyor ({} yeni, {} güncelleme, {} hatalı, {} atlandı)", 
+                        log.info("{} model kaydediliyor ({} yeni, {} güncelleme, {} hatalı, {} atlandı, {} geçersiz provider)", 
                             modelsToSave.size(), counter.newCount, counter.updatedCount, 
-                            counter.errorCount, counter.skippedCount);
-                            
+                            counter.errorCount, counter.skippedCount, counter.invalidProviderCount);
+                        
                         // Modelleri toplu olarak kaydet, daha verimli
                         return aiModelRepository.saveAll(modelsToSave)
                                 .collectList()
