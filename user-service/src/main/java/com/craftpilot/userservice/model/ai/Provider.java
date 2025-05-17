@@ -8,6 +8,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Data
 @Builder
@@ -37,8 +38,12 @@ public class Provider {
      * @param name atanacak name değeri
      */
     public void setName(String name) {
-        // Null değerleri için varsayılan değer kullan
-        this.name = (name != null && !name.trim().isEmpty()) ? name : "Bilinmeyen";
+        // Null değerleri için benzersiz varsayılan değer kullan
+        if (name == null || name.trim().isEmpty()) {
+            this.name = "Bilinmeyen-" + UUID.randomUUID().toString().substring(0, 8);
+        } else {
+            this.name = name;
+        }
     }
     
     /**
@@ -46,7 +51,11 @@ public class Provider {
      */
     public static class ProviderBuilder {
         public ProviderBuilder name(String name) {
-            this.name = (name != null && !name.trim().isEmpty()) ? name : "Bilinmeyen";
+            if (name == null || name.trim().isEmpty()) {
+                this.name = "Bilinmeyen-" + UUID.randomUUID().toString().substring(0, 8);
+            } else {
+                this.name = name;
+            }
             return this;
         }
     }

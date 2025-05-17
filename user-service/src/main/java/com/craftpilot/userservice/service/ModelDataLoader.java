@@ -107,13 +107,18 @@ public class ModelDataLoader {
         try {
             if (loadInProgress.getAndSet(true)) {
                 log.warn("Başka bir thread model yükleme işlemini başlattı. İşlem zaten devam ediyor.");
+                loadLock.unlock();
                 return;
             }
             
             log.info("AI model verilerini yükleme başlıyor - Deneme {}", loadAttempts.incrementAndGet());
             
+            // Tam dosya yolunu oluştur
+            String resourcePath = modelsResource.getURL().toString();
+            log.info("Model dosyası yolu: {}", resourcePath);
+            
             // Model yükleme işlemini timeout ile sınırla ve ayrı bir thread'de çalıştır
-            loadModelsFromFile(modelsResource.getURL().toString())
+            loadModelsFromFile(resourcePath)
                 .timeout(Duration.ofSeconds(timeoutSeconds))
                 .subscribeOn(Schedulers.boundedElastic())
                 .doOnSuccess(count -> {
@@ -163,14 +168,31 @@ public class ModelDataLoader {
     private List<ModelDTO> readModelsFromJson(String filePath) throws IOException {
         log.debug("JSON dosyasından model verilerini okuma: {}", filePath);
         
-        Resource resource = resourceLoader.getResource(filePath.startsWith("classpath:") || 
-                                                     filePath.startsWith("file:") || 
-                                                     filePath.startsWith("http") ? 
-            filePath : "file:" + filePath);
+        Resource resource;
+        
+        // Create proper resource based on path
+        if (filePath.startsWith("classpath:")) {
+            resource = resourceLoader.getResource(filePath);
+        } else if (filePath.startsWith("file:") || filePath.startsWith("http")) {
+            resource = resourceLoader.getResource(filePath);
+        } else {
+            // Assume it's a file path if no prefix provided
+            resource = resourceLoader.getResource("file:" + filePath);
+            // Fall back to classpath if file not found
+            if (!resource.exists()) {
+                log.info("Dosya yerelde bulunamadı, classpath'te aranıyor: {}", filePath);
+                resource = resourceLoader.getResource("classpath:" + filePath);
+            }
+        }
         
         if (!resource.exists()) {
             log.error("Model dosyası bulunamadı: {}", filePath);
-            throw new IOException("Model dosyası bulunamadı: " + filePath);
+            // Try to fall back to the default location
+            resource = resourceLoader.getResource("classpath:newmodels.json");
+            if (!resource.exists()) {
+                throw new IOException("Model dosyası bulunamadı: " + filePath + " ve varsayılan dosya da bulunamadı");
+            }
+            log.info("Varsayılan model dosyası kullanılıyor: newmodels.json");
         }
         
         try (InputStream inputStream = resource.getInputStream()) {
@@ -178,7 +200,16 @@ public class ModelDataLoader {
                 inputStream, 
                 new TypeReference<List<ModelDTO>>() {}
             );
-            log.info("JSON dosyasından {} model okundu", models.size());
+            log.info("JSON dosyasından {} model okundu: {}", models.size(), resource.getFilename());
+            
+            // Log the first few models for debugging
+            if (!models.isEmpty()) {
+                int sampleSize = Math.min(models.size(), 3);
+                List<String> sampleModels = models.subList(0, sampleSize).stream()
+                    .map(m -> m.modelId + " (" + m.provider + ")")
+                    .collect(Collectors.toList());
+                log.info("Örnek modeller: {}", String.join(", ", sampleModels));
+            }
             
             // Okunan verileri doğrula
             validateModels(models);
@@ -309,6 +340,16 @@ public class ModelDataLoader {
         if (originalProviderCount > uniqueProviderNames.size()) {
             log.warn("{} model null veya boş provider içeriyor ve işlenmeyecek", 
                     originalProviderCount - uniqueProviderNames.size());
+            
+            // Uyarı: Null/boş provider içeren model ID'lerini raporla
+            List<String> problematicModels = modelDTOs.stream()
+                    .filter(dto -> dto.provider == null || dto.provider.trim().isEmpty())
+                    .map(dto -> dto.modelId != null ? dto.modelId : "bilinmeyen model")
+                    .collect(Collectors.toList());
+            
+            if (!problematicModels.isEmpty()) {
+                log.warn("Null/boş provider içeren modeller: {}", String.join(", ", problematicModels));
+            }
         }
         
         // Veritabanından mevcut provider'ları getir
@@ -341,6 +382,12 @@ public class ModelDataLoader {
                             }
                             
                             Provider newProvider = createProvider(providerName, null);
+                            
+                            // Ekstra güvenlik: Adın null olmadığından emin ol
+                            if (newProvider.getName() == null) {
+                                log.error("Provider oluşturma hatası: null isim. Orijinal isim: {}", providerName);
+                                continue;
+                            }
                                 
                             newProviders.add(newProvider);
                             log.info("Yeni provider hazırlanıyor: {}", newProvider.getName());
@@ -437,9 +484,9 @@ public class ModelDataLoader {
                             
                             processedModelIds.add(dto.modelId);
                             
-                            // Provider kontrolü
+                            // Provider kontrolü - null veya boş provider'ları atla
                             if (dto.provider == null || dto.provider.trim().isEmpty()) {
-                                log.warn("Model için provider null veya boş: {}", dto.modelId);
+                                log.warn("Model için provider null veya boş: {}, bu model atlanıyor", dto.modelId);
                                 counter.invalidProviderCount++;
                                 continue;
                             }
@@ -447,7 +494,7 @@ public class ModelDataLoader {
                             Provider provider = providerMap.get(dto.provider);
                             
                             if (provider == null) {
-                                log.warn("Model için provider bulunamadı {}: {}", dto.modelId, dto.provider);
+                                log.warn("Model için provider bulunamadı {}: {}, bu model atlanıyor", dto.modelId, dto.provider);
                                 counter.errorCount++;
                                 continue;
                             }
@@ -580,9 +627,14 @@ public class ModelDataLoader {
      * Provider oluşturma işlemini gerçekleştiren yardımcı metod
      */
     private Provider createProvider(String name, String description) {
+        if (name == null || name.trim().isEmpty()) {
+            name = "Bilinmeyen-" + UUID.randomUUID().toString().substring(0, 8);
+            log.warn("Null veya boş provider ismi yerine benzersiz değer oluşturuldu: {}", name);
+        }
+
         return Provider.builder()
                 .name(name)
-                .description(description)
+                .description(description != null ? description : name + " Provider")
                 .active(true)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
