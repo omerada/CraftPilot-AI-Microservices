@@ -11,7 +11,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
 
 @Data
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "ai_models")
@@ -32,7 +32,10 @@ public class AIModel {
     private String creditType;
     private String category;
     private Integer contextLength;
+    
+    @Builder.Default
     private boolean active = true;
+    
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
