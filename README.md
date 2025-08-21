@@ -1,4 +1,4 @@
-# 🚀 CraftPilot AI - Saas Backend Platform
+# 🚀 CraftPilot AI - SaaS Backend Platform
 
 <div align="center">
 
