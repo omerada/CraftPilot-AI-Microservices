@@ -195,14 +195,14 @@ jobs:
               -e SPRING_CLOUD_STREAM_BINDINGS_PROCESSNOTIFICATION_OUT_0_DESTINATION=notifications \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
+              -e REDIS_PASSWORD=TEST123 \
               -e SPRING_DATA_REDIS_HOST=redis \
               -e SPRING_DATA_REDIS_PORT=6379 \
-              -e SPRING_DATA_REDIS_PASSWORD=13579ada \
+              -e SPRING_DATA_REDIS_PASSWORD=TEST123 \
               -e MONGODB_URI="${MONGODB_URI}" \
               -e SPRING_DATA_MONGODB_URI="${MONGODB_URI}" \
               -e SPRING_DATA_MONGODB_DATABASE=craftpilot_notification_db \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:TEST123@eureka-server:8761/eureka/ \
               -e SPRING_MAIL_SENDGRID_FROM='${{ secrets.SENDGRID_FROM_EMAIL }}' \
               -e SPRING_MAIL_HOST=smtp.sendgrid.net \
               -e SPRING_MAIL_PORT=587 \

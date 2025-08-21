@@ -170,7 +170,7 @@ spring:
     redis:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:13579ada}
+      password: ${REDIS_PASSWORD:TEST123}
 
   httpclient:
     connect-timeout: 30000
@@ -221,7 +221,7 @@ eureka:
       management.context-path: ${server.servlet.context-path:/actuator}
   client:
     service-url:
-      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://craftpilot:${EUREKA_PASSWORD:13579ada}@eureka-server:8761/eureka/}
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://craftpilot:${EUREKA_PASSWORD:TEST123}@eureka-server:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
     registry-fetch-interval-seconds: 5

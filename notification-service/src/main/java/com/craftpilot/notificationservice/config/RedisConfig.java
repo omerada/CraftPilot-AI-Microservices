@@ -29,7 +29,7 @@ public class RedisConfig {
     @Value("${spring.data.redis.port:6379}")
     private int redisPort;
 
-    @Value("${spring.data.redis.password:13579ada}")
+    @Value("${spring.data.redis.password:TEST123}")
     private String redisPassword;
 
     @Value("${spring.data.redis.timeout:10000}")

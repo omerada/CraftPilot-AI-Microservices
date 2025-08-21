@@ -32,7 +32,7 @@ spring:
     redis:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:13579ada}
+      password: ${REDIS_PASSWORD:TEST123}
       timeout: 10000
       connect-timeout: 10000
       client-type: lettuce
@@ -88,7 +88,7 @@ management:
 eureka:
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8761/eureka/}
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:TEST123@eureka-server:8761/eureka/}
     register-with-eureka: true
     fetch-registry: true
   instance:

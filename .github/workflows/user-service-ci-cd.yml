@@ -120,7 +120,7 @@ jobs:
             rm -rf ~/.m2/repository/com/craftpilot/redis-client-lib || true
 
             echo "Cleaning Redis cache related to user-service..."
-            docker exec -i redis redis-cli -a 13579ada KEYS "user:preferences:*" | xargs -r docker exec -i redis redis-cli -a 13579ada DEL || true
+            docker exec -i redis redis-cli -a TEST123 KEYS "user:preferences:*" | xargs -r docker exec -i redis redis-cli -a TEST123 DEL || true
 
             echo "=== Testing Directory Access ==="
             mkdir -p /opt/craftpilot
@@ -189,14 +189,14 @@ jobs:
                 -e SPRING_DATA_MONGODB_SOCKET_TIMEOUT=60000 \
                 -e SPRING_DATA_MONGODB_MAX_CONNECTION_IDLE_TIME=300000 \
                 -e SPRING_DATA_MONGODB_CONNECTION_POOL_MAX_SIZE=20 \
-                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:TEST123@eureka-server:8761/eureka/ \
                 -e EUREKA_INSTANCE_HOSTNAME=user-service \
                 -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
                 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
                 -e KAFKA_ENABLED=true \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
-                -e REDIS_PASSWORD=13579ada \
+                -e REDIS_PASSWORD=TEST123 \
                 -e REDIS_TIMEOUT=2000 \
                 -e REDIS_DATABASE=0 \
                 -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
@@ -233,14 +233,14 @@ jobs:
                 -e SPRING_DATA_MONGODB_SOCKET_TIMEOUT=60000 \
                 -e SPRING_DATA_MONGODB_MAX_CONNECTION_IDLE_TIME=300000 \
                 -e SPRING_DATA_MONGODB_CONNECTION_POOL_MAX_SIZE=20 \
-                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:TEST123@eureka-server:8761/eureka/ \
                 -e EUREKA_INSTANCE_HOSTNAME=user-service \
                 -e EUREKA_INSTANCE_PREFER_IP_ADDRESS=false \
                 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
                 -e KAFKA_ENABLED=true \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
-                -e REDIS_PASSWORD=13579ada \
+                -e REDIS_PASSWORD=TEST123 \
                 -e REDIS_TIMEOUT=2000 \
                 -e REDIS_DATABASE=0 \
                 -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \

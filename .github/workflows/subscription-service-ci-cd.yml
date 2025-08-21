@@ -194,12 +194,12 @@ jobs:
               --restart unless-stopped \
               -p 8092:8092 \
               -e SPRING_PROFILES_ACTIVE=prod \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:TEST123@eureka-server:8761/eureka/ \
               -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
               -e SPRING_DATA_MONGODB_DATABASE=craftpilot_subscription_db \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
+              -e REDIS_PASSWORD=TEST123 \
               -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
               -e MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
               -e MANAGEMENT_HEALTH_MONGODB_ENABLED=true \

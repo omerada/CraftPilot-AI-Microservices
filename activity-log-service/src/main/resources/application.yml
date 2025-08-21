@@ -108,7 +108,7 @@ pagination:
 eureka:
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8761/eureka/}
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:TEST123@eureka-server:8761/eureka/}
     register-with-eureka: true
     fetch-registry: true
     instance-info-replication-interval-seconds: 10

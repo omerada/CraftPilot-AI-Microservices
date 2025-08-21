@@ -67,10 +67,10 @@ eureka:
     instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
     metadata-map:
       user.name: ${eureka.client.security.user.name:craftpilot}
-      user.password: ${eureka.client.security.user.password:13579ada}
+      user.password: ${eureka.client.security.user.password:TEST123}
   client:
     serviceUrl:
-      defaultZone: http://${eureka.client.security.user.name:craftpilot}:${eureka.client.security.user.password:13579ada}@${EUREKA_HOST:eureka-server}:${EUREKA_PORT:8761}/eureka/
+      defaultZone: http://${eureka.client.security.user.name:craftpilot}:${eureka.client.security.user.password:TEST123}@${EUREKA_HOST:eureka-server}:${EUREKA_PORT:8761}/eureka/
     register-with-eureka: ${EUREKA_REGISTER:true}
     fetch-registry: ${EUREKA_FETCH:true}
     enabled: ${EUREKA_ENABLED:true}
@@ -83,7 +83,7 @@ eureka:
     security:
       user:
         name: ${EUREKA_USERNAME:craftpilot}
-        password: ${EUREKA_PASSWORD:13579ada}
+        password: ${EUREKA_PASSWORD:TEST123}
 
 server:
   port: ${SERVER_PORT:8080}

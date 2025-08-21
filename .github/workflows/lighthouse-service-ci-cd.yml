@@ -221,7 +221,7 @@ jobs:
               -v /opt/craftpilot/tmp/netty:/tmp/netty \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SPRING_DATA_REDIS_HOST=redis \
-              -e SPRING_DATA_REDIS_PASSWORD=13579ada \
+              -e SPRING_DATA_REDIS_PASSWORD=TEST123 \
               --ulimit nofile=65536:65536 \
               --security-opt no-new-privileges \
               --health-cmd="curl -f http://localhost:8085/health || exit 1" \
@@ -253,7 +253,7 @@ jobs:
                 --restart unless-stopped \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
-                -e REDIS_PASSWORD=13579ada \
+                -e REDIS_PASSWORD=TEST123 \
                 -e POLL_INTERVAL=5000 \
                 -e MAX_RETRIES=3 \
                 -e LIGHTHOUSE_QUEUE_NAME=lighthouse-jobs \

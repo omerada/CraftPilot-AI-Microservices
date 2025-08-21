@@ -93,7 +93,7 @@ jobs:
               -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
               -e EUREKA_CLIENT_FETCH_REGISTRY=false \
               -e SPRING_SECURITY_USER_NAME=craftpilot \
-              -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+              -e SPRING_SECURITY_USER_PASSWORD=TEST123 \
               -e EUREKA_SERVER_ENABLE_SELF_PRESERVATION=false \
               -e EUREKA_SERVER_EVICTION_INTERVAL_TIMER_IN_MS=3000 \
               -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
@@ -104,7 +104,7 @@ jobs:
             # Health check - port 8761'i kontrol et
             echo "Checking Eureka Server health..."
             for i in {1..30}; do
-              HEALTH_STATUS=$(curl -s -u craftpilot:13579ada http://localhost:8761/actuator/health || echo "Failed to connect")
+              HEALTH_STATUS=$(curl -s -u craftpilot:TEST123 http://localhost:8761/actuator/health || echo "Failed to connect")
               
               if echo "$HEALTH_STATUS" | grep -q "UP"; then
                 echo "Eureka Server is healthy"

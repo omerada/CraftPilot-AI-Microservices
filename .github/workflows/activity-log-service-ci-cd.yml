@@ -176,10 +176,10 @@ jobs:
                 -e SPRING_APPLICATION_NAME=activity-log-service \
                 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
                 -e ACTIVITY_KAFKA_CONSUMER_TOPIC=activity-events \
-                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:TEST123@eureka-server:8761/eureka/ \
                 -e HOSTNAME=activity-log-service \
                 -e SPRING_SECURITY_USER_NAME=craftpilot \
-                -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+                -e SPRING_SECURITY_USER_PASSWORD=TEST123 \
                 -e MONGODB_URI="${MONGODB_URI}" \
                 -e MONGODB_DATABASE="craftpilot_activity_log_db" \
                 -e MONGO_INITDB_DATABASE="craftpilot_activity_log_db" \
@@ -188,7 +188,7 @@ jobs:
                 -e MONGODB_HOST="${MONGODB_CONTAINER}" \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
-                -e REDIS_PASSWORD=13579ada \
+                -e REDIS_PASSWORD=TEST123 \
                 -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
                 -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus,loggers,env \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
@@ -212,10 +212,10 @@ jobs:
                 -e SPRING_APPLICATION_NAME=activity-log-service \
                 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
                 -e ACTIVITY_KAFKA_CONSUMER_TOPIC=activity-events \
-                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:TEST123@eureka-server:8761/eureka/ \
                 -e HOSTNAME=activity-log-service \
                 -e SPRING_SECURITY_USER_NAME=craftpilot \
-                -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+                -e SPRING_SECURITY_USER_PASSWORD=TEST123 \
                 -e MONGODB_URI="${MONGODB_URI}" \
                 -e MONGODB_DATABASE="craftpilot_activity_log_db" \
                 -e MONGO_INITDB_DATABASE="craftpilot_activity_log_db" \
@@ -224,7 +224,7 @@ jobs:
                 -e MONGODB_HOST="${MONGODB_CONTAINER}" \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
-                -e REDIS_PASSWORD=13579ada \
+                -e REDIS_PASSWORD=TEST123 \
                 -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
                 -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \

@@ -196,7 +196,7 @@ jobs:
                 restart: unless-stopped
                 ports:
                   - "6379:6379"
-                command: redis-server --requirepass 13579ada --maxmemory 800mb --maxmemory-policy volatile-lru --appendonly yes --appendfsync everysec --no-appendfsync-on-rewrite yes
+                command: redis-server --requirepass TEST123 --maxmemory 800mb --maxmemory-policy volatile-lru --appendonly yes --appendfsync everysec --no-appendfsync-on-rewrite yes
                 volumes:
                   - type: volume
                     source: redis-data
@@ -204,7 +204,7 @@ jobs:
                 networks:
                   - craftpilot-network
                 healthcheck:
-                  test: redis-cli -a 13579ada ping || exit 1
+                  test: redis-cli -a TEST123 ping || exit 1
                   interval: 5s
                   timeout: 3s
                   retries: 3
@@ -368,12 +368,12 @@ jobs:
                 if [ "$SERVICE" == "all" ] || [ "$SERVICE" == "redis" ]; then
                   echo ""
                   echo "==== Redis Durumu ===="
-                  if docker exec -t redis redis-cli -a 13579ada ping | grep -q 'PONG'; then
+                  if docker exec -t redis redis-cli -a TEST123 ping | grep -q 'PONG'; then
                     echo "Redis çalışıyor"
                     echo "Bilgiler:"
-                    docker exec -t redis redis-cli -a 13579ada info | grep connected
-                    docker exec -t redis redis-cli -a 13579ada info memory | grep used_memory_human
-                    docker exec -t redis redis-cli -a 13579ada info keyspace
+                    docker exec -t redis redis-cli -a TEST123 info | grep connected
+                    docker exec -t redis redis-cli -a TEST123 info memory | grep used_memory_human
+                    docker exec -t redis redis-cli -a TEST123 info keyspace
                   else
                     echo "Redis yanıt vermiyor veya çalışmıyor!"
                   fi

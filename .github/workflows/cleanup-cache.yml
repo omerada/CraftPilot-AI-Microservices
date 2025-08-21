@@ -342,7 +342,7 @@ jobs:
           # Redis bağlantı parametreleri
           REDIS_HOST="${{ env.REDIS_HOST || 'redis' }}"
           REDIS_PORT="${{ env.REDIS_PORT || '6379' }}"
-          REDIS_PASS="${{ env.REDIS_PASSWORD || '13579ada' }}"
+          REDIS_PASS="${{ env.REDIS_PASSWORD || 'TEST123' }}"
 
           # Redis CLI komutu oluştur
           REDIS_CLI="redis-cli -h $REDIS_HOST -p $REDIS_PORT"

@@ -141,7 +141,7 @@ jobs:
                 -v /craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=8064 \
-                -e EUREKA_SERVER_URL=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_SERVER_URL=http://craftpilot:TEST123@eureka-server:8761/eureka/ \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
                 -e SPRING_DATA_MONGODB_DATABASE="craftpilot_analytics_db" \
                 -e MONGODB_HOST="$MONGODB_CONTAINER" \
@@ -149,7 +149,7 @@ jobs:
                 -e MONGO_ROOT_PASSWORD="${{ secrets.MONGO_ROOT_PASSWORD }}" \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
-                -e REDIS_PASSWORD=13579ada \
+                -e REDIS_PASSWORD=TEST123 \
                 -e KAFKA_ENABLED=true \
                 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
                 -e KAFKA_ADMIN_FAIL_FAST=false \
@@ -174,7 +174,7 @@ jobs:
                 -v /craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=8064 \
-                -e EUREKA_SERVER_URL=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_SERVER_URL=http://craftpilot:TEST123@eureka-server:8761/eureka/ \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
                 -e SPRING_DATA_MONGODB_DATABASE="craftpilot_analytics_db" \
                 -e MONGODB_HOST="$MONGODB_CONTAINER" \
@@ -182,7 +182,7 @@ jobs:
                 -e MONGO_ROOT_PASSWORD="${{ secrets.MONGO_ROOT_PASSWORD }}" \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
-                -e REDIS_PASSWORD=13579ada \
+                -e REDIS_PASSWORD=TEST123 \
                 -e KAFKA_ENABLED=true \
                 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
                 -e KAFKA_ADMIN_FAIL_FAST=false \

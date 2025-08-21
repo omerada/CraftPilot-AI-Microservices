@@ -139,7 +139,7 @@ jobs:
                 -v /craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=8063 \
-                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:TEST123@eureka-server:8761/eureka/ \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
                 -e SPRING_DATA_MONGODB_DATABASE=craftpilot \
                 -e SPRING_DATA_MONGODB_CONNECT_TIMEOUT=60000 \
@@ -147,7 +147,7 @@ jobs:
                 -e SPRING_DATA_MONGODB_MAX_WAIT_TIME=120000 \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
-                -e REDIS_PASSWORD=13579ada \
+                -e REDIS_PASSWORD=TEST123 \
                 -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
                 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
                 -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
@@ -172,12 +172,12 @@ jobs:
                 -v /craftpilot/gcp-credentials.json:/app/gcp-credentials.json:ro \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e SERVER_PORT=8063 \
-                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:TEST123@eureka-server:8761/eureka/ \
                 -e SPRING_DATA_MONGODB_URI="$MONGODB_URI" \
                 -e SPRING_DATA_MONGODB_DATABASE=craftpilot \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
-                -e REDIS_PASSWORD=13579ada \
+                -e REDIS_PASSWORD=TEST123 \
                 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
                 -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
                 -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus \

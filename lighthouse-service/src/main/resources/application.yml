@@ -5,7 +5,7 @@ spring:
     redis:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:13579ada}
+      password: ${REDIS_PASSWORD:TEST123}
       connect-timeout: 5000 # Bağlantı zaman aşımı
       timeout: 3000 # Komut zaman aşımı
       lettuce:
