@@ -7,7 +7,7 @@ require("dotenv").config();
 // Redis bağlantı bilgileri
 const REDIS_HOST = process.env.REDIS_HOST || "redis";
 const REDIS_PORT = process.env.REDIS_PORT || 6379;
-const REDIS_PASSWORD = process.env.REDIS_PASSWORD || "13579ada";
+const REDIS_PASSWORD = process.env.REDIS_PASSWORD || "CHANGE_ME_IN_PRODUCTION";
 
 // Redis kuyruk ve sonuç key'leri
 const QUEUE_NAME = process.env.LIGHTHOUSE_QUEUE_NAME || "lighthouse-jobs";

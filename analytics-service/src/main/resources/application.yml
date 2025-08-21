@@ -42,7 +42,7 @@ management:
 eureka:
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_SERVER_URL:http://craftpilot:13579ada@eureka-server:8761/eureka/}
+      defaultZone: ${EUREKA_SERVER_URL:http://craftpilot:CHANGE_ME_IN_PRODUCTION@eureka-server:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
   instance:
@@ -60,7 +60,7 @@ springdoc:
 redis:
   host: ${REDIS_HOST:redis}
   port: ${REDIS_PORT:6379}
-  password: ${REDIS_PASSWORD:13579ada}
+  password: ${REDIS_PASSWORD:CHANGE_ME_IN_PRODUCTION}
 
 openai:
   api-key: ${OPENAI_API_KEY}

@@ -66,6 +66,7 @@
 ## 📋 İçindekiler
 
 - [Genel Bakış](#-genel-bakış)
+- [🔐 Güvenlik](#-güvenlik)
 - [Özellikler](#-özellikler)
 - [Mimari](#-mimari)
 - [Servisler](#-servisler)
@@ -76,6 +77,10 @@
 - [Monitoring & Observability](#-monitoring--observability)
 - [Katkıda Bulunma](#-katkıda-bulunma)
 - [Lisans](#-lisans)
+
+---
+
+> **🔐 SECURITY NOTICE**: This repository contains template configurations with placeholder passwords. **Before deployment, you MUST change all default passwords and configure proper secret management.** See [SECURITY.md](./SECURITY.md) for detailed security setup instructions.
 
 ---
 
@@ -90,6 +95,43 @@
 - **Enterprise Ready**: Kurumsal düzeyde güvenlik, monitoring ve ölçeklenebilirlik
 - **Real-time**: Reactive programming ile gerçek zamanlı veri işleme
 - **Cloud Native**: Kubernetes ve Docker ile cloud-first yaklaşım
+
+---
+
+## 🔐 Güvenlik
+
+> **⚠️ UYARI**: Bu proje şu anda development template konfigürasyonları içermektedir.
+
+### 🚨 Production Öncesi Gereksinimler
+
+**Bu projeyi production'da kullanmadan önce mutlaka:**
+
+1. **📋 [SECURITY.md](./SECURITY.md) dosyasını okuyun** - Detaylı güvenlik kurulum talimatları
+2. **� [DEPLOYMENT_SECURITY.md](./DEPLOYMENT_SECURITY.md) dosyasını inceleyin** - Production deployment güvenlik kılavuzu
+3. **�🔑 Tüm placeholder password'ları değiştirin** (`CHANGE_ME_IN_PRODUCTION`)
+4. **🔥 Firebase service account'u yapılandırın**
+5. **🗝️ GitHub Secrets'ı ayarlayın** (CI/CD için)
+6. **🛡️ SSL/TLS sertifikalarını yapılandırın**
+
+### 🔐 Güvenlik Özellikleri
+
+- **Firebase Authentication** - JWT token tabanlı kimlik doğrulama
+- **Redis AUTH** - Şifreli cache erişimi
+- **Role-based Access Control** - Yetki tabanlı erişim
+- **API Rate Limiting** - DDoS koruması
+- **Circuit Breaker Pattern** - Hata yalıtımı
+- **Distributed Tracing** - Güvenlik monitoring
+
+### 📋 Güvenlik Checklist
+
+- [ ] `.env.example`'dan `.env` oluşturun ve şifreleri değiştirin
+- [ ] Firebase credentials'ları yapılandırın
+- [ ] GitHub repository secrets'ları ayarlayın
+- [ ] Network security rules'ları uygulayın
+- [ ] SSL certificates'ları yapılandırın
+- [ ] Security scanning yapın
+
+**⚠️ Default şifrelerle production'a çıkmayın!**
 
 ---
 

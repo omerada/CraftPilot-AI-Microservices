@@ -27,7 +27,7 @@ public class RedisConfig {
     @Value("${redis.port:6379}")
     private int redisPort;
     
-    @Value("${redis.password:13579ada}")
+    @Value("${redis.password:CHANGE_ME_IN_PRODUCTION}")
     private String redisPassword;
     
     @Value("${redis.timeout:2000}")

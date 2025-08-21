@@ -43,7 +43,7 @@ spring:
 spring.data.redis:
   host: ${REDIS_HOST:redis}
   port: ${REDIS_PORT:6379}
-  password: ${REDIS_PASSWORD:13579ada}
+  password: ${REDIS_PASSWORD:CHANGE_ME_IN_PRODUCTION}
   timeout: 5000
 
 management:
@@ -94,7 +94,7 @@ pagination:
 eureka:
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:13579ada@eureka-server:8761/eureka/}
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://craftpilot:CHANGE_ME_IN_PRODUCTION@eureka-server:8761/eureka/}
     register-with-eureka: true
     fetch-registry: true
     instance-info-replication-interval-seconds: 10

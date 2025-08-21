@@ -46,10 +46,10 @@ eureka:
     instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${server.port}
     metadata-map:
       user.name: ${eureka.client.security.user.name:craftpilot}
-      user.password: ${eureka.client.security.user.password:13579ada}
+      user.password: ${EUREKA_PASSWORD:CHANGE_ME_IN_PRODUCTION}
   client:
     serviceUrl:
-      defaultZone: http://${eureka.client.security.user.name:craftpilot}:${eureka.client.security.user.password:13579ada}@${EUREKA_HOST:eureka-server}:${EUREKA_PORT:8761}/eureka/
+      defaultZone: http://${eureka.client.security.user.name:craftpilot}:${EUREKA_PASSWORD:CHANGE_ME_IN_PRODUCTION}@${EUREKA_HOST:eureka-server}:${EUREKA_PORT:8761}/eureka/
     register-with-eureka: ${EUREKA_REGISTER:true}
     fetch-registry: ${EUREKA_FETCH:true}
     enabled: ${EUREKA_ENABLED:true}
@@ -62,7 +62,7 @@ eureka:
     security:
       user:
         name: ${EUREKA_USERNAME:craftpilot}
-        password: ${EUREKA_PASSWORD:13579ada}
+        password: ${EUREKA_PASSWORD:CHANGE_ME_IN_PRODUCTION}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -198,7 +198,7 @@ craftpilot:
   redis:
     host: ${REDIS_HOST:redis}
     port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:13579ada}
+    password: ${REDIS_PASSWORD:CHANGE_ME_IN_PRODUCTION}
     database: 0
     connect-timeout: 1000ms # 2000ms'den 1000ms'e düşürüldü
     timeout: 800ms # 1000ms'den 800ms'e düşürüldü

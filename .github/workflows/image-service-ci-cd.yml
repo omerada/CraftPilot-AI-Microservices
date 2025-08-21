@@ -86,13 +86,13 @@ jobs:
               -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:CHANGE_ME_IN_PRODUCTION@eureka-server:8761/eureka/ \
               -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
               -e SPRING_SECURITY_USER_NAME=craftpilot \
-              -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+              -e SPRING_SECURITY_USER_PASSWORD=CHANGE_ME_IN_PRODUCTION \
               -e SPRING_DATA_REDIS_HOST=redis \
               -e SPRING_DATA_REDIS_PORT=6379 \
-              -e SPRING_DATA_REDIS_PASSWORD=13579ada \
+              -e SPRING_DATA_REDIS_PASSWORD=CHANGE_ME_IN_PRODUCTION \
               -e MANAGEMENT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false \
               -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
               -e IMAGE_STORAGE_BUCKET_NAME=${{ secrets.GCP_STORAGE_BUCKET }} \

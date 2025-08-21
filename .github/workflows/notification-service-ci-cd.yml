@@ -156,11 +156,11 @@ jobs:
               -e SPRING_CLOUD_STREAM_BINDINGS_PROCESSNOTIFICATION_OUT_0_DESTINATION=notifications \
               -e REDIS_HOST=redis \
               -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=13579ada \
+              -e REDIS_PASSWORD=CHANGE_ME_IN_PRODUCTION \
               -e SPRING_DATA_REDIS_HOST=redis \
               -e SPRING_DATA_REDIS_PORT=6379 \
-              -e SPRING_DATA_REDIS_PASSWORD=13579ada \
-              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+              -e SPRING_DATA_REDIS_PASSWORD=CHANGE_ME_IN_PRODUCTION \
+              -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:CHANGE_ME_IN_PRODUCTION@eureka-server:8761/eureka/ \
               -e SPRING_MAIL_SENDGRID_FROM='${{ secrets.SENDGRID_FROM_EMAIL }}' \
               -e SPRING_MAIL_HOST=smtp.sendgrid.net \
               -e SPRING_MAIL_PORT=587 \

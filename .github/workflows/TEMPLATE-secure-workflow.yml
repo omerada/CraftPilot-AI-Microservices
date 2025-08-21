@@ -1,0 +1,123 @@
+# 🔧 CI/CD Workflow Configuration Template
+#
+# ⚠️ SECURITY WARNING:
+# This file contains placeholder environment variables that MUST be
+# configured as GitHub Secrets before using in production.
+#
+# Required GitHub Secrets:
+# - REDIS_PASSWORD
+# - EUREKA_PASSWORD
+# - OPENROUTER_API_KEY
+# - FIREBASE_PROJECT_ID
+# - GCP_SA_KEY
+#
+# See SECURITY.md for detailed setup instructions.
+
+name: CraftPilot Service CI/CD Template
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment environment"
+        required: true
+        default: "staging"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: craftpilot/service-template
+
+jobs:
+  security-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Security Configuration Check
+        run: |
+          echo "🔐 Checking security configuration..."
+
+          # Check if required secrets are configured
+          if [[ -z "${{ secrets.REDIS_PASSWORD }}" ]]; then
+            echo "❌ ERROR: REDIS_PASSWORD secret not configured"
+            exit 1
+          fi
+
+          if [[ -z "${{ secrets.EUREKA_PASSWORD }}" ]]; then
+            echo "❌ ERROR: EUREKA_PASSWORD secret not configured"
+            exit 1
+          fi
+
+          if [[ -z "${{ secrets.OPENROUTER_API_KEY }}" ]]; then
+            echo "❌ ERROR: OPENROUTER_API_KEY secret not configured"
+            exit 1
+          fi
+
+          echo "✅ Security configuration check passed"
+
+  build-and-test:
+    needs: security-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Run tests
+        run: mvn clean test
+        env:
+          # Use secrets for test environment
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          EUREKA_PASSWORD: ${{ secrets.EUREKA_PASSWORD }}
+
+      - name: Build application
+        run: mvn clean package -DskipTests
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest .
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy with secure configuration
+        run: |
+          echo "🚀 Deploying with secure configuration..."
+
+          # Example deployment with proper secret management
+          docker run -d \
+            --name craftpilot-service \
+            --network craftpilot-network \
+            -e SPRING_PROFILES_ACTIVE=prod \
+            -e REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }} \
+            -e EUREKA_PASSWORD=${{ secrets.EUREKA_PASSWORD }} \
+            -e OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }} \
+            -e FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+          echo "✅ Deployment completed with secure configuration"
+
+# 📝 NOTES:
+# 1. Replace 'service-template' with actual service name
+# 2. Add specific service build/test commands
+# 3. Configure deployment target (K8s, Docker, etc.)
+# 4. Add health checks and monitoring
+# 5. Configure proper rollback procedures
+#
+# 🔗 See SECURITY.md for complete security setup guide

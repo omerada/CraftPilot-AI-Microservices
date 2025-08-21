@@ -48,7 +48,42 @@ build/
 .env.*
 !.env.example
 
-# Credentials
+# Credentials & Sensitive Data
 **/credentials.json
 **/firebase-service-account.json
 **/gcp-credentials.json
+**/*service-account*.json
+**/*private-key*.json
+
+# Postman collections (may contain sensitive data)
+postman_collection/
+*.postman_collection.json
+*.postman_environment.json
+
+# Application configs with secrets
+application-local.yml
+application-dev.yml
+application-secrets.yml
+
+# Kubernetes secrets
+k8s/secrets/
+k8s/*secret*.yml
+k8s/*secret*.yaml
+
+# Docker compose overrides (may contain secrets)
+docker-compose.override.yml
+docker-compose.local.yml
+
+# Logs directory
+logs/
+*.log.*
+
+# Temporary and backup files
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# Redis dump files
+dump.rdb

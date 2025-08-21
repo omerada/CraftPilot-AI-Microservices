@@ -22,7 +22,7 @@ spring:
   redis:
     host: ${REDIS_HOST:redis}
     port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:13579ada}
+    password: ${REDIS_PASSWORD:CHANGE_ME_IN_PRODUCTION}
     timeout: 5000
     connect-timeout: 5000
     lettuce:
@@ -108,7 +108,7 @@ eureka:
     initial-instance-info-replication-interval-seconds: 5
     instance-info-replication-interval-seconds: 5
     service-url:
-      defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:13579ada}@${EUREKA_HOST:eureka-server}:${EUREKA_PORT:8761}/eureka/
+      defaultZone: http://${EUREKA_USERNAME:craftpilot}:${EUREKA_PASSWORD:CHANGE_ME_IN_PRODUCTION}@${EUREKA_HOST:eureka-server}:${EUREKA_PORT:8761}/eureka/
 
 management:
   endpoints:

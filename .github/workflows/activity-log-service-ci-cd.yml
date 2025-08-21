@@ -131,15 +131,15 @@ jobs:
                 -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:CHANGE_ME_IN_PRODUCTION@eureka-server:8761/eureka/ \
                 -e HOSTNAME=activity-log-service \
                 -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
                 -e SPRING_SECURITY_USER_NAME=craftpilot \
-                -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+                -e SPRING_SECURITY_USER_PASSWORD=CHANGE_ME_IN_PRODUCTION \
                 -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
-                -e REDIS_PASSWORD=13579ada \
+                -e REDIS_PASSWORD=CHANGE_ME_IN_PRODUCTION \
                 -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
                 -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*" \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \
@@ -160,15 +160,15 @@ jobs:
                 -v /opt/craftpilot/gcp-credentials.json:/gcp-credentials.json:ro \
                 -e SPRING_PROFILES_ACTIVE=prod \
                 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:13579ada@eureka-server:8761/eureka/ \
+                -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://craftpilot:CHANGE_ME_IN_PRODUCTION@eureka-server:8761/eureka/ \
                 -e HOSTNAME=activity-log-service \
                 -e GOOGLE_APPLICATION_CREDENTIALS=/gcp-credentials.json \
                 -e SPRING_SECURITY_USER_NAME=craftpilot \
-                -e SPRING_SECURITY_USER_PASSWORD=13579ada \
+                -e SPRING_SECURITY_USER_PASSWORD=CHANGE_ME_IN_PRODUCTION \
                 -e SPRING_CLOUD_GCP_PROJECT_ID=craft-pilot-ai \
                 -e REDIS_HOST=redis \
                 -e REDIS_PORT=6379 \
-                -e REDIS_PASSWORD=13579ada \
+                -e REDIS_PASSWORD=CHANGE_ME_IN_PRODUCTION \
                 -e MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
                 -e "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*" \
                 -e MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always \

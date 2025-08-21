@@ -42,7 +42,7 @@ public class RedisClientAutoConfiguration {
     public RedisClientProperties redisClientProperties(
             @Value("${redis.host:localhost}") String host,
             @Value("${redis.port:6379}") int port,
-            @Value("${redis.password:13579ada}") String password,
+            @Value("${redis.password:CHANGE_ME_IN_PRODUCTION}") String password,
             @Value("${redis.connect-timeout:2000ms}") Duration connectTimeout,
             @Value("${redis.timeout:1000ms}") Duration timeout) {
         return RedisClientProperties.builder()

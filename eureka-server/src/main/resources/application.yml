@@ -15,7 +15,7 @@ spring:
   security:
     user:
       name: craftpilot
-      password: 13579ada
+      password: ${EUREKA_PASSWORD:CHANGE_ME_IN_PRODUCTION}
 
 server:
   port: ${SERVER_PORT:8761}
