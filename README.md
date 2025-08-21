@@ -1,50 +1,61 @@
 # 🚀 CraftPilot AI - Enterprise AI Platform
 
-<div align="center">
+<div align="center## 📋 Table of Contents
 
-```
-                    ┌─────────────────────────────────────────┐
-                    │            🌐 Frontend Layer            │
-                    │        Web UI  •  Mobile  •  API       │
-                    └─────────────────┬───────────────────────┘
-                                      │
-                    ┌─────────────────┴───────────────────────┐
-                    │         🚪 API Gateway (8080)          │
-                    │     Authentication  •  Rate Limiting   │
-                    │        Routing  •  Load Balancing      │
-                    └─────┬─────────┬─────────┬───────────────┘
-                          │         │         │
-           ┌──────────────┴───┐ ┌───┴───┐ ┌───┴─────────────────────┐
-           │                  │ │       │ │                         │
-    ┌──────▼──────┐    ┌──────▼──────┐ ┌▼──────┐    ┌──────────────▼──────┐
-    │ 👤 User      │    │ 🤖 LLM      │ │🖼️ Image│    │ 💳 Subscription     │
-    │ Service      │    │ Service     │ │Service │    │ Service             │
-    │ (8081)       │    │ (8082)      │ │(8083)  │    │ (8084)              │
-    └──────┬──────┘    └──────┬──────┘ └┬──────┘    └──────────────┬──────┘
-           │                  │         │                          │
-    ┌──────▼──────┐    ┌──────▼──────┐ ┌▼──────┐    ┌──────────────▼──────┐
-    │ 💰 Credit    │    │ 🔔 Notification│📊 Analytics│ 🛡️ Admin            │
-    │ Service      │    │ Service     │ │Service │    │ Service             │
-    │ (8085)       │    │ (8086)      │ │(8087)  │    │ (8088)              │
-    └──────┬──────┘    └──────┬──────┘ └┬──────┘    └──────────────┬──────┘
-           │                  │         │                          │
-           └──────────────────┼─────────┼──────────────────────────┘
-                              │         │
-              ┌───────────────▼─────────▼───────────────┐
-              │        📡 Service Discovery             │
-              │         Eureka Server (8761)           │
-              └───────────────┬─────────────────────────┘
-                              │
-    ┌─────────────────────────┼─────────────────────────────────────┐
-    │                         │                                     │
-┌───▼────┐  ┌──────▼──────┐  ┌▼──────┐  ┌─────────▼─────────┐  ┌───▼────┐
-│🗄️ Redis │  │📊 Prometheus │  │Kafka  │  │  🔥 Firebase       │  │📈Grafana│
-│ Cache   │  │  Metrics    │  │Message│  │  Firestore        │  │Dashboard│
-│         │  │             │  │Broker │  │  Authentication   │  │        │
-└─────────┘  └─────────────┘  └───────┘  └───────────────────┘  └────────┘
+- [Overview](#-overview)
+- [🔐 Security](#-security)
+- [Features](#-features)
+- [Architecture](#-architecture)
+- [Services](#-services)
+- [Technology Stack](#-technology-stack)
+- [Installation](#-installation)
+- [Usage](#-usage)
+- [API Documentation](#-api-documentation)
+- [Monitoring & Observability](#-monitoring--observability)
+- [Contributing](#-contributing)
+- [License](#-license) ┌─────────────────────────────────────────┐
+  │ 🌐 Frontend Layer │
+  │ Web UI • Mobile • API │
+  └─────────────────┬───────────────────────┘
+  │
+  ┌─────────────────┴───────────────────────┐
+  │ 🚪 API Gateway (8080) │
+  │ Authentication • Rate Limiting │
+  │ Routing • Load Balancing │
+  └─────┬─────────┬─────────┬───────────────┘
+  │ │ │
+  ┌──────────────┴───┐ ┌───┴───┐ ┌───┴─────────────────────┐
+  │ │ │ │ │ │
+  ┌──────▼──────┐ ┌──────▼──────┐ ┌▼──────┐ ┌──────────────▼──────┐
+  │ 👤 User │ │ 🤖 LLM │ │🖼️ Image│ │ 💳 Subscription │
+  │ Service │ │ Service │ │Service │ │ Service │
+  │ (8081) │ │ (8082) │ │(8083) │ │ (8084) │
+  └──────┬──────┘ └──────┬──────┘ └┬──────┘ └──────────────┬──────┘
+  │ │ │ │
+  ┌──────▼──────┐ ┌──────▼──────┐ ┌▼──────┐ ┌──────────────▼──────┐
+  │ 💰 Credit │ │ 🔔 Notification│📊 Analytics│ 🛡️ Admin │
+  │ Service │ │ Service │ │Service │ │ Service │
+  │ (8085) │ │ (8086) │ │(8087) │ │ (8088) │
+  └──────┬──────┘ └──────┬──────┘ └┬──────┘ └──────────────┬──────┘
+  │ │ │ │
+  └──────────────────┼─────────┼──────────────────────────┘
+  │ │
+  ┌───────────────▼─────────▼───────────────┐
+  │ 📡 Service Discovery │
+  │ Eureka Server (8761) │
+  └───────────────┬─────────────────────────┘
+  │
+  ┌─────────────────────────┼─────────────────────────────────────┐
+  │ │ │
+  ┌───▼────┐ ┌──────▼──────┐ ┌▼──────┐ ┌─────────▼─────────┐ ┌───▼────┐
+  │🗄️ Redis │ │📊 Prometheus │ │Kafka │ │ 🔥 Firebase │ │📈Grafana│
+  │ Cache │ │ Metrics │ │Message│ │ Firestore │ │Dashboard│
+  │ │ │ │ │Broker │ │ Authentication │ │ │
+  └─────────┘ └─────────────┘ └───────┘ └───────────────────┘ └────────┘
 
-           🚀 Reactive • ⚡ Real-time • 🔒 Secure • 📈 Scalable
-```
+             🚀 Reactive • ⚡ Real-time • 🔒 Secure • 📈 Scalable
+
+````
 
 </div>
 
@@ -55,9 +66,9 @@
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue?style=for-the-badge&logo=docker)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-Compatible-purple?style=for-the-badge&logo=kubernetes)
 
-**Gelişmiş AI destekli SaaS platformu - Microservices mimarisi ile yapılandırılmış**
+**Advanced AI-powered SaaS platform - Built with Microservices architecture**
 
-[🔗 Demo](https://craftpilot.io) • [📖 Dokümantasyon](./docs) • [🐛 Issue Bildirimi](../../issues) • [💬 Tartışmalar](../../discussions)
+[🔗 Demo](https://craftpilot.io) • [📖 Documentation](./docs) • [🐛 Report Issues](../../issues) • [💬 Discussions](../../discussions)
 
 </div>
 
@@ -66,7 +77,7 @@
 ## 📋 İçindekiler
 
 - [Genel Bakış](#-genel-bakış)
-- [🔐 Güvenlik](#-güvenlik)
+- [Güvenlik](#-güvenlik)
 - [Özellikler](#-özellikler)
 - [Mimari](#-mimari)
 - [Servisler](#-servisler)
@@ -84,71 +95,71 @@
 
 ---
 
-## 🌟 Genel Bakış
+## 🌟 Overview
 
-**CraftPilot AI**, modern işletmeler için tasarlanmış, kapsamlı yapay zeka destekli SaaS platformudur. Mikroservis mimarisi kullanarak ölçeklenebilir, güvenilir ve yüksek performanslı AI çözümleri sunar.
+**CraftPilot AI** is a comprehensive AI-powered SaaS platform designed for modern businesses. It delivers scalable, reliable, and high-performance AI solutions using microservices architecture.
 
-### 🎯 Temel Amaç
+### 🎯 Core Objectives
 
-- **AI Entegrasyonu**: GPT, Claude gibi LLM modelleriyle güçlü konuşma deneyimi
-- **Görsel AI**: Gelişmiş image generation ve processing yetenekleri
-- **Enterprise Ready**: Kurumsal düzeyde güvenlik, monitoring ve ölçeklenebilirlik
-- **Real-time**: Reactive programming ile gerçek zamanlı veri işleme
-- **Cloud Native**: Kubernetes ve Docker ile cloud-first yaklaşım
-
----
-
-## 🔐 Güvenlik
-
-> **⚠️ UYARI**: Bu proje şu anda development template konfigürasyonları içermektedir.
-
-### 🚨 Production Öncesi Gereksinimler
-
-**Bu projeyi production'da kullanmadan önce mutlaka:**
-
-1. **📋 [SECURITY.md](./SECURITY.md) dosyasını okuyun** - Detaylı güvenlik kurulum talimatları
-2. **� [DEPLOYMENT_SECURITY.md](./DEPLOYMENT_SECURITY.md) dosyasını inceleyin** - Production deployment güvenlik kılavuzu
-3. **�🔑 Tüm placeholder password'ları değiştirin** (`CHANGE_ME_IN_PRODUCTION`)
-4. **🔥 Firebase service account'u yapılandırın**
-5. **🗝️ GitHub Secrets'ı ayarlayın** (CI/CD için)
-6. **🛡️ SSL/TLS sertifikalarını yapılandırın**
-
-### 🔐 Güvenlik Özellikleri
-
-- **Firebase Authentication** - JWT token tabanlı kimlik doğrulama
-- **Redis AUTH** - Şifreli cache erişimi
-- **Role-based Access Control** - Yetki tabanlı erişim
-- **API Rate Limiting** - DDoS koruması
-- **Circuit Breaker Pattern** - Hata yalıtımı
-- **Distributed Tracing** - Güvenlik monitoring
-
-### 📋 Güvenlik Checklist
-
-- [ ] `.env.example`'dan `.env` oluşturun ve şifreleri değiştirin
-- [ ] Firebase credentials'ları yapılandırın
-- [ ] GitHub repository secrets'ları ayarlayın
-- [ ] Network security rules'ları uygulayın
-- [ ] SSL certificates'ları yapılandırın
-- [ ] Security scanning yapın
-
-**⚠️ Default şifrelerle production'a çıkmayın!**
+- **AI Integration**: Powerful conversational experience with LLM models like GPT, Claude
+- **Visual AI**: Advanced image generation and processing capabilities
+- **Enterprise Ready**: Enterprise-grade security, monitoring, and scalability
+- **Real-time**: Real-time data processing with reactive programming
+- **Cloud Native**: Cloud-first approach with Kubernetes and Docker
 
 ---
 
-## ✨ Özellikler
+## 🔐 Security
+
+> **⚠️ WARNING**: This project currently contains development template configurations.
+
+### 🚨 Pre-Production Requirements
+
+**Before using this project in production, you MUST:**
+
+1. **📋 Read [SECURITY.md](./SECURITY.md)** - Detailed security setup instructions
+2. **🔒 Review [DEPLOYMENT_SECURITY.md](./DEPLOYMENT_SECURITY.md)** - Production deployment security guide
+3. **🔑 Change all placeholder passwords** (`CHANGE_ME_IN_PRODUCTION`)
+4. **🔥 Configure Firebase service account**
+5. **🗝️ Set up GitHub Secrets** (for CI/CD)
+6. **🛡️ Configure SSL/TLS certificates**
+
+### 🔐 Security Features
+
+- **Firebase Authentication** - JWT token-based authentication
+- **Redis AUTH** - Encrypted cache access
+- **Role-based Access Control** - Permission-based access
+- **API Rate Limiting** - DDoS protection
+- **Circuit Breaker Pattern** - Error isolation
+- **Distributed Tracing** - Security monitoring
+
+### 📋 Security Checklist
+
+- [ ] Create `.env` from `.env.example` and change passwords
+- [ ] Configure Firebase credentials
+- [ ] Set up GitHub repository secrets
+- [ ] Apply network security rules
+- [ ] Configure SSL certificates
+- [ ] Perform security scanning
+
+**⚠️ Do not deploy to production with default passwords!**
+
+---
+
+## ✨ Features
 
 ### 🤖 AI & Machine Learning
 
-- **Large Language Models (LLM)** entegrasyonu
-- **Image Generation** ve processing servisleri
-- **User Memory Service** ile kişiselleştirilmiş deneyim
-- **Analytics Service** ile AI kullanım analitikleri
+- **Large Language Models (LLM)** integration
+- **Image Generation** and processing services
+- **User Memory Service** for personalized experience
+- **Analytics Service** for AI usage analytics
 
 ### 🏢 Enterprise Features
 
 - **Multi-tenant** architecture
 - **Role-based** access control (RBAC)
-- **Subscription Management** sistemi
+- **Subscription Management** system
 - **Credit-based** usage tracking
 - **Real-time notifications**
 
@@ -157,13 +168,13 @@
 - **Reactive Programming** (Spring WebFlux)
 - **Event-driven** architecture (Kafka)
 - **Circuit Breaker** pattern (Resilience4j)
-- **API Gateway** ile centralized routing
+- **API Gateway** with centralized routing
 - **Service Discovery** (Eureka)
-- **Distributed tracing** ve monitoring
+- **Distributed tracing** and monitoring
 
 ---
 
-## 🏗️ Mimari
+## 🏗️ Architecture
 
 ```mermaid
 graph TB
@@ -221,7 +232,7 @@ graph TB
     ACTIVITY -.-> KAFKA
 
     PROMETHEUS --> GRAFANA
-```
+````
 
 ### 🔄 Communication Patterns
 
@@ -233,46 +244,46 @@ graph TB
 
 ---
 
-## 🚀 Servisler
+## 🚀 Services
 
 ### 🛡️ Core Infrastructure
 
-| Servis                 | Port | Açıklama                                   | Teknolojiler                        |
-| ---------------------- | ---- | ------------------------------------------ | ----------------------------------- |
-| **API Gateway**        | 8080 | Ana giriş noktası, routing, authentication | Spring Cloud Gateway, Firebase Auth |
-| **Eureka Server**      | 8761 | Service discovery ve registry              | Netflix Eureka                      |
-| **CraftPilot Commons** | -    | Ortak kütüphaneler ve utilities            | Activity logging, Configuration     |
+| Service                | Port | Description                               | Technologies                        |
+| ---------------------- | ---- | ----------------------------------------- | ----------------------------------- |
+| **API Gateway**        | 8080 | Main entry point, routing, authentication | Spring Cloud Gateway, Firebase Auth |
+| **Eureka Server**      | 8761 | Service discovery and registry            | Netflix Eureka                      |
+| **CraftPilot Commons** | -    | Shared libraries and utilities            | Activity logging, Configuration     |
 
 ### 👤 Business Services
 
-| Servis                   | Port | Açıklama                        | Özellikler                                              |
-| ------------------------ | ---- | ------------------------------- | ------------------------------------------------------- |
-| **User Service**         | 8081 | Kullanıcı yönetimi ve tercihler | Profile management, Preferences, Circuit breaker        |
-| **LLM Service**          | 8082 | Language model entegrasyonu     | OpenRouter API, Chat histories, Conversation management |
-| **Image Service**        | 8083 | AI destekli görsel üretimi      | Image generation, Processing, Storage                   |
-| **Subscription Service** | 8084 | Abonelik ve plan yönetimi       | Plan management, Billing, Usage tracking                |
-| **Credit Service**       | 8085 | Kredi sistemi yönetimi          | Credit allocation, Usage monitoring, Limits             |
+| Service                  | Port | Description                      | Features                                                |
+| ------------------------ | ---- | -------------------------------- | ------------------------------------------------------- |
+| **User Service**         | 8081 | User management and preferences  | Profile management, Preferences, Circuit breaker        |
+| **LLM Service**          | 8082 | Language model integration       | OpenRouter API, Chat histories, Conversation management |
+| **Image Service**        | 8083 | AI-powered image generation      | Image generation, Processing, Storage                   |
+| **Subscription Service** | 8084 | Subscription and plan management | Plan management, Billing, Usage tracking                |
+| **Credit Service**       | 8085 | Credit system management         | Credit allocation, Usage monitoring, Limits             |
 
 ### 📊 Support Services
 
-| Servis                   | Port | Açıklama              | Özellikler                                      |
-| ------------------------ | ---- | --------------------- | ----------------------------------------------- |
-| **Notification Service** | 8086 | Bildirim sistemi      | Push notifications, Email, SMS                  |
-| **Analytics Service**    | 8087 | Platform analitikleri | Usage analytics, Reporting, Insights            |
-| **Admin Service**        | 8088 | Yönetim paneli        | User management, System monitoring, Admin tools |
-| **User Memory Service**  | 8089 | Kullanıcı hafızası    | Context storage, Personalization                |
-| **Activity Log Service** | 8090 | Aktivite takibi       | Audit logs, User activities, Compliance         |
+| Service                  | Port | Description         | Features                                        |
+| ------------------------ | ---- | ------------------- | ----------------------------------------------- |
+| **Notification Service** | 8086 | Notification system | Push notifications, Email, SMS                  |
+| **Analytics Service**    | 8087 | Platform analytics  | Usage analytics, Reporting, Insights            |
+| **Admin Service**        | 8088 | Management panel    | User management, System monitoring, Admin tools |
+| **User Memory Service**  | 8089 | User memory         | Context storage, Personalization                |
+| **Activity Log Service** | 8090 | Activity tracking   | Audit logs, User activities, Compliance         |
 
 ### 🌊 Monitoring & DevOps
 
-| Servis                 | Port | Açıklama                                |
-| ---------------------- | ---- | --------------------------------------- |
-| **Lighthouse Service** | 8091 | Health monitoring ve lighthouse metrics |
-| **Lighthouse Worker**  | -    | Background tasks ve scheduled jobs      |
+| Service                | Port | Description                              |
+| ---------------------- | ---- | ---------------------------------------- |
+| **Lighthouse Service** | 8091 | Health monitoring and lighthouse metrics |
+| **Lighthouse Worker**  | -    | Background tasks and scheduled jobs      |
 
 ---
 
-## 🛠️ Teknoloji Yığını
+## 🛠️ Technology Stack
 
 ### ☕ Backend Framework
 
@@ -285,7 +296,7 @@ graph TB
 ### 🗄️ Database & Storage
 
 - **Firebase/Firestore** - NoSQL document database
-- **Redis** - In-memory caching ve session storage
+- **Redis** - In-memory caching and session storage
 - **Google Cloud Storage** - File storage
 
 ### 📨 Messaging & Events
@@ -321,17 +332,17 @@ graph TB
 
 ---
 
-## 🚀 Kurulum
+## 🚀 Installation
 
-### 📋 Gereksinimler
+### 📋 Requirements
 
 - **Java 21+**
 - **Maven 3.8+**
 - **Docker & Docker Compose**
-- **Redis** (local veya container)
-- **Firebase Project** (authentication için)
+- **Redis** (local or container)
+- **Firebase Project** (for authentication)
 
-### 1️⃣ Proje Klonlama
+### 1️⃣ Clone Project
 
 ```bash
 git clone https://github.com/omerada/CraftPilot-API.git
@@ -341,7 +352,7 @@ cd CraftPilot-API
 ### 2️⃣ Environment Setup
 
 ```bash
-# Firebase configuration dosyasını yerleştirin
+# Place Firebase configuration file
 cp firebase-service-account.json scripts/
 
 # Environment variables
@@ -353,20 +364,20 @@ export REDIS_PORT=6379
 ### 3️⃣ Infrastructure Services
 
 ```bash
-# Redis ve monitoring stack'i başlatın
+# Start Redis and monitoring stack
 docker-compose -f docker-compose.infra.yml up -d
 
-# Durumu kontrol edin
+# Check status
 docker-compose -f docker-compose.infra.yml ps
 ```
 
 ### 4️⃣ Application Build
 
 ```bash
-# Tüm modülleri build edin
+# Build all modules
 mvn clean install
 
-# Veya sadece package
+# Or just package
 mvn clean package -DskipTests
 ```
 
@@ -379,37 +390,37 @@ cd eureka-server && mvn spring-boot:run
 # 2. API Gateway
 cd api-gateway && mvn spring-boot:run
 
-# 3. Core Services (paralel olarak)
+# 3. Core Services (in parallel)
 cd user-service && mvn spring-boot:run &
 cd llm-service && mvn spring-boot:run &
 cd image-service && mvn spring-boot:run &
 ```
 
-### 🐳 Docker ile Production
+### 🐳 Production with Docker
 
 ```bash
-# Tüm servisleri build edin
+# Build all services
 mvn clean package -DskipTests
 
-# Docker images oluşturun
+# Create Docker images
 docker build -t craftpilot/eureka-server eureka-server/
 docker build -t craftpilot/api-gateway api-gateway/
 docker build -t craftpilot/user-service user-service/
-# ... diğer servisler
+# ... other services
 
-# Docker Compose ile çalıştırın
+# Run with Docker Compose
 docker-compose up -d
 ```
 
 ---
 
-## 💻 Kullanım
+## 💻 Usage
 
-### 🌐 Erişim Noktaları
+### 🌐 Access Points
 
-| Servis               | URL                                   | Açıklama             |
+| Service              | URL                                   | Description          |
 | -------------------- | ------------------------------------- | -------------------- |
-| **API Gateway**      | http://localhost:8080                 | Ana API endpoint     |
+| **API Gateway**      | http://localhost:8080                 | Main API endpoint    |
 | **Eureka Dashboard** | http://localhost:8761                 | Service discovery UI |
 | **Swagger UI**       | http://localhost:8080/swagger-ui.html | API documentation    |
 | **Prometheus**       | http://localhost:9090                 | Metrics              |
@@ -418,28 +429,28 @@ docker-compose up -d
 ### 🔑 Authentication
 
 ```bash
-# Firebase Authentication token ile API çağrısı
+# API call with Firebase Authentication token
 curl -H "Authorization: Bearer YOUR_FIREBASE_TOKEN" \
      http://localhost:8080/api/users/profile
 ```
 
-### 💬 LLM Service Kullanımı
+### 💬 LLM Service Usage
 
 ```bash
-# Yeni konuşma başlatma
+# Start new conversation
 curl -X POST http://localhost:8080/api/llm/conversations \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"title": "My Conversation"}'
 
-# Mesaj gönderme
+# Send message
 curl -X POST http://localhost:8080/api/llm/conversations/{id}/messages \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"content": "Hello, AI!"}'
 ```
 
-### 🖼️ Image Service Kullanımı
+### 🖼️ Image Service Usage
 
 ```bash
 # Image generation
@@ -451,13 +462,13 @@ curl -X POST http://localhost:8080/api/images/generate \
 
 ---
 
-## 📚 API Dokümantasyonu
+## 📚 API Documentation
 
 ### 🔍 Swagger UI
 
-Tüm servisler için interaktif API dokümantasyonu:
+Interactive API documentation for all services:
 
-- **Ana API**: http://localhost:8080/swagger-ui.html
+- **Main API**: http://localhost:8080/swagger-ui.html
 - **User Service**: http://localhost:8081/swagger-ui.html
 - **LLM Service**: http://localhost:8082/swagger-ui.html
 - **Image Service**: http://localhost:8083/swagger-ui.html
@@ -473,7 +484,7 @@ curl http://localhost:8082/v3/api-docs
 
 ### 🔐 Authentication
 
-Tüm API endpoints Firebase JWT token gerektirir:
+All API endpoints require Firebase JWT token:
 
 ```
 Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6...
@@ -516,7 +527,7 @@ craftpilot_credit_usage_total
 
 ### 🔍 Distributed Tracing
 
-**Spring Cloud Sleuth** ile request tracing:
+**Spring Cloud Sleuth** for request tracing:
 
 ```
 # Trace headers
@@ -542,7 +553,7 @@ curl http://localhost:8080/actuator/health/details
 ### 🛠️ Local Development Setup
 
 ```bash
-# Hot reload ile development
+# Development with hot reload
 mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Dspring.profiles.active=dev"
 
 # Debug mode
@@ -575,49 +586,49 @@ mvn checkstyle:check
 
 ---
 
-## 🤝 Katkıda Bulunma
+## 🤝 Contributing
 
 ### 📝 Contribution Guidelines
 
-1. **Fork** projeyi
-2. **Feature branch** oluşturun (`git checkout -b feature/amazing-feature`)
-3. **Commit** yapın (`git commit -m 'Add amazing feature'`)
-4. **Push** yapın (`git push origin feature/amazing-feature`)
-5. **Pull Request** oluşturun
+1. **Fork** the project
+2. **Create feature branch** (`git checkout -b feature/amazing-feature`)
+3. **Commit** changes (`git commit -m 'Add amazing feature'`)
+4. **Push** to branch (`git push origin feature/amazing-feature`)
+5. **Create Pull Request**
 
 ### 🐛 Bug Reports
 
-[Issue templates](../../issues/new/choose) kullanarak bug raporlayın.
+Report bugs using [Issue templates](../../issues/new/choose).
 
 ### 💡 Feature Requests
 
-[Discussions](../../discussions) kısmından önerilerde bulunun.
+Make suggestions in [Discussions](../../discussions).
 
 ### 📋 Development Standards
 
 - **Java Code Style**: Google Java Style Guide
 - **Commit Convention**: Conventional Commits
-- **Testing**: Minimum %80 test coverage
-- **Documentation**: JavaDoc ve API documentation
+- **Testing**: Minimum 80% test coverage
+- **Documentation**: JavaDoc and API documentation
 
 ---
 
-## 📄 Lisans
+## 📄 License
 
-Bu proje **MIT License** altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakın.
+This project is licensed under **MIT License**. See [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🙏 Teşekkürler
+## 🙏 Acknowledgments
 
-- **Spring Team** - Framework ve ecosystem
-- **Firebase Team** - Authentication ve database services
+- **Spring Team** - Framework and ecosystem
+- **Firebase Team** - Authentication and database services
 - **OpenRouter** - LLM API provider
 - **Contributors** - Open source community
 
 ---
 
-## 📞 İletişim
+## 📞 Contact
 
 - **Website**: [craftpilot.io](https://craftpilot.io)
 - **Email**: support@craftpilot.com
@@ -628,8 +639,8 @@ Bu proje **MIT License** altında lisanslanmıştır. Detaylar için [LICENSE](L
 
 <div align="center">
 
-**⭐ Projeyi beğendiyseniz star vermeyi unutmayın!**
+**⭐ If you like the project, don't forget to give it a star!**
 
-[🔝 Başa Dön](#-craftpilot-ai---enterprise-ai-platform)
+[🔝 Back to Top](#-craftpilot-ai---enterprise-ai-platform)
 
 </div>
