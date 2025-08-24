@@ -66,7 +66,7 @@
 ## 📋 Table of Contents
 
 - [Overview](#-overview)
-- [🔐 Security](#-security)
+- [Security](#-security)
 - [Features](#-features)
 - [Architecture](#-architecture)
 - [Services](#-services)
