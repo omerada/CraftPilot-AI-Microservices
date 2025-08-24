@@ -1,61 +1,50 @@
-# 🚀 CraftPilot AI - Enterprise AI Platform
+# 🚀 CraftPilot AI - SaaS Backend Platform
 
-<div align="center## 📋 Table of Contents
+<div align="center">
 
-- [Overview](#-overview)
-- [🔐 Security](#-security)
-- [Features](#-features)
-- [Architecture](#-architecture)
-- [Services](#-services)
-- [Technology Stack](#-technology-stack)
-- [Installation](#-installation)
-- [Usage](#-usage)
-- [API Documentation](#-api-documentation)
-- [Monitoring & Observability](#-monitoring--observability)
-- [Contributing](#-contributing)
-- [License](#-license) ┌─────────────────────────────────────────┐
-  │ 🌐 Frontend Layer │
-  │ Web UI • Mobile • API │
-  └─────────────────┬───────────────────────┘
-  │
-  ┌─────────────────┴───────────────────────┐
-  │ 🚪 API Gateway (8080) │
-  │ Authentication • Rate Limiting │
-  │ Routing • Load Balancing │
-  └─────┬─────────┬─────────┬───────────────┘
-  │ │ │
-  ┌──────────────┴───┐ ┌───┴───┐ ┌───┴─────────────────────┐
-  │ │ │ │ │ │
-  ┌──────▼──────┐ ┌──────▼──────┐ ┌▼──────┐ ┌──────────────▼──────┐
-  │ 👤 User │ │ 🤖 LLM │ │🖼️ Image│ │ 💳 Subscription │
-  │ Service │ │ Service │ │Service │ │ Service │
-  │ (8081) │ │ (8082) │ │(8083) │ │ (8084) │
-  └──────┬──────┘ └──────┬──────┘ └┬──────┘ └──────────────┬──────┘
-  │ │ │ │
-  ┌──────▼──────┐ ┌──────▼──────┐ ┌▼──────┐ ┌──────────────▼──────┐
-  │ 💰 Credit │ │ 🔔 Notification│📊 Analytics│ 🛡️ Admin │
-  │ Service │ │ Service │ │Service │ │ Service │
-  │ (8085) │ │ (8086) │ │(8087) │ │ (8088) │
-  └──────┬──────┘ └──────┬──────┘ └┬──────┘ └──────────────┬──────┘
-  │ │ │ │
-  └──────────────────┼─────────┼──────────────────────────┘
-  │ │
-  ┌───────────────▼─────────▼───────────────┐
-  │ 📡 Service Discovery │
-  │ Eureka Server (8761) │
-  └───────────────┬─────────────────────────┘
-  │
-  ┌─────────────────────────┼─────────────────────────────────────┐
-  │ │ │
-  ┌───▼────┐ ┌──────▼──────┐ ┌▼──────┐ ┌─────────▼─────────┐ ┌───▼────┐
-  │🗄️ Redis │ │📊 Prometheus │ │Kafka │ │ 🔥 Firebase │ │📈Grafana│
-  │ Cache │ │ Metrics │ │Message│ │ Firestore │ │Dashboard│
-  │ │ │ │ │Broker │ │ Authentication │ │ │
-  └─────────┘ └─────────────┘ └───────┘ └───────────────────┘ └────────┘
+```
+                    ┌─────────────────────────────────────────┐
+                    │            🌐 Frontend Layer            │
+                    │        Web UI  •  Mobile  •  API       │
+                    └─────────────────┬───────────────────────┘
+                                      │
+                    ┌─────────────────┴───────────────────────┐
+                    │         🚪 API Gateway (8080)          │
+                    │     Authentication  •  Rate Limiting   │
+                    │        Routing  •  Load Balancing      │
+                    └─────┬─────────┬─────────┬───────────────┘
+                          │         │         │
+           ┌──────────────┴───┐ ┌───┴───┐ ┌───┴─────────────────────┐
+           │                  │ │       │ │                         │
+    ┌──────▼──────┐    ┌──────▼──────┐ ┌▼──────┐    ┌──────────────▼──────┐
+    │ 👤 User      │    │ 🤖 LLM      │ │🖼️ Image│    │ 💳 Subscription     │
+    │ Service      │    │ Service     │ │Service │    │ Service             │
+    │ (8081)       │    │ (8082)      │ │(8083)  │    │ (8084)              │
+    └──────┬──────┘    └──────┬──────┘ └┬──────┘    └──────────────┬──────┘
+           │                  │         │                          │
+    ┌──────▼──────┐    ┌──────▼──────┐ ┌▼──────┐    ┌──────────────▼──────┐
+    │ 💰 Credit    │    │ 🔔 Notification│📊 Analytics│ 🛡️ Admin            │
+    │ Service      │    │ Service     │ │Service │    │ Service             │
+    │ (8085)       │    │ (8086)      │ │(8087)  │    │ (8088)              │
+    └──────┬──────┘    └──────┬──────┘ └┬──────┘    └──────────────┬──────┘
+           │                  │         │                          │
+           └──────────────────┼─────────┼──────────────────────────┘
+                              │         │
+              ┌───────────────▼─────────▼───────────────┐
+              │        📡 Service Discovery             │
+              │         Eureka Server (8761)           │
+              └───────────────┬─────────────────────────┘
+                              │
+    ┌─────────────────────────┼─────────────────────────────────────┐
+    │                         │                                     │
+┌───▼────┐  ┌──────▼──────┐  ┌▼──────┐  ┌─────────▼─────────┐  ┌───▼────┐
+│🗄️ Redis │  │📊 Prometheus │  │Kafka  │  │  🔥 Firebase       │  │📈Grafana│
+│ Cache   │  │  Metrics    │  │Message│  │  Firestore        │  │Dashboard│
+│         │  │             │  │Broker │  │  Authentication   │  │        │
+└─────────┘  └─────────────┘  └───────┘  └───────────────────┘  └────────┘
 
-             🚀 Reactive • ⚡ Real-time • 🔒 Secure • 📈 Scalable
-
-````
+           🚀 Reactive • ⚡ Real-time • 🔒 Secure • 📈 Scalable
+```
 
 </div>
 
@@ -66,28 +55,28 @@
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue?style=for-the-badge&logo=docker)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-Compatible-purple?style=for-the-badge&logo=kubernetes)
 
-**Advanced AI-powered SaaS platform - Built with Microservices architecture**
+**Advanced AI-powered SaaS platform — structured as a microservices architecture**
 
-[🔗 Demo](https://craftpilot.io) • [📖 Documentation](./docs) • [🐛 Report Issues](../../issues) • [💬 Discussions](../../discussions)
+[🔗 Demo](https://craftpilot.io) • [📖 Documentation](./docs) • [🐛 Report an Issue](../../issues) • [💬 Discussions](../../discussions)
 
 </div>
 
 ---
 
-## 📋 İçindekiler
+## 📋 Table of Contents
 
-- [Genel Bakış](#-genel-bakış)
-- [Güvenlik](#-güvenlik)
-- [Özellikler](#-özellikler)
-- [Mimari](#-mimari)
-- [Servisler](#-servisler)
-- [Teknoloji Yığını](#-teknoloji-yığını)
-- [Kurulum](#-kurulum)
-- [Kullanım](#-kullanım)
-- [API Dokümantasyonu](#-api-dokümantasyonu)
+- [Overview](#-overview)
+- [Security](#-security)
+- [Features](#-features)
+- [Architecture](#-architecture)
+- [Services](#-services)
+- [Tech Stack](#-tech-stack)
+- [Setup](#-setup)
+- [Usage](#-usage)
+- [API Documentation](#-api-documentation)
 - [Monitoring & Observability](#-monitoring--observability)
-- [Katkıda Bulunma](#-katkıda-bulunma)
-- [Lisans](#-lisans)
+- [Contributing](#-contributing)
+- [License](#-license)
 
 ---
 
@@ -97,14 +86,14 @@
 
 ## 🌟 Overview
 
-**CraftPilot AI** is a comprehensive AI-powered SaaS platform designed for modern businesses. It delivers scalable, reliable, and high-performance AI solutions using microservices architecture.
+**CraftPilot AI** is a comprehensive AI-powered SaaS platform designed for modern enterprises. It leverages a microservices architecture to deliver scalable, resilient, and high-performance AI solutions.
 
-### 🎯 Core Objectives
+### 🎯 Main Goals
 
-- **AI Integration**: Powerful conversational experience with LLM models like GPT, Claude
+- **AI Integration**: Robust conversational experiences with LLMs like GPT and Claude
 - **Visual AI**: Advanced image generation and processing capabilities
-- **Enterprise Ready**: Enterprise-grade security, monitoring, and scalability
-- **Real-time**: Real-time data processing with reactive programming
+- **Enterprise Ready**: Enterprise-grade security, monitoring and scalability
+- **Real-time**: Reactive programming for real-time data processing
 - **Cloud Native**: Cloud-first approach with Kubernetes and Docker
 
 ---
@@ -113,36 +102,36 @@
 
 > **⚠️ WARNING**: This project currently contains development template configurations.
 
-### 🚨 Pre-Production Requirements
+### 🚨 Pre-production Requirements
 
-**Before using this project in production, you MUST:**
+Before using this project in production, make sure to:
 
-1. **📋 Read [SECURITY.md](./SECURITY.md)** - Detailed security setup instructions
-2. **🔒 Review [DEPLOYMENT_SECURITY.md](./DEPLOYMENT_SECURITY.md)** - Production deployment security guide
-3. **🔑 Change all placeholder passwords** (`CHANGE_ME_IN_PRODUCTION`)
+1. **📋 Read [SECURITY.md](./SECURITY.md)** - detailed security setup guide
+2. **📄 Review [DEPLOYMENT_SECURITY.md](./DEPLOYMENT_SECURITY.md)** - production deployment security checklist
+3. **🔑 Replace all placeholder passwords** (`CHANGE_ME_IN_PRODUCTION`)
 4. **🔥 Configure Firebase service account**
 5. **🗝️ Set up GitHub Secrets** (for CI/CD)
 6. **🛡️ Configure SSL/TLS certificates**
 
 ### 🔐 Security Features
 
-- **Firebase Authentication** - JWT token-based authentication
-- **Redis AUTH** - Encrypted cache access
-- **Role-based Access Control** - Permission-based access
+- **Firebase Authentication** - JWT token based authentication
+- **Redis AUTH** - authenticated cache access
+- **Role-based Access Control (RBAC)** - permission management
 - **API Rate Limiting** - DDoS protection
-- **Circuit Breaker Pattern** - Error isolation
-- **Distributed Tracing** - Security monitoring
+- **Circuit Breaker Pattern** - failure isolation
+- **Distributed Tracing** - security monitoring
 
 ### 📋 Security Checklist
 
-- [ ] Create `.env` from `.env.example` and change passwords
+- [ ] Create a `.env` from `.env.example` and change credentials
 - [ ] Configure Firebase credentials
-- [ ] Set up GitHub repository secrets
+- [ ] Set repository secrets in GitHub
 - [ ] Apply network security rules
 - [ ] Configure SSL certificates
-- [ ] Perform security scanning
+- [ ] Run security scanning
 
-**⚠️ Do not deploy to production with default passwords!**
+**⚠️ Do not run in production with default credentials!**
 
 ---
 
@@ -150,10 +139,10 @@
 
 ### 🤖 AI & Machine Learning
 
-- **Large Language Models (LLM)** integration
+- **Large Language Models (LLM)** integrations
 - **Image Generation** and processing services
-- **User Memory Service** for personalized experience
-- **Analytics Service** for AI usage analytics
+- **User Memory Service** for personalized experiences
+- **Analytics Service** for AI usage insights
 
 ### 🏢 Enterprise Features
 
@@ -168,7 +157,7 @@
 - **Reactive Programming** (Spring WebFlux)
 - **Event-driven** architecture (Kafka)
 - **Circuit Breaker** pattern (Resilience4j)
-- **API Gateway** with centralized routing
+- **API Gateway** for centralized routing
 - **Service Discovery** (Eureka)
 - **Distributed tracing** and monitoring
 
@@ -232,7 +221,7 @@ graph TB
     ACTIVITY -.-> KAFKA
 
     PROMETHEUS --> GRAFANA
-````
+```
 
 ### 🔄 Communication Patterns
 
@@ -248,42 +237,42 @@ graph TB
 
 ### 🛡️ Core Infrastructure
 
-| Service                | Port | Description                               | Technologies                        |
-| ---------------------- | ---- | ----------------------------------------- | ----------------------------------- |
-| **API Gateway**        | 8080 | Main entry point, routing, authentication | Spring Cloud Gateway, Firebase Auth |
-| **Eureka Server**      | 8761 | Service discovery and registry            | Netflix Eureka                      |
+|                Service | Port | Description                               | Technologies                        |
+| ---------------------: | ---- | ----------------------------------------- | ----------------------------------- |
+|        **API Gateway** | 8080 | Main entry point, routing, authentication | Spring Cloud Gateway, Firebase Auth |
+|      **Eureka Server** | 8761 | Service discovery and registry            | Netflix Eureka                      |
 | **CraftPilot Commons** | -    | Shared libraries and utilities            | Activity logging, Configuration     |
 
 ### 👤 Business Services
 
-| Service                  | Port | Description                      | Features                                                |
-| ------------------------ | ---- | -------------------------------- | ------------------------------------------------------- |
-| **User Service**         | 8081 | User management and preferences  | Profile management, Preferences, Circuit breaker        |
-| **LLM Service**          | 8082 | Language model integration       | OpenRouter API, Chat histories, Conversation management |
-| **Image Service**        | 8083 | AI-powered image generation      | Image generation, Processing, Storage                   |
+|                  Service | Port | Description                      | Features                                                |
+| -----------------------: | ---- | -------------------------------- | ------------------------------------------------------- |
+|         **User Service** | 8081 | User management and preferences  | Profile management, Preferences, Circuit breaker        |
+|          **LLM Service** | 8082 | Language model integration       | OpenRouter API, Chat histories, Conversation management |
+|        **Image Service** | 8083 | AI-assisted image generation     | Image generation, Processing, Storage                   |
 | **Subscription Service** | 8084 | Subscription and plan management | Plan management, Billing, Usage tracking                |
-| **Credit Service**       | 8085 | Credit system management         | Credit allocation, Usage monitoring, Limits             |
+|       **Credit Service** | 8085 | Credit system management         | Credit allocation, Usage monitoring, Limits             |
 
 ### 📊 Support Services
 
-| Service                  | Port | Description         | Features                                        |
-| ------------------------ | ---- | ------------------- | ----------------------------------------------- |
+|                  Service | Port | Description         | Features                                        |
+| -----------------------: | ---- | ------------------- | ----------------------------------------------- |
 | **Notification Service** | 8086 | Notification system | Push notifications, Email, SMS                  |
-| **Analytics Service**    | 8087 | Platform analytics  | Usage analytics, Reporting, Insights            |
-| **Admin Service**        | 8088 | Management panel    | User management, System monitoring, Admin tools |
-| **User Memory Service**  | 8089 | User memory         | Context storage, Personalization                |
+|    **Analytics Service** | 8087 | Platform analytics  | Usage analytics, Reporting, Insights            |
+|        **Admin Service** | 8088 | Admin panel         | User management, System monitoring, Admin tools |
+|  **User Memory Service** | 8089 | User memory         | Context storage, Personalization                |
 | **Activity Log Service** | 8090 | Activity tracking   | Audit logs, User activities, Compliance         |
 
 ### 🌊 Monitoring & DevOps
 
-| Service                | Port | Description                              |
-| ---------------------- | ---- | ---------------------------------------- |
+|                Service | Port | Description                              |
+| ---------------------: | ---- | ---------------------------------------- |
 | **Lighthouse Service** | 8091 | Health monitoring and lighthouse metrics |
-| **Lighthouse Worker**  | -    | Background tasks and scheduled jobs      |
+|  **Lighthouse Worker** | -    | Background tasks and scheduled jobs      |
 
 ---
 
-## 🛠️ Technology Stack
+## 🛠️ Tech Stack
 
 ### ☕ Backend Framework
 
@@ -332,7 +321,7 @@ graph TB
 
 ---
 
-## 🚀 Installation
+## 🚀 Setup
 
 ### 📋 Requirements
 
@@ -342,7 +331,7 @@ graph TB
 - **Redis** (local or container)
 - **Firebase Project** (for authentication)
 
-### 1️⃣ Clone Project
+### 1️⃣ Clone the project
 
 ```bash
 git clone https://github.com/omerada/CraftPilot-API.git
@@ -352,7 +341,7 @@ cd CraftPilot-API
 ### 2️⃣ Environment Setup
 
 ```bash
-# Place Firebase configuration file
+# Place the Firebase configuration file
 cp firebase-service-account.json scripts/
 
 # Environment variables
@@ -364,7 +353,7 @@ export REDIS_PORT=6379
 ### 3️⃣ Infrastructure Services
 
 ```bash
-# Start Redis and monitoring stack
+# Start Redis and the monitoring stack
 docker-compose -f docker-compose.infra.yml up -d
 
 # Check status
@@ -377,7 +366,7 @@ docker-compose -f docker-compose.infra.yml ps
 # Build all modules
 mvn clean install
 
-# Or just package
+# Or package only
 mvn clean package -DskipTests
 ```
 
@@ -390,7 +379,7 @@ cd eureka-server && mvn spring-boot:run
 # 2. API Gateway
 cd api-gateway && mvn spring-boot:run
 
-# 3. Core Services (in parallel)
+# 3. Core Services (run in parallel)
 cd user-service && mvn spring-boot:run &
 cd llm-service && mvn spring-boot:run &
 cd image-service && mvn spring-boot:run &
@@ -402,7 +391,7 @@ cd image-service && mvn spring-boot:run &
 # Build all services
 mvn clean package -DskipTests
 
-# Create Docker images
+# Build Docker images
 docker build -t craftpilot/eureka-server eureka-server/
 docker build -t craftpilot/api-gateway api-gateway/
 docker build -t craftpilot/user-service user-service/
@@ -416,15 +405,15 @@ docker-compose up -d
 
 ## 💻 Usage
 
-### 🌐 Access Points
+### 🌐 Endpoints
 
-| Service              | URL                                   | Description          |
-| -------------------- | ------------------------------------- | -------------------- |
-| **API Gateway**      | http://localhost:8080                 | Main API endpoint    |
+|              Service | URL                                   | Notes                |
+| -------------------: | ------------------------------------- | -------------------- |
+|      **API Gateway** | http://localhost:8080                 | Main API endpoint    |
 | **Eureka Dashboard** | http://localhost:8761                 | Service discovery UI |
-| **Swagger UI**       | http://localhost:8080/swagger-ui.html | API documentation    |
-| **Prometheus**       | http://localhost:9090                 | Metrics              |
-| **Grafana**          | http://localhost:3000                 | Monitoring dashboard |
+|       **Swagger UI** | http://localhost:8080/swagger-ui.html | API documentation    |
+|       **Prometheus** | http://localhost:9090                 | Metrics              |
+|          **Grafana** | http://localhost:3000                 | Monitoring dashboard |
 
 ### 🔑 Authentication
 
@@ -437,13 +426,13 @@ curl -H "Authorization: Bearer YOUR_FIREBASE_TOKEN" \
 ### 💬 LLM Service Usage
 
 ```bash
-# Start new conversation
+# Start a new conversation
 curl -X POST http://localhost:8080/api/llm/conversations \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"title": "My Conversation"}'
 
-# Send message
+# Send a message
 curl -X POST http://localhost:8080/api/llm/conversations/{id}/messages \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
@@ -466,7 +455,7 @@ curl -X POST http://localhost:8080/api/images/generate \
 
 ### 🔍 Swagger UI
 
-Interactive API documentation for all services:
+Interactive API docs for all services:
 
 - **Main API**: http://localhost:8080/swagger-ui.html
 - **User Service**: http://localhost:8081/swagger-ui.html
@@ -476,7 +465,7 @@ Interactive API documentation for all services:
 ### 📖 OpenAPI Specifications
 
 ```bash
-# OpenAPI JSON specifications
+# OpenAPI JSON specs
 curl http://localhost:8080/v3/api-docs
 curl http://localhost:8081/v3/api-docs
 curl http://localhost:8082/v3/api-docs
@@ -484,7 +473,7 @@ curl http://localhost:8082/v3/api-docs
 
 ### 🔐 Authentication
 
-All API endpoints require Firebase JWT token:
+All API endpoints require a Firebase JWT token:
 
 ```
 Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6...
@@ -527,7 +516,7 @@ craftpilot_credit_usage_total
 
 ### 🔍 Distributed Tracing
 
-**Spring Cloud Sleuth** for request tracing:
+Using **Spring Cloud Sleuth** for request tracing:
 
 ```
 # Trace headers
@@ -553,7 +542,7 @@ curl http://localhost:8080/actuator/health/details
 ### 🛠️ Local Development Setup
 
 ```bash
-# Development with hot reload
+# Run with hot reload in development
 mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Dspring.profiles.active=dev"
 
 # Debug mode
@@ -591,18 +580,18 @@ mvn checkstyle:check
 ### 📝 Contribution Guidelines
 
 1. **Fork** the project
-2. **Create feature branch** (`git checkout -b feature/amazing-feature`)
-3. **Commit** changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to branch (`git push origin feature/amazing-feature`)
-5. **Create Pull Request**
+2. Create a **feature branch** (`git checkout -b feature/amazing-feature`)
+3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
+4. **Push** (`git push origin feature/amazing-feature`)
+5. Open a **Pull Request**
 
 ### 🐛 Bug Reports
 
-Report bugs using [Issue templates](../../issues/new/choose).
+Use the [Issue templates](../../issues/new/choose) to report bugs.
 
 ### 💡 Feature Requests
 
-Make suggestions in [Discussions](../../discussions).
+Share ideas via the [Discussions](../../discussions) section.
 
 ### 📋 Development Standards
 
@@ -615,14 +604,14 @@ Make suggestions in [Discussions](../../discussions).
 
 ## 📄 License
 
-This project is licensed under **MIT License**. See [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🙏 Acknowledgments
+## 🙏 Thanks
 
-- **Spring Team** - Framework and ecosystem
-- **Firebase Team** - Authentication and database services
+- **Spring Team** - For the framework and ecosystem
+- **Firebase Team** - For authentication and database services
 - **OpenRouter** - LLM API provider
 - **Contributors** - Open source community
 
@@ -639,8 +628,8 @@ This project is licensed under **MIT License**. See [LICENSE](LICENSE) file for 
 
 <div align="center">
 
-**⭐ If you like the project, don't forget to give it a star!**
+**⭐ If you like the project, please give it a star!**
 
-[🔝 Back to Top](#-craftpilot-ai---enterprise-ai-platform)
+[🔝 Back to top](#-craftpilot-ai---saas-backend-platform)
 
 </div>
